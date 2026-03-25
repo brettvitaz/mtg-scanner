@@ -114,7 +114,7 @@ private struct CardRow: View {
                 Spacer()
                 if isCorrected {
                     Image(systemName: "pencil.circle.fill")
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                         .imageScale(.small)
                 }
                 Image(systemName: "chevron.right")

@@ -1,7 +1,6 @@
 """Card detection using OpenCV to find multiple cards in an image."""
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -16,6 +15,7 @@ class CardRegion:
     width: int
     height: int
     confidence: float
+    corners: tuple[tuple[int, int], tuple[int, int], tuple[int, int], tuple[int, int]] | None = None
 
     @property
     def area(self) -> int:
@@ -37,15 +37,11 @@ class DetectionResult:
 class CardDetector:
     """Detects Magic: The Gathering card boundaries in images using OpenCV."""
 
-    # MTG cards have an aspect ratio of approximately 2.5:3.5 (width:height) = ~0.714
-    # Allow some tolerance for perspective distortion
     TARGET_ASPECT_RATIO = 2.5 / 3.5
-    ASPECT_RATIO_TOLERANCE = 0.25  # ±25% tolerance
-
-    # Minimum card area as percentage of image area (bounding rect)
-    MIN_CARD_AREA_PERCENT = 0.06  # Card must be at least 6% of image
-    # Maximum card area as percentage of image area (filters background contour)
-    MAX_CARD_AREA_PERCENT = 0.70  # Card must be at most 70% of image
+    ASPECT_RATIO_TOLERANCE = 0.25
+    MIN_CARD_AREA_PERCENT = 0.06
+    MAX_CARD_AREA_PERCENT = 0.70
+    CROP_PADDING_PERCENT = 0.03
 
     def __init__(
         self,
@@ -58,15 +54,6 @@ class CardDetector:
         self._max_card_area_percent = max_card_area_percent
 
     def detect(self, image_bytes: bytes) -> DetectionResult:
-        """Detect card regions in the given image bytes.
-
-        Args:
-            image_bytes: Raw image bytes (JPEG, PNG, etc.)
-
-        Returns:
-            DetectionResult containing detected card regions
-        """
-        # Decode image
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
         image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
@@ -78,54 +65,52 @@ class CardDetector:
         min_card_area = int(image_area * self._min_card_area_percent)
         max_card_area = int(image_area * self._max_card_area_percent)
 
-        # Preprocess: convert to grayscale and blur
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-        # Edge detection
         edges = cv2.Canny(blurred, 50, 150)
 
-        # Dilate to connect edges
         kernel = np.ones((5, 5), np.uint8)
         dilated = cv2.dilate(edges, kernel, iterations=2)
 
-        # Find contours — use RETR_LIST to capture all contours including inner card boundaries
-        contours, _ = cv2.findContours(
-            dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
-        )
+        contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         regions: list[CardRegion] = []
         for contour in contours:
-            # Use convexHull to normalize irregular/fragmented contours to convex shapes
             hull = cv2.convexHull(contour)
             epsilon = 0.02 * cv2.arcLength(hull, True)
             approx = cv2.approxPolyDP(hull, epsilon, True)
 
-            # Check if it's a quadrilateral (4 corners)
             if len(approx) != 4:
                 continue
 
-            # Get bounding rectangle for size and aspect ratio check
+            points = approx.reshape(4, 2).astype(np.float32)
+            ordered = self._order_points(points)
+
             x, y, w, h = cv2.boundingRect(approx)
             if h == 0:
                 continue
 
-            # Use bounding rect area for size filtering (contour area is unreliable for
-            # partial/fragmented contours where only some edges are detected)
             area = w * h
             if area < min_card_area or area > max_card_area:
                 continue
 
-            aspect_ratio = w / h
+            width_a = np.linalg.norm(ordered[2] - ordered[3])
+            width_b = np.linalg.norm(ordered[1] - ordered[0])
+            height_a = np.linalg.norm(ordered[1] - ordered[2])
+            height_b = np.linalg.norm(ordered[0] - ordered[3])
+            card_width = max(width_a, width_b)
+            card_height = max(height_a, height_b)
+            if card_height == 0:
+                continue
+
+            aspect_ratio = min(card_width, card_height) / max(card_width, card_height)
             expected_ratio = self.TARGET_ASPECT_RATIO
             ratio_diff = abs(aspect_ratio - expected_ratio) / expected_ratio
-
             if ratio_diff > self._aspect_ratio_tolerance:
                 continue
 
-            # Calculate confidence based on aspect ratio closeness to ideal MTG card ratio
-            shape_confidence = max(0.0, 1.0 - ratio_diff / self._aspect_ratio_tolerance)
-
+            shape_confidence = float(max(0.0, 1.0 - ratio_diff / self._aspect_ratio_tolerance))
+            corners = tuple((int(p[0]), int(p[1])) for p in ordered)
             regions.append(
                 CardRegion(
                     x=x,
@@ -133,32 +118,16 @@ class CardDetector:
                     width=w,
                     height=h,
                     confidence=round(shape_confidence, 3),
+                    corners=corners,
                 )
             )
 
-        # Sort by area (largest first) to prioritize main cards over artifacts
         regions.sort(key=lambda r: r.area, reverse=True)
-
-        # Filter out overlapping regions (keep the larger one)
         filtered_regions = self._filter_overlapping(regions)
 
-        return DetectionResult(
-            regions=filtered_regions,
-            original_shape=(height, width),
-        )
+        return DetectionResult(regions=filtered_regions, original_shape=(height, width))
 
-    def _filter_overlapping(
-        self, regions: list[CardRegion], iou_threshold: float = 0.3
-    ) -> list[CardRegion]:
-        """Filter out overlapping regions, keeping larger ones.
-
-        Args:
-            regions: List of detected regions
-            iou_threshold: Intersection over Union threshold for overlap
-
-        Returns:
-            Filtered list of regions
-        """
+    def _filter_overlapping(self, regions: list[CardRegion], iou_threshold: float = 0.3) -> list[CardRegion]:
         if not regions:
             return []
 
@@ -174,7 +143,6 @@ class CardDetector:
         return filtered
 
     def _iou(self, r1: CardRegion, r2: CardRegion) -> float:
-        """Calculate Intersection over Union of two regions."""
         x1 = max(r1.x, r2.x)
         y1 = max(r1.y, r2.y)
         x2 = min(r1.x + r1.width, r2.x + r2.width)
@@ -185,43 +153,77 @@ class CardDetector:
 
         intersection = (x2 - x1) * (y2 - y1)
         union = r1.area + r2.area - intersection
-
         return intersection / union if union > 0 else 0.0
 
-    def crop_region(
-        self, image_bytes: bytes, region: CardRegion
-    ) -> tuple[bytes, str]:
-        """Crop a region from the image and return as JPEG bytes.
-
-        Args:
-            image_bytes: Raw image bytes
-            region: CardRegion to crop
-
-        Returns:
-            Tuple of (cropped_image_bytes, content_type)
-        """
+    def crop_region(self, image_bytes: bytes, region: CardRegion) -> tuple[bytes, str]:
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
         image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
         if image is None:
             return image_bytes, "image/jpeg"
 
-        # Add small padding (2%) to ensure we capture the full card
-        padding_x = int(region.width * 0.02)
-        padding_y = int(region.height * 0.02)
+        if region.corners:
+            cropped = self._perspective_crop(image, region)
+        else:
+            cropped = self._bounding_box_crop(image, region)
 
+        _, encoded = cv2.imencode(".jpg", cropped)
+        return encoded.tobytes(), "image/jpeg"
+
+    def _bounding_box_crop(self, image: np.ndarray, region: CardRegion) -> np.ndarray:
+        padding_x = int(region.width * self.CROP_PADDING_PERCENT)
+        padding_y = int(region.height * self.CROP_PADDING_PERCENT)
         x1 = max(0, region.x - padding_x)
         y1 = max(0, region.y - padding_y)
         x2 = min(image.shape[1], region.x + region.width + padding_x)
         y2 = min(image.shape[0], region.y + region.height + padding_y)
+        return image[y1:y2, x1:x2]
 
-        cropped = image[y1:y2, x1:x2]
+    def _perspective_crop(self, image: np.ndarray, region: CardRegion) -> np.ndarray:
+        corners = np.array(region.corners, dtype=np.float32)
+        tl, tr, br, bl = corners
 
-        # Encode as JPEG
-        _, encoded = cv2.imencode(".jpg", cropped)
-        return encoded.tobytes(), "image/jpeg"
+        width_top = np.linalg.norm(tr - tl)
+        width_bottom = np.linalg.norm(br - bl)
+        height_right = np.linalg.norm(br - tr)
+        height_left = np.linalg.norm(bl - tl)
+
+        target_width = max(int(max(width_top, width_bottom)), 1)
+        target_height = max(int(max(height_right, height_left)), 1)
+
+        if target_width > target_height:
+            target_width, target_height = target_height, target_width
+
+        padded_width = max(int(target_width * (1 + self.CROP_PADDING_PERCENT * 2)), 1)
+        padded_height = max(int(target_height * (1 + self.CROP_PADDING_PERCENT * 2)), 1)
+        offset_x = int((padded_width - target_width) / 2)
+        offset_y = int((padded_height - target_height) / 2)
+
+        destination = np.array(
+            [
+                [offset_x, offset_y],
+                [offset_x + target_width - 1, offset_y],
+                [offset_x + target_width - 1, offset_y + target_height - 1],
+                [offset_x, offset_y + target_height - 1],
+            ],
+            dtype=np.float32,
+        )
+
+        transform = cv2.getPerspectiveTransform(corners, destination)
+        warped = cv2.warpPerspective(image, transform, (padded_width, padded_height))
+        return warped
+
+    def _order_points(self, points: np.ndarray) -> np.ndarray:
+        rect = np.zeros((4, 2), dtype=np.float32)
+        s = points.sum(axis=1)
+        rect[0] = points[np.argmin(s)]
+        rect[2] = points[np.argmax(s)]
+
+        diff = np.diff(points, axis=1)
+        rect[1] = points[np.argmin(diff)]
+        rect[3] = points[np.argmax(diff)]
+        return rect
 
 
 def get_card_detector() -> CardDetector:
-    """Factory function for CardDetector."""
     return CardDetector()

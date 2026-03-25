@@ -1,3 +1,4 @@
+import AudioToolbox
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -10,14 +11,12 @@ struct ScanView: View {
     @State private var selectedUIImage: UIImage?
     @State private var isShowingCamera = false
     @State private var isShowingCameraUnavailableAlert = false
+    @State private var shutterFlash = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Capture or pick a card photo, upload it to the FastAPI service, and review the mocked recognition result.")
-                        .font(.body)
-
                     previewSection
 
                     HStack(spacing: 12) {
@@ -38,9 +37,7 @@ struct ScanView: View {
                         .disabled(appModel.isRecognizing)
                         .onChange(of: selectedPhoto) { _, newValue in
                             guard let newValue else { return }
-                            Task {
-                                await loadPhoto(from: newValue)
-                            }
+                            Task { await loadPhoto(from: newValue) }
                         }
                     }
 
@@ -50,28 +47,16 @@ struct ScanView: View {
                     .buttonStyle(.bordered)
                     .disabled(appModel.isRecognizing)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Status")
-                            .font(.headline)
-                        Text(appModel.statusMessage)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let filename = appModel.lastUploadedFilename {
-                        Text("Last upload: \(filename)")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
+                    statusSection
                 }
                 .padding()
             }
             .navigationTitle("MTG Scanner")
+            .overlay { if appModel.isRecognizing { loadingOverlay } }
             .sheet(isPresented: $isShowingCamera) {
                 CameraPicker(image: $selectedUIImage) { image in
-                    Task {
-                        await handleCapturedImage(image)
-                    }
+                    triggerShutterFeedback()
+                    Task { await handleCapturedImage(image) }
                 }
             }
             .alert("Camera Unavailable", isPresented: $isShowingCameraUnavailableAlert) {
@@ -82,32 +67,81 @@ struct ScanView: View {
         }
     }
 
+    // MARK: - Subviews
+
     @ViewBuilder
     private var previewSection: some View {
         GroupBox("Selected Image") {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.secondary.opacity(0.12))
-                    .frame(height: 220)
+                    .frame(height: 240)
 
                 if let selectedImage {
                     selectedImage
                         .resizable()
                         .scaledToFit()
-                        .frame(maxHeight: 200)
+                        .frame(maxHeight: 220)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(shutterFlash ? 0.7 : 0))
+                                .padding(10)
+                        )
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "photo")
-                            .font(.system(size: 36))
+                            .font(.system(size: 48))
                             .foregroundStyle(.secondary)
-                        Text("No image selected yet")
+                        Text("No image selected")
                             .foregroundStyle(.secondary)
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var statusSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Status")
+                .font(.headline)
+            Text(appModel.statusMessage)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if let filename = appModel.lastUploadedFilename {
+                Text("Last upload: \(filename)")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.35).ignoresSafeArea()
+            VStack(spacing: 16) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
+                    .scaleEffect(1.4)
+                Text("Recognizing…")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+            }
+            .padding(32)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        }
+    }
+
+    // MARK: - Actions
+
+    private func triggerShutterFeedback() {
+        AudioServicesPlaySystemSound(1108) // shutter click
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.easeOut(duration: 0.08)) { shutterFlash = true }
+        withAnimation(.easeIn(duration: 0.18).delay(0.08)) { shutterFlash = false }
     }
 
     @MainActor
@@ -117,12 +151,10 @@ struct ScanView: View {
                 appModel.statusMessage = "Could not read the selected image."
                 return
             }
-
             guard let uiImage = UIImage(data: data) else {
                 appModel.statusMessage = "The selected file is not a supported image."
                 return
             }
-
             setPreviewImage(uiImage)
             let filename = item.itemIdentifier.map { "photo-\($0).jpg" } ?? "selected-image.jpg"
             let contentType = UTType.jpeg.preferredMIMEType ?? "image/jpeg"
@@ -138,7 +170,6 @@ struct ScanView: View {
             appModel.statusMessage = "Failed to prepare the captured photo."
             return
         }
-
         setPreviewImage(image)
         let filename = "camera-capture-\(UUID().uuidString.prefix(8)).jpg"
         let contentType = UTType.jpeg.preferredMIMEType ?? "image/jpeg"
@@ -156,10 +187,11 @@ struct ScanView: View {
             isShowingCameraUnavailableAlert = true
             return
         }
-
         isShowingCamera = true
     }
 }
+
+// MARK: - CameraPicker
 
 private struct CameraPicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
@@ -176,16 +208,12 @@ private struct CameraPicker: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         private let parent: CameraPicker
 
-        init(_ parent: CameraPicker) {
-            self.parent = parent
-        }
+        init(_ parent: CameraPicker) { self.parent = parent }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             picker.dismiss(animated: true)
@@ -193,13 +221,12 @@ private struct CameraPicker: UIViewControllerRepresentable {
 
         func imagePickerController(
             _ picker: UIImagePickerController,
-            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
             guard let image = info[.originalImage] as? UIImage else {
                 picker.dismiss(animated: true)
                 return
             }
-
             parent.image = image
             picker.dismiss(animated: true)
             parent.onImagePicked(image)

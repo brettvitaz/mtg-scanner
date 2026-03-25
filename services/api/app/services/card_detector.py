@@ -42,6 +42,7 @@ class CardDetector:
     MIN_CARD_AREA_PERCENT = 0.06
     MAX_CARD_AREA_PERCENT = 0.70
     CROP_PADDING_PERCENT = 0.03
+    MIN_RECT_FILL_RATIO = 0.58
 
     def __init__(
         self,
@@ -65,69 +66,131 @@ class CardDetector:
         min_card_area = int(image_area * self._min_card_area_percent)
         max_card_area = int(image_area * self._max_card_area_percent)
 
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 50, 150)
+        masks = self._build_candidate_masks(image)
+        candidates: list[CardRegion] = []
+        seen_signatures: set[tuple[int, int, int, int]] = set()
 
-        kernel = np.ones((5, 5), np.uint8)
-        dilated = cv2.dilate(edges, kernel, iterations=2)
+        for mask in masks:
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for contour in contours:
+                candidate = self._candidate_from_contour(contour, min_card_area, max_card_area)
+                if candidate is None:
+                    continue
 
-        contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-        regions: list[CardRegion] = []
-        for contour in contours:
-            hull = cv2.convexHull(contour)
-            epsilon = 0.02 * cv2.arcLength(hull, True)
-            approx = cv2.approxPolyDP(hull, epsilon, True)
-
-            if len(approx) != 4:
-                continue
-
-            points = approx.reshape(4, 2).astype(np.float32)
-            ordered = self._order_points(points)
-
-            x, y, w, h = cv2.boundingRect(approx)
-            if h == 0:
-                continue
-
-            area = w * h
-            if area < min_card_area or area > max_card_area:
-                continue
-
-            width_a = np.linalg.norm(ordered[2] - ordered[3])
-            width_b = np.linalg.norm(ordered[1] - ordered[0])
-            height_a = np.linalg.norm(ordered[1] - ordered[2])
-            height_b = np.linalg.norm(ordered[0] - ordered[3])
-            card_width = max(width_a, width_b)
-            card_height = max(height_a, height_b)
-            if card_height == 0:
-                continue
-
-            aspect_ratio = min(card_width, card_height) / max(card_width, card_height)
-            expected_ratio = self.TARGET_ASPECT_RATIO
-            ratio_diff = abs(aspect_ratio - expected_ratio) / expected_ratio
-            if ratio_diff > self._aspect_ratio_tolerance:
-                continue
-
-            shape_confidence = float(max(0.0, 1.0 - ratio_diff / self._aspect_ratio_tolerance))
-            corners = tuple((int(p[0]), int(p[1])) for p in ordered)
-            regions.append(
-                CardRegion(
-                    x=x,
-                    y=y,
-                    width=w,
-                    height=h,
-                    confidence=round(shape_confidence, 3),
-                    corners=corners,
+                signature = (
+                    int(round(candidate.x / 8)),
+                    int(round(candidate.y / 8)),
+                    int(round(candidate.width / 8)),
+                    int(round(candidate.height / 8)),
                 )
-            )
+                if signature in seen_signatures:
+                    continue
+                seen_signatures.add(signature)
+                candidates.append(candidate)
 
-        regions.sort(key=lambda r: r.area, reverse=True)
-        filtered_regions = self._filter_overlapping(regions)
+        candidates.sort(key=lambda r: (r.confidence, r.area), reverse=True)
+        filtered_regions = self._filter_overlapping(candidates)
+        filtered_regions.sort(key=lambda r: (r.y, r.x))
 
         return DetectionResult(regions=filtered_regions, original_shape=(height, width))
 
-    def _filter_overlapping(self, regions: list[CardRegion], iou_threshold: float = 0.3) -> list[CardRegion]:
+    def _build_candidate_masks(self, image: np.ndarray) -> list[np.ndarray]:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Edge mask catches strong borders and skewed cards.
+        edges = cv2.Canny(blurred, 40, 140)
+        edge_kernel = np.ones((5, 5), np.uint8)
+        edge_mask = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, edge_kernel, iterations=2)
+        edge_mask = cv2.dilate(edge_mask, edge_kernel, iterations=1)
+
+        # Background-distance mask helps when edge detection merges or misses one card.
+        bg_mask = self._background_distance_mask(image)
+
+        combined = cv2.bitwise_or(edge_mask, bg_mask)
+        combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8), iterations=2)
+
+        return [combined, bg_mask, edge_mask]
+
+    def _background_distance_mask(self, image: np.ndarray) -> np.ndarray:
+        height, width = image.shape[:2]
+        patch_h = max(16, height // 10)
+        patch_w = max(16, width // 10)
+
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
+        patches = [
+            lab[:patch_h, :patch_w],
+            lab[:patch_h, width - patch_w :],
+            lab[height - patch_h :, :patch_w],
+            lab[height - patch_h :, width - patch_w :],
+        ]
+        bg_colors = np.array([np.median(p.reshape(-1, 3), axis=0) for p in patches], dtype=np.float32)
+
+        distances = np.stack([np.linalg.norm(lab - color, axis=2) for color in bg_colors], axis=2)
+        min_distance = distances.min(axis=2)
+        normalized = cv2.normalize(min_distance, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        _, mask = cv2.threshold(normalized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        kernel = np.ones((7, 7), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        return mask
+
+    def _candidate_from_contour(
+        self,
+        contour: np.ndarray,
+        min_card_area: int,
+        max_card_area: int,
+    ) -> CardRegion | None:
+        contour_area = cv2.contourArea(contour)
+        if contour_area <= 0:
+            return None
+
+        rect = cv2.minAreaRect(contour)
+        (_, _), (rect_w, rect_h), _ = rect
+        if rect_w <= 1 or rect_h <= 1:
+            return None
+
+        rect_area = rect_w * rect_h
+        if rect_area < min_card_area or rect_area > max_card_area:
+            return None
+
+        short_side = min(rect_w, rect_h)
+        long_side = max(rect_w, rect_h)
+        if long_side <= 0:
+            return None
+
+        aspect_ratio = short_side / long_side
+        expected_ratio = self.TARGET_ASPECT_RATIO
+        ratio_diff = abs(aspect_ratio - expected_ratio) / expected_ratio
+        if ratio_diff > self._aspect_ratio_tolerance:
+            return None
+
+        fill_ratio = contour_area / rect_area if rect_area > 0 else 0.0
+        if fill_ratio < self.MIN_RECT_FILL_RATIO:
+            return None
+
+        box = cv2.boxPoints(rect).astype(np.float32)
+        ordered = self._order_points(box)
+        x, y, w, h = cv2.boundingRect(ordered.astype(np.int32))
+        if w <= 0 or h <= 0:
+            return None
+
+        shape_confidence = 1.0 - min(1.0, ratio_diff / max(self._aspect_ratio_tolerance, 1e-6))
+        fill_confidence = min(1.0, max(0.0, (fill_ratio - self.MIN_RECT_FILL_RATIO) / 0.3))
+        confidence = float(0.7 * shape_confidence + 0.3 * fill_confidence)
+
+        corners = tuple((int(round(p[0])), int(round(p[1]))) for p in ordered)
+        return CardRegion(
+            x=x,
+            y=y,
+            width=w,
+            height=h,
+            confidence=round(confidence, 3),
+            corners=corners,
+        )
+
+    def _filter_overlapping(self, regions: list[CardRegion], iou_threshold: float = 0.45) -> list[CardRegion]:
         if not regions:
             return []
 
@@ -135,7 +198,8 @@ class CardDetector:
         for region in regions:
             is_overlapping = False
             for existing in filtered:
-                if self._iou(region, existing) > iou_threshold:
+                overlap = self._polygon_iou(region, existing) if region.corners and existing.corners else self._iou(region, existing)
+                if overlap > iou_threshold:
                     is_overlapping = True
                     break
             if not is_overlapping:
@@ -154,6 +218,18 @@ class CardDetector:
         intersection = (x2 - x1) * (y2 - y1)
         union = r1.area + r2.area - intersection
         return intersection / union if union > 0 else 0.0
+
+    def _polygon_iou(self, r1: CardRegion, r2: CardRegion) -> float:
+        if not r1.corners or not r2.corners:
+            return self._iou(r1, r2)
+
+        poly1 = np.array(r1.corners, dtype=np.float32)
+        poly2 = np.array(r2.corners, dtype=np.float32)
+        intersection_area, _ = cv2.intersectConvexConvex(poly1, poly2)
+        union_area = cv2.contourArea(poly1) + cv2.contourArea(poly2) - intersection_area
+        if union_area <= 0:
+            return 0.0
+        return float(intersection_area / union_area)
 
     def crop_region(self, image_bytes: bytes, region: CardRegion) -> tuple[bytes, str]:
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -183,35 +259,68 @@ class CardDetector:
         corners = np.array(region.corners, dtype=np.float32)
         tl, tr, br, bl = corners
 
+        expanded = self._expand_quad(corners, self.CROP_PADDING_PERCENT)
+        tl, tr, br, bl = expanded
+
         width_top = np.linalg.norm(tr - tl)
         width_bottom = np.linalg.norm(br - bl)
         height_right = np.linalg.norm(br - tr)
         height_left = np.linalg.norm(bl - tl)
 
-        target_width = max(int(max(width_top, width_bottom)), 1)
-        target_height = max(int(max(height_right, height_left)), 1)
-
-        if target_width > target_height:
-            target_width, target_height = target_height, target_width
-
-        padded_width = max(int(target_width * (1 + self.CROP_PADDING_PERCENT * 2)), 1)
-        padded_height = max(int(target_height * (1 + self.CROP_PADDING_PERCENT * 2)), 1)
-        offset_x = int((padded_width - target_width) / 2)
-        offset_y = int((padded_height - target_height) / 2)
+        measured_width = max(float(width_top), float(width_bottom), 1.0)
+        measured_height = max(float(height_right), float(height_left), 1.0)
+        long_side = max(measured_width, measured_height)
+        target_height = max(int(round(long_side)), 1)
+        target_width = max(int(round(target_height * self.TARGET_ASPECT_RATIO)), 1)
 
         destination = np.array(
             [
-                [offset_x, offset_y],
-                [offset_x + target_width - 1, offset_y],
-                [offset_x + target_width - 1, offset_y + target_height - 1],
-                [offset_x, offset_y + target_height - 1],
+                [0, 0],
+                [target_width - 1, 0],
+                [target_width - 1, target_height - 1],
+                [0, target_height - 1],
             ],
             dtype=np.float32,
         )
 
-        transform = cv2.getPerspectiveTransform(corners, destination)
-        warped = cv2.warpPerspective(image, transform, (padded_width, padded_height))
+        transform = cv2.getPerspectiveTransform(expanded, destination)
+        warped = cv2.warpPerspective(image, transform, (target_width, target_height))
         return warped
+
+    def debug_overlay(self, image_bytes: bytes, detection_result: DetectionResult) -> bytes:
+        """Render detected card outlines on top of the original image for diagnosis."""
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        if image is None:
+            return image_bytes
+
+        for index, region in enumerate(detection_result.regions, start=1):
+            color = (0, 255, 0)
+            if region.corners:
+                points = np.array(region.corners, dtype=np.int32).reshape((-1, 1, 2))
+                cv2.polylines(image, [points], True, color, 3)
+                anchor = tuple(points[0][0])
+            else:
+                cv2.rectangle(image, (region.x, region.y), (region.x + region.width, region.y + region.height), color, 3)
+                anchor = (region.x, region.y)
+            cv2.putText(
+                image,
+                f"{index}:{region.confidence:.2f}",
+                (anchor[0], max(20, anchor[1] - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
+        _, encoded = cv2.imencode(".jpg", image)
+        return encoded.tobytes()
+
+    def _expand_quad(self, corners: np.ndarray, padding_percent: float) -> np.ndarray:
+        center = corners.mean(axis=0)
+        expanded = center + (corners - center) * (1.0 + padding_percent)
+        return expanded.astype(np.float32)
 
     def _order_points(self, points: np.ndarray) -> np.ndarray:
         rect = np.zeros((4, 2), dtype=np.float32)

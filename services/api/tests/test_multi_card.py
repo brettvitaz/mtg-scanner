@@ -2,6 +2,7 @@
 
 import json
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -11,6 +12,9 @@ from app.main import app
 from app.services.card_detector import CardDetector, CardRegion, DetectionResult
 
 client = TestClient(app)
+
+
+SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples" / "test"
 
 
 class TestCardDetector:
@@ -136,6 +140,16 @@ class TestCardDetector:
         assert isinstance(crop_bytes, bytes)
         assert len(crop_bytes) > 0
         assert content_type == "image/jpeg"
+
+    def test_real_sample_image_detects_two_cards(self):
+        """Regression test for the real two-card sample that previously returned one card."""
+        detector = CardDetector()
+        image_bytes = (SAMPLES_DIR / "IMG_1611.png").read_bytes()
+
+        result = detector.detect(image_bytes)
+
+        assert result.count == 2
+        assert all(region.corners is not None for region in result.regions)
 
     def test_iou_calculation(self):
         """Test IoU (Intersection over Union) calculation."""

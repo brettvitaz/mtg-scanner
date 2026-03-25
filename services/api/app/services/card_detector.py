@@ -44,14 +44,18 @@ class CardDetector:
 
     # Minimum card area as percentage of image area
     MIN_CARD_AREA_PERCENT = 0.02  # Card must be at least 2% of image
+    # Maximum card area as percentage of image area (filters background contour)
+    MAX_CARD_AREA_PERCENT = 0.70  # Card must be at most 70% of image
 
     def __init__(
         self,
         aspect_ratio_tolerance: float = ASPECT_RATIO_TOLERANCE,
         min_card_area_percent: float = MIN_CARD_AREA_PERCENT,
+        max_card_area_percent: float = MAX_CARD_AREA_PERCENT,
     ) -> None:
         self._aspect_ratio_tolerance = aspect_ratio_tolerance
         self._min_card_area_percent = min_card_area_percent
+        self._max_card_area_percent = max_card_area_percent
 
     def detect(self, image_bytes: bytes) -> DetectionResult:
         """Detect card regions in the given image bytes.
@@ -70,7 +74,9 @@ class CardDetector:
             return DetectionResult(regions=[], original_shape=(0, 0))
 
         height, width = image.shape[:2]
-        min_card_area = int(width * height * self._min_card_area_percent)
+        image_area = width * height
+        min_card_area = int(image_area * self._min_card_area_percent)
+        max_card_area = int(image_area * self._max_card_area_percent)
 
         # Preprocess: convert to grayscale and blur
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -83,9 +89,9 @@ class CardDetector:
         kernel = np.ones((5, 5), np.uint8)
         dilated = cv2.dilate(edges, kernel, iterations=2)
 
-        # Find contours
+        # Find contours — use RETR_LIST to capture all contours including inner card boundaries
         contours, _ = cv2.findContours(
-            dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
         )
 
         regions: list[CardRegion] = []
@@ -100,7 +106,7 @@ class CardDetector:
 
             # Calculate area
             area = cv2.contourArea(contour)
-            if area < min_card_area:
+            if area < min_card_area or area > max_card_area:
                 continue
 
             # Get bounding rectangle for aspect ratio check

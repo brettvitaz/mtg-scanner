@@ -232,9 +232,14 @@ class TestMultiCardRecognitionAPI:
         artifact_dir = recognition_dirs[0]
         crops_dir = artifact_dir / "crops"
 
-        if crops_dir.exists():
-            crops = list(crops_dir.glob("*.jpg"))
-            assert len(crops) >= 1  # At least one crop saved
+        assert crops_dir.exists()
+        crops = sorted(crops_dir.glob("*.jpg"))
+        assert len(crops) >= 1  # At least one crop saved
+
+        metadata = json.loads((artifact_dir / "metadata.json").read_text())
+        assert "crop_files" in metadata
+        assert len(metadata["crop_files"]) == len(crops)
+        assert all("crop_path" in region for region in metadata["regions"])
 
     def test_backward_compatibility_single_card(self, tmp_path, monkeypatch):
         """Test that single-card images still work correctly."""

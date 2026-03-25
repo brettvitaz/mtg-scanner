@@ -58,26 +58,38 @@ class LocalArtifactStore:
             metadata_dict["original_shape"] = detection_result.original_shape
 
             if detection_result.regions:
-                metadata_dict["regions"] = [
-                    {
-                        "x": r.x,
-                        "y": r.y,
-                        "width": r.width,
-                        "height": r.height,
-                        "confidence": r.confidence,
-                    }
-                    for r in detection_result.regions
-                ]
-
-                # Save individual crops
+                # Save individual crops first so metadata can reference concrete files.
                 crops_dir = artifact_dir / "crops"
                 crops_dir.mkdir(exist_ok=True)
+
+                detector = None
+                region_entries: list[dict] = []
+                crop_files: list[str] = []
+
                 for i, region in enumerate(detection_result.regions):
-                    from app.services.card_detector import CardDetector
-                    detector = CardDetector()
+                    if detector is None:
+                        from app.services.card_detector import CardDetector
+                        detector = CardDetector()
+
                     crop_bytes, _ = detector.crop_region(image_bytes, region)
-                    crop_path = crops_dir / f"card-{i}.jpg"
+                    crop_filename = f"card-{i}.jpg"
+                    crop_path = crops_dir / crop_filename
                     crop_path.write_bytes(crop_bytes)
+                    crop_files.append(crop_filename)
+
+                    region_entries.append(
+                        {
+                            "x": region.x,
+                            "y": region.y,
+                            "width": region.width,
+                            "height": region.height,
+                            "confidence": region.confidence,
+                            "crop_path": f"crops/{crop_filename}",
+                        }
+                    )
+
+                metadata_dict["regions"] = region_entries
+                metadata_dict["crop_files"] = crop_files
 
         metadata_path = artifact_dir / "metadata.json"
         metadata_path.write_text(json.dumps(metadata_dict, indent=2) + "\n")

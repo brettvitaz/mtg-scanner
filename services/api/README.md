@@ -68,9 +68,25 @@ export OPENAI_API_KEY=your-api-key
 export MTG_SCANNER_OPENAI_MODEL=gpt-4.1-mini
 # Optional:
 export OPENAI_BASE_URL=https://api.openai.com/v1
+export MTG_SCANNER_OPENAI_RESPONSE_MODE=json_schema
 ```
 
-The OpenAI provider reads the prompt file named by `prompt_version` from the repo `prompts/` directory and sends the uploaded image bytes as a data URL. Missing OpenAI env vars only fail when `MTG_SCANNER_RECOGNIZER_PROVIDER=openai`.
+Response modes:
+- `json_schema` — best for OpenAI
+- `json_mode` — OpenAI-compatible JSON mode (useful for Ollama)
+- `raw` — prompt-only JSON extraction fallback (useful for LM Studio or rougher OpenAI-compatible servers)
+
+The OpenAI-compatible provider reads the prompt file named by `prompt_version` from the repo `prompts/` directory and sends the uploaded image bytes as a data URL. Missing OpenAI env vars only fail when `MTG_SCANNER_RECOGNIZER_PROVIDER=openai`.
+
+## Evaluation harness
+
+Run fixture images against the configured recognizer and compare with ground truth:
+
+```bash
+PYTHONPATH=services/api python evals/run_eval.py
+```
+
+Fixtures live in `samples/fixtures/` and expected results live in `samples/ground-truth/`. The latest eval summary is written to `evals/results/latest.json`.
 
 ## Tests
 ```bash

@@ -12,14 +12,11 @@ from app.models.recognition import (
     RecognitionUploadMetadata,
 )
 from app.services.card_detector import CardDetector, DetectionResult
-
-
-class RecognitionConfigurationError(RuntimeError):
-    pass
-
-
-class RecognitionProviderError(RuntimeError):
-    pass
+from app.services.errors import RecognitionConfigurationError, RecognitionProviderError
+from app.services.openai_compat import (
+    build_openai_request_body,
+    extract_recognition_response,
+)
 
 
 class RecognitionProvider(Protocol):
@@ -74,11 +71,13 @@ class OpenAIRecognitionProvider:
         model_name: str,
         base_url: str,
         timeout_seconds: float = 30.0,
+        response_mode: str = "json_schema",
     ) -> None:
         self.model_name = model_name
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._response_mode = response_mode
         self._response_schema = _load_response_schema()
 
     def recognize(
@@ -87,40 +86,16 @@ class OpenAIRecognitionProvider:
         metadata: RecognitionUploadMetadata,
         prompt_text: str,
     ) -> RecognitionResponse:
-        request_body = {
-            "model": self.model_name,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": prompt_text,
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze this Magic: The Gathering card image and return JSON only.",
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": _make_data_url(
-                                    content_type=metadata.content_type,
-                                    image_bytes=image_bytes,
-                                )
-                            },
-                        },
-                    ],
-                },
-            ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "recognition_response",
-                    "schema": self._response_schema,
-                },
-            },
-        }
+        request_body = build_openai_request_body(
+            model_name=self.model_name,
+            prompt_text=prompt_text,
+            data_url=_make_data_url(
+                content_type=metadata.content_type,
+                image_bytes=image_bytes,
+            ),
+            schema=self._response_schema,
+            response_mode=self._response_mode,
+        )
 
         with httpx.Client(timeout=self._timeout_seconds) as client:
             try:
@@ -139,13 +114,7 @@ class OpenAIRecognitionProvider:
                 ) from exc
 
         payload = http_response.json()
-        content = _extract_openai_content(payload)
-        try:
-            return RecognitionResponse.model_validate_json(content)
-        except Exception as exc:
-            raise RecognitionProviderError(
-                "OpenAI recognition response did not match RecognitionResponse."
-            ) from exc
+        return extract_recognition_response(payload, self._response_mode)
 
 
 class RecognitionService:
@@ -242,11 +211,13 @@ def get_recognition_service() -> RecognitionService:
             )
 
         base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        response_mode = os.environ.get("MTG_SCANNER_OPENAI_RESPONSE_MODE", "json_schema").strip().lower()
         return RecognitionService(
             OpenAIRecognitionProvider(
                 api_key=api_key,
                 model_name=model_name,
                 base_url=base_url,
+                response_mode=response_mode,
             ),
             detector,
         )
@@ -281,33 +252,3 @@ def _make_data_url(*, content_type: str, image_bytes: bytes) -> str:
     return f"data:{content_type};base64,{encoded}"
 
 
-def _extract_openai_content(payload: dict) -> str:
-    try:
-        choice = payload["choices"][0]
-        message = choice["message"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RecognitionProviderError(
-            "OpenAI recognition response was missing choices[0].message."
-        ) from exc
-
-    if isinstance(message.get("content"), str):
-        return message["content"]
-
-    parsed = message.get("parsed")
-    if isinstance(parsed, dict):
-        return json.dumps(parsed)
-
-    content = message.get("content")
-    if isinstance(content, list):
-        text_parts: list[str] = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") in {"text", "output_text"}:
-                text_value = item.get("text")
-                if isinstance(text_value, str):
-                    text_parts.append(text_value)
-        if text_parts:
-            return "".join(text_parts)
-
-    raise RecognitionProviderError(
-        "OpenAI recognition response did not contain JSON content."
-    )

@@ -60,6 +60,17 @@ The backend keeps the current `POST /api/v1/recognitions` contract unchanged and
 - Default: `MTG_SCANNER_RECOGNIZER_PROVIDER=mock`
 - Real provider: `MTG_SCANNER_RECOGNIZER_PROVIDER=openai`
 - Required when using `openai`: `OPENAI_API_KEY`, `MTG_SCANNER_OPENAI_MODEL`
-- Optional when using `openai`: `OPENAI_BASE_URL`, `MTG_SCANNER_ARTIFACTS_DIR`
+- Optional when using `openai`: `OPENAI_BASE_URL`, `MTG_SCANNER_ARTIFACTS_DIR`, `MTG_SCANNER_OPENAI_RESPONSE_MODE`
+- Response modes:
+  - `json_schema` for OpenAI
+  - `json_mode` for OpenAI-compatible JSON mode (for example Ollama)
+  - `raw` for prompt-only JSON fallback (for example LM Studio)
+
+## Evaluation harness
+- Fixture images go in `samples/fixtures/`
+- Expected outputs go in `samples/ground-truth/`
+- Run evals with:
+  - `PYTHONPATH=services/api python evals/run_eval.py`
+- Latest results are written to `evals/results/latest.json`
 
 See [services/api/.env.example](/Users/brettvitaz/Development/mtg-scanner/services/api/.env.example) for a concrete backend setup.

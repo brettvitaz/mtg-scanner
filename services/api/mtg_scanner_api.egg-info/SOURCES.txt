@@ -5,6 +5,8 @@ app/main.py
 app/api/routes/health.py
 app/api/routes/recognitions.py
 app/models/recognition.py
+app/services/artifact_store.py
+app/services/card_detector.py
 app/services/recognizer.py
 mtg_scanner_api.egg-info/PKG-INFO
 mtg_scanner_api.egg-info/SOURCES.txt

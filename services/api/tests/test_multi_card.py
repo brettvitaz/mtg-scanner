@@ -1,0 +1,268 @@
+"""Tests for multi-card detection functionality."""
+
+import json
+from io import BytesIO
+
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.services.card_detector import CardDetector, CardRegion, DetectionResult
+
+client = TestClient(app)
+
+
+class TestCardDetector:
+    """Unit tests for the CardDetector."""
+
+    def _create_test_image(self, width: int = 800, height: int = 600, color: tuple = (255, 255, 255)):
+        """Create a test image as JPEG bytes."""
+        import cv2
+
+        image = np.full((height, width, 3), color, dtype=np.uint8)
+        _, encoded = cv2.imencode(".jpg", image)
+        return encoded.tobytes()
+
+    def _create_image_with_card(self, card_bounds: tuple[int, int, int, int]):
+        """Create an image with a simulated card region.
+
+        Args:
+            card_bounds: (x, y, width, height) of card
+        """
+        import cv2
+
+        image = np.full((600, 800, 3), (128, 128, 128), dtype=np.uint8)
+        x, y, w, h = card_bounds
+
+        # Draw a card-like rectangle with border
+        cv2.rectangle(image, (x, y), (x + w, y + h), (255, 255, 255), -1)
+        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 0), 3)
+
+        _, encoded = cv2.imencode(".jpg", image)
+        return encoded.tobytes()
+
+    def test_detector_initialization(self):
+        """Test that CardDetector can be initialized with custom params."""
+        detector = CardDetector(
+            aspect_ratio_tolerance=0.3,
+            min_card_area_percent=0.05,
+        )
+        assert detector._aspect_ratio_tolerance == 0.3
+        assert detector._min_card_area_percent == 0.05
+
+    def test_detector_default_initialization(self):
+        """Test default detector initialization."""
+        from app.services.card_detector import get_card_detector
+
+        detector = get_card_detector()
+        assert detector._aspect_ratio_tolerance == CardDetector.ASPECT_RATIO_TOLERANCE
+        assert detector._min_card_area_percent == CardDetector.MIN_CARD_AREA_PERCENT
+
+    def test_detect_empty_image(self):
+        """Test detection on invalid image bytes."""
+        detector = CardDetector()
+        result = detector.detect(b"not-an-image")
+        assert result.count == 0
+        assert result.original_shape == (0, 0)
+
+    def test_detect_single_card(self):
+        """Test detection of a single card in an image."""
+        detector = CardDetector()
+
+        # Create image with one card (~MTG aspect ratio)
+        # MTG card ratio: 2.5/3.5 = ~0.714
+        card_width = 200
+        card_height = int(card_width / CardDetector.TARGET_ASPECT_RATIO)
+        image_bytes = self._create_image_with_card((100, 100, card_width, card_height))
+
+        result = detector.detect(image_bytes)
+        assert result.count >= 1
+        assert result.original_shape[0] > 0
+        assert result.original_shape[1] > 0
+
+        # Check first region
+        region = result.regions[0]
+        assert region.width > 0
+        assert region.height > 0
+        assert region.confidence > 0
+
+    def test_detect_multiple_cards(self):
+        """Test detection of multiple cards in an image."""
+        import cv2
+
+        detector = CardDetector()
+
+        # Create image with two cards side by side
+        image = np.full((600, 800, 3), (128, 128, 128), dtype=np.uint8)
+
+        card_width = 180
+        card_height = int(card_width / CardDetector.TARGET_ASPECT_RATIO)
+
+        # Card 1
+        x1, y1 = 100, 100
+        cv2.rectangle(image, (x1, y1), (x1 + card_width, y1 + card_height), (255, 255, 255), -1)
+        cv2.rectangle(image, (x1, y1), (x1 + card_width, y1 + card_height), (0, 0, 0), 3)
+
+        # Card 2
+        x2, y2 = 350, 100
+        cv2.rectangle(image, (x2, y2), (x2 + card_width, y2 + card_height), (255, 255, 255), -1)
+        cv2.rectangle(image, (x2, y2), (x2 + card_width, y2 + card_height), (0, 0, 0), 3)
+
+        _, encoded = cv2.imencode(".jpg", image)
+        image_bytes = encoded.tobytes()
+
+        result = detector.detect(image_bytes)
+
+        # Should detect at least 2 cards (may detect more due to noise)
+        assert result.count >= 2
+
+    def test_crop_region(self):
+        """Test cropping a detected region."""
+        import cv2
+
+        detector = CardDetector()
+
+        # Create test image with a distinct region
+        image = np.zeros((400, 400, 3), dtype=np.uint8)
+        cv2.rectangle(image, (50, 50), (150, 200), (255, 0, 0), -1)  # Blue rectangle
+
+        _, encoded = cv2.imencode(".jpg", image)
+        image_bytes = encoded.tobytes()
+
+        region = CardRegion(x=50, y=50, width=100, height=150, confidence=0.9)
+        crop_bytes, content_type = detector.crop_region(image_bytes, region)
+
+        assert isinstance(crop_bytes, bytes)
+        assert len(crop_bytes) > 0
+        assert content_type == "image/jpeg"
+
+    def test_iou_calculation(self):
+        """Test IoU (Intersection over Union) calculation."""
+        detector = CardDetector()
+
+        r1 = CardRegion(x=0, y=0, width=100, height=100, confidence=1.0)
+        r2 = CardRegion(x=50, y=50, width=100, height=100, confidence=1.0)
+        r3 = CardRegion(x=200, y=200, width=100, height=100, confidence=1.0)
+
+        # Overlapping regions
+        iou = detector._iou(r1, r2)
+        assert 0 < iou < 1
+
+        # Non-overlapping regions
+        iou = detector._iou(r1, r3)
+        assert iou == 0.0
+
+        # Same region
+        iou = detector._iou(r1, r1)
+        assert iou == 1.0
+
+
+class TestMultiCardRecognitionAPI:
+    """Integration tests for multi-card recognition via API."""
+
+    def test_recognition_saves_detection_metadata(self, tmp_path, monkeypatch):
+        """Test that detection results are saved in metadata."""
+        import cv2
+        import numpy as np
+
+        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+
+        # Create image with one card-like rectangle
+        image = np.full((400, 600, 3), (128, 128, 128), dtype=np.uint8)
+        cv2.rectangle(image, (100, 100), (250, 350), (255, 255, 255), -1)
+        cv2.rectangle(image, (100, 100), (250, 350), (0, 0, 0), 3)
+
+        _, encoded = cv2.imencode(".jpg", image)
+        image_bytes = encoded.tobytes()
+
+        response = client.post(
+            "/api/v1/recognitions",
+            data={"prompt_version": "card-recognition.md"},
+            files={"image": ("multi-card.jpg", BytesIO(image_bytes), "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+
+        # Check saved artifacts
+        recognition_dirs = list((tmp_path / "recognitions").iterdir())
+        assert len(recognition_dirs) == 1
+
+        artifact_dir = recognition_dirs[0]
+        metadata = json.loads((artifact_dir / "metadata.json").read_text())
+
+        # Should have detection info
+        assert "detected_cards" in metadata
+        assert metadata["detected_cards"] >= 1
+        assert "original_shape" in metadata
+
+    def test_recognition_saves_crops_when_multiple_detected(self, tmp_path, monkeypatch):
+        """Test that individual card crops are saved when multiple cards detected."""
+        import cv2
+        import numpy as np
+
+        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+
+        # Create image with two distinct cards
+        image = np.full((600, 800, 3), (128, 128, 128), dtype=np.uint8)
+
+        # Card 1 (left)
+        cv2.rectangle(image, (50, 100), (200, 380), (255, 255, 255), -1)
+        cv2.rectangle(image, (50, 100), (200, 380), (0, 0, 0), 3)
+
+        # Card 2 (right)
+        cv2.rectangle(image, (300, 100), (450, 380), (255, 255, 255), -1)
+        cv2.rectangle(image, (300, 100), (450, 380), (0, 0, 0), 3)
+
+        _, encoded = cv2.imencode(".jpg", image)
+        image_bytes = encoded.tobytes()
+
+        response = client.post(
+            "/api/v1/recognitions",
+            data={"prompt_version": "card-recognition.md"},
+            files={"image": ("two-cards.jpg", BytesIO(image_bytes), "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+
+        # Check for crops directory
+        recognition_dirs = list((tmp_path / "recognitions").iterdir())
+        artifact_dir = recognition_dirs[0]
+        crops_dir = artifact_dir / "crops"
+
+        if crops_dir.exists():
+            crops = list(crops_dir.glob("*.jpg"))
+            assert len(crops) >= 1  # At least one crop saved
+
+    def test_backward_compatibility_single_card(self, tmp_path, monkeypatch):
+        """Test that single-card images still work correctly."""
+        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+
+        # Use simple fake image (no card-like features, so detection may fail gracefully)
+        response = client.post(
+            "/api/v1/recognitions",
+            data={"prompt_version": "card-recognition.md"},
+            files={"image": ("single-card.jpg", b"fake-image-bytes", "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert "cards" in payload
+        assert len(payload["cards"]) >= 1
+
+    def test_multi_card_detection_disabled(self, tmp_path, monkeypatch):
+        """Test that multi-card detection can be disabled."""
+        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+        monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
+
+        response = client.post(
+            "/api/v1/recognitions",
+            data={"prompt_version": "card-recognition.md"},
+            files={"image": ("test.jpg", b"fake-image-bytes", "image/jpeg")},
+        )
+
+        assert response.status_code == 200

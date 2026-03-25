@@ -6,7 +6,12 @@ from typing import Protocol
 
 import httpx
 
-from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.models.recognition import (
+    RecognizedCard,
+    RecognitionResponse,
+    RecognitionUploadMetadata,
+)
+from app.services.card_detector import CardDetector, DetectionResult
 
 
 class RecognitionConfigurationError(RuntimeError):
@@ -144,15 +149,28 @@ class OpenAIRecognitionProvider:
 
 
 class RecognitionService:
-    def __init__(self, provider: RecognitionProvider) -> None:
+    def __init__(
+        self,
+        provider: RecognitionProvider,
+        card_detector: CardDetector | None = None,
+    ) -> None:
         self._provider = provider
+        self._card_detector = card_detector
 
     def recognize(
         self,
         *,
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
-    ) -> tuple[RecognitionResponse, RecognitionUploadMetadata]:
+    ) -> tuple[RecognitionResponse, RecognitionUploadMetadata, DetectionResult | None]:
+        """Recognize cards in an image.
+
+        If a card detector is configured and multiple cards are detected,
+        each card is cropped and recognized individually.
+
+        Returns:
+            Tuple of (RecognitionResponse, enriched metadata, detection result)
+        """
         prompt_text = _load_prompt(metadata.prompt_version)
         enriched_metadata = metadata.model_copy(
             update={
@@ -160,19 +178,55 @@ class RecognitionService:
                 "model": self._provider.model_name,
             }
         )
+
+        # Try multi-card detection if detector is available
+        detection_result: DetectionResult | None = None
+        if self._card_detector is not None:
+            detection_result = self._card_detector.detect(image_bytes)
+
+            if detection_result.count > 1:
+                # Multiple cards detected - recognize each individually
+                all_cards: list[RecognizedCard] = []
+                for i, region in enumerate(detection_result.regions):
+                    crop_bytes, crop_content_type = self._card_detector.crop_region(
+                        image_bytes, region
+                    )
+                    crop_metadata = enriched_metadata.model_copy(
+                        update={
+                            "filename": f"{metadata.filename}-crop-{i}.jpg",
+                            "content_type": crop_content_type,
+                        }
+                    )
+                    response = self._provider.recognize(
+                        image_bytes=crop_bytes,
+                        metadata=crop_metadata,
+                        prompt_text=prompt_text,
+                    )
+                    all_cards.extend(response.cards)
+
+                return RecognitionResponse(cards=all_cards), enriched_metadata, detection_result
+
+        # Single card or no detection - use original behavior
         response = self._provider.recognize(
             image_bytes=image_bytes,
             metadata=enriched_metadata,
             prompt_text=prompt_text,
         )
-        return response, enriched_metadata
+        return response, enriched_metadata, detection_result
 
 
 def get_recognition_service() -> RecognitionService:
     provider_name = os.environ.get("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock").strip().lower()
 
+    # Check if multi-card detection is enabled
+    detector: CardDetector | None = None
+    enable_detection = os.environ.get("MTG_SCANNER_ENABLE_MULTI_CARD", "true").lower() in ("true", "1", "yes")
+    if enable_detection:
+        from app.services.card_detector import get_card_detector
+        detector = get_card_detector()
+
     if provider_name == "mock":
-        return RecognitionService(MockRecognitionProvider())
+        return RecognitionService(MockRecognitionProvider(), detector)
 
     if provider_name == "openai":
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -193,7 +247,8 @@ def get_recognition_service() -> RecognitionService:
                 api_key=api_key,
                 model_name=model_name,
                 base_url=base_url,
-            )
+            ),
+            detector,
         )
 
     raise RecognitionConfigurationError(

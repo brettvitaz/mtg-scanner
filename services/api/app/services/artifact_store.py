@@ -15,6 +15,7 @@ class StoredRecognitionArtifacts:
     image_path: Path
     response_path: Path
     metadata_path: Path
+    crops_dir: Path | None = None
 
 
 class LocalArtifactStore:
@@ -26,7 +27,10 @@ class LocalArtifactStore:
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         response: RecognitionResponse,
+        detection_result = None,  # type: ignore[no-untyped-def]
     ) -> StoredRecognitionArtifacts:
+        from app.services.card_detector import DetectionResult
+
         run_id = self._make_run_id()
         artifact_dir = self._base_dir / "recognitions" / run_id
         artifact_dir.mkdir(parents=True, exist_ok=False)
@@ -37,27 +41,53 @@ class LocalArtifactStore:
         response_path = artifact_dir / "response.json"
         response_path.write_text(response.model_dump_json(indent=2) + "\n")
 
+        # Build metadata dict
+        metadata_dict: dict = {
+            "filename": metadata.filename,
+            "content_type": metadata.content_type,
+            "prompt_version": metadata.prompt_version,
+            "provider": metadata.provider,
+            "model": metadata.model,
+            "saved_at": datetime.now(UTC).isoformat(),
+        }
+
+        # Save detection result if available
+        crops_dir: Path | None = None
+        if detection_result is not None and isinstance(detection_result, DetectionResult):
+            metadata_dict["detected_cards"] = detection_result.count
+            metadata_dict["original_shape"] = detection_result.original_shape
+
+            if detection_result.regions:
+                metadata_dict["regions"] = [
+                    {
+                        "x": r.x,
+                        "y": r.y,
+                        "width": r.width,
+                        "height": r.height,
+                        "confidence": r.confidence,
+                    }
+                    for r in detection_result.regions
+                ]
+
+                # Save individual crops
+                crops_dir = artifact_dir / "crops"
+                crops_dir.mkdir(exist_ok=True)
+                for i, region in enumerate(detection_result.regions):
+                    from app.services.card_detector import CardDetector
+                    detector = CardDetector()
+                    crop_bytes, _ = detector.crop_region(image_bytes, region)
+                    crop_path = crops_dir / f"card-{i}.jpg"
+                    crop_path.write_bytes(crop_bytes)
+
         metadata_path = artifact_dir / "metadata.json"
-        metadata_path.write_text(
-            json.dumps(
-                {
-                    "filename": metadata.filename,
-                    "content_type": metadata.content_type,
-                    "prompt_version": metadata.prompt_version,
-                    "provider": metadata.provider,
-                    "model": metadata.model,
-                    "saved_at": datetime.now(UTC).isoformat(),
-                },
-                indent=2,
-            )
-            + "\n"
-        )
+        metadata_path.write_text(json.dumps(metadata_dict, indent=2) + "\n")
 
         return StoredRecognitionArtifacts(
             directory=artifact_dir,
             image_path=image_path,
             response_path=response_path,
             metadata_path=metadata_path,
+            crops_dir=crops_dir,
         )
 
     def _make_run_id(self) -> str:

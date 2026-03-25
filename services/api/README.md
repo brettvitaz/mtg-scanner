@@ -22,10 +22,37 @@ FastAPI backend scaffold for MTG card recognition.
 ./scripts/run-api.sh
 ```
 
+## Multi-Card Detection
+
+The API now supports automatic detection and recognition of multiple cards in a single image:
+
+- Uses OpenCV to detect card boundaries based on shape and aspect ratio
+- When multiple cards are detected, each card is cropped and recognized individually
+- Detection results are saved in `metadata.json` with region coordinates
+- Individual card crops are saved in the `crops/` subdirectory when multiple cards are detected
+
+### Configuration
+
+```bash
+# Enable multi-card detection (default: true)
+export MTG_SCANNER_ENABLE_MULTI_CARD=true
+
+# Disable to always process the full image
+export MTG_SCANNER_ENABLE_MULTI_CARD=false
+```
+
+### Detection behavior
+
+| Cards Detected | Behavior |
+|----------------|----------|
+| 0 or 1 | Original image sent to recognizer as before |
+| 2+ | Each detected card region is cropped and recognized individually |
+
 ## Artifact logging
 - Recognition uploads are saved under `.artifacts/recognitions/<timestamp>-<id>/` by default.
 - Each run writes `upload.<ext>`, `response.json`, and `metadata.json`.
-- `metadata.json` now also records the selected provider and model when available.
+- `metadata.json` now also records the selected provider, model, and detection results when available.
+- When multiple cards are detected, individual crops are saved in `crops/card-{index}.jpg`.
 - Override the base directory with `MTG_SCANNER_ARTIFACTS_DIR=/path/to/artifacts` for local debugging or eval collection.
 
 ## Provider configuration

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/mtg-scanner/v1/recognition-request.schema.json",
+  "title": "RecognitionUploadMetadata",
+  "description": "Logical metadata carried by the multipart/form-data recognition request.",
+  "type": "object",
+  "required": ["filename", "content_type"],
+  "properties": {
+    "filename": { "type": "string", "minLength": 1 },
+    "content_type": { "type": "string", "pattern": "^image/" },
+    "prompt_version": { "type": "string" }
+  },
+  "additionalProperties": false
+}

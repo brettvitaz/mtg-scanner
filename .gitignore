@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+
+# Node
+node_modules/
+
+# Xcode / Swift
+DerivedData/
+.build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Logs
+*.log
+
+# Local sample artifacts
+.artifacts/
+samples/tmp/
+evals/results/

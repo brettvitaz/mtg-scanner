@@ -1,0 +1,340 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000101 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000201 /* AppModel.swift */; };
+		A00000000000000000000102 /* MTGScannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000202 /* MTGScannerApp.swift */; };
+		A00000000000000000000103 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000203 /* RootTabView.swift */; };
+		A00000000000000000000104 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000204 /* ResultsView.swift */; };
+		A00000000000000000000105 /* ScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000205 /* ScanView.swift */; };
+		A00000000000000000000106 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000206 /* SettingsView.swift */; };
+		A00000000000000000000107 /* RecognitionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000207 /* RecognitionModels.swift */; };
+		A00000000000000000000108 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000208 /* APIClient.swift */; };
+		A00000000000000000000109 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000209 /* AppConfig.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000001 /* MTGScanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MTGScanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000201 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A00000000000000000000202 /* MTGScannerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MTGScannerApp.swift; sourceTree = "<group>"; };
+		A00000000000000000000203 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		A00000000000000000000204 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
+		A00000000000000000000205 /* ScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanView.swift; sourceTree = "<group>"; };
+		A00000000000000000000206 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A00000000000000000000207 /* RecognitionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionModels.swift; sourceTree = "<group>"; };
+		A00000000000000000000208 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000209 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		A0000000000000000000020A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000003 /* MTGScanner */,
+				A00000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000003 /* MTGScanner */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000011 /* App */,
+				A00000000000000000000012 /* Features */,
+				A00000000000000000000013 /* Models */,
+				A00000000000000000000014 /* Services */,
+				A00000000000000000000015 /* Support */,
+			);
+			path = MTGScanner;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000001 /* MTGScanner.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000011 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000201 /* AppModel.swift */,
+				A00000000000000000000202 /* MTGScannerApp.swift */,
+				A00000000000000000000203 /* RootTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000012 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000016 /* Results */,
+				A00000000000000000000017 /* Scan */,
+				A00000000000000000000018 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000013 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000207 /* RecognitionModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000014 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000208 /* APIClient.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000015 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000209 /* AppConfig.swift */,
+				A0000000000000000000020A /* Info.plist */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000016 /* Results */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000204 /* ResultsView.swift */,
+			);
+			path = Results;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000017 /* Scan */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000205 /* ScanView.swift */,
+			);
+			path = Scan;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000018 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000206 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000005 /* MTGScanner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000009 /* Build configuration list for PBXNativeTarget "MTGScanner" */;
+			buildPhases = (
+				A00000000000000000000007 /* Sources */,
+				A00000000000000000000008 /* Frameworks */,
+				A0000000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MTGScanner;
+			productName = MTGScanner;
+			productReference = A00000000000000000000001 /* MTGScanner.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000006 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A00000000000000000000005 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A0000000000000000000000A /* Build configuration list for PBXProject "MTGScanner" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00000000000000000000002;
+			productRefGroup = A00000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00000000000000000000005 /* MTGScanner */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A0000000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000101 /* AppModel.swift in Sources */,
+				A00000000000000000000102 /* MTGScannerApp.swift in Sources */,
+				A00000000000000000000103 /* RootTabView.swift in Sources */,
+				A00000000000000000000104 /* ResultsView.swift in Sources */,
+				A00000000000000000000105 /* ScanView.swift in Sources */,
+				A00000000000000000000106 /* SettingsView.swift in Sources */,
+				A00000000000000000000107 /* RecognitionModels.swift in Sources */,
+				A00000000000000000000108 /* APIClient.swift in Sources */,
+				A00000000000000000000109 /* AppConfig.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A00000000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A00000000000000000000023 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MTGScanner/Support/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brettvitaz.mtgscanner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A00000000000000000000024 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MTGScanner/Support/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brettvitaz.mtgscanner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000009 /* Build configuration list for PBXNativeTarget "MTGScanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000023 /* Debug */,
+				A00000000000000000000024 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A0000000000000000000000A /* Build configuration list for PBXProject "MTGScanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000021 /* Debug */,
+				A00000000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000006 /* Project object */;
+}

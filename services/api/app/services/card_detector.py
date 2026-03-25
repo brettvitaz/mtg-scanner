@@ -42,8 +42,8 @@ class CardDetector:
     TARGET_ASPECT_RATIO = 2.5 / 3.5
     ASPECT_RATIO_TOLERANCE = 0.25  # ±25% tolerance
 
-    # Minimum card area as percentage of image area
-    MIN_CARD_AREA_PERCENT = 0.02  # Card must be at least 2% of image
+    # Minimum card area as percentage of image area (bounding rect)
+    MIN_CARD_AREA_PERCENT = 0.06  # Card must be at least 6% of image
     # Maximum card area as percentage of image area (filters background contour)
     MAX_CARD_AREA_PERCENT = 0.70  # Card must be at most 70% of image
 
@@ -96,22 +96,24 @@ class CardDetector:
 
         regions: list[CardRegion] = []
         for contour in contours:
-            # Approximate polygon
-            epsilon = 0.02 * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, epsilon, True)
+            # Use convexHull to normalize irregular/fragmented contours to convex shapes
+            hull = cv2.convexHull(contour)
+            epsilon = 0.02 * cv2.arcLength(hull, True)
+            approx = cv2.approxPolyDP(hull, epsilon, True)
 
             # Check if it's a quadrilateral (4 corners)
             if len(approx) != 4:
                 continue
 
-            # Calculate area
-            area = cv2.contourArea(contour)
-            if area < min_card_area or area > max_card_area:
-                continue
-
-            # Get bounding rectangle for aspect ratio check
+            # Get bounding rectangle for size and aspect ratio check
             x, y, w, h = cv2.boundingRect(approx)
             if h == 0:
+                continue
+
+            # Use bounding rect area for size filtering (contour area is unreliable for
+            # partial/fragmented contours where only some edges are detected)
+            area = w * h
+            if area < min_card_area or area > max_card_area:
                 continue
 
             aspect_ratio = w / h
@@ -121,10 +123,8 @@ class CardDetector:
             if ratio_diff > self._aspect_ratio_tolerance:
                 continue
 
-            # Calculate confidence based on how close to perfect rectangle
-            perimeter = cv2.arcLength(contour, True)
-            area_from_perimeter = (perimeter / 4) ** 2
-            shape_confidence = min(1.0, area / area_from_perimeter) if area_from_perimeter > 0 else 0.5
+            # Calculate confidence based on aspect ratio closeness to ideal MTG card ratio
+            shape_confidence = max(0.0, 1.0 - ratio_diff / self._aspect_ratio_tolerance)
 
             regions.append(
                 CardRegion(

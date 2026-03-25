@@ -9,6 +9,7 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 3. Make the smallest useful change.
 4. Update docs and examples alongside code.
 5. Run the smallest verification that proves the change.
+6. **Commit after each feature or change.**
 
 ## Local development
 ### Backend

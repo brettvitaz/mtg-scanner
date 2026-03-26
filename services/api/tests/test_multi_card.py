@@ -1,6 +1,8 @@
 """Tests for multi-card detection functionality."""
 
 import json
+import threading
+import time
 from io import BytesIO
 from pathlib import Path
 
@@ -502,3 +504,212 @@ class TestMultiCardRecognitionAPI:
         assert [card["title"] for card in payload["cards"]] == ["Lightning Bolt", "Totally Fake Card"]
         assert payload["cards"][0]["edition"] == "Magic 2010"
         assert payload["cards"][1]["confidence"] == 0.55
+
+    def test_multi_card_recognition_preserves_stable_ordering(self, monkeypatch):
+        from app.models.recognition import RecognitionUploadMetadata
+        from app.services import recognizer as recognizer_module
+
+        monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+
+        service = recognizer_module.RecognitionService(
+            recognizer_module.MockRecognitionProvider(),
+            card_detector=CardDetector(),
+            validator=None,
+            max_concurrent_recognitions=3,
+        )
+
+        def fake_detect(self, image_bytes):  # type: ignore[no-untyped-def]
+            del self, image_bytes
+            return DetectionResult(
+                regions=[
+                    CardRegion(x=0, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=20, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=40, y=0, width=10, height=10, confidence=0.9),
+                ],
+                original_shape=(100, 100),
+            )
+
+        def fake_crop_region(self, image_bytes, region):  # type: ignore[no-untyped-def]
+            del self, region
+            return (image_bytes, "image/jpeg")
+
+        delays = {
+            "upload.jpg-crop-0.jpg": 0.05,
+            "upload.jpg-crop-1.jpg": 0.01,
+            "upload.jpg-crop-2.jpg": 0.02,
+        }
+
+        def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
+            del self, image_bytes, prompt_text
+            time.sleep(delays[metadata.filename])
+            crop_index = int(metadata.filename.split("-crop-")[1].split(".")[0])
+            return RecognitionResponse(
+                cards=[
+                    {
+                        "title": f"Card {crop_index}",
+                        "edition": "Test Set",
+                        "collector_number": str(crop_index),
+                        "foil": False,
+                        "confidence": 0.9,
+                        "notes": metadata.filename,
+                    }
+                ]
+            )
+
+        monkeypatch.setattr(CardDetector, "detect", fake_detect)
+        monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
+        monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
+
+        response, _, detection_result, validation_result = service.recognize(
+            image_bytes=b"fake-image-bytes",
+            metadata=RecognitionUploadMetadata(
+                filename="upload.jpg",
+                content_type="image/jpeg",
+                prompt_version="card-recognition.md",
+            ),
+        )
+
+        assert detection_result is not None
+        assert validation_result is None
+        assert [card.title for card in response.cards] == ["Card 0", "Card 1", "Card 2"]
+
+    def test_multi_card_recognition_enforces_bounded_concurrency(self, monkeypatch):
+        from app.models.recognition import RecognitionUploadMetadata
+        from app.services import recognizer as recognizer_module
+
+        monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+
+        service = recognizer_module.RecognitionService(
+            recognizer_module.MockRecognitionProvider(),
+            card_detector=CardDetector(),
+            validator=None,
+            max_concurrent_recognitions=2,
+        )
+
+        def fake_detect(self, image_bytes):  # type: ignore[no-untyped-def]
+            del self, image_bytes
+            return DetectionResult(
+                regions=[
+                    CardRegion(x=0, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=20, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=40, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=60, y=0, width=10, height=10, confidence=0.9),
+                ],
+                original_shape=(100, 100),
+            )
+
+        def fake_crop_region(self, image_bytes, region):  # type: ignore[no-untyped-def]
+            del self, region
+            return (image_bytes, "image/jpeg")
+
+        counters = {"current": 0, "max": 0}
+        lock = threading.Lock()
+
+        def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
+            del self, image_bytes, metadata, prompt_text
+            with lock:
+                counters["current"] += 1
+                counters["max"] = max(counters["max"], counters["current"])
+            try:
+                time.sleep(0.03)
+                return RecognitionResponse(
+                    cards=[
+                        {
+                            "title": "Bounded Card",
+                            "edition": "Test Set",
+                            "collector_number": None,
+                            "foil": False,
+                            "confidence": 0.9,
+                            "notes": "bounded",
+                        }
+                    ]
+                )
+            finally:
+                with lock:
+                    counters["current"] -= 1
+
+        monkeypatch.setattr(CardDetector, "detect", fake_detect)
+        monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
+        monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
+
+        response, _, _, _ = service.recognize(
+            image_bytes=b"fake-image-bytes",
+            metadata=RecognitionUploadMetadata(
+                filename="upload.jpg",
+                content_type="image/jpeg",
+                prompt_version="card-recognition.md",
+            ),
+        )
+
+        assert len(response.cards) == 4
+        assert counters["max"] == 2
+
+    def test_multi_card_recognition_prepares_all_crops_before_recognition(self, monkeypatch):
+        from app.models.recognition import RecognitionUploadMetadata
+        from app.services import recognizer as recognizer_module
+
+        monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+
+        service = recognizer_module.RecognitionService(
+            recognizer_module.MockRecognitionProvider(),
+            card_detector=CardDetector(),
+            validator=None,
+            max_concurrent_recognitions=2,
+        )
+
+        crop_events: list[str] = []
+        recognize_events: list[str] = []
+
+        def fake_detect(self, image_bytes):  # type: ignore[no-untyped-def]
+            del self, image_bytes
+            return DetectionResult(
+                regions=[
+                    CardRegion(x=0, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=20, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=40, y=0, width=10, height=10, confidence=0.9),
+                ],
+                original_shape=(100, 100),
+            )
+
+        def fake_crop_region(self, image_bytes, region):  # type: ignore[no-untyped-def]
+            del self, image_bytes
+            crop_events.append(f"crop-{region.x}")
+            return (f"crop-{region.x}".encode(), "image/jpeg")
+
+        def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
+            del self, prompt_text
+            recognize_events.append(metadata.filename)
+            assert len(crop_events) == 3
+            return RecognitionResponse(
+                cards=[
+                    {
+                        "title": image_bytes.decode(),
+                        "edition": "Test Set",
+                        "collector_number": None,
+                        "foil": False,
+                        "confidence": 0.9,
+                        "notes": metadata.filename,
+                    }
+                ]
+            )
+
+        monkeypatch.setattr(CardDetector, "detect", fake_detect)
+        monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
+        monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
+
+        response, _, _, _ = service.recognize(
+            image_bytes=b"fake-image-bytes",
+            metadata=RecognitionUploadMetadata(
+                filename="upload.jpg",
+                content_type="image/jpeg",
+                prompt_version="card-recognition.md",
+            ),
+        )
+
+        assert crop_events == ["crop-0", "crop-20", "crop-40"]
+        assert sorted(recognize_events) == [
+            "upload.jpg-crop-0.jpg",
+            "upload.jpg-crop-1.jpg",
+            "upload.jpg-crop-2.jpg",
+        ]
+        assert [card.title for card in response.cards] == ["crop-0", "crop-20", "crop-40"]

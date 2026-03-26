@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     mtg_scanner_api_port: int = Field(default=8000)
     mtg_scanner_recognizer_provider: str = Field(default="mock")
     mtg_scanner_enable_multi_card: bool = Field(default=True)
+    mtg_scanner_max_concurrent_recognitions: int = Field(default=4)
     mtg_scanner_artifacts_dir: str | None = Field(default=None)
     mtg_scanner_enable_mtg_validation: bool = Field(default=True)
     mtg_scanner_mtgjson_db_path: str = Field(default=str(Path(__file__).resolve().parents[1] / "data" / "mtgjson" / "mtgjson.sqlite"))

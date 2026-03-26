@@ -40,7 +40,7 @@ Shell environment variables override values from `.env` files. Use `0.0.0.0` ins
 The API now supports automatic detection and recognition of multiple cards in a single image:
 
 - Uses OpenCV to detect card boundaries based on shape and aspect ratio
-- When multiple cards are detected, each card is cropped and recognized individually
+- When multiple cards are detected, all card crops are prepared first, then each crop is recognized concurrently with bounded concurrency
 - Detection results are saved in `metadata.json` with region coordinates
 - Individual card crops are saved in the `crops/` subdirectory when multiple cards are detected
 
@@ -49,6 +49,9 @@ The API now supports automatic detection and recognition of multiple cards in a 
 ```bash
 # Enable multi-card detection (default: true)
 export MTG_SCANNER_ENABLE_MULTI_CARD=true
+
+# Bound concurrent per-card recognition work after crop prep (default: 4)
+export MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS=4
 
 # Disable to always process the full image
 export MTG_SCANNER_ENABLE_MULTI_CARD=false
@@ -59,7 +62,7 @@ export MTG_SCANNER_ENABLE_MULTI_CARD=false
 | Cards Detected | Behavior |
 |----------------|----------|
 | 0 or 1 | Original image sent to recognizer as before |
-| 2+ | Each detected card region is cropped and recognized individually |
+| 2+ | All detected card regions are cropped first, then recognized concurrently with stable output ordering |
 
 ## Artifact logging
 - Recognition uploads are saved under `.artifacts/recognitions/<timestamp>-<id>/` by default.

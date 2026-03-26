@@ -61,7 +61,7 @@ The backend keeps the current `POST /api/v1/recognitions` contract unchanged and
 - Default: `MTG_SCANNER_RECOGNIZER_PROVIDER=mock`
 - Real provider: `MTG_SCANNER_RECOGNIZER_PROVIDER=openai`
 - Required when using `openai`: `OPENAI_API_KEY`, `MTG_SCANNER_OPENAI_MODEL`
-- Optional when using `openai`: `OPENAI_BASE_URL`, `MTG_SCANNER_ARTIFACTS_DIR`, `MTG_SCANNER_OPENAI_RESPONSE_MODE`, `MTG_SCANNER_OPENAI_TIMEOUT_SECONDS`
+- Optional when using `openai`: `OPENAI_BASE_URL`, `MTG_SCANNER_ARTIFACTS_DIR`, `MTG_SCANNER_OPENAI_RESPONSE_MODE`, `MTG_SCANNER_OPENAI_TIMEOUT_SECONDS`, `MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS`
 - Response modes:
   - `json_schema` for OpenAI
   - `json_mode` for OpenAI-compatible JSON mode (for example Ollama)

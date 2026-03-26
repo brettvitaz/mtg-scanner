@@ -23,6 +23,7 @@ mtg-scanner/
 3. Backend validates request and stores request artifact for debugging.
 4. Backend runs recognition pipeline:
    - optional card detection / cropping
+   - if multiple cards are detected, prepare all crops first and then run per-card recognition concurrently with bounded concurrency
    - OCR + vision extraction / LLM structured extraction
    - normalization against MTG card data if needed
 5. Backend returns structured JSON response.

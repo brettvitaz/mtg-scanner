@@ -1,4 +1,5 @@
 import base64
+import concurrent.futures
 import json
 from pathlib import Path
 from typing import Protocol
@@ -125,10 +126,12 @@ class RecognitionService:
         provider: RecognitionProvider,
         card_detector: CardDetector | None = None,
         validator: CardValidationService | None = None,
+        max_concurrent_recognitions: int = 4,
     ) -> None:
         self._provider = provider
         self._card_detector = card_detector
         self._validator = validator
+        self._max_concurrent_recognitions = max(1, max_concurrent_recognitions)
 
     def _validate_response(
         self,
@@ -137,6 +140,26 @@ class RecognitionService:
         if self._validator is None:
             return None
         return self._validator.validate_response(response)
+
+    def _recognize_multiple_crops(
+        self,
+        *,
+        crops: list[tuple[bytes, RecognitionUploadMetadata]],
+        prompt_text: str,
+    ) -> list[RecognitionResponse]:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self._max_concurrent_recognitions
+        ) as executor:
+            futures = [
+                executor.submit(
+                    self._provider.recognize,
+                    crop_bytes,
+                    crop_metadata,
+                    prompt_text,
+                )
+                for crop_bytes, crop_metadata in crops
+            ]
+            return [future.result() for future in futures]
 
     def recognize(
         self,
@@ -171,8 +194,7 @@ class RecognitionService:
             detection_result = self._card_detector.detect(image_bytes)
 
             if detection_result.count > 1:
-                # Multiple cards detected - recognize each individually
-                all_cards: list[RecognizedCard] = []
+                crops: list[tuple[bytes, RecognitionUploadMetadata]] = []
                 for i, region in enumerate(detection_result.regions):
                     crop_bytes, crop_content_type = self._card_detector.crop_region(
                         image_bytes, region
@@ -183,11 +205,15 @@ class RecognitionService:
                             "content_type": crop_content_type,
                         }
                     )
-                    response = self._provider.recognize(
-                        image_bytes=crop_bytes,
-                        metadata=crop_metadata,
-                        prompt_text=prompt_text,
-                    )
+                    crops.append((crop_bytes, crop_metadata))
+
+                crop_responses = self._recognize_multiple_crops(
+                    crops=crops,
+                    prompt_text=prompt_text,
+                )
+
+                all_cards: list[RecognizedCard] = []
+                for response in crop_responses:
                     all_cards.extend(response.cards)
 
                 combined_response = RecognitionResponse(cards=all_cards)
@@ -231,7 +257,12 @@ def get_recognition_service() -> RecognitionService:
         )
 
     if provider_name == "mock":
-        return RecognitionService(MockRecognitionProvider(), detector, validator)
+        return RecognitionService(
+            MockRecognitionProvider(),
+            detector,
+            validator,
+            max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
+        )
 
     if provider_name == "openai":
         api_key = settings.openai_api_key
@@ -256,6 +287,7 @@ def get_recognition_service() -> RecognitionService:
             ),
             detector,
             validator,
+            max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
         )
 
     raise RecognitionConfigurationError(
@@ -286,4 +318,3 @@ def _load_response_schema() -> dict:
 def _make_data_url(*, content_type: str, image_bytes: bytes) -> str:
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{content_type};base64,{encoded}"
-

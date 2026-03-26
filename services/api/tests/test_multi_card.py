@@ -159,6 +159,28 @@ class TestCardDetector:
         assert refined_height < image.shape[0] - 10
         assert abs((refined_width / refined_height) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
 
+    def test_refine_cropped_card_preserves_dark_outer_border(self):
+        """The trim pass should keep the full border when a card has a dark frame and dark art near the edge."""
+        import cv2
+
+        detector = CardDetector()
+        image = np.full((250, 190, 3), 208, dtype=np.uint8)
+        cv2.rectangle(image, (14, 14), (176, 236), (18, 18, 18), -1)
+        cv2.rectangle(image, (22, 22), (168, 228), (232, 232, 232), -1)
+        cv2.rectangle(image, (26, 26), (164, 82), (32, 32, 32), -1)
+        cv2.rectangle(image, (30, 90), (160, 224), (245, 245, 245), -1)
+
+        refined = detector._refine_cropped_card(image)
+        refined_gray = cv2.cvtColor(refined, cv2.COLOR_BGR2GRAY)
+
+        assert refined.shape[1] >= 160
+        assert refined.shape[0] >= 220
+        assert refined_gray[:, :16].min() < 40
+        assert refined_gray[:, -16:].min() < 40
+        assert refined_gray[:16, :].min() < 40
+        assert refined_gray[-16:, :].min() < 40
+        assert abs((refined.shape[1] / refined.shape[0]) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
+
     def test_real_sample_image_detects_two_cards(self):
         """Regression test for the real two-card sample that previously returned one card."""
         detector = CardDetector()
@@ -255,10 +277,11 @@ class TestCardDetector:
         refined_eternal = cv2.imdecode(np.frombuffer(detector.crop_region(image_bytes, eternal_witness)[0], dtype=np.uint8), cv2.IMREAD_COLOR)
         refined_liliana = cv2.imdecode(np.frombuffer(detector.crop_region(image_bytes, liliana)[0], dtype=np.uint8), cv2.IMREAD_COLOR)
 
-        assert refined_eternal.shape[0] < raw_eternal.shape[0] - 100
-        assert refined_eternal.shape[1] < raw_eternal.shape[1] - 100
-        assert refined_liliana.shape[0] < raw_liliana.shape[0] - 150
-        assert refined_liliana.shape[1] < raw_liliana.shape[1] - 80
+        assert refined_eternal.shape[0] < raw_eternal.shape[0] - 35
+        assert refined_eternal.shape[1] < raw_eternal.shape[1] - 30
+        assert refined_eternal.shape[0] > raw_eternal.shape[0] * 0.85
+        assert refined_liliana.shape[0] >= raw_liliana.shape[0] * 0.95
+        assert refined_liliana.shape[1] >= raw_liliana.shape[1] * 0.95
         assert abs((refined_eternal.shape[1] / refined_eternal.shape[0]) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
         assert abs((refined_liliana.shape[1] / refined_liliana.shape[0]) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
 

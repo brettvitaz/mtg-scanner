@@ -151,6 +151,16 @@ class TestCardDetector:
         assert result.count == 2
         assert all(region.corners is not None for region in result.regions)
 
+    def test_binder_page_detects_nine_cards(self):
+        """Dense 3x3 binder pages should resolve to all nine cards."""
+        detector = CardDetector()
+        image_bytes = (SAMPLES_DIR / "binder_page_1.jpg").read_bytes()
+
+        result = detector.detect(image_bytes)
+
+        assert result.count == 9
+        assert len([region for region in result.regions if region.confidence >= 0.6]) == 9
+
     def test_iou_calculation(self):
         """Test IoU (Intersection over Union) calculation."""
         detector = CardDetector()

@@ -81,6 +81,7 @@ export OPENAI_API_KEY=your-api-key
 export MTG_SCANNER_OPENAI_MODEL=gpt-4.1-mini
 # Optional:
 export OPENAI_BASE_URL=https://api.openai.com/v1
+export MTG_SCANNER_OPENAI_TIMEOUT_SECONDS=30
 export MTG_SCANNER_OPENAI_RESPONSE_MODE=json_schema
 ```
 
@@ -90,6 +91,8 @@ Response modes:
 - `raw` — prompt-only JSON extraction fallback (useful for LM Studio or rougher OpenAI-compatible servers)
 
 The OpenAI-compatible provider reads the prompt file named by `prompt_version` from the repo `prompts/` directory and sends the uploaded image bytes as a data URL. Missing OpenAI env vars only fail when `MTG_SCANNER_RECOGNIZER_PROVIDER=openai`.
+
+`MTG_SCANNER_OPENAI_TIMEOUT_SECONDS` controls the HTTP client timeout for the OpenAI-compatible recognizer and defaults to `30` seconds.
 
 ## Evaluation harness
 

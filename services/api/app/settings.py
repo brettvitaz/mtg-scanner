@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     mtg_scanner_openai_model: str | None = Field(default=None)
     openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+    mtg_scanner_openai_timeout_seconds: float = Field(default=30.0)
     mtg_scanner_openai_response_mode: str = Field(default="json_schema")
 
 

@@ -3,6 +3,7 @@ import json
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.recognizer import OpenAIRecognitionProvider, get_recognition_service
 
 client = TestClient(app)
 
@@ -125,3 +126,29 @@ def test_openai_provider_requires_env_when_selected(monkeypatch) -> None:
 
     assert response.status_code == 500
     assert "OPENAI_API_KEY must be set" in response.json()["detail"]
+
+
+def test_openai_provider_timeout_defaults_to_thirty_seconds(monkeypatch) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
+    monkeypatch.delenv("MTG_SCANNER_OPENAI_TIMEOUT_SECONDS", raising=False)
+
+    service = get_recognition_service()
+
+    assert isinstance(service._provider, OpenAIRecognitionProvider)
+    assert service._provider._timeout_seconds == 30.0
+
+
+def test_openai_provider_timeout_can_be_configured(monkeypatch) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
+    monkeypatch.setenv("MTG_SCANNER_OPENAI_TIMEOUT_SECONDS", "12.5")
+
+    service = get_recognition_service()
+
+    assert isinstance(service._provider, OpenAIRecognitionProvider)
+    assert service._provider._timeout_seconds == 12.5

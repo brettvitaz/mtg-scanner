@@ -17,6 +17,7 @@
 		A00000000000000000000108 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000208 /* APIClient.swift */; };
 		A00000000000000000000109 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000209 /* AppConfig.swift */; };
 		A0000000000000000000010A /* CorrectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020B /* CorrectionView.swift */; };
+		A0000000000000000000010B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020C /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		A00000000000000000000209 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		A0000000000000000000020A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A0000000000000000000020B /* CorrectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrectionView.swift; sourceTree = "<group>"; };
+		A0000000000000000000020C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +115,7 @@
 		A00000000000000000000015 /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				A0000000000000000000020C /* Assets.xcassets */,
 				A00000000000000000000209 /* AppConfig.swift */,
 				A0000000000000000000020A /* Info.plist */,
 			);
@@ -209,6 +212,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A0000000000000000000010B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

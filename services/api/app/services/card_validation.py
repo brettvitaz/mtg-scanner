@@ -97,14 +97,21 @@ class CardValidationService:
 
         if resolved_set_code:
             candidates = self._index.lookup_by_name_and_set(title=card.title or "", set_code=resolved_set_code)
-            if len(candidates) == 1:
-                return self._matched(card, trace_base, candidates[0], "normalized_match", "Resolved set and title to a single printing.")
             if normalized_number:
                 narrowed = [c for c in candidates if c.normalized_collector_number == normalized_number]
                 if len(narrowed) == 1:
                     return self._matched(card, trace_base, narrowed[0], "normalized_match", "Resolved set and collector number after title match.")
                 if len(narrowed) > 1:
                     return self._result(card, trace_base, "ambiguous_match", None, "Multiple printings share the same title and collector number in the resolved set.")
+                if candidates:
+                    return self._result(card, trace_base, "no_match", None, "Resolved set and title matched MTGJSON, but collector number conflicts with every printing in that set.")
+                return self._result(card, trace_base, "no_match", None, "Resolved set is valid, but title does not exist in that set.")
+
+            if len(candidates) == 1:
+                return self._matched(card, trace_base, candidates[0], "normalized_match", "Resolved set and title to a single printing.")
+            if len(candidates) > 1:
+                return self._result(card, trace_base, "ambiguous_match", None, "Multiple printings share the same title in the resolved set.")
+            return self._result(card, trace_base, "no_match", None, "Resolved set is valid, but title does not exist in that set.")
 
         if normalized_number:
             candidates = self._index.lookup_by_name_and_number(title=card.title or "", collector_number=card.collector_number or "")

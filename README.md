@@ -42,6 +42,7 @@ make bootstrap     # prepare local dependencies
 make api-run       # run FastAPI dev server
 make api-test      # run backend tests
 make tree          # print a compact repo tree
+PYTHONPATH=services/api ./services/api/.venv/bin/python scripts/import_mtgjson.py tmp/AllPrintings.json
 xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build
 ```
 

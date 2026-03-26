@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.services.card_validation import ValidationBatchResult
 from app.settings import get_settings
 
 
@@ -28,6 +29,7 @@ class LocalArtifactStore:
         metadata: RecognitionUploadMetadata,
         response: RecognitionResponse,
         detection_result = None,  # type: ignore[no-untyped-def]
+        validation_result: ValidationBatchResult | None = None,
     ) -> StoredRecognitionArtifacts:
         from app.services.card_detector import DetectionResult
 
@@ -50,6 +52,26 @@ class LocalArtifactStore:
             "model": metadata.model,
             "saved_at": datetime.now(UTC).isoformat(),
         }
+
+        if validation_result is not None:
+            metadata_dict["validation"] = {
+                "enabled": validation_result.enabled,
+                "available": validation_result.available,
+                "cards": [
+                    {
+                        "original": trace.original,
+                        "normalized_inputs": trace.normalized_inputs,
+                        "status": trace.status,
+                        "matched_uuid": trace.matched_uuid,
+                        "matched_set_code": trace.matched_set_code,
+                        "matched_collector_number": trace.matched_collector_number,
+                        "confidence_before": trace.confidence_before,
+                        "confidence_after": trace.confidence_after,
+                        "reason": trace.reason,
+                    }
+                    for trace in validation_result.traces
+                ],
+            }
 
         # Save detection result if available
         crops_dir: Path | None = None

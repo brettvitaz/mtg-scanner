@@ -64,9 +64,39 @@ export MTG_SCANNER_ENABLE_MULTI_CARD=false
 ## Artifact logging
 - Recognition uploads are saved under `.artifacts/recognitions/<timestamp>-<id>/` by default.
 - Each run writes `upload.<ext>`, `response.json`, and `metadata.json`.
-- `metadata.json` now also records the selected provider, model, and detection results when available.
+- `metadata.json` now also records the selected provider, model, detection results, and MTGJSON validation traces when available.
 - When multiple cards are detected, individual crops are saved in `crops/card-{index}.jpg`.
 - Override the base directory with `MTG_SCANNER_ARTIFACTS_DIR=/path/to/artifacts` for local debugging or eval collection.
+
+## MTGJSON validation
+The API can post-process recognizer output against a local MTGJSON index before returning the response.
+
+### Runtime behavior
+- Validation runs after provider recognition and before the API response is returned.
+- The public response contract stays the same: `title`, `edition`, `collector_number`, `foil`, `confidence`, `notes`.
+- When validation finds a trusted match, the response is canonicalized to MTGJSON values.
+- `edition` continues to use the set name in API responses to preserve existing repo semantics.
+- If the MTGJSON database is missing, validation is skipped gracefully and the raw recognizer response is returned.
+
+### Configuration
+```bash
+export MTG_SCANNER_ENABLE_MTG_VALIDATION=true
+export MTG_SCANNER_MTGJSON_DB_PATH=services/api/data/mtgjson/mtgjson.sqlite
+export MTG_SCANNER_MTGJSON_SOURCE_PATH=/Users/brettvitaz/Development/mtg-scanner/tmp/AllPrintings.json
+export MTG_SCANNER_MTGJSON_MAX_FUZZY_CANDIDATES=10
+```
+
+### Import workflow
+Build the local SQLite index offline from `AllPrintings.json`:
+
+```bash
+PYTHONPATH=services/api ./services/api/.venv/bin/python scripts/import_mtgjson.py \
+  /Users/brettvitaz/Development/mtg-scanner/tmp/AllPrintings.json
+```
+
+This writes:
+- `services/api/data/mtgjson/mtgjson.sqlite`
+- `services/api/data/mtgjson/manifest.json`
 
 ## Provider configuration
 The route contract stays the same. Provider selection is environment-driven:

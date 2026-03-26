@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     mtg_scanner_recognizer_provider: str = Field(default="mock")
     mtg_scanner_enable_multi_card: bool = Field(default=True)
     mtg_scanner_artifacts_dir: str | None = Field(default=None)
+    mtg_scanner_enable_mtg_validation: bool = Field(default=True)
+    mtg_scanner_mtgjson_db_path: str = Field(default=str(Path(__file__).resolve().parents[1] / "data" / "mtgjson" / "mtgjson.sqlite"))
+    mtg_scanner_mtgjson_source_path: str = Field(default="/Users/brettvitaz/Development/mtg-scanner/tmp/AllPrintings.json")
+    mtg_scanner_mtgjson_max_fuzzy_candidates: int = Field(default=10)
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     mtg_scanner_openai_model: str | None = Field(default=None)

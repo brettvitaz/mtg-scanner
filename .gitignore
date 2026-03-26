@@ -27,3 +27,4 @@ DerivedData/
 samples/tmp/
 evals/results/
 tmp/
+services/api/data/mtgjson/

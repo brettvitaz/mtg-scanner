@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models.recognition import RecognitionResponse
 from app.services.card_detector import CardDetector, CardRegion, DetectionResult
 
 client = TestClient(app)
@@ -306,7 +307,7 @@ class TestMultiCardRecognitionAPI:
         import cv2
         import numpy as np
 
-        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
 
         # Create image with one card-like rectangle
@@ -342,7 +343,7 @@ class TestMultiCardRecognitionAPI:
         import cv2
         import numpy as np
 
-        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
 
         # Create image with two distinct cards
@@ -383,7 +384,7 @@ class TestMultiCardRecognitionAPI:
 
     def test_backward_compatibility_single_card(self, tmp_path, monkeypatch):
         """Test that single-card images still work correctly."""
-        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
 
         # Use simple fake image (no card-like features, so detection may fail gracefully)
@@ -400,7 +401,7 @@ class TestMultiCardRecognitionAPI:
 
     def test_multi_card_detection_disabled(self, tmp_path, monkeypatch):
         """Test that multi-card detection can be disabled."""
-        monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
 
@@ -411,3 +412,70 @@ class TestMultiCardRecognitionAPI:
         )
 
         assert response.status_code == 200
+
+    def test_multi_card_recognition_validates_each_card_independently(self, tmp_path, monkeypatch):
+        mtgjson_source = tmp_path / "AllPrintings.fixture.json"
+        mtgjson_source.write_text(
+            json.dumps(
+                {
+                    "meta": {"date": "2026-03-26", "version": "1.0.0"},
+                    "data": {
+                        "M10": {
+                            "code": "M10",
+                            "name": "Magic 2010",
+                            "releaseDate": "2009-07-17",
+                            "cards": [
+                                {"uuid": "bolt-m10-146", "name": "Lightning Bolt", "setCode": "M10", "number": "146", "layout": "normal", "language": "English"},
+                                {"uuid": "forest-m10-247", "name": "Forest", "setCode": "M10", "number": "247", "layout": "normal", "language": "English"}
+                            ],
+                        }
+                    },
+                }
+            )
+        )
+        from app.services.mtgjson_index import import_all_printings
+        from app.services import recognizer as recognizer_module
+
+        db_path = tmp_path / "mtgjson.sqlite"
+        import_all_printings(source_path=mtgjson_source, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+        monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(db_path))
+        monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "true")
+
+        def fake_detect(self, image_bytes):  # type: ignore[no-untyped-def]
+            del image_bytes
+            return DetectionResult(
+                regions=[
+                    CardRegion(x=0, y=0, width=10, height=10, confidence=0.9),
+                    CardRegion(x=20, y=20, width=10, height=10, confidence=0.9),
+                ],
+                original_shape=(100, 100),
+            )
+
+        def fake_crop_region(self, image_bytes, region):  # type: ignore[no-untyped-def]
+            del image_bytes, region
+            return (b"crop-bytes", "image/jpeg")
+
+        def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
+            del image_bytes, prompt_text
+            if metadata.filename.endswith("crop-0.jpg"):
+                return RecognitionResponse(cards=[{"title": "Lightning Bolt", "edition": "M10", "collector_number": "146", "foil": False, "confidence": 0.9, "notes": "first crop"}])
+            return RecognitionResponse(cards=[{"title": "Totally Fake Card", "edition": "M10", "collector_number": "999", "foil": False, "confidence": 0.8, "notes": "second crop"}])
+
+        monkeypatch.setattr(CardDetector, "detect", fake_detect)
+        monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
+        monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
+
+        response = client.post(
+            "/api/v1/recognitions",
+            data={"prompt_version": "card-recognition.md"},
+            files={"image": ("test.jpg", b"fake-image-bytes", "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert [card["title"] for card in payload["cards"]] == ["Lightning Bolt", "Totally Fake Card"]
+        assert payload["cards"][0]["edition"] == "Magic 2010"
+        assert payload["cards"][1]["confidence"] == 0.55

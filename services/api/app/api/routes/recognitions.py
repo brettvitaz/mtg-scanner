@@ -30,7 +30,7 @@ async def create_recognition(
         prompt_version=prompt_version,
     )
     try:
-        response, enriched_metadata, detection_result = get_recognition_service().recognize(
+        response, enriched_metadata, detection_result, validation_result = get_recognition_service().recognize(
             image_bytes=image_bytes,
             metadata=metadata,
         )
@@ -50,5 +50,6 @@ async def create_recognition(
         metadata=enriched_metadata,
         response=response,
         detection_result=detection_result,
+        validation_result=validation_result,
     )
     return response

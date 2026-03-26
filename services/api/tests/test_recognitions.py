@@ -1,5 +1,7 @@
 import json
+from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -8,7 +10,43 @@ from app.services.recognizer import OpenAIRecognitionProvider, get_recognition_s
 client = TestClient(app)
 
 
-def test_recognition_upload_response() -> None:
+@pytest.fixture
+def mtgjson_db(tmp_path: Path) -> Path:
+    source_path = tmp_path / "AllPrintings.fixture.json"
+    source_path.write_text(
+        json.dumps(
+            {
+                "meta": {"date": "2026-03-26", "version": "1.0.0"},
+                "data": {
+                    "M10": {
+                        "code": "M10",
+                        "name": "Magic 2010",
+                        "releaseDate": "2009-07-17",
+                        "cards": [
+                            {
+                                "uuid": "bolt-m10-146",
+                                "name": "Lightning Bolt",
+                                "setCode": "M10",
+                                "number": "146",
+                                "layout": "normal",
+                                "language": "English",
+                            }
+                        ],
+                    }
+                },
+            }
+        )
+    )
+    from app.services.mtgjson_index import import_all_printings
+
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=source_path, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+    return db_path
+
+
+def test_recognition_upload_response(mtgjson_db: Path, monkeypatch) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
     response = client.post(
         "/api/v1/recognitions",
         data={"prompt_version": "card-recognition.md"},
@@ -17,6 +55,8 @@ def test_recognition_upload_response() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["cards"][0]["title"] == "Lightning Bolt"
+    assert payload["cards"][0]["edition"] == "Magic 2010"
+    assert payload["cards"][0]["collector_number"] == "146"
     assert "lightning-bolt.jpg" in payload["cards"][0]["notes"]
 
 
@@ -29,9 +69,10 @@ def test_recognition_rejects_non_image_upload() -> None:
     assert response.json()["detail"] == "Uploaded file must be an image."
 
 
-def test_recognition_upload_saves_artifacts(tmp_path, monkeypatch) -> None:
-    monkeypatch.delenv("MTG_SCANNER_RECOGNIZER_PROVIDER", raising=False)
+def test_recognition_upload_saves_artifacts(tmp_path, monkeypatch, mtgjson_db: Path) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+    monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 
     response = client.post(
         "/api/v1/recognitions",
@@ -56,6 +97,9 @@ def test_recognition_upload_saves_artifacts(tmp_path, monkeypatch) -> None:
     assert saved_metadata["prompt_version"] == "card-recognition.md"
     assert saved_metadata["provider"] == "mock"
     assert saved_metadata["model"] is None
+    assert saved_metadata["validation"]["enabled"] is True
+    assert saved_metadata["validation"]["available"] is True
+    assert saved_metadata["validation"]["cards"][0]["status"] == "exact_match"
 
 
 def test_recognition_can_use_openai_provider_without_live_access(
@@ -65,6 +109,7 @@ def test_recognition_can_use_openai_provider_without_live_access(
     monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
 
     from app.models.recognition import RecognitionResponse
     from app.services import recognizer as recognizer_module
@@ -115,8 +160,9 @@ def test_recognition_can_use_openai_provider_without_live_access(
 
 def test_openai_provider_requires_env_when_selected(monkeypatch) -> None:
     monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("MTG_SCANNER_OPENAI_MODEL", raising=False)
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "")
 
     response = client.post(
         "/api/v1/recognitions",
@@ -133,6 +179,7 @@ def test_openai_provider_timeout_defaults_to_thirty_seconds(monkeypatch) -> None
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
     monkeypatch.delenv("MTG_SCANNER_OPENAI_TIMEOUT_SECONDS", raising=False)
 
     service = get_recognition_service()
@@ -146,9 +193,31 @@ def test_openai_provider_timeout_can_be_configured(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
     monkeypatch.setenv("MTG_SCANNER_OPENAI_TIMEOUT_SECONDS", "12.5")
 
     service = get_recognition_service()
 
     assert isinstance(service._provider, OpenAIRecognitionProvider)
     assert service._provider._timeout_seconds == 12.5
+
+
+def test_recognition_gracefully_skips_validation_when_db_missing(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+    monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(tmp_path / "missing.sqlite"))
+
+    response = client.post(
+        "/api/v1/recognitions",
+        data={"prompt_version": "card-recognition.md"},
+        files={"image": ("lightning-bolt.jpg", b"fake-image-bytes", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["cards"][0]["title"] == "Lightning Bolt"
+
+    recognition_dirs = list((tmp_path / "recognitions").iterdir())
+    saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
+    assert saved_metadata["validation"]["available"] is False
+    assert saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"

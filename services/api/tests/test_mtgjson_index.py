@@ -1,0 +1,147 @@
+import json
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+from app.services.mtgjson_index import (
+    MTGJSONImportError,
+    MTGJSONIndex,
+    import_all_printings,
+    normalize_collector_number,
+    normalize_set_code,
+    normalize_set_name,
+    normalize_title,
+)
+
+
+@pytest.fixture
+def mtgjson_fixture(tmp_path: Path) -> Path:
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "M10": {
+                "code": "M10",
+                "name": "Magic 2010",
+                "releaseDate": "2009-07-17",
+                "cards": [
+                    {
+                        "uuid": "bolt-m10-146",
+                        "name": "Lightning Bolt",
+                        "setCode": "M10",
+                        "number": "146",
+                        "layout": "normal",
+                        "language": "English",
+                    },
+                    {
+                        "uuid": "forest-m10-247",
+                        "name": "Forest",
+                        "setCode": "M10",
+                        "number": "247",
+                        "layout": "normal",
+                        "language": "English",
+                    },
+                ],
+            },
+            "2XM": {
+                "code": "2XM",
+                "name": "Double Masters",
+                "releaseDate": "2020-08-07",
+                "cards": [
+                    {
+                        "uuid": "bolt-2xm-123",
+                        "name": "Lightning Bolt",
+                        "setCode": "2XM",
+                        "number": "123",
+                        "layout": "normal",
+                        "language": "English",
+                    },
+                    {
+                        "uuid": "forest-2xm-247",
+                        "name": "Forest",
+                        "setCode": "2XM",
+                        "number": "247",
+                        "layout": "normal",
+                        "language": "English",
+                    },
+                    {
+                        "uuid": "skip-me",
+                        "setCode": "2XM",
+                        "number": "999",
+                    },
+                ],
+            },
+        },
+    }
+    path = tmp_path / "AllPrintings.fixture.json"
+    path.write_text(json.dumps(payload))
+    return path
+
+
+def test_normalization_helpers() -> None:
+    assert normalize_title("  Lightning—Bolt  ") == "lightning-bolt"
+    assert normalize_title("Jace, the Mind Sculptor") == "jace the mind sculptor"
+    assert normalize_set_code(" m10 ") == "M10"
+    assert normalize_set_name("  Magic 2010 ") == "magic 2010"
+    assert normalize_collector_number(" 001A ") == "1a"
+    assert normalize_collector_number("007") == "7"
+
+
+def test_import_all_printings_builds_sqlite_and_manifest(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    manifest_path = tmp_path / "manifest.json"
+
+    summary = import_all_printings(
+        source_path=mtgjson_fixture,
+        db_path=db_path,
+        manifest_path=manifest_path,
+    )
+
+    assert summary.set_count == 2
+    assert summary.card_count == 4
+    assert summary.skipped_card_count == 1
+    assert db_path.exists()
+
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["total_set_count"] == 2
+    assert manifest["total_card_printing_count"] == 4
+    assert manifest["mtgjson_version"] == "1.0.0"
+
+    with sqlite3.connect(db_path) as conn:
+        set_count = conn.execute("SELECT COUNT(*) FROM sets").fetchone()[0]
+        card_count = conn.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
+    assert set_count == 2
+    assert card_count == 4
+
+
+def test_import_all_printings_rejects_malformed_source(tmp_path: Path) -> None:
+    source_path = tmp_path / "broken.json"
+    source_path.write_text("{not-json")
+
+    with pytest.raises(MTGJSONImportError):
+        import_all_printings(
+            source_path=source_path,
+            db_path=tmp_path / "mtgjson.sqlite",
+            manifest_path=tmp_path / "manifest.json",
+        )
+
+
+def test_index_lookup_paths(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    manifest_path = tmp_path / "manifest.json"
+    import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=manifest_path)
+
+    index = MTGJSONIndex(db_path)
+
+    exact = index.lookup_exact(title="Lightning Bolt", set_code="M10", collector_number="146")
+    assert exact is not None
+    assert exact.uuid == "bolt-m10-146"
+
+    assert index.resolve_set("Magic 2010") == "M10"
+    assert index.resolve_set("m10") == "M10"
+
+    by_name_set = index.lookup_by_name_and_set(title="Lightning Bolt", set_code="2XM")
+    assert [card.uuid for card in by_name_set] == ["bolt-2xm-123"]
+
+    by_name_number = index.lookup_by_name_and_number(title="Forest", collector_number="247")
+    assert sorted(card.uuid for card in by_name_number) == ["forest-2xm-247", "forest-m10-247"]

@@ -11,7 +11,9 @@ from app.models.recognition import (
     RecognitionUploadMetadata,
 )
 from app.services.card_detector import CardDetector, DetectionResult
+from app.services.card_validation import CardValidationService, ValidationBatchResult
 from app.services.errors import RecognitionConfigurationError, RecognitionProviderError
+from app.services.mtgjson_index import MTGJSONIndex
 from app.services.openai_compat import (
     build_openai_request_body,
     extract_recognition_response,
@@ -122,23 +124,38 @@ class RecognitionService:
         self,
         provider: RecognitionProvider,
         card_detector: CardDetector | None = None,
+        validator: CardValidationService | None = None,
     ) -> None:
         self._provider = provider
         self._card_detector = card_detector
+        self._validator = validator
+
+    def _validate_response(
+        self,
+        response: RecognitionResponse,
+    ) -> ValidationBatchResult | None:
+        if self._validator is None:
+            return None
+        return self._validator.validate_response(response)
 
     def recognize(
         self,
         *,
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
-    ) -> tuple[RecognitionResponse, RecognitionUploadMetadata, DetectionResult | None]:
+    ) -> tuple[
+        RecognitionResponse,
+        RecognitionUploadMetadata,
+        DetectionResult | None,
+        ValidationBatchResult | None,
+    ]:
         """Recognize cards in an image.
 
         If a card detector is configured and multiple cards are detected,
         each card is cropped and recognized individually.
 
         Returns:
-            Tuple of (RecognitionResponse, enriched metadata, detection result)
+            Tuple of (RecognitionResponse, enriched metadata, detection result, validation result)
         """
         prompt_text = _load_prompt(metadata.prompt_version)
         enriched_metadata = metadata.model_copy(
@@ -173,7 +190,14 @@ class RecognitionService:
                     )
                     all_cards.extend(response.cards)
 
-                return RecognitionResponse(cards=all_cards), enriched_metadata, detection_result
+                combined_response = RecognitionResponse(cards=all_cards)
+                validation_result = self._validate_response(combined_response)
+                return (
+                    validation_result.response if validation_result else combined_response,
+                    enriched_metadata,
+                    detection_result,
+                    validation_result,
+                )
 
         # Single card or no detection - use original behavior
         response = self._provider.recognize(
@@ -181,7 +205,13 @@ class RecognitionService:
             metadata=enriched_metadata,
             prompt_text=prompt_text,
         )
-        return response, enriched_metadata, detection_result
+        validation_result = self._validate_response(response)
+        return (
+            validation_result.response if validation_result else response,
+            enriched_metadata,
+            detection_result,
+            validation_result,
+        )
 
 
 def get_recognition_service() -> RecognitionService:
@@ -193,8 +223,15 @@ def get_recognition_service() -> RecognitionService:
         from app.services.card_detector import get_card_detector
         detector = get_card_detector()
 
+    validator: CardValidationService | None = None
+    if settings.mtg_scanner_enable_mtg_validation:
+        validator = CardValidationService(
+            index=MTGJSONIndex(Path(settings.mtg_scanner_mtgjson_db_path).expanduser()),
+            max_fuzzy_candidates=settings.mtg_scanner_mtgjson_max_fuzzy_candidates,
+        )
+
     if provider_name == "mock":
-        return RecognitionService(MockRecognitionProvider(), detector)
+        return RecognitionService(MockRecognitionProvider(), detector, validator)
 
     if provider_name == "openai":
         api_key = settings.openai_api_key
@@ -218,6 +255,7 @@ def get_recognition_service() -> RecognitionService:
                 response_mode=settings.mtg_scanner_openai_response_mode.strip().lower(),
             ),
             detector,
+            validator,
         )
 
     raise RecognitionConfigurationError(

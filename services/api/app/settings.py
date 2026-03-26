@@ -5,8 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 _ENV_FILES = [
-    Path(__file__).resolve().parents[2] / ".env",
-    Path(__file__).resolve().parents[2] / ".env.local",
+    Path(__file__).resolve().parents[1] / ".env",
+    Path(__file__).resolve().parents[1] / ".env.local",
 ]
 
 

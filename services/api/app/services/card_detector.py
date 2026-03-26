@@ -43,8 +43,11 @@ class CardDetector:
     MAX_CARD_AREA_PERCENT = 0.70
     CROP_PADDING_PERCENT = 0.03
     MIN_RECT_FILL_RATIO = 0.58
-    CROP_REFINE_BAND_PERCENT = 0.16
+    CROP_REFINE_BAND_PERCENT = 0.18
     CROP_REFINE_MIN_INSET_PERCENT = 0.01
+    CROP_REFINE_MAX_TRIM_PERCENT = 0.12
+    CROP_REFINE_SAFE_MARGIN_PERCENT = 0.012
+    CROP_REFINE_MIN_EDGE_CONTRAST = 10.0
 
     def __init__(
         self,
@@ -544,68 +547,84 @@ class CardDetector:
     ) -> tuple[int, int, int, int] | None:
         min_inset_x = max(2, int(round(width * self.CROP_REFINE_MIN_INSET_PERCENT)))
         min_inset_y = max(2, int(round(height * self.CROP_REFINE_MIN_INSET_PERCENT)))
-        band_x = max(min_inset_x + 8, int(round(width * self.CROP_REFINE_BAND_PERCENT)))
-        band_y = max(min_inset_y + 8, int(round(height * self.CROP_REFINE_BAND_PERCENT)))
+        band_x = max(min_inset_x + 10, int(round(width * self.CROP_REFINE_BAND_PERCENT)))
+        band_y = max(min_inset_y + 10, int(round(height * self.CROP_REFINE_BAND_PERCENT)))
+        max_trim_x = max(min_inset_x + 1, int(round(width * self.CROP_REFINE_MAX_TRIM_PERCENT)))
+        max_trim_y = max(min_inset_y + 1, int(round(height * self.CROP_REFINE_MAX_TRIM_PERCENT)))
 
-        left_candidates = self._darkest_candidates(col_signal, min_inset_x, min(band_x, width - min_inset_x - 1))
-        right_candidates = self._darkest_candidates(col_signal, max(width - band_x, min_inset_x + 1), width - min_inset_x - 1)
-        top_candidates = self._darkest_candidates(row_signal, min_inset_y, min(band_y, height - min_inset_y - 1))
-        bottom_candidates = self._darkest_candidates(row_signal, max(height - band_y, min_inset_y + 1), height - min_inset_y - 1)
+        left = self._edge_trim_position(col_signal, min_inset_x, min(band_x, width - min_inset_x - 2), side="left")
+        right = self._edge_trim_position(col_signal, max(width - band_x - 1, min_inset_x + 1), width - min_inset_x - 2, side="right")
+        top = self._edge_trim_position(row_signal, min_inset_y, min(band_y, height - min_inset_y - 2), side="top")
+        bottom = self._edge_trim_position(row_signal, max(height - band_y - 1, min_inset_y + 1), height - min_inset_y - 2, side="bottom")
 
-        if not left_candidates or not right_candidates or not top_candidates or not bottom_candidates:
+        if None in (left, right, top, bottom):
             return None
 
-        best_choice: tuple[float, tuple[int, int, int, int]] | None = None
-        for left in left_candidates:
-            for right in right_candidates:
-                if right <= left + width * 0.45:
-                    continue
-                for top in top_candidates:
-                    for bottom in bottom_candidates:
-                        if bottom <= top + height * 0.45:
-                            continue
+        assert left is not None and right is not None and top is not None and bottom is not None
 
-                        trimmed_width = right - left + 1
-                        trimmed_height = bottom - top + 1
-                        aspect_ratio = trimmed_width / max(trimmed_height, 1)
-                        ratio_diff = abs(aspect_ratio - self.TARGET_ASPECT_RATIO) / self.TARGET_ASPECT_RATIO
-                        if ratio_diff > 0.12:
-                            continue
+        left = min(left, max_trim_x)
+        top = min(top, max_trim_y)
+        right = max(right, width - max_trim_x - 1)
+        bottom = max(bottom, height - max_trim_y - 1)
 
-                        area_ratio = (trimmed_width * trimmed_height) / max(width * height, 1)
-                        if not 0.68 <= area_ratio <= 0.99:
-                            continue
+        if right <= left + width * 0.55 or bottom <= top + height * 0.55:
+            return None
 
-                        darkness_score = (
-                            float(col_signal[left])
-                            + float(col_signal[right])
-                            + float(row_signal[top])
-                            + float(row_signal[bottom])
-                        ) / 4.0
-                        edge_distance_penalty = (
-                            abs(left - min_inset_x)
-                            + abs((width - min_inset_x - 1) - right)
-                            + abs(top - min_inset_y)
-                            + abs((height - min_inset_y - 1) - bottom)
-                        ) / max(width + height, 1)
-                        score = darkness_score + 18.0 * ratio_diff + 25.0 * edge_distance_penalty
-                        if best_choice is None or score < best_choice[0]:
-                            best_choice = (score, (left, top, right, bottom))
+        trimmed_width = right - left + 1
+        trimmed_height = bottom - top + 1
+        aspect_ratio = trimmed_width / max(trimmed_height, 1)
+        ratio_diff = abs(aspect_ratio - self.TARGET_ASPECT_RATIO) / self.TARGET_ASPECT_RATIO
+        if ratio_diff > 0.10:
+            return None
 
-        return best_choice[1] if best_choice else None
+        area_ratio = (trimmed_width * trimmed_height) / max(width * height, 1)
+        if not 0.78 <= area_ratio <= 0.99:
+            return None
 
-    def _darkest_candidates(self, signal: np.ndarray, start: int, end: int, limit: int = 6) -> list[int]:
+        return left, top, right, bottom
+
+    def _edge_trim_position(self, signal: np.ndarray, start: int, end: int, side: str) -> int | None:
         if end <= start:
-            return []
+            return None
 
-        window = signal[start : end + 1]
-        candidate_count = min(limit, window.shape[0])
-        if candidate_count <= 0:
-            return []
+        window = signal[start : end + 1].astype(np.float32)
+        if window.size < 6:
+            return None
 
-        ranked = np.argsort(window)[:candidate_count]
-        positions = sorted({int(start + index) for index in ranked})
-        return positions
+        reversed_side = side in {"right", "bottom"}
+        search_window = window[::-1] if reversed_side else window
+
+        sample_span = max(4, min(12, search_window.size // 2))
+        outer_mean = float(search_window[:sample_span].mean())
+        darkest_index = int(np.argmin(search_window))
+        darkest_mean = float(
+            search_window[max(0, darkest_index - 1) : min(search_window.shape[0], darkest_index + sample_span)].mean()
+        )
+        contrast = outer_mean - darkest_mean
+
+        threshold = outer_mean - max(self.CROP_REFINE_MIN_EDGE_CONTRAST, contrast * 0.35)
+        run_length = max(2, min(4, search_window.size // 8))
+        edge_index: int | None = None
+        if contrast >= self.CROP_REFINE_MIN_EDGE_CONTRAST:
+            for index in range(0, search_window.size - run_length + 1):
+                segment = search_window[index : index + run_length]
+                if float(segment.mean()) <= threshold:
+                    edge_index = index
+                    break
+
+        if edge_index is None:
+            fallback_contrast = outer_mean - float(search_window[darkest_index])
+            if fallback_contrast < self.CROP_REFINE_MIN_EDGE_CONTRAST * 0.55:
+                return None
+            edge_index = darkest_index
+
+        safe_margin = max(2, int(round(signal.shape[0] * self.CROP_REFINE_SAFE_MARGIN_PERCENT)))
+        if reversed_side:
+            edge_position = end - edge_index
+            return min(signal.shape[0] - 1, edge_position + safe_margin)
+
+        edge_position = start + edge_index
+        return max(0, edge_position - safe_margin)
 
     def _expand_quad(self, corners: np.ndarray, padding_percent: float) -> np.ndarray:
         center = corners.mean(axis=0)

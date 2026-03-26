@@ -39,7 +39,7 @@ class CardDetector:
 
     TARGET_ASPECT_RATIO = 2.5 / 3.5
     ASPECT_RATIO_TOLERANCE = 0.25
-    MIN_CARD_AREA_PERCENT = 0.06
+    MIN_CARD_AREA_PERCENT = 0.04
     MAX_CARD_AREA_PERCENT = 0.70
     CROP_PADDING_PERCENT = 0.03
     MIN_RECT_FILL_RATIO = 0.58
@@ -217,7 +217,7 @@ class CardDetector:
         image_shape: tuple[int, int],
     ) -> list[CardRegion]:
         dense_candidates = [candidate for candidate in candidates if candidate.confidence >= 0.75]
-        if len(dense_candidates) < 5:
+        if len(dense_candidates) < 8:
             return []
 
         widths = np.array([candidate.width for candidate in dense_candidates], dtype=np.float32)
@@ -250,6 +250,7 @@ class CardDetector:
         image_height, image_width = image_shape
         match_x_threshold = median_width * 0.28
         match_y_threshold = median_height * 0.28
+        occupied_cells = 0
 
         for y_cluster in y_clusters:
             for x_cluster in x_clusters:
@@ -263,6 +264,7 @@ class CardDetector:
                 ]
 
                 if matching_candidates:
+                    occupied_cells += 1
                     inferred_regions.append(max(matching_candidates, key=lambda region: (region.confidence, region.area)))
                     continue
 
@@ -284,7 +286,7 @@ class CardDetector:
                     )
                 )
 
-        return inferred_regions if len(inferred_regions) == 9 else []
+        return inferred_regions if len(inferred_regions) == 9 and occupied_cells >= 8 else []
 
     def _cluster_axis(self, values: list[float], threshold: float) -> list[list[float]]:
         if not values:
@@ -366,11 +368,14 @@ class CardDetector:
         width_ratio = inner.width / max(outer.width, 1)
         height_ratio = inner.height / max(outer.height, 1)
         area_ratio = inner.area / max(outer.area, 1)
+        center_distance_x = abs((inner.x + inner.width / 2) - (outer.x + outer.width / 2))
+        strong_containment = self._contains(outer, inner, tolerance=32) or self._intersection_ratio(outer, inner) >= 0.92
         return (
-            width_ratio <= 0.9
-            and height_ratio <= 0.9
-            and area_ratio <= 0.7
-            and inner.confidence >= outer.confidence - 0.2
+            strong_containment
+            and center_distance_x <= outer.width * 0.18
+            and max(width_ratio, height_ratio) <= 0.97
+            and area_ratio <= 0.75
+            and inner.confidence >= outer.confidence - 0.3
         )
 
     def _intersection_ratio(self, outer: CardRegion, inner: CardRegion) -> float:

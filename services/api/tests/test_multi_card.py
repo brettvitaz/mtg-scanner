@@ -15,6 +15,7 @@ client = TestClient(app)
 
 
 SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples" / "test"
+ARTIFACTS_DIR = Path("/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions")
 
 
 class TestCardDetector:
@@ -151,6 +152,29 @@ class TestCardDetector:
         assert result.count == 2
         assert all(region.corners is not None for region in result.regions)
 
+    @pytest.mark.parametrize(
+        ("filename", "expected_count"),
+        [
+            ("IMG_1619.png", 1),
+            ("IMG_1620.png", 2),
+            ("IMG_1621.png", 3),
+            ("IMG_1622.png", 4),
+            ("IMG_1623.png", 5),
+            ("IMG_1624.png", 6),
+            ("IMG_1625.png", 7),
+            ("IMG_1626.png", 9),
+            ("IMG_1627.png", 9),
+        ],
+    )
+    def test_real_sample_ladder_detects_expected_cards(self, filename: str, expected_count: int):
+        """Real sample ladder regressions should stay pinned to their expected card counts."""
+        detector = CardDetector()
+        image_bytes = (SAMPLES_DIR / filename).read_bytes()
+
+        result = detector.detect(image_bytes)
+
+        assert result.count == expected_count
+
     def test_binder_page_detects_nine_cards(self):
         """Dense 3x3 binder pages should resolve to all nine cards."""
         detector = CardDetector()
@@ -164,9 +188,7 @@ class TestCardDetector:
     def test_real_two_card_artifact_stays_at_two_cards(self):
         """Dense-layout inference should not add a spurious container region to normal two-card shots."""
         detector = CardDetector()
-        image_bytes = Path(
-            "/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T042740-313a4c56/upload.jpg"
-        ).read_bytes()
+        image_bytes = (ARTIFACTS_DIR / "20260326T042740-313a4c56" / "upload.jpg").read_bytes()
 
         result = detector.detect(image_bytes)
 
@@ -176,14 +198,23 @@ class TestCardDetector:
     def test_real_three_card_artifact_stays_at_three_cards(self):
         """Three-card table shots should not produce extra nested crops."""
         detector = CardDetector()
-        image_bytes = Path(
-            "/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T043745-01c5b1b9/upload.jpg"
-        ).read_bytes()
+        image_bytes = (ARTIFACTS_DIR / "20260326T043745-01c5b1b9" / "upload.jpg").read_bytes()
 
         result = detector.detect(image_bytes)
 
         assert result.count == 3
         assert sum(1 for region in result.regions if region.confidence >= 0.5) >= 2
+
+    def test_duplicate_crop_bug_keeps_distinct_two_cards(self):
+        """Overlapping candidates for the same physical card should collapse to one crop per card."""
+        detector = CardDetector()
+        image_bytes = (ARTIFACTS_DIR / "20260326T044827-23ae7d33" / "upload.jpg").read_bytes()
+
+        result = detector.detect(image_bytes)
+
+        assert result.count == 2
+        assert all(region.corners is not None for region in result.regions)
+        assert max(detector._polygon_iou(result.regions[0], result.regions[1]), detector._polygon_iou(result.regions[1], result.regions[0])) < 0.05
 
     def test_iou_calculation(self):
         """Test IoU (Intersection over Union) calculation."""
@@ -214,14 +245,10 @@ class TestMultiCardRecognitionAPI:
         detector = CardDetector()
 
         cases = [
-            (
-                Path("/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T042740-313a4c56/upload.jpg"),
-                2,
-            ),
-            (
-                Path("/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T043745-01c5b1b9/upload.jpg"),
-                3,
-            ),
+            (ARTIFACTS_DIR / "20260326T042740-313a4c56" / "upload.jpg", 2),
+            (ARTIFACTS_DIR / "20260326T043745-01c5b1b9" / "upload.jpg", 3),
+            (ARTIFACTS_DIR / "20260326T044827-23ae7d33" / "upload.jpg", 2),
+            *[(SAMPLES_DIR / f"IMG_{index}.png", expected) for index, expected in zip(range(1619, 1628), [1, 2, 3, 4, 5, 6, 7, 9, 9], strict=True)],
             (SAMPLES_DIR / "binder_page_1.jpg", 9),
         ]
 

@@ -323,9 +323,11 @@ class CardDetector:
         for region in regions:
             enclosed_regions = [other for other in regions if other is not region and self._contains(region, other)]
             if len(enclosed_regions) >= 2:
+                contained_coverage = max((self._intersection_ratio(region, other) for other in enclosed_regions), default=0.0)
                 enclosed_area_ratio = sum(other.area for other in enclosed_regions) / max(region.area, 1)
-                if enclosed_area_ratio >= 0.8:
+                if enclosed_area_ratio >= 0.8 and contained_coverage < 0.95:
                     continue
+
             filtered.append(region)
         return filtered
 
@@ -349,9 +351,39 @@ class CardDetector:
                 if overlap > iou_threshold:
                     is_overlapping = True
                     break
+
+                if self._is_nested_subregion(existing, region):
+                    is_overlapping = True
+                    break
+                if self._is_nested_subregion(region, existing):
+                    filtered.remove(existing)
+                    break
             if not is_overlapping:
                 filtered.append(region)
         return filtered
+
+    def _is_nested_subregion(self, outer: CardRegion, inner: CardRegion) -> bool:
+        width_ratio = inner.width / max(outer.width, 1)
+        height_ratio = inner.height / max(outer.height, 1)
+        area_ratio = inner.area / max(outer.area, 1)
+        return (
+            width_ratio <= 0.9
+            and height_ratio <= 0.9
+            and area_ratio <= 0.7
+            and inner.confidence >= outer.confidence - 0.2
+        )
+
+    def _intersection_ratio(self, outer: CardRegion, inner: CardRegion) -> float:
+        x1 = max(outer.x, inner.x)
+        y1 = max(outer.y, inner.y)
+        x2 = min(outer.x + outer.width, inner.x + inner.width)
+        y2 = min(outer.y + outer.height, inner.y + inner.height)
+
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+
+        intersection = (x2 - x1) * (y2 - y1)
+        return intersection / max(inner.area, 1)
 
     def _iou(self, r1: CardRegion, r2: CardRegion) -> float:
         x1 = max(r1.x, r2.x)

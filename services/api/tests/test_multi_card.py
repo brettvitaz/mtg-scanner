@@ -173,6 +173,18 @@ class TestCardDetector:
         assert result.count == 2
         assert all(region.corners is not None for region in result.regions)
 
+    def test_real_three_card_artifact_stays_at_three_cards(self):
+        """Three-card table shots should not produce extra nested crops."""
+        detector = CardDetector()
+        image_bytes = Path(
+            "/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T043745-01c5b1b9/upload.jpg"
+        ).read_bytes()
+
+        result = detector.detect(image_bytes)
+
+        assert result.count == 3
+        assert sum(1 for region in result.regions if region.confidence >= 0.5) >= 2
+
     def test_iou_calculation(self):
         """Test IoU (Intersection over Union) calculation."""
         detector = CardDetector()
@@ -196,6 +208,26 @@ class TestCardDetector:
 
 class TestMultiCardRecognitionAPI:
     """Integration tests for multi-card recognition via API."""
+
+    def test_crop_regression_real_sample_counts(self):
+        """Real regression samples should stay pinned to expected crop counts."""
+        detector = CardDetector()
+
+        cases = [
+            (
+                Path("/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T042740-313a4c56/upload.jpg"),
+                2,
+            ),
+            (
+                Path("/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T043745-01c5b1b9/upload.jpg"),
+                3,
+            ),
+            (SAMPLES_DIR / "binder_page_1.jpg", 9),
+        ]
+
+        for image_path, expected_count in cases:
+            result = detector.detect(image_path.read_bytes())
+            assert result.count == expected_count, f"{image_path} expected {expected_count} cards, got {result.count}"
 
     def test_recognition_saves_detection_metadata(self, tmp_path, monkeypatch):
         """Test that detection results are saved in metadata."""

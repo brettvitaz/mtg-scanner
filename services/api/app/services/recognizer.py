@@ -214,6 +214,7 @@ def get_recognition_service() -> RecognitionService:
                 api_key=api_key,
                 model_name=model_name,
                 base_url=settings.openai_base_url,
+                timeout_seconds=settings.mtg_scanner_openai_timeout_seconds,
                 response_mode=settings.mtg_scanner_openai_response_mode.strip().lower(),
             ),
             detector,
@@ -247,5 +248,4 @@ def _load_response_schema() -> dict:
 def _make_data_url(*, content_type: str, image_bytes: bytes) -> str:
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{content_type};base64,{encoded}"
-
 

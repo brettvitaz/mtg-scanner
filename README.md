@@ -52,7 +52,7 @@ This pass establishes a clean MVP foundation:
 - Versioned schema/examples plus validation tests
 - Workflow docs and ADRs for future contributors
 
-See `docs/development-workflow.md` for the preferred way to work in this repo.
+See `docs/feature-workflow.md` for the preferred low-token workflow for feature implementation, and `docs/development-workflow.md` for broader repo conventions.
 
 ## Recognition provider config
 The backend keeps the current `POST /api/v1/recognitions` contract unchanged and selects its recognition provider from environment variables.

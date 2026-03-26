@@ -66,6 +66,7 @@ Cards on dark backgrounds (like Eternal Witness) were particularly challenging b
 2. **Use wake triggers for ACP agents** — ensure completion events are sent
 3. **Test with real images** — verify detection/recognition on actual card photos
 4. **Document findings** — keep notes on decisions and debugging in this file
+5. **Use `docs/feature-workflow.md` as the default feature-thread playbook** to keep token cost low for coding agents with smaller context windows.
 
 ---
 

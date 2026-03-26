@@ -32,6 +32,36 @@ def mtgjson_db(tmp_path: Path) -> Path:
                                 "language": "English",
                             }
                         ],
+                    },
+                    "DFT": {
+                        "code": "DFT",
+                        "name": "Aetherdrift",
+                        "releaseDate": "2026-02-14",
+                        "cards": [
+                            {
+                                "uuid": "autarch-mammoth-dft-166",
+                                "name": "Autarch Mammoth",
+                                "setCode": "DFT",
+                                "number": "166",
+                                "layout": "normal",
+                                "language": "English"
+                            }
+                        ]
+                    },
+                    "OTJ": {
+                        "code": "OTJ",
+                        "name": "Outlaws of Thunder Junction",
+                        "releaseDate": "2024-04-19",
+                        "cards": [
+                            {
+                                "uuid": "laughing-jasper-flint-otj-215",
+                                "name": "Laughing Jasper Flint",
+                                "setCode": "OTJ",
+                                "number": "215",
+                                "layout": "normal",
+                                "language": "English"
+                            }
+                        ]
                     }
                 },
             }
@@ -67,6 +97,59 @@ def test_recognition_rejects_non_image_upload() -> None:
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Uploaded file must be an image."
+
+
+def test_recognition_does_not_canonicalize_impossible_title_and_set_combination(
+    tmp_path, monkeypatch, mtgjson_db: Path
+) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
+    monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+    monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+
+    from app.models.recognition import RecognitionResponse
+    from app.services import recognizer as recognizer_module
+
+    def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
+        del self, image_bytes, metadata, prompt_text
+        return RecognitionResponse(
+            cards=[
+                {
+                    "title": "Autarch Mammoth",
+                    "edition": "Outlaws of Thunder Junction",
+                    "collector_number": "166",
+                    "foil": False,
+                    "confidence": 0.92,
+                    "notes": "Model guessed the set from weak packaging context.",
+                }
+            ]
+        )
+
+    monkeypatch.setattr(
+        recognizer_module.OpenAIRecognitionProvider,
+        "recognize",
+        fake_recognize,
+    )
+
+    response = client.post(
+        "/api/v1/recognitions",
+        data={"prompt_version": "card-recognition.md"},
+        files={"image": ("autarch-mammoth.jpg", b"fake-image-bytes", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["cards"][0]["title"] == "Autarch Mammoth"
+    assert payload["cards"][0]["edition"] == "Outlaws of Thunder Junction"
+    assert payload["cards"][0]["collector_number"] == "166"
+    assert payload["cards"][0]["confidence"] == 0.67
+    assert "title does not exist in that set" in payload["cards"][0]["notes"].lower()
+
+    recognition_dirs = list((tmp_path / "recognitions").iterdir())
+    saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
+    assert saved_metadata["validation"]["cards"][0]["status"] == "no_match"
+    assert saved_metadata["validation"]["cards"][0]["matched_uuid"] is None
 
 
 def test_recognition_upload_saves_artifacts(tmp_path, monkeypatch, mtgjson_db: Path) -> None:

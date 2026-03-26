@@ -32,6 +32,22 @@ def validation_service(tmp_path: Path) -> CardValidationService:
                 {"uuid": "bolt-2xm-123", "name": "Lightning Bolt", "setCode": "2XM", "number": "123", "language": "English", "layout": "normal"},
                 {"uuid": "forest-2xm-247", "name": "Forest", "setCode": "2XM", "number": "247", "language": "English", "layout": "normal"}
               ]
+            },
+            "DFT": {
+              "code": "DFT",
+              "name": "Aetherdrift",
+              "releaseDate": "2026-02-14",
+              "cards": [
+                {"uuid": "autarch-mammoth-dft-166", "name": "Autarch Mammoth", "setCode": "DFT", "number": "166", "language": "English", "layout": "normal"}
+              ]
+            },
+            "OTJ": {
+              "code": "OTJ",
+              "name": "Outlaws of Thunder Junction",
+              "releaseDate": "2024-04-19",
+              "cards": [
+                {"uuid": "laughing-jasper-flint-otj-215", "name": "Laughing Jasper Flint", "setCode": "OTJ", "number": "215", "language": "English", "layout": "normal"}
+              ]
             }
           }
         }
@@ -128,7 +144,49 @@ def test_validate_card_handles_no_match(validation_service: CardValidationServic
 
     assert result.trace.status == "no_match"
     assert result.card.confidence == 0.45
-    assert "no mtgjson match" in result.card.notes.lower()
+    assert "title does not exist in that set" in result.card.notes.lower()
+
+
+def test_validate_card_rejects_impossible_title_and_set_combination(validation_service: CardValidationService) -> None:
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Autarch Mammoth",
+            edition="Outlaws of Thunder Junction",
+            collector_number="166",
+            foil=False,
+            confidence=0.92,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "no_match"
+    assert result.card.title == "Autarch Mammoth"
+    assert result.card.edition == "Outlaws of Thunder Junction"
+    assert result.card.collector_number == "166"
+    assert result.card.confidence == 0.67
+    assert result.trace.matched_uuid is None
+    assert "title does not exist in that set" in result.card.notes.lower()
+
+
+def test_validate_card_rejects_collector_number_conflict_inside_resolved_set(validation_service: CardValidationService) -> None:
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Lightning Bolt",
+            edition="Magic 2010",
+            collector_number="999",
+            foil=False,
+            confidence=0.9,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "no_match"
+    assert result.card.title == "Lightning Bolt"
+    assert result.card.edition == "Magic 2010"
+    assert result.card.collector_number == "999"
+    assert result.card.confidence == 0.65
+    assert result.trace.matched_uuid is None
+    assert "collector number conflicts" in result.card.notes.lower()
 
 
 def test_validate_response_gracefully_skips_when_db_missing(tmp_path: Path) -> None:

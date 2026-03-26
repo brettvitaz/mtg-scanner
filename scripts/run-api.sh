@@ -2,4 +2,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
-uvicorn app.main:app --app-dir services/api --reload
+python -m app.run

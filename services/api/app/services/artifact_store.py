@@ -1,12 +1,12 @@
 import json
 import mimetypes
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
 from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.settings import get_settings
 
 
 @dataclass(slots=True)
@@ -113,9 +113,9 @@ class LocalArtifactStore:
 
 
 def get_artifacts_base_dir() -> Path:
-    configured_dir = os.environ.get("MTG_SCANNER_ARTIFACTS_DIR")
-    if configured_dir:
-        return Path(configured_dir).expanduser()
+    settings = get_settings()
+    if settings.mtg_scanner_artifacts_dir:
+        return Path(settings.mtg_scanner_artifacts_dir).expanduser()
 
     return Path(__file__).resolve().parents[3] / ".artifacts"
 

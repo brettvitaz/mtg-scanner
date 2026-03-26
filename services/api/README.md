@@ -22,6 +22,19 @@ FastAPI backend scaffold for MTG card recognition.
 ./scripts/run-api.sh
 ```
 
+The app reads local env files from:
+- `services/api/.env`
+- `services/api/.env.local` (if present)
+
+You can configure the bind address and port there or via shell environment variables:
+
+```bash
+MTG_SCANNER_API_HOST=127.0.0.1
+MTG_SCANNER_API_PORT=8000
+```
+
+Shell environment variables override values from `.env` files. Use `0.0.0.0` instead of `127.0.0.1` if you want the API reachable from other devices on your network.
+
 ## Multi-Card Detection
 
 The API now supports automatic detection and recognition of multiple cards in a single image:

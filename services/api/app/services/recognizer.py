@@ -1,6 +1,5 @@
 import base64
 import json
-import os
 from pathlib import Path
 from typing import Protocol
 
@@ -17,6 +16,7 @@ from app.services.openai_compat import (
     build_openai_request_body,
     extract_recognition_response,
 )
+from app.settings import get_settings
 
 
 class RecognitionProvider(Protocol):
@@ -185,12 +185,11 @@ class RecognitionService:
 
 
 def get_recognition_service() -> RecognitionService:
-    provider_name = os.environ.get("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock").strip().lower()
+    settings = get_settings()
+    provider_name = settings.mtg_scanner_recognizer_provider.strip().lower()
 
-    # Check if multi-card detection is enabled
     detector: CardDetector | None = None
-    enable_detection = os.environ.get("MTG_SCANNER_ENABLE_MULTI_CARD", "true").lower() in ("true", "1", "yes")
-    if enable_detection:
+    if settings.mtg_scanner_enable_multi_card:
         from app.services.card_detector import get_card_detector
         detector = get_card_detector()
 
@@ -198,26 +197,24 @@ def get_recognition_service() -> RecognitionService:
         return RecognitionService(MockRecognitionProvider(), detector)
 
     if provider_name == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = settings.openai_api_key
         if not api_key:
             raise RecognitionConfigurationError(
                 "OPENAI_API_KEY must be set when MTG_SCANNER_RECOGNIZER_PROVIDER=openai."
             )
 
-        model_name = os.environ.get("MTG_SCANNER_OPENAI_MODEL")
+        model_name = settings.mtg_scanner_openai_model
         if not model_name:
             raise RecognitionConfigurationError(
                 "MTG_SCANNER_OPENAI_MODEL must be set when MTG_SCANNER_RECOGNIZER_PROVIDER=openai."
             )
 
-        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        response_mode = os.environ.get("MTG_SCANNER_OPENAI_RESPONSE_MODE", "json_schema").strip().lower()
         return RecognitionService(
             OpenAIRecognitionProvider(
                 api_key=api_key,
                 model_name=model_name,
-                base_url=base_url,
-                response_mode=response_mode,
+                base_url=settings.openai_base_url,
+                response_mode=settings.mtg_scanner_openai_response_mode.strip().lower(),
             ),
             detector,
         )

@@ -66,12 +66,12 @@ class CardDetector:
         min_card_area = int(image_area * self._min_card_area_percent)
         max_card_area = int(image_area * self._max_card_area_percent)
 
-        masks = self._build_candidate_masks(image)
+        candidate_specs = self._build_candidate_specs(image)
         candidates: list[CardRegion] = []
         seen_signatures: set[tuple[int, int, int, int]] = set()
 
-        for mask in masks:
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for mask, retrieval_mode in candidate_specs:
+            contours, _ = cv2.findContours(mask, retrieval_mode, cv2.CHAIN_APPROX_SIMPLE)
             for contour in contours:
                 candidate = self._candidate_from_contour(contour, min_card_area, max_card_area)
                 if candidate is None:
@@ -88,13 +88,15 @@ class CardDetector:
                 seen_signatures.add(signature)
                 candidates.append(candidate)
 
+        candidates.extend(self._infer_dense_grid_regions(candidates, image.shape[:2]))
+
         candidates.sort(key=lambda r: (r.confidence, r.area), reverse=True)
         filtered_regions = self._filter_overlapping(candidates)
         filtered_regions.sort(key=lambda r: (r.y, r.x))
 
         return DetectionResult(regions=filtered_regions, original_shape=(height, width))
 
-    def _build_candidate_masks(self, image: np.ndarray) -> list[np.ndarray]:
+    def _build_candidate_specs(self, image: np.ndarray) -> list[tuple[np.ndarray, int]]:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
@@ -110,7 +112,24 @@ class CardDetector:
         combined = cv2.bitwise_or(edge_mask, bg_mask)
         combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8), iterations=2)
 
-        return [combined, bg_mask, edge_mask]
+        adaptive_mask = cv2.adaptiveThreshold(
+            blurred,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV,
+            51,
+            7,
+        )
+        adaptive_mask = cv2.morphologyEx(adaptive_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8), iterations=1)
+        adaptive_mask = cv2.morphologyEx(adaptive_mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8), iterations=1)
+
+        return [
+            (combined, cv2.RETR_EXTERNAL),
+            (bg_mask, cv2.RETR_EXTERNAL),
+            (edge_mask, cv2.RETR_EXTERNAL),
+            (adaptive_mask, cv2.RETR_EXTERNAL),
+            (adaptive_mask, cv2.RETR_LIST),
+        ]
 
     def _background_distance_mask(self, image: np.ndarray) -> np.ndarray:
         height, width = image.shape[:2]
@@ -189,6 +208,110 @@ class CardDetector:
             confidence=round(confidence, 3),
             corners=corners,
         )
+
+    def _infer_dense_grid_regions(
+        self,
+        candidates: list[CardRegion],
+        image_shape: tuple[int, int],
+    ) -> list[CardRegion]:
+        dense_candidates = [candidate for candidate in candidates if candidate.confidence >= 0.75]
+        if len(dense_candidates) < 5:
+            return []
+
+        widths = np.array([candidate.width for candidate in dense_candidates], dtype=np.float32)
+        heights = np.array([candidate.height for candidate in dense_candidates], dtype=np.float32)
+        median_width = float(np.median(widths))
+        median_height = float(np.median(heights))
+        if median_width <= 0 or median_height <= 0:
+            return []
+
+        normalized_candidates = [
+            candidate
+            for candidate in dense_candidates
+            if 0.75 <= candidate.width / median_width <= 1.35 and 0.75 <= candidate.height / median_height <= 1.35
+        ]
+        if len(normalized_candidates) < 5:
+            return []
+
+        x_centers = [candidate.x + candidate.width / 2 for candidate in normalized_candidates]
+        y_centers = [candidate.y + candidate.height / 2 for candidate in normalized_candidates]
+
+        x_clusters = self._cluster_axis(x_centers, threshold=max(80.0, median_width * 0.35))
+        y_clusters = self._cluster_axis(y_centers, threshold=max(80.0, median_height * 0.30))
+        if len(x_clusters) != 3 or len(y_clusters) != 3:
+            return []
+
+        if not self._clusters_are_regular(x_clusters) or not self._clusters_are_regular(y_clusters):
+            return []
+
+        inferred_regions: list[CardRegion] = []
+        image_height, image_width = image_shape
+        match_x_threshold = median_width * 0.28
+        match_y_threshold = median_height * 0.28
+
+        for y_cluster in y_clusters:
+            for x_cluster in x_clusters:
+                center_x = float(np.mean(x_cluster))
+                center_y = float(np.mean(y_cluster))
+                matching_candidates = [
+                    candidate
+                    for candidate in normalized_candidates
+                    if abs((candidate.x + candidate.width / 2) - center_x) <= match_x_threshold
+                    and abs((candidate.y + candidate.height / 2) - center_y) <= match_y_threshold
+                ]
+
+                if matching_candidates:
+                    inferred_regions.append(max(matching_candidates, key=lambda region: (region.confidence, region.area)))
+                    continue
+
+                x = max(0, int(round(center_x - median_width / 2)))
+                y = max(0, int(round(center_y - median_height / 2)))
+                width = min(int(round(median_width)), image_width - x)
+                height = min(int(round(median_height)), image_height - y)
+                if width <= 0 or height <= 0:
+                    continue
+
+                inferred_regions.append(
+                    CardRegion(
+                        x=x,
+                        y=y,
+                        width=width,
+                        height=height,
+                        confidence=0.61,
+                        corners=None,
+                    )
+                )
+
+        return inferred_regions if len(inferred_regions) == 9 else []
+
+    def _cluster_axis(self, values: list[float], threshold: float) -> list[list[float]]:
+        if not values:
+            return []
+
+        clusters: list[list[float]] = []
+        for value in sorted(values):
+            if not clusters:
+                clusters.append([value])
+                continue
+
+            if abs(value - float(np.mean(clusters[-1]))) <= threshold:
+                clusters[-1].append(value)
+            else:
+                clusters.append([value])
+
+        return [cluster for cluster in clusters if cluster]
+
+    def _clusters_are_regular(self, clusters: list[list[float]]) -> bool:
+        if len(clusters) != 3:
+            return False
+
+        centers = [float(np.mean(cluster)) for cluster in clusters]
+        gaps = [centers[index + 1] - centers[index] for index in range(len(centers) - 1)]
+        if any(gap <= 0 for gap in gaps):
+            return False
+
+        gap_ratio = max(gaps) / min(gaps)
+        return gap_ratio <= 1.4
 
     def _filter_overlapping(self, regions: list[CardRegion], iou_threshold: float = 0.45) -> list[CardRegion]:
         if not regions:

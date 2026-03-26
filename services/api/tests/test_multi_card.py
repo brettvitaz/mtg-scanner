@@ -142,6 +142,22 @@ class TestCardDetector:
         assert len(crop_bytes) > 0
         assert content_type == "image/jpeg"
 
+    def test_refine_cropped_card_trims_simple_spillover(self):
+        """A local trim pass should snap inward from obvious dark card borders."""
+        import cv2
+
+        detector = CardDetector()
+        image = np.full((220, 180, 3), 210, dtype=np.uint8)
+        cv2.rectangle(image, (20, 15), (160, 205), (25, 25, 25), -1)
+        cv2.rectangle(image, (26, 21), (154, 199), (235, 235, 235), -1)
+
+        refined = detector._refine_cropped_card(image)
+        refined_height, refined_width = refined.shape[:2]
+
+        assert refined_width < image.shape[1] - 10
+        assert refined_height < image.shape[0] - 10
+        assert abs((refined_width / refined_height) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
+
     def test_real_sample_image_detects_two_cards(self):
         """Regression test for the real two-card sample that previously returned one card."""
         detector = CardDetector()
@@ -215,6 +231,35 @@ class TestCardDetector:
         assert result.count == 2
         assert all(region.corners is not None for region in result.regions)
         assert max(detector._polygon_iou(result.regions[0], result.regions[1]), detector._polygon_iou(result.regions[1], result.regions[0])) < 0.05
+
+    def test_binder_page_crop_refinement_trims_spillover_on_real_artifact(self):
+        """The crop refinement pass should tighten top-row binder-page crops without changing card count."""
+        import cv2
+
+        detector = CardDetector()
+        artifact_path = ARTIFACTS_DIR / "20260326T051835-8fe04381" / "upload.jpg"
+        image_bytes = artifact_path.read_bytes()
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+
+        result = detector.detect(image_bytes)
+        assert result.count == 9
+
+        eternal_witness = result.regions[0]
+        liliana = result.regions[1]
+
+        raw_eternal = detector._perspective_crop(image, eternal_witness)
+        raw_liliana = detector._bounding_box_crop(image, liliana)
+
+        refined_eternal = cv2.imdecode(np.frombuffer(detector.crop_region(image_bytes, eternal_witness)[0], dtype=np.uint8), cv2.IMREAD_COLOR)
+        refined_liliana = cv2.imdecode(np.frombuffer(detector.crop_region(image_bytes, liliana)[0], dtype=np.uint8), cv2.IMREAD_COLOR)
+
+        assert refined_eternal.shape[0] < raw_eternal.shape[0] - 100
+        assert refined_eternal.shape[1] < raw_eternal.shape[1] - 100
+        assert refined_liliana.shape[0] < raw_liliana.shape[0] - 150
+        assert refined_liliana.shape[1] < raw_liliana.shape[1] - 80
+        assert abs((refined_eternal.shape[1] / refined_eternal.shape[0]) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
+        assert abs((refined_liliana.shape[1] / refined_liliana.shape[0]) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
 
     def test_iou_calculation(self):
         """Test IoU (Intersection over Union) calculation."""

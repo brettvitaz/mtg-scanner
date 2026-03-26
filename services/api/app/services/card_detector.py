@@ -43,6 +43,8 @@ class CardDetector:
     MAX_CARD_AREA_PERCENT = 0.70
     CROP_PADDING_PERCENT = 0.03
     MIN_RECT_FILL_RATIO = 0.58
+    CROP_REFINE_BAND_PERCENT = 0.16
+    CROP_REFINE_MIN_INSET_PERCENT = 0.01
 
     def __init__(
         self,
@@ -427,6 +429,8 @@ class CardDetector:
         else:
             cropped = self._bounding_box_crop(image, region)
 
+        cropped = self._refine_cropped_card(cropped)
+
         _, encoded = cv2.imencode(".jpg", cropped)
         return encoded.tobytes(), "image/jpeg"
 
@@ -500,6 +504,108 @@ class CardDetector:
 
         _, encoded = cv2.imencode(".jpg", image)
         return encoded.tobytes()
+
+    def _refine_cropped_card(self, crop: np.ndarray) -> np.ndarray:
+        refined = crop
+        for _ in range(2):
+            if refined.size == 0:
+                return refined
+
+            height, width = refined.shape[:2]
+            min_dimension = min(height, width)
+            if min_dimension < 80:
+                return refined
+
+            gray = cv2.cvtColor(refined, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(gray, (5, 5), 0)
+
+            row_signal = cv2.GaussianBlur(gray.mean(axis=1).astype(np.float32).reshape(-1, 1), (1, 15), 0).ravel()
+            col_signal = cv2.GaussianBlur(gray.mean(axis=0).astype(np.float32).reshape(-1, 1), (1, 15), 0).ravel()
+
+            trim = self._find_trim_bounds(row_signal, col_signal, width, height)
+            if trim is None:
+                break
+
+            left, top, right, bottom = trim
+            candidate = refined[top : bottom + 1, left : right + 1]
+            if candidate.size == 0 or candidate.shape == refined.shape:
+                break
+
+            refined = candidate
+
+        return refined
+
+    def _find_trim_bounds(
+        self,
+        row_signal: np.ndarray,
+        col_signal: np.ndarray,
+        width: int,
+        height: int,
+    ) -> tuple[int, int, int, int] | None:
+        min_inset_x = max(2, int(round(width * self.CROP_REFINE_MIN_INSET_PERCENT)))
+        min_inset_y = max(2, int(round(height * self.CROP_REFINE_MIN_INSET_PERCENT)))
+        band_x = max(min_inset_x + 8, int(round(width * self.CROP_REFINE_BAND_PERCENT)))
+        band_y = max(min_inset_y + 8, int(round(height * self.CROP_REFINE_BAND_PERCENT)))
+
+        left_candidates = self._darkest_candidates(col_signal, min_inset_x, min(band_x, width - min_inset_x - 1))
+        right_candidates = self._darkest_candidates(col_signal, max(width - band_x, min_inset_x + 1), width - min_inset_x - 1)
+        top_candidates = self._darkest_candidates(row_signal, min_inset_y, min(band_y, height - min_inset_y - 1))
+        bottom_candidates = self._darkest_candidates(row_signal, max(height - band_y, min_inset_y + 1), height - min_inset_y - 1)
+
+        if not left_candidates or not right_candidates or not top_candidates or not bottom_candidates:
+            return None
+
+        best_choice: tuple[float, tuple[int, int, int, int]] | None = None
+        for left in left_candidates:
+            for right in right_candidates:
+                if right <= left + width * 0.45:
+                    continue
+                for top in top_candidates:
+                    for bottom in bottom_candidates:
+                        if bottom <= top + height * 0.45:
+                            continue
+
+                        trimmed_width = right - left + 1
+                        trimmed_height = bottom - top + 1
+                        aspect_ratio = trimmed_width / max(trimmed_height, 1)
+                        ratio_diff = abs(aspect_ratio - self.TARGET_ASPECT_RATIO) / self.TARGET_ASPECT_RATIO
+                        if ratio_diff > 0.12:
+                            continue
+
+                        area_ratio = (trimmed_width * trimmed_height) / max(width * height, 1)
+                        if not 0.68 <= area_ratio <= 0.99:
+                            continue
+
+                        darkness_score = (
+                            float(col_signal[left])
+                            + float(col_signal[right])
+                            + float(row_signal[top])
+                            + float(row_signal[bottom])
+                        ) / 4.0
+                        edge_distance_penalty = (
+                            abs(left - min_inset_x)
+                            + abs((width - min_inset_x - 1) - right)
+                            + abs(top - min_inset_y)
+                            + abs((height - min_inset_y - 1) - bottom)
+                        ) / max(width + height, 1)
+                        score = darkness_score + 18.0 * ratio_diff + 25.0 * edge_distance_penalty
+                        if best_choice is None or score < best_choice[0]:
+                            best_choice = (score, (left, top, right, bottom))
+
+        return best_choice[1] if best_choice else None
+
+    def _darkest_candidates(self, signal: np.ndarray, start: int, end: int, limit: int = 6) -> list[int]:
+        if end <= start:
+            return []
+
+        window = signal[start : end + 1]
+        candidate_count = min(limit, window.shape[0])
+        if candidate_count <= 0:
+            return []
+
+        ranked = np.argsort(window)[:candidate_count]
+        positions = sorted({int(start + index) for index in ranked})
+        return positions
 
     def _expand_quad(self, corners: np.ndarray, padding_percent: float) -> np.ndarray:
         center = corners.mean(axis=0)

@@ -4,15 +4,19 @@ import Foundation
 final class AppModel: ObservableObject {
     @Published var latestResult: RecognitionResult = .sample
     @Published var corrections: [UUID: CardCorrection] = [:]
-    @Published var apiBaseURL: String = AppConfig.defaultAPIBaseURL
+    @Published var apiBaseURL: String {
+        didSet { persistAPIBaseURL() }
+    }
     @Published var isRecognizing = false
     @Published var statusMessage = "Pick a card photo to start a mocked scan."
     @Published var lastUploadedFilename: String?
 
     private let apiClient = APIClient()
     private let correctionsStoreKey = "card_corrections"
+    private let apiBaseURLStoreKey = "api_base_url"
 
     init() {
+        self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         loadCorrections()
     }
 
@@ -55,6 +59,14 @@ final class AppModel: ObservableObject {
     private func persistCorrections() {
         guard let data = try? JSONEncoder().encode(corrections) else { return }
         UserDefaults.standard.set(data, forKey: correctionsStoreKey)
+    }
+
+    private func persistAPIBaseURL() {
+        UserDefaults.standard.set(apiBaseURL, forKey: apiBaseURLStoreKey)
+    }
+
+    func resetAPIBaseURL() {
+        apiBaseURL = AppConfig.defaultAPIBaseURL
     }
 
     private func loadCorrections() {

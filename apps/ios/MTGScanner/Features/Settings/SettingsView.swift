@@ -10,8 +10,14 @@ struct SettingsView: View {
                     TextField("Base URL", text: $appModel.apiBaseURL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
 
-                    Text("Use your Mac's LAN IP instead of 127.0.0.1 when the app runs on a physical iPhone.")
+                    Button("Reset to Default") {
+                        appModel.resetAPIBaseURL()
+                    }
+
+                    Text("The API address is saved between launches. Use your Mac's LAN or tailnet IP instead of 127.0.0.1 when the app runs on a physical iPhone.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

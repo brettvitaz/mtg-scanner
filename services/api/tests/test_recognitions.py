@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.settings import get_settings
 from app.services.recognizer import OpenAIRecognitionProvider, get_recognition_service
 
 client = TestClient(app)
@@ -283,6 +284,30 @@ def test_openai_provider_timeout_can_be_configured(monkeypatch) -> None:
 
     assert isinstance(service._provider, OpenAIRecognitionProvider)
     assert service._provider._timeout_seconds == 12.5
+
+
+def test_max_concurrent_recognitions_defaults_to_four(monkeypatch) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+    monkeypatch.delenv("MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS", raising=False)
+
+    settings = get_settings()
+    service = get_recognition_service()
+
+    assert settings.mtg_scanner_max_concurrent_recognitions == 4
+    assert service._max_concurrent_recognitions == 4
+
+
+def test_max_concurrent_recognitions_uses_configured_value(monkeypatch) -> None:
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+    monkeypatch.setenv("MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS", "7")
+
+    settings = get_settings()
+    service = get_recognition_service()
+
+    assert settings.mtg_scanner_max_concurrent_recognitions == 7
+    assert service._max_concurrent_recognitions == 7
 
 
 def test_recognition_gracefully_skips_validation_when_db_missing(tmp_path, monkeypatch) -> None:

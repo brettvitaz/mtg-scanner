@@ -147,19 +147,54 @@ class RecognitionService:
         crops: list[tuple[bytes, RecognitionUploadMetadata]],
         prompt_text: str,
     ) -> list[RecognitionResponse]:
-        with concurrent.futures.ThreadPoolExecutor(
+        executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=self._max_concurrent_recognitions
-        ) as executor:
-            futures = [
-                executor.submit(
-                    self._provider.recognize,
-                    crop_bytes,
-                    crop_metadata,
-                    prompt_text,
+        )
+        shutdown_nowait = False
+        try:
+            responses: list[RecognitionResponse | None] = [None] * len(crops)
+            indexed_crops = iter(enumerate(crops))
+            futures: dict[concurrent.futures.Future[RecognitionResponse], int] = {}
+
+            def submit_next_crop() -> bool:
+                try:
+                    index, (crop_bytes, crop_metadata) = next(indexed_crops)
+                except StopIteration:
+                    return False
+                futures[
+                    executor.submit(
+                        self._provider.recognize,
+                        crop_bytes,
+                        crop_metadata,
+                        prompt_text,
+                    )
+                ] = index
+                return True
+
+            for _ in range(min(self._max_concurrent_recognitions, len(crops))):
+                submit_next_crop()
+
+            while futures:
+                done, _ = concurrent.futures.wait(
+                    futures,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
                 )
-                for crop_bytes, crop_metadata in crops
-            ]
-            return [future.result() for future in futures]
+                for future in done:
+                    index = futures.pop(future)
+                    try:
+                        responses[index] = future.result()
+                    except Exception:
+                        for pending_future in futures:
+                            pending_future.cancel()
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        shutdown_nowait = True
+                        raise
+                    submit_next_crop()
+
+            return [response for response in responses if response is not None]
+        finally:
+            if not shutdown_nowait:
+                executor.shutdown(wait=True)
 
     def recognize(
         self,

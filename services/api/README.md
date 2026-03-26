@@ -112,6 +112,10 @@ export MTG_SCANNER_RECOGNIZER_PROVIDER=mock
 export MTG_SCANNER_RECOGNIZER_PROVIDER=openai
 export OPENAI_API_KEY=your-api-key
 export MTG_SCANNER_OPENAI_MODEL=gpt-4.1-mini
+
+# General multi-card recognition setting
+export MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS=4
+
 # Optional:
 export OPENAI_BASE_URL=https://api.openai.com/v1
 export MTG_SCANNER_OPENAI_TIMEOUT_SECONDS=30

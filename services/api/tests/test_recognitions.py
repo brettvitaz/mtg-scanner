@@ -221,3 +221,28 @@ def test_recognition_gracefully_skips_validation_when_db_missing(tmp_path, monke
     saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
     assert saved_metadata["validation"]["available"] is False
     assert saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"
+
+
+def test_recognition_gracefully_skips_validation_when_db_corrupt(tmp_path, monkeypatch) -> None:
+    corrupt_db = tmp_path / "corrupt.sqlite"
+    corrupt_db.write_text("not a sqlite database")
+
+    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
+    monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(corrupt_db))
+
+    response = client.post(
+        "/api/v1/recognitions",
+        data={"prompt_version": "card-recognition.md"},
+        files={"image": ("lightning-bolt.jpg", b"fake-image-bytes", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["cards"][0]["title"] == "Lightning Bolt"
+
+    recognition_dirs = list((tmp_path / "recognitions").iterdir())
+    saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
+    assert saved_metadata["validation"]["available"] is False
+    assert saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"
+    assert "unreadable" in saved_metadata["validation"]["cards"][0]["reason"].lower()

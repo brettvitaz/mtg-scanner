@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sqlite3
 
 from app.models.recognition import RecognizedCard, RecognitionResponse
 from app.services.mtgjson_index import (
@@ -50,7 +51,12 @@ class CardValidationService:
             traces = [self._unavailable_trace(card) for card in response.cards]
             return ValidationBatchResult(response=response, traces=traces, enabled=True, available=False)
 
-        results = [self.validate_card(card) for card in response.cards]
+        try:
+            results = [self.validate_card(card) for card in response.cards]
+        except sqlite3.Error:
+            traces = [self._unavailable_trace(card, reason="MTGJSON database unreadable; validation skipped.") for card in response.cards]
+            return ValidationBatchResult(response=response, traces=traces, enabled=True, available=False)
+
         return ValidationBatchResult(
             response=RecognitionResponse(cards=[result.card for result in results]),
             traces=[result.trace for result in results],
@@ -182,7 +188,12 @@ class CardValidationService:
             ),
         )
 
-    def _unavailable_trace(self, card: RecognizedCard) -> ValidationTrace:
+    def _unavailable_trace(
+        self,
+        card: RecognizedCard,
+        *,
+        reason: str = "MTGJSON database unavailable; validation skipped.",
+    ) -> ValidationTrace:
         return ValidationTrace(
             original=card.model_dump(),
             normalized_inputs={
@@ -197,7 +208,7 @@ class CardValidationService:
             matched_collector_number=None,
             confidence_before=card.confidence,
             confidence_after=card.confidence,
-            reason="MTGJSON database unavailable; validation skipped.",
+            reason=reason,
         )
 
 

@@ -79,8 +79,11 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
 
 
 def test_normalization_helpers() -> None:
-    assert normalize_title("  Lightning—Bolt  ") == "lightning-bolt"
+    assert normalize_title("Lightning Bolt") == "lightning bolt"
+    assert normalize_title("  Lightning—Bolt  ") == "lightning bolt"
+    assert normalize_title("Lightning-Bolt") == "lightning bolt"
     assert normalize_title("Jace, the Mind Sculptor") == "jace the mind sculptor"
+    assert normalize_title("Urza's Saga") == "urzas saga"
     assert normalize_set_code(" m10 ") == "M10"
     assert normalize_set_name("  Magic 2010 ") == "magic 2010"
     assert normalize_collector_number(" 001A ") == "1a"

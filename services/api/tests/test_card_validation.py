@@ -78,6 +78,24 @@ def test_validate_card_resolves_set_name(validation_service: CardValidationServi
     assert result.trace.status == "exact_match"
 
 
+def test_validate_card_matches_common_punctuation_variants(validation_service: CardValidationService) -> None:
+    for variant in ("Lightning—Bolt", "Lightning-Bolt"):
+        result = validation_service.validate_card(
+            RecognizedCard(
+                title=variant,
+                edition="M10",
+                collector_number="146",
+                foil=False,
+                confidence=0.9,
+                notes=None,
+            )
+        )
+
+        assert result.card.title == "Lightning Bolt"
+        assert result.card.edition == "Magic 2010"
+        assert result.trace.status == "exact_match"
+
+
 def test_validate_card_handles_ambiguous_match(validation_service: CardValidationService) -> None:
     result = validation_service.validate_card(
         RecognizedCard(
@@ -122,6 +140,20 @@ def test_validate_response_gracefully_skips_when_db_missing(tmp_path: Path) -> N
     assert batch.response == response
     assert batch.available is False
     assert batch.traces[0].status == "validation_unavailable"
+
+
+def test_validate_response_gracefully_skips_when_db_corrupt(tmp_path: Path) -> None:
+    corrupt_db = tmp_path / "corrupt.sqlite"
+    corrupt_db.write_text("this is not a sqlite database")
+    service = CardValidationService(index=MTGJSONIndex(corrupt_db))
+    response = RecognitionResponse(cards=[RecognizedCard(title="Lightning Bolt", edition="M10", collector_number="146", foil=False, confidence=0.9, notes=None)])
+
+    batch = service.validate_response(response)
+
+    assert batch.response == response
+    assert batch.available is False
+    assert batch.traces[0].status == "validation_unavailable"
+    assert "unreadable" in batch.traces[0].reason.lower()
 
 
 def test_validate_response_validates_each_card_independently(validation_service: CardValidationService) -> None:

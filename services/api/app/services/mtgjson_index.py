@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import unicodedata
 from dataclasses import dataclass
@@ -8,23 +9,31 @@ from pathlib import Path
 from typing import Any
 
 
-PUNCT_TRANSLATION = str.maketrans(
-    {
-        "’": "'",
-        "‘": "'",
-        "´": "'",
-        "`": "'",
-        "“": '"',
-        "”": '"',
-        "–": "-",
-        "—": "-",
-        "−": "-",
-        "•": " ",
-        ":": " ",
-        ",": " ",
-        ".": " ",
-    }
-)
+SPACE_PUNCTUATION = {
+    "-",
+    "‐",
+    "‑",
+    "‒",
+    "–",
+    "—",
+    "−",
+    "•",
+    ":",
+    ",",
+    ".",
+    "/",
+}
+DROP_PUNCTUATION = {
+    "'",
+    "’",
+    "‘",
+    "´",
+    "`",
+    '"',
+    "“",
+    "”",
+}
+NON_ALNUM_WHITESPACE_RE = re.compile(r"[^0-9a-z\s]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,7 +220,19 @@ class MTGJSONIndex:
 def normalize_title(value: str | None) -> str:
     if not value:
         return ""
-    text = unicodedata.normalize("NFKC", value).translate(PUNCT_TRANSLATION).lower().strip()
+
+    normalized = unicodedata.normalize("NFKC", value).lower().strip()
+    chars: list[str] = []
+    for char in normalized:
+        if char in DROP_PUNCTUATION:
+            continue
+        if char in SPACE_PUNCTUATION:
+            chars.append(" ")
+            continue
+        chars.append(char)
+
+    text = "".join(chars)
+    text = NON_ALNUM_WHITESPACE_RE.sub(" ", text)
     return " ".join(text.split())
 
 

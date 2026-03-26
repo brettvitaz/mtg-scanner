@@ -161,6 +161,18 @@ class TestCardDetector:
         assert result.count == 9
         assert len([region for region in result.regions if region.confidence >= 0.6]) == 9
 
+    def test_real_two_card_artifact_stays_at_two_cards(self):
+        """Dense-layout inference should not add a spurious container region to normal two-card shots."""
+        detector = CardDetector()
+        image_bytes = Path(
+            "/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions/20260326T042740-313a4c56/upload.jpg"
+        ).read_bytes()
+
+        result = detector.detect(image_bytes)
+
+        assert result.count == 2
+        assert all(region.corners is not None for region in result.regions)
+
     def test_iou_calculation(self):
         """Test IoU (Intersection over Union) calculation."""
         detector = CardDetector()

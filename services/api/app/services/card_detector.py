@@ -90,6 +90,8 @@ class CardDetector:
 
         candidates.extend(self._infer_dense_grid_regions(candidates, image.shape[:2]))
 
+        candidates = self._remove_container_regions(candidates)
+
         candidates.sort(key=lambda r: (r.confidence, r.area), reverse=True)
         filtered_regions = self._filter_overlapping(candidates)
         filtered_regions.sort(key=lambda r: (r.y, r.x))
@@ -312,6 +314,28 @@ class CardDetector:
 
         gap_ratio = max(gaps) / min(gaps)
         return gap_ratio <= 1.4
+
+    def _remove_container_regions(self, regions: list[CardRegion]) -> list[CardRegion]:
+        if len(regions) < 2:
+            return regions
+
+        filtered: list[CardRegion] = []
+        for region in regions:
+            enclosed_regions = [other for other in regions if other is not region and self._contains(region, other)]
+            if len(enclosed_regions) >= 2:
+                enclosed_area_ratio = sum(other.area for other in enclosed_regions) / max(region.area, 1)
+                if enclosed_area_ratio >= 0.8:
+                    continue
+            filtered.append(region)
+        return filtered
+
+    def _contains(self, outer: CardRegion, inner: CardRegion, tolerance: int = 24) -> bool:
+        return (
+            inner.x >= outer.x - tolerance
+            and inner.y >= outer.y - tolerance
+            and inner.x + inner.width <= outer.x + outer.width + tolerance
+            and inner.y + inner.height <= outer.y + outer.height + tolerance
+        )
 
     def _filter_overlapping(self, regions: list[CardRegion], iou_threshold: float = 0.45) -> list[CardRegion]:
         if not regions:

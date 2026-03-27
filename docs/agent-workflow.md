@@ -76,6 +76,4 @@ Cards on dark backgrounds (like Eternal Witness) were particularly challenging b
 - [x] Multi-card detection (OpenCV + OpenAI fallback)
 - [x] OpenCV detector tuning
 - [ ] iOS app improvements (camera UX, results display, correction UI)
-- [ ] Crops directory fix (artifact store should save individual card crops)
 - [ ] Evaluation harness (automated accuracy testing)
-- [ ] Ollama/LM Studio support (fallback response modes)

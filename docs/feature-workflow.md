@@ -67,6 +67,7 @@ A feature/change is done when all of these are true:
 - relevant tests/build/manual checks pass
 - artifacts/debug outputs still make sense if the change touches recognition
 - docs updated if behavior/config changed
+- important findings and decisions are recorded in the appropriate repo docs when the work is completed
 - commit created
 
 ## Recognition-specific rules

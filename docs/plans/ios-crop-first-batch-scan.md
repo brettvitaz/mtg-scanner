@@ -24,8 +24,16 @@ Improve crop quality, reduce unnecessary image area sent to the backend, and mak
   - first-pass crop extraction
 - **No crop editing in v1.**
 - Photo library images should use the same detection/crop pipeline as camera images.
-- Preview should happen **after capture/selection**, not while the user is lining up the shot.
+- In camera mode, crop-region preview should be displayed **live before capture** so the user can judge whether the shot is likely to succeed.
+- The user remains fully in control of capture; there is **no auto-capture** in v1.
 - A scan-style preview animation is desired (for example: translucent blue crop region with animated scan line).
+- Backend crop/detection learnings should be reused as heuristics on iPhone where practical, especially:
+  - MTG-like aspect ratio filtering
+  - overlap suppression / de-duplication
+  - mild crop padding
+  - perspective-aware crop thinking
+  but the iPhone implementation should use native iOS/Vision tooling rather than attempting a direct OpenCV port.
+- Because MTG cards have rounded corners, on-device detection should not overfit to perfect geometric corners; detecting stable straight edges / card-like boundaries may be more reliable than assuming sharp-corner rectangles.
 
 ### Camera UX requirements
 - Preserve normal camera controls such as zoom and flash.
@@ -59,19 +67,22 @@ Strict result ordering is not a product requirement.
 However, the implementation should still prefer stable ordering where practical.
 Longer term, result-to-crop association will matter more once result details can show crop thumbnails.
 
-## Follow-up feature already anticipated
-A later results-improvements feature should make a thumbnail of the cropped image available in result details.
+## Follow-up features already anticipated
+- A later results-improvements feature should make a thumbnail of the cropped image available in result details.
+- A later crop-enhancement feature should improve detection of two cards that are touching. This is known future work and not expected to be fully solved in v1 of the crop-first pipeline.
 
 ## Recommended behavior flow
 
 ### Camera flow
-1. User captures image.
-2. App runs on-device rectangle/card detection.
-3. App shows crop-region preview with scan animation for a short period.
-4. If card regions are found:
+1. User opens camera view.
+2. App runs live on-device card-region detection on preview frames.
+3. App shows live crop-region preview with scan animation while the user frames the shot.
+4. User decides when to capture.
+5. After capture, app uses the most recent valid detected regions to create first-pass crops.
+6. If card regions are found:
    - create first-pass crops on-device
    - upload crops to new batch endpoint
-5. If no card regions are found:
+7. If no card regions are found:
    - upload original image to existing single-image endpoint
 
 ### Photo library flow
@@ -81,9 +92,11 @@ A later results-improvements feature should make a thumbnail of the cropped imag
 4. If card regions are found, upload first-pass crops to batch endpoint.
 5. Otherwise, fallback to the existing single-image endpoint.
 
-## UX note on preview timing
-A pre-upload preview is useful, but should not create pressure while framing a live shot.
-So the preview delay should happen **after capture**, not during camera composition.
+## UX note on live preview
+Live crop preview during camera framing is a requirement.
+The user should see whether the app believes the shot is likely to succeed **before capture**, but the user remains in control of when to press capture.
+This means the preview should guide capture, not force timing pressure or automatic submission.
+The live overlay should be reasonably stable and not flicker aggressively.
 
 ## Feasibility
 This feature is feasible in the current project and is a medium-complexity extension of the existing architecture.
@@ -107,15 +120,16 @@ To maximize agent success, iOS work should not rely only on subjective manual in
 1. **Build must pass**
    - `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
 2. Add testable state/logic for:
-   - preview state after capture
+   - live preview state while camera is active
    - fallback to original route when no cards are detected
    - batch upload path when crops are detected
-3. If practical, add simulator UI testing for the preview/fallback/upload path.
+3. If practical, add simulator UI testing for the live preview/fallback/upload path.
 4. Capture screenshots for camera modal review and crop preview states.
 5. Manual review should explicitly verify:
    - flash button fully visible
    - zoom/flash still usable
    - crop preview understandable
+   - user remains in control of capture
 
 ## Suggested implementation phases
 

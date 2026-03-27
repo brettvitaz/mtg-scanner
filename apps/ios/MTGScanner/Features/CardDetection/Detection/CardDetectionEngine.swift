@@ -130,8 +130,9 @@ final class CardDetectionEngine {
         request.maximumAspectRatio = maxAspectRatio
         request.quadratureTolerance = 15.0
 
-        // The rear camera in portrait orientation delivers frames with .right exif orientation.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
+        // The session connection rotates frames to portrait before delivery (videoRotationAngle=90),
+        // so Vision receives an upright image and needs no additional orientation correction.
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
         try? handler.perform([request])
 
         return results

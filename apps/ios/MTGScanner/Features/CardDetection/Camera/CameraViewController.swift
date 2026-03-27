@@ -29,6 +29,14 @@ final class CameraViewController: UIViewController {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
 
+    // MARK: - Orientation
+
+    /// Lock the camera view to portrait so the preview layer and overlay layer
+    /// always match the coordinate space of the pixel buffers delivered by the session.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        .portrait
+    }
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {

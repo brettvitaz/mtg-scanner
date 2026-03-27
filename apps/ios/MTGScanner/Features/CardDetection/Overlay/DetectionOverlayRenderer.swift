@@ -13,6 +13,13 @@ final class DetectionOverlayRenderer {
 
     private weak var detectionLayer: CALayer?
     private var layerPool: [CAShapeLayer] = []
+    private var lastDetections: [DetectedCard] = []
+
+    /// Minimum IoU between a new detection and its matched prior detection before
+    /// we consider the position "changed enough" to redraw. Values below this
+    /// threshold are treated as stable and the overlay is not updated, suppressing
+    /// sub-pixel jitter.
+    private static let jitterThreshold: CGFloat = 0.85
 
     // MARK: - Init
 
@@ -27,6 +34,16 @@ final class DetectionOverlayRenderer {
     ///
     /// Must be called on the main thread.
     func update(detections: [DetectedCard], previewLayer: AVCaptureVideoPreviewLayer) {
+        // Suppress redraws when detection count is unchanged and all bounding boxes
+        // haven't moved significantly — this eliminates sub-pixel jitter.
+        if detections.count == lastDetections.count, !detections.isEmpty {
+            let allStable = zip(detections, lastDetections).allSatisfy { new, old in
+                RectangleFilter.iou(new.boundingBox, old.boundingBox) >= Self.jitterThreshold
+            }
+            if allStable { return }
+        }
+        lastDetections = detections
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
@@ -59,12 +76,11 @@ final class DetectionOverlayRenderer {
     /// Converts a Vision normalized point (origin bottom-left, 0…1) to a point in
     /// the `previewLayer`'s coordinate space.
     ///
-    /// Vision corner coordinates have their Y axis flipped relative to capture device
-    /// coordinates (which expect origin top-left). We flip Y before calling the preview
-    /// layer's built-in conversion so the overlay lands on the correct pixel.
+    /// Vision normalized coordinates and AVCaptureDevice coordinates share the same
+    /// origin (bottom-left) and axis orientation, so `layerPointConverted` handles
+    /// the mapping directly without any manual axis flip.
     static func visionToPreview(point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
-        let devicePoint = CGPoint(x: point.x, y: 1.0 - point.y)
-        return previewLayer.layerPointConverted(fromCaptureDevicePoint: devicePoint)
+        previewLayer.layerPointConverted(fromCaptureDevicePoint: point)
     }
 
     // MARK: - Private Helpers

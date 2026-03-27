@@ -64,11 +64,18 @@ final class CardDetectionEngine {
     }
 
     private func detectCards(in pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+        // Do not pass aspect ratio constraints to VNDetectRectanglesRequest.
+        // The request's aspect ratio parameters operate on Vision's internal coordinate
+        // space (after applying the image orientation), which does not correspond to the
+        // card's on-screen orientation — causing upright cards to be rejected in landscape
+        // mode and sideways cards to be rejected in portrait mode.
+        // RectangleFilter.isCardAspectRatio performs the correct orientation-agnostic
+        // filter after the fact using the normalized bounding box.
         let observations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 10,
-            minAspectRatio: Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)),
-            maxAspectRatio: Float(RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance))
+            minAspectRatio: 0.1,
+            maxAspectRatio: 1.0
         )
         return rectangleFilter.filter(observations).map { DetectedCard(from: $0, timestamp: timestamp) }
     }

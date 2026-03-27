@@ -205,6 +205,7 @@ class TestCardDetector:
             ("IMG_1625.png", 7),
             ("IMG_1626.png", 9),
             ("IMG_1627.png", 9),
+            ("hand_held_card.jpg", 1),
             ("bad_crop2.jpg", 1),
         ],
     )

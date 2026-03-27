@@ -29,14 +29,6 @@ final class CameraViewController: UIViewController {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
 
-    // MARK: - Orientation
-
-    /// Lock the camera view to portrait so the preview layer and overlay layer
-    /// always match the coordinate space of the pixel buffers delivered by the session.
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        .portrait
-    }
-
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -62,6 +54,27 @@ final class CameraViewController: UIViewController {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.bounds
         detectionLayer.frame = view.bounds
+        updatePreviewOrientation()
+    }
+
+    // MARK: - Orientation
+
+    /// Rotates the preview layer connection to match the current interface orientation,
+    /// so the camera feed always appears upright regardless of device orientation.
+    ///
+    /// The data output connection is NOT rotated — pixel buffers are always delivered
+    /// in the native landscape orientation for Vision processing.
+    private func updatePreviewOrientation() {
+        guard let connection = previewLayer?.connection,
+              connection.isVideoRotationAngleSupported(90) else { return }
+        let angle: CGFloat
+        switch view.window?.windowScene?.interfaceOrientation {
+        case .landscapeLeft:            angle = 180
+        case .landscapeRight:           angle = 0
+        case .portraitUpsideDown:       angle = 270
+        default:                        angle = 90   // portrait
+        }
+        connection.videoRotationAngle = angle
     }
 
     // MARK: - Public API

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CardDetectionView: View {
     @StateObject private var viewModel = CardDetectionViewModel()
@@ -12,7 +13,13 @@ struct CardDetectionView: View {
                 controlBar
             }
         }
-        .onAppear { viewModel.requestCameraPermissionIfNeeded() }
+        .onAppear {
+            viewModel.requestCameraPermissionIfNeeded()
+            lockOrientation(.portrait)
+        }
+        .onDisappear {
+            lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
+        }
         .alert("Camera Access Required", isPresented: $viewModel.cameraPermissionDenied) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -57,5 +64,13 @@ struct CardDetectionView: View {
         .pickerStyle(.segmented)
         .frame(width: 180)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Orientation
+
+    private func lockOrientation(_ mask: UIInterfaceOrientationMask) {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+        let prefs = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
+        scene.requestGeometryUpdate(prefs)
     }
 }

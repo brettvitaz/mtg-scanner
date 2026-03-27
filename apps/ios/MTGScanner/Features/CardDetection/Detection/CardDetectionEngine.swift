@@ -130,9 +130,10 @@ final class CardDetectionEngine {
         request.maximumAspectRatio = maxAspectRatio
         request.quadratureTolerance = 15.0
 
-        // The session connection rotates frames to portrait before delivery (videoRotationAngle=90),
-        // so Vision receives an upright image and needs no additional orientation correction.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
+        // The sensor delivers landscape pixel buffers (1920×1080, right side up).
+        // .right tells Vision the image needs a 90° CCW rotation to appear upright,
+        // which matches the portrait camera preview shown to the user.
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
         try? handler.perform([request])
 
         return results

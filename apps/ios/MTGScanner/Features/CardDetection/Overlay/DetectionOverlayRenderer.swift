@@ -73,14 +73,22 @@ final class DetectionOverlayRenderer {
 
     // MARK: - Coordinate Transform
 
-    /// Converts a Vision normalized point (origin bottom-left, 0…1) to a point in
-    /// the `previewLayer`'s coordinate space.
+    /// Converts a Vision normalized point to a point in the `previewLayer`'s coordinate space.
     ///
-    /// Vision normalized coordinates and AVCaptureDevice coordinates share the same
-    /// origin (bottom-left) and axis orientation, so `layerPointConverted` handles
-    /// the mapping directly without any manual axis flip.
+    /// Vision with `.right` orientation returns coordinates in the upright portrait space:
+    /// origin at bottom-left, x right, y up, all values in [0, 1]. The preview layer has
+    /// its origin at top-left with y increasing downward. The transform is:
+    ///   screenX = visionX * boundsWidth
+    ///   screenY = (1 - visionY) * boundsHeight
+    ///
+    /// This bypasses `layerPointConverted` (which operates in the raw capture device
+    /// coordinate space, not the Vision-result space) to avoid orientation mismatches.
     static func visionToPreview(point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
-        previewLayer.layerPointConverted(fromCaptureDevicePoint: point)
+        let bounds = previewLayer.bounds
+        return CGPoint(
+            x: point.x * bounds.width,
+            y: (1.0 - point.y) * bounds.height
+        )
     }
 
     // MARK: - Private Helpers

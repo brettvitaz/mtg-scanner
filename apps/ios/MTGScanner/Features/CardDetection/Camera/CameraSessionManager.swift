@@ -52,14 +52,6 @@ final class CameraSessionManager: NSObject {
 
         guard session.canAddOutput(output) else { return }
         session.addOutput(output)
-
-        // Rotate the pixel buffer to portrait before delivery so that Vision
-        // coordinates and preview layer coordinates share the same orientation.
-        if let connection = output.connection(with: .video) {
-            if connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
-            }
-        }
     }
 
     // MARK: - Lifecycle

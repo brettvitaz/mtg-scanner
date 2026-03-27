@@ -17,7 +17,7 @@
 		A00000000000000000000108 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000208 /* APIClient.swift */; };
 		A00000000000000000000109 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000209 /* AppConfig.swift */; };
 		A0000000000000000000010C /* CardCropService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020D /* CardCropService.swift */; };
-		A0000000000000000000010A /* CorrectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020B /* CorrectionView.swift */; };
+		A00000000000000000000180 /* CorrectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020B /* CorrectionView.swift */; };
 		A0000000000000000000010B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020C /* Assets.xcassets */; };
 		/* CardDetection feature files */
 		A00000000000000000000110 /* DetectedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000210 /* DetectedCard.swift */; };
@@ -49,7 +49,7 @@
 		A00000000000000000000208 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A0000000000000000000020D /* CardCropService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCropService.swift; sourceTree = "<group>"; };
 		A00000000000000000000209 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
-		A0000000000000000000020A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A00000000000000000000280 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A0000000000000000000020B /* CorrectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrectionView.swift; sourceTree = "<group>"; };
 		A0000000000000000000020C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		/* CardDetection feature files */
@@ -164,7 +164,7 @@
 			children = (
 				A0000000000000000000020C /* Assets.xcassets */,
 				A00000000000000000000209 /* AppConfig.swift */,
-				A0000000000000000000020A /* Info.plist */,
+				A00000000000000000000280 /* Info.plist */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -380,7 +380,7 @@
 				A00000000000000000000107 /* RecognitionModels.swift in Sources */,
 				A00000000000000000000108 /* APIClient.swift in Sources */,
 				A00000000000000000000109 /* AppConfig.swift in Sources */,
-				A0000000000000000000010A /* CorrectionView.swift in Sources */,
+				A00000000000000000000180 /* CorrectionView.swift in Sources */,
 				A0000000000000000000010C /* CardCropService.swift in Sources */,
 				A00000000000000000000110 /* DetectedCard.swift in Sources */,
 				A00000000000000000000111 /* DetectionMode.swift in Sources */,

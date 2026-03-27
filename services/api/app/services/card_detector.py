@@ -374,13 +374,16 @@ class CardDetector:
         height_ratio = inner.height / max(outer.height, 1)
         area_ratio = inner.area / max(outer.area, 1)
         center_distance_x = abs((inner.x + inner.width / 2) - (outer.x + outer.width / 2))
-        strong_containment = self._contains(outer, inner, tolerance=32) or self._intersection_ratio(outer, inner) >= 0.92
+        intersection_ratio = self._intersection_ratio(outer, inner)
+        strong_containment = self._contains(outer, inner, tolerance=32) or intersection_ratio >= 0.92
+        almost_fully_contained_smaller = intersection_ratio >= 0.98 and area_ratio <= 0.6
+        confidence_tolerance = 0.35 if almost_fully_contained_smaller else 0.3
         return (
             strong_containment
-            and center_distance_x <= outer.width * 0.18
+            and (center_distance_x <= outer.width * 0.18 or almost_fully_contained_smaller)
             and max(width_ratio, height_ratio) <= 0.97
             and area_ratio <= 0.75
-            and inner.confidence >= outer.confidence - 0.3
+            and inner.confidence >= outer.confidence - confidence_tolerance
         )
 
     def _intersection_ratio(self, outer: CardRegion, inner: CardRegion) -> float:

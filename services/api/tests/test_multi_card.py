@@ -205,6 +205,7 @@ class TestCardDetector:
             ("IMG_1625.png", 7),
             ("IMG_1626.png", 9),
             ("IMG_1627.png", 9),
+            ("bad_crop2.jpg", 1),
         ],
     )
     def test_real_sample_ladder_detects_expected_cards(self, filename: str, expected_count: int):

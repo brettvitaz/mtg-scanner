@@ -22,8 +22,10 @@
 		/* CardDetection feature files */
 		A00000000000000000000110 /* DetectedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000210 /* DetectedCard.swift */; };
 		A00000000000000000000111 /* DetectionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000211 /* DetectionMode.swift */; };
+		A00000000000000000000112 /* RectangleFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000212 /* RectangleFilter.swift */; };
 		/* Test target build files */
 		A00000000000000000000190 /* DetectedCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000290 /* DetectedCardTests.swift */; };
+		A00000000000000000000191 /* RectangleFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000291 /* RectangleFilterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,9 +46,11 @@
 		/* CardDetection feature files */
 		A00000000000000000000210 /* DetectedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedCard.swift; sourceTree = "<group>"; };
 		A00000000000000000000211 /* DetectionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionMode.swift; sourceTree = "<group>"; };
+		A00000000000000000000212 /* RectangleFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RectangleFilter.swift; sourceTree = "<group>"; };
 		/* Test target */
 		A00000000000000000000030 /* MTGScannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MTGScannerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000290 /* DetectedCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedCardTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000291 /* RectangleFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RectangleFilterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -183,6 +187,7 @@
 			isa = PBXGroup;
 			children = (
 				A0000000000000000000001A /* CardDetection/Models */,
+				A0000000000000000000001B /* CardDetection/Detection */,
 			);
 			path = CardDetection;
 			sourceTree = "<group>";
@@ -196,11 +201,20 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		A0000000000000000000001B /* CardDetection/Detection */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000212 /* RectangleFilter.swift */,
+			);
+			path = Detection;
+			sourceTree = "<group>";
+		};
 		/* Test target group */
 		A00000000000000000000040 /* MTGScannerTests */ = {
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000290 /* DetectedCardTests.swift */,
+				A00000000000000000000291 /* RectangleFilterTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
@@ -309,6 +323,7 @@
 				A0000000000000000000010C /* CardCropService.swift in Sources */,
 				A00000000000000000000110 /* DetectedCard.swift in Sources */,
 				A00000000000000000000111 /* DetectionMode.swift in Sources */,
+				A00000000000000000000112 /* RectangleFilter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -317,6 +332,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000190 /* DetectedCardTests.swift in Sources */,
+				A00000000000000000000191 /* RectangleFilterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

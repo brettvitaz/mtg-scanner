@@ -23,6 +23,7 @@
 		A00000000000000000000110 /* DetectedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000210 /* DetectedCard.swift */; };
 		A00000000000000000000111 /* DetectionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000211 /* DetectionMode.swift */; };
 		A00000000000000000000112 /* RectangleFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000212 /* RectangleFilter.swift */; };
+		A0000000000000000000011B /* CardTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000021B /* CardTracker.swift */; };
 		A00000000000000000000113 /* GridInterpolator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000213 /* GridInterpolator.swift */; };
 		A00000000000000000000114 /* CardDetectionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000214 /* CardDetectionEngine.swift */; };
 		A00000000000000000000115 /* CameraSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000215 /* CameraSessionManager.swift */; };
@@ -56,6 +57,7 @@
 		A00000000000000000000210 /* DetectedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedCard.swift; sourceTree = "<group>"; };
 		A00000000000000000000211 /* DetectionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionMode.swift; sourceTree = "<group>"; };
 		A00000000000000000000212 /* RectangleFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RectangleFilter.swift; sourceTree = "<group>"; };
+		A0000000000000000000021B /* CardTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardTracker.swift; sourceTree = "<group>"; };
 		A00000000000000000000213 /* GridInterpolator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridInterpolator.swift; sourceTree = "<group>"; };
 		A00000000000000000000214 /* CardDetectionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetectionEngine.swift; sourceTree = "<group>"; };
 		A00000000000000000000215 /* CameraSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSessionManager.swift; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 				A00000000000000000000212 /* RectangleFilter.swift */,
 				A00000000000000000000213 /* GridInterpolator.swift */,
 				A00000000000000000000214 /* CardDetectionEngine.swift */,
+				A0000000000000000000021B /* CardTracker.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -387,6 +390,7 @@
 				A00000000000000000000112 /* RectangleFilter.swift in Sources */,
 				A00000000000000000000113 /* GridInterpolator.swift in Sources */,
 				A00000000000000000000114 /* CardDetectionEngine.swift in Sources */,
+				A0000000000000000000011B /* CardTracker.swift in Sources */,
 				A00000000000000000000115 /* CameraSessionManager.swift in Sources */,
 				A00000000000000000000116 /* DetectionOverlayRenderer.swift in Sources */,
 				A00000000000000000000117 /* CameraViewController.swift in Sources */,

@@ -23,6 +23,8 @@ final class CardDetectionEngine {
     private let rectangleFilter = RectangleFilter()
     /// Guarded by visionQueue — never read/written from other queues.
     private var isProcessing = false
+    /// Guarded by visionQueue — stabilizes detections with EMA smoothing + hysteresis.
+    private let tracker = CardTracker()
 
     // MARK: - Frame Processing
 
@@ -40,7 +42,8 @@ final class CardDetectionEngine {
         visionQueue.async { [weak self] in
             guard let self, !self.isProcessing else { return }
             self.isProcessing = true
-            let cards = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode)
+            let raw = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode)
+            let cards = self.tracker.update(detections: raw)
             self.isProcessing = false
             DispatchQueue.main.async {
                 self.onDetection?(cards)

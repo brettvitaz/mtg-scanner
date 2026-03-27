@@ -43,6 +43,7 @@ class CardDetector:
     MAX_CARD_AREA_PERCENT = 0.70
     CROP_PADDING_PERCENT = 0.03
     MIN_RECT_FILL_RATIO = 0.58
+    MIN_REGION_CONFIDENCE = 0.35
     CROP_REFINE_BAND_PERCENT = 0.18
     CROP_REFINE_MIN_INSET_PERCENT = 0.01
     CROP_REFINE_MAX_TRIM_PERCENT = 0.12
@@ -94,8 +95,10 @@ class CardDetector:
                 candidates.append(candidate)
 
         candidates.extend(self._infer_dense_grid_regions(candidates, image.shape[:2]))
+        candidates.extend(self._merge_fragmented_regions(candidates, image.shape[:2]))
 
         candidates = self._remove_container_regions(candidates)
+        candidates = [candidate for candidate in candidates if candidate.confidence >= self.MIN_REGION_CONFIDENCE]
 
         candidates.sort(key=lambda r: (r.confidence, r.area), reverse=True)
         filtered_regions = self._filter_overlapping(candidates)
@@ -292,6 +295,131 @@ class CardDetector:
                 )
 
         return inferred_regions if len(inferred_regions) == 9 and occupied_cells >= 8 else []
+
+    def _merge_fragmented_regions(
+        self,
+        regions: list[CardRegion],
+        image_shape: tuple[int, int],
+    ) -> list[CardRegion]:
+        if len(regions) < 2:
+            return []
+
+        image_height, image_width = image_shape
+        merged_regions: list[CardRegion] = []
+        seen_signatures: set[tuple[int, int, int, int]] = set()
+
+        ordered_regions = sorted(regions, key=lambda region: (region.y, region.x))
+        for upper_index, upper in enumerate(ordered_regions[:-1]):
+            for lower in ordered_regions[upper_index + 1 :]:
+                if lower.y + lower.height / 2 <= upper.y + upper.height / 2:
+                    continue
+
+                width_ratio = lower.width / max(upper.width, 1)
+                if not 0.82 <= width_ratio <= 1.22:
+                    continue
+
+                x_overlap = min(upper.x + upper.width, lower.x + lower.width) - max(upper.x, lower.x)
+                min_width = min(upper.width, lower.width)
+                if x_overlap <= 0 or (x_overlap / max(min_width, 1)) < 0.8:
+                    continue
+
+                center_distance_x = abs((upper.x + upper.width / 2) - (lower.x + lower.width / 2))
+                if center_distance_x > max(18.0, max(upper.width, lower.width) * 0.12):
+                    continue
+
+                vertical_gap = lower.y - (upper.y + upper.height)
+                max_vertical_gap = max(24.0, min(upper.height, lower.height) * 0.18)
+                max_vertical_overlap = min(upper.height, lower.height) * 0.22
+                if vertical_gap > max_vertical_gap or vertical_gap < -max_vertical_overlap:
+                    continue
+
+                union_x1 = max(0, min(upper.x, lower.x))
+                union_y1 = max(0, min(upper.y, lower.y))
+                union_x2 = min(image_width, max(upper.x + upper.width, lower.x + lower.width))
+                union_y2 = min(image_height, max(upper.y + upper.height, lower.y + lower.height))
+                union_x1, union_y1, union_x2, union_y2 = self._expand_fragment_union(
+                    union_x1,
+                    union_y1,
+                    union_x2,
+                    union_y2,
+                    image_width=image_width,
+                    image_height=image_height,
+                )
+                union_width = union_x2 - union_x1
+                union_height = union_y2 - union_y1
+                if union_width <= 0 or union_height <= 0:
+                    continue
+
+                aspect_ratio = union_width / union_height
+                ratio_diff = abs(aspect_ratio - self.TARGET_ASPECT_RATIO) / self.TARGET_ASPECT_RATIO
+                if ratio_diff > 0.12:
+                    continue
+
+                union_area = union_width * union_height
+                union_region = CardRegion(union_x1, union_y1, union_width, union_height, confidence=1.0)
+                upper_overlap = self._intersection_ratio(union_region, upper)
+                lower_overlap = self._intersection_ratio(union_region, lower)
+                if upper_overlap < 0.92 or lower_overlap < 0.92:
+                    continue
+                if union_area / max(upper.area + lower.area, 1) > 1.28:
+                    continue
+
+                signature = (
+                    int(round(union_x1 / 8)),
+                    int(round(union_y1 / 8)),
+                    int(round(union_width / 8)),
+                    int(round(union_height / 8)),
+                )
+                if signature in seen_signatures:
+                    continue
+                seen_signatures.add(signature)
+
+                merged_regions.append(
+                    CardRegion(
+                        x=union_x1,
+                        y=union_y1,
+                        width=union_width,
+                        height=union_height,
+                        confidence=round(min(0.95, max(upper.confidence, lower.confidence) + 0.04), 3),
+                        corners=None,
+                    )
+                )
+
+        return merged_regions
+
+    def _expand_fragment_union(
+        self,
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        *,
+        image_width: int,
+        image_height: int,
+    ) -> tuple[int, int, int, int]:
+        width = max(1, x2 - x1)
+        height = max(1, y2 - y1)
+
+        pad_x = max(8, int(round(width * 0.02)))
+        pad_top = max(24, int(round(height * 0.08)))
+        pad_bottom = max(16, int(round(height * 0.04)))
+
+        x1 = max(0, x1 - pad_x)
+        x2 = min(image_width, x2 + pad_x)
+        y1 = max(0, y1 - pad_top)
+        y2 = min(image_height, y2 + pad_bottom)
+
+        width = max(1, x2 - x1)
+        height = max(1, y2 - y1)
+        target_height = int(round(width / self.TARGET_ASPECT_RATIO))
+        if target_height > height:
+            extra = target_height - height
+            grow_top = int(round(extra * 0.65))
+            grow_bottom = extra - grow_top
+            y1 = max(0, y1 - grow_top)
+            y2 = min(image_height, y2 + grow_bottom)
+
+        return x1, y1, x2, y2
 
     def _cluster_axis(self, values: list[float], threshold: float) -> list[list[float]]:
         if not values:

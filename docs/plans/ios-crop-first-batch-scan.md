@@ -1,0 +1,138 @@
+# iOS Crop-First Batch Scan — Planning Summary
+
+## Goal
+Add a crop-first scan flow to the iPhone companion app:
+- detect likely MTG card regions on-device
+- preview detected crop regions in the iOS UI
+- create first-pass crops on-device
+- send those crops to a new batch backend endpoint
+- have the backend perform a second-pass crop/tightening step before recognition
+
+## Product intent
+Improve crop quality, reduce unnecessary image area sent to the backend, and make the scan pipeline more trustworthy by previewing detected card regions before upload.
+
+## Decisions locked
+
+### Backend/API
+- Add a **new batch image endpoint**.
+- Keep the existing single-image route unchanged.
+- If the iPhone detects no cards locally, it should send the full image to the original route for backend-side processing.
+
+### iPhone behavior
+- On-device intelligence is limited to:
+  - previewing crop regions
+  - first-pass crop extraction
+- **No crop editing in v1.**
+- Photo library images should use the same detection/crop pipeline as camera images.
+- Preview should happen **after capture/selection**, not while the user is lining up the shot.
+- A scan-style preview animation is desired (for example: translucent blue crop region with animated scan line).
+
+### Camera UX requirements
+- Preserve normal camera controls such as zoom and flash.
+- Review the camera modal for usability.
+- Fix the partially cut-off flash button / top-right control layout issue as part of this work if it is in the touched surface area.
+
+### Batch artifact layout
+Use a clear batch artifact layout that distinguishes:
+- uploaded first-pass crops
+- backend-refined crops
+- response + metadata linking them
+
+Recommended shape:
+
+```text
+services/.artifacts/recognitions-batch/<timestamp>-<id>/
+├── inputs/
+│   ├── crop-0.jpg
+│   ├── crop-1.jpg
+│   └── ...
+├── refined/
+│   ├── crop-0-tight.jpg
+│   ├── crop-1-tight.jpg
+│   └── ...
+├── response.json
+└── metadata.json
+```
+
+## Ordering / result mapping
+Strict result ordering is not a product requirement.
+However, the implementation should still prefer stable ordering where practical.
+Longer term, result-to-crop association will matter more once result details can show crop thumbnails.
+
+## Follow-up feature already anticipated
+A later results-improvements feature should make a thumbnail of the cropped image available in result details.
+
+## Recommended behavior flow
+
+### Camera flow
+1. User captures image.
+2. App runs on-device rectangle/card detection.
+3. App shows crop-region preview with scan animation for a short period.
+4. If card regions are found:
+   - create first-pass crops on-device
+   - upload crops to new batch endpoint
+5. If no card regions are found:
+   - upload original image to existing single-image endpoint
+
+### Photo library flow
+1. User selects image from Photos.
+2. App runs the same on-device detection.
+3. App shows crop preview.
+4. If card regions are found, upload first-pass crops to batch endpoint.
+5. Otherwise, fallback to the existing single-image endpoint.
+
+## UX note on preview timing
+A pre-upload preview is useful, but should not create pressure while framing a live shot.
+So the preview delay should happen **after capture**, not during camera composition.
+
+## Feasibility
+This feature is feasible in the current project and is a medium-complexity extension of the existing architecture.
+
+### Why it fits
+- iOS app already captures and uploads images.
+- Backend already performs detection/cropping/recognition work.
+- Crop quality is already known to be an important driver of recognition quality.
+- Multi-card semantics and artifact logging already exist.
+
+## Key technical risks
+- On-device rectangle detection quality on real MTG photos
+- Coordinate mapping / crop extraction correctness on iOS
+- Keeping the camera UI usable while adding crop preview behavior
+- Clean backend contract for multi-image uploads and batch artifact output
+
+## Deterministic testing guidance
+To maximize agent success, iOS work should not rely only on subjective manual inspection.
+
+### Desired test strategy
+1. **Build must pass**
+   - `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
+2. Add testable state/logic for:
+   - preview state after capture
+   - fallback to original route when no cards are detected
+   - batch upload path when crops are detected
+3. If practical, add simulator UI testing for the preview/fallback/upload path.
+4. Capture screenshots for camera modal review and crop preview states.
+5. Manual review should explicitly verify:
+   - flash button fully visible
+   - zoom/flash still usable
+   - crop preview understandable
+
+## Suggested implementation phases
+
+### Phase 1
+- New batch crop endpoint in backend
+- iOS on-device crop detection + preview
+- first-pass crop upload
+- backend second-pass crop tightening + recognition
+- fallback to old route when no crops detected
+
+### Phase 2
+- improve preview polish
+- improve crop/result association in the UI
+- add crop thumbnails in result details
+
+## Scope notes for implementation handoff
+- Keep the existing single-image route intact.
+- Prefer a separate batch endpoint instead of overloading the current endpoint.
+- Preserve current response contract unless explicitly changed for the new batch route.
+- Keep v1 preview-only; no crop editing UI.

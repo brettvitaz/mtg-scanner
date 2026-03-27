@@ -8,7 +8,6 @@ struct ScanView: View {
     @EnvironmentObject private var appModel: AppModel
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImage: Image?
-    @State private var selectedUIImage: UIImage?
     @State private var isShowingCamera = false
     @State private var isShowingCameraUnavailableAlert = false
     @State private var shutterFlash = false
@@ -47,6 +46,8 @@ struct ScanView: View {
                     .buttonStyle(.bordered)
                     .disabled(appModel.isRecognizing)
 
+                    cropsPreviewSection
+
                     statusSection
                 }
                 .padding()
@@ -54,7 +55,7 @@ struct ScanView: View {
             .navigationTitle("MTG Scanner")
             .overlay { if appModel.isRecognizing { loadingOverlay } }
             .sheet(isPresented: $isShowingCamera) {
-                CameraPicker(image: $selectedUIImage) { image in
+                CameraPicker { image in
                     triggerShutterFeedback()
                     Task { await handleCapturedImage(image) }
                 }
@@ -102,6 +103,31 @@ struct ScanView: View {
         }
     }
 
+    /// Brief post-capture preview of detected crops (informational only).
+    @ViewBuilder
+    private var cropsPreviewSection: some View {
+        let crops = appModel.lastDetectedCrops
+        if !crops.isEmpty {
+            GroupBox {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(Array(crops.enumerated()), id: \.offset) { _, crop in
+                            Image(uiImage: crop)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            } label: {
+                Label("Detected crops (\(crops.count))", systemImage: "rectangle.dashed")
+                    .font(.subheadline)
+            }
+        }
+    }
+
     @ViewBuilder
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -126,9 +152,10 @@ struct ScanView: View {
                     .progressViewStyle(.circular)
                     .tint(.white)
                     .scaleEffect(1.4)
-                Text("Recognizing…")
+                Text(appModel.statusMessage)
                     .font(.subheadline.bold())
                     .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
             }
             .padding(32)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
@@ -178,7 +205,6 @@ struct ScanView: View {
 
     @MainActor
     private func setPreviewImage(_ image: UIImage) {
-        selectedUIImage = image
         selectedImage = Image(uiImage: image)
     }
 
@@ -194,7 +220,6 @@ struct ScanView: View {
 // MARK: - CameraPicker
 
 private struct CameraPicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
     let onImagePicked: (UIImage) -> Void
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -227,7 +252,6 @@ private struct CameraPicker: UIViewControllerRepresentable {
                 picker.dismiss(animated: true)
                 return
             }
-            parent.image = image
             picker.dismiss(animated: true)
             parent.onImagePicked(image)
         }

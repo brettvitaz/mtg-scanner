@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -10,8 +11,11 @@ final class AppModel: ObservableObject {
     @Published var isRecognizing = false
     @Published var statusMessage = "Pick a card photo to start a mocked scan."
     @Published var lastUploadedFilename: String?
+    /// Crops detected during the last capture, for display in the preview.
+    @Published var lastDetectedCrops: [UIImage] = []
 
     private let apiClient = APIClient()
+    private let cropService = CardCropService()
     private let correctionsStoreKey = "card_corrections"
     private let apiBaseURLStoreKey = "api_base_url"
 
@@ -20,10 +24,70 @@ final class AppModel: ObservableObject {
         loadCorrections()
     }
 
+    // MARK: - Recognition entry points
+
+    /// Recognise cards in a single image (camera capture or photo library).
+    ///
+    /// Flow:
+    /// 1. Run on-device crop detection.
+    /// 2. If ≥1 usable crop found → upload to batch endpoint.
+    /// 3. Otherwise → fall back to single-image endpoint.
     func recognizeImage(data: Data, filename: String, contentType: String) async {
         isRecognizing = true
-        statusMessage = "Uploading \(filename)…"
+        lastDetectedCrops = []
+        statusMessage = "Detecting cards…"
         lastUploadedFilename = filename
+
+        // --- On-device detection ---
+        guard let uiImage = UIImage(data: data) else {
+            statusMessage = "Could not decode image for detection."
+            isRecognizing = false
+            return
+        }
+
+        let cropResult = await cropService.detectAndCrop(image: uiImage)
+        lastDetectedCrops = cropResult.crops
+
+        if !cropResult.crops.isEmpty {
+            await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
+        } else {
+            await recognizeViaSingleImage(data: data, filename: filename, contentType: contentType)
+        }
+
+        isRecognizing = false
+    }
+
+    // MARK: - Private recognition helpers
+
+    private func recognizeViaBatch(crops: [UIImage], baseFilename: String) async {
+        let stem = (baseFilename as NSString).deletingPathExtension
+        var cropPairs: [(data: Data, filename: String)] = []
+        for (i, crop) in crops.enumerated() {
+            guard let jpegData = crop.jpegData(compressionQuality: 0.9) else { continue }
+            cropPairs.append((data: jpegData, filename: "\(stem)-crop-\(i).jpg"))
+        }
+
+        guard !cropPairs.isEmpty else {
+            // All crop encodings failed — fall back.
+            statusMessage = "Crop encoding failed, uploading full image…"
+            return
+        }
+
+        statusMessage = "Uploading \(cropPairs.count) crop(s)…"
+
+        do {
+            latestResult = try await apiClient.recognizeBatch(
+                crops: cropPairs,
+                baseURL: apiBaseURL
+            )
+            statusMessage = "Recognition finished (\(cropPairs.count) crop(s)). Open Results to inspect."
+        } catch {
+            statusMessage = "Batch recognition failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func recognizeViaSingleImage(data: Data, filename: String, contentType: String) async {
+        statusMessage = "No crops found — uploading full image…"
 
         do {
             latestResult = try await apiClient.recognizeImage(
@@ -36,8 +100,6 @@ final class AppModel: ObservableObject {
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
         }
-
-        isRecognizing = false
     }
 
     func loadSampleResult() {

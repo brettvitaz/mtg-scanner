@@ -15,6 +15,8 @@ struct APIClient {
         }
     }
 
+    // MARK: - Single-image route
+
     func recognizeImage(
         data: Data,
         filename: String,
@@ -26,10 +28,9 @@ struct APIClient {
             throw APIError.invalidBaseURL
         }
 
+        let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-
-        let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = makeMultipartBody(
             data: data,
@@ -39,6 +40,42 @@ struct APIClient {
             boundary: boundary
         )
 
+        return try await performRequest(request)
+    }
+
+    // MARK: - Batch route (client-side crops)
+
+    /// Uploads multiple pre-cropped images to `/api/v1/recognitions/batch`.
+    ///
+    /// Each element of `crops` is `(imageData, filename)`. All cropped cards
+    /// are merged into a single `RecognitionResult` by the server.
+    func recognizeBatch(
+        crops: [(data: Data, filename: String)],
+        contentType: String = "image/jpeg",
+        baseURL: String,
+        promptVersion: String = "card-recognition.md"
+    ) async throws -> RecognitionResult {
+        guard let url = URL(string: baseURL)?.appending(path: "/api/v1/recognitions/batch") else {
+            throw APIError.invalidBaseURL
+        }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = makeBatchMultipartBody(
+            crops: crops,
+            contentType: contentType,
+            promptVersion: promptVersion,
+            boundary: boundary
+        )
+
+        return try await performRequest(request)
+    }
+
+    // MARK: - Shared request helper
+
+    private func performRequest(_ request: URLRequest) async throws -> RecognitionResult {
         let (responseData, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
@@ -53,9 +90,10 @@ struct APIClient {
             )
         }
 
-        let decoder = JSONDecoder()
-        return try decoder.decode(RecognitionResult.self, from: responseData)
+        return try JSONDecoder().decode(RecognitionResult.self, from: responseData)
     }
+
+    // MARK: - Multipart helpers
 
     private func makeMultipartBody(
         data: Data,
@@ -66,9 +104,7 @@ struct APIClient {
     ) -> Data {
         var body = Data()
 
-        func append(_ string: String) {
-            body.append(Data(string.utf8))
-        }
+        func append(_ string: String) { body.append(Data(string.utf8)) }
 
         append("--\(boundary)\r\n")
         append("Content-Disposition: form-data; name=\"prompt_version\"\r\n\r\n")
@@ -81,6 +117,32 @@ struct APIClient {
         append("\r\n")
         append("--\(boundary)--\r\n")
 
+        return body
+    }
+
+    private func makeBatchMultipartBody(
+        crops: [(data: Data, filename: String)],
+        contentType: String,
+        promptVersion: String,
+        boundary: String
+    ) -> Data {
+        var body = Data()
+
+        func append(_ string: String) { body.append(Data(string.utf8)) }
+
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"prompt_version\"\r\n\r\n")
+        append("\(promptVersion)\r\n")
+
+        for crop in crops {
+            append("--\(boundary)\r\n")
+            append("Content-Disposition: form-data; name=\"images\"; filename=\"\(crop.filename)\"\r\n")
+            append("Content-Type: \(contentType)\r\n\r\n")
+            body.append(crop.data)
+            append("\r\n")
+        }
+
+        append("--\(boundary)--\r\n")
         return body
     }
 }

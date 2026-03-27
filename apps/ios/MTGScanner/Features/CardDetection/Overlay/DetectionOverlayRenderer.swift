@@ -86,18 +86,40 @@ final class DetectionOverlayRenderer {
     // MARK: - Private Helpers
 
     private func makeQuadPath(for card: DetectedCard, previewLayer: AVCaptureVideoPreviewLayer) -> UIBezierPath {
-        let tl = Self.visionToPreview(point: card.topLeft, previewLayer: previewLayer)
-        let tr = Self.visionToPreview(point: card.topRight, previewLayer: previewLayer)
-        let br = Self.visionToPreview(point: card.bottomRight, previewLayer: previewLayer)
-        let bl = Self.visionToPreview(point: card.bottomLeft, previewLayer: previewLayer)
+        // Convert all four Vision corners to screen coordinates.
+        let points = [card.topLeft, card.topRight, card.bottomRight, card.bottomLeft]
+            .map { Self.visionToPreview(point: $0, previewLayer: previewLayer) }
+
+        // Sort into convex drawing order (top-left → top-right → bottom-right → bottom-left
+        // in screen space) so the polygon never self-intersects regardless of card tilt.
+        let ordered = convexOrder(points)
 
         let path = UIBezierPath()
-        path.move(to: tl)
-        path.addLine(to: tr)
-        path.addLine(to: br)
-        path.addLine(to: bl)
+        path.move(to: ordered[0])
+        for pt in ordered.dropFirst() { path.addLine(to: pt) }
         path.close()
         return path
+    }
+
+    /// Returns the four points sorted in clockwise screen order starting from the
+    /// top-left point (smallest x+y sum).
+    private func convexOrder(_ pts: [CGPoint]) -> [CGPoint] {
+        guard pts.count == 4 else { return pts }
+        // Find centroid.
+        let cx = pts.map(\.x).reduce(0, +) / 4
+        let cy = pts.map(\.y).reduce(0, +) / 4
+        let center = CGPoint(x: cx, y: cy)
+        // Sort by angle from centroid (clockwise in screen coords where y increases downward).
+        let sorted = pts.sorted { a, b in
+            let angleA = atan2(a.y - center.y, a.x - center.x)
+            let angleB = atan2(b.y - center.y, b.x - center.x)
+            return angleA < angleB
+        }
+        // Rotate so the top-left point (min x+y) is first.
+        guard let startIdx = sorted.indices.min(by: { sorted[$0].x + sorted[$0].y < sorted[$1].x + sorted[$1].y }) else {
+            return sorted
+        }
+        return Array(sorted[startIdx...] + sorted[..<startIdx])
     }
 
     private func growPoolIfNeeded(to count: Int, in parent: CALayer?) {

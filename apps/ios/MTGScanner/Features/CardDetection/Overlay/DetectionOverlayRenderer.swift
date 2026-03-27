@@ -73,22 +73,28 @@ final class DetectionOverlayRenderer {
 
     // MARK: - Coordinate Transform
 
-    /// Converts a Vision normalized point to a point in the `previewLayer`'s coordinate space.
+    /// Converts a Vision normalized point to a point in the `previewLayer`'s coordinate space,
+    /// accounting for the current device orientation.
     ///
-    /// Vision with `.right` orientation returns coordinates in the upright portrait space:
-    /// origin at bottom-left, x right, y up, all values in [0, 1]. The preview layer has
-    /// its origin at top-left with y increasing downward. The transform is:
-    ///   screenX = visionX * boundsWidth
-    ///   screenY = (1 - visionY) * boundsHeight
+    /// Vision with `.right` orientation always returns coordinates in the upright portrait space
+    /// (origin bottom-left, x right, y up, values 0–1) regardless of device orientation.
+    /// The preview layer connection's `videoRotationAngle` tells us how the camera feed has
+    /// been rotated to fill the screen, so we apply the inverse mapping:
     ///
-    /// This bypasses `layerPointConverted` (which operates in the raw capture device
-    /// coordinate space, not the Vision-result space) to avoid orientation mismatches.
+    ///   90°  (portrait):        screenX = visionX * W,       screenY = (1-visionY) * H
+    ///   0°   (landscape right): screenX = (1-visionY) * W,   screenY = (1-visionX) * H
+    ///   180° (landscape left):  screenX = visionY * W,       screenY = visionX * H
+    ///   270° (portrait upside-down): screenX = (1-visionX)*W, screenY = visionY*H
     static func visionToPreview(point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
         let bounds = previewLayer.bounds
-        return CGPoint(
-            x: point.x * bounds.width,
-            y: (1.0 - point.y) * bounds.height
-        )
+        let W = bounds.width, H = bounds.height
+        let angle = previewLayer.connection?.videoRotationAngle ?? 90
+        switch angle {
+        case 0:   return CGPoint(x: (1.0 - point.y) * W, y: (1.0 - point.x) * H)
+        case 180: return CGPoint(x: point.y * W,          y: point.x * H)
+        case 270: return CGPoint(x: (1.0 - point.x) * W, y: point.y * H)
+        default:  return CGPoint(x: point.x * W,          y: (1.0 - point.y) * H) // 90° portrait
+        }
     }
 
     // MARK: - Private Helpers

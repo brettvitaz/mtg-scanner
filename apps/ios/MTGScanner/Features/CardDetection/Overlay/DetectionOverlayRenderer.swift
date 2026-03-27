@@ -56,10 +56,15 @@ final class DetectionOverlayRenderer {
 
     // MARK: - Coordinate Transform
 
-    /// Converts a Vision normalized point (origin bottom-left) to a point in
-    /// the `previewLayer`'s coordinate space using the layer's built-in transform.
+    /// Converts a Vision normalized point (origin bottom-left, 0…1) to a point in
+    /// the `previewLayer`'s coordinate space.
+    ///
+    /// Vision corner coordinates have their Y axis flipped relative to capture device
+    /// coordinates (which expect origin top-left). We flip Y before calling the preview
+    /// layer's built-in conversion so the overlay lands on the correct pixel.
     static func visionToPreview(point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
-        previewLayer.layerPointConverted(fromCaptureDevicePoint: point)
+        let devicePoint = CGPoint(x: point.x, y: 1.0 - point.y)
+        return previewLayer.layerPointConverted(fromCaptureDevicePoint: devicePoint)
     }
 
     // MARK: - Private Helpers
@@ -94,6 +99,15 @@ final class DetectionOverlayRenderer {
         layer.fillColor = UIColor.systemGreen.withAlphaComponent(0.15).cgColor
         layer.lineWidth = 2.0
         layer.isHidden = true
+        // Disable implicit animations on all animatable properties to prevent
+        // path-change interpolation flicker between detection frames.
+        layer.actions = [
+            "path": NSNull(),
+            "hidden": NSNull(),
+            "opacity": NSNull(),
+            "position": NSNull(),
+            "bounds": NSNull(),
+        ]
         return layer
     }
 }

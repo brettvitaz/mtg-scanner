@@ -21,6 +21,7 @@ final class CardDetectionEngine {
 
     private let visionQueue = DispatchQueue(label: "com.mtgscanner.vision", qos: .userInitiated)
     private let rectangleFilter = RectangleFilter()
+    /// Guarded by visionQueue — never read/written from other queues.
     private var isProcessing = false
 
     // MARK: - Frame Processing
@@ -30,19 +31,15 @@ final class CardDetectionEngine {
     /// Frames arriving while a prior request is still running are silently dropped;
     /// the caller must not assume every frame produces a detection callback.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard !isProcessing else { return }
-        isProcessing = true
-
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            isProcessing = false
-            return
-        }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         let mode = detectionMode
 
+        // tryAsync: if the queue already has a pending item, drop this frame.
         visionQueue.async { [weak self] in
-            guard let self else { return }
+            guard let self, !self.isProcessing else { return }
+            self.isProcessing = true
             let cards = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode)
             self.isProcessing = false
             DispatchQueue.main.async {

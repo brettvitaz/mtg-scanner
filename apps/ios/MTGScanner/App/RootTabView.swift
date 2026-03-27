@@ -13,6 +13,11 @@ struct RootTabView: View {
                     Label("Results", systemImage: "list.bullet.rectangle")
                 }
 
+            CardDetectionView()
+                .tabItem {
+                    Label("Detect", systemImage: "viewfinder.rectangular")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")

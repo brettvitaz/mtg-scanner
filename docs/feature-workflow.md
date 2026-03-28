@@ -8,12 +8,10 @@ Use this when starting a feature thread or handing work to a coding agent.
 ## Minimal context to load
 Default reading set for feature work:
 1. `README.md`
-2. `docs/architecture.md`
-3. `docs/feature-workflow.md`
+2. `docs/feature-workflow.md`
 
 Only load more if needed:
 - `services/api/README.md` for backend/provider details
-- `docs/agent-workflow.md` for prior findings/debugging history
 - file-specific code/docs relevant to the task
 
 This keeps the token footprint small for local agents with ~65k context windows.
@@ -23,8 +21,7 @@ This keeps the token footprint small for local agents with ~65k context windows.
 2. Make the smallest useful change that solves the problem.
 3. Run verification before claiming success.
 4. **Commit after each feature or change.**
-5. Prefer native subagents over ACP for async orchestration until ACP completion relay is reliable.
-6. Keep docs concise; avoid creating instruction sprawl.
+5. Keep docs concise; avoid creating instruction sprawl.
 
 ## Feature thread template
 Each implementation thread should define:
@@ -41,7 +38,6 @@ Implement [feature/fix].
 
 Context to read:
 - README.md
-- docs/architecture.md
 - docs/feature-workflow.md
 - [specific files for this task]
 
@@ -102,4 +98,3 @@ To keep prompts efficient for smaller local models:
 - avoid loading every doc by default
 - prefer direct file pointers over broad repo summaries
 - summarize prior findings in 5-10 bullets instead of pasting long transcripts
-- use `docs/agent-workflow.md` as deep history, not required startup context

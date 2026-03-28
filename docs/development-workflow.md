@@ -4,8 +4,8 @@
 Keep the repo easy for both humans and coding agents to understand, run, and modify.
 
 ## Preferred workflow
-1. Read `README.md`, `docs/plan.md`, and `docs/architecture.md`.
-2. Check `AGENTS.md` for repo-specific conventions.
+1. Read `README.md` and `docs/plan.md`.
+2. Check `CLAUDE.md` for repo-specific conventions.
 3. Make the smallest useful change.
 4. Update docs and examples alongside code.
 5. Run the smallest verification that proves the change.

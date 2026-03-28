@@ -57,38 +57,27 @@ Build an iPhone-first app that captures one or more Magic: The Gathering cards i
 - Make every major component runnable independently
 - Use a monorepo so agents can reason across app, API, schemas, and evals in one place
 
-## Suggested Phases
+## Phases
 
-### Phase 0 — Foundations
-- Create repo structure
-- Define API schema
-- Define recognition JSON schema
-- Add sample prompt file
-- Add initial backend skeleton
-- Add initial SwiftUI app skeleton
+### Phase 0 — Foundations ✅
+Repo structure, API schema, recognition JSON schema, prompt files, backend skeleton, SwiftUI app skeleton.
 
-### Phase 1 — Recognition Pipeline Proof
-- Build upload endpoint
-- Send sample images to chosen AI recognition provider
-- Return structured JSON
-- Save raw outputs for debugging
-- Evaluate accuracy on sample images
+### Phase 1 — Recognition Pipeline Proof ✅
+Upload endpoint, OpenAI provider integration with config-driven provider abstraction (mock/openai/openai-compatible), structured JSON responses, artifact logging, evaluation harness.
 
-### Phase 2 — iPhone MVP
-- Camera flow
-- Photo picker fallback
-- Upload client
-- Results screen
-- Correction UI
+### Phase 2 — iPhone MVP ✅
+Camera capture with live card detection overlays, photo picker, upload client, results screen, correction UI scaffold, settings flow.
 
-### Phase 3 — Multi-card Quality Improvements
-- Card detection/cropping before recognition
-- Confidence calibration
-- Better set disambiguation
-- Better foil heuristics
+### Phase 3 — Multi-card Quality Improvements ✅ (partially)
+- ✅ Card detection/cropping: YOLOv8n on-device (table mode), VNDetectRectangles + grid interpolation (binder mode), OpenCV server-side
+- ✅ On-device perspective-corrected cropping with `CIPerspectiveCorrection`
+- ✅ MTGJSON validation for set/title/collector number normalization
+- ✅ Batch upload endpoint for multi-card images
+- Remaining: crop-first batch scan integration (see `docs/plans/ios-crop-first-batch-scan.md`)
+- Remaining: confidence calibration, better foil heuristics
 
-## Open Questions
-- Which AI provider gives best structured extraction quality for MTG cards?
-- Should card boundary detection happen on-device, server-side, or both?
-- Is synchronous request/response good enough for MVP, or should backend support async jobs for large images?
-- What metadata should be persisted for later training/evaluation?
+## Resolved Questions
+- **AI provider:** OpenAI (gpt-4.1-mini) via structured output. OpenAI-compatible mode supports Ollama and LM Studio.
+- **Card boundary detection:** Both on-device (YOLOv8n for table, Vision rectangles for binder) and server-side (OpenCV contour-based).
+- **Request model:** Synchronous request/response works for MVP. Batch endpoint handles multi-card images.
+- **Metadata for evaluation:** Artifacts store uploaded images, crops, raw recognition output, validation details, and response JSON.

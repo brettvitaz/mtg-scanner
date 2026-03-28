@@ -38,7 +38,6 @@ Improve crop quality, reduce unnecessary image area sent to the backend, and mak
 ### Camera UX requirements
 - Preserve normal camera controls such as zoom and flash.
 - Review the camera modal for usability.
-- Fix the partially cut-off flash button / top-right control layout issue as part of this work if it is in the touched surface area.
 
 ### Batch artifact layout
 Use a clear batch artifact layout that distinguishes:
@@ -95,17 +94,7 @@ Longer term, result-to-crop association will matter more once result details can
 ## UX note on live preview
 Live crop preview during camera framing is a requirement.
 The user should see whether the app believes the shot is likely to succeed **before capture**, but the user remains in control of when to press capture.
-This means the preview should guide capture, not force timing pressure or automatic submission.
 The live overlay should be reasonably stable and not flicker aggressively.
-
-## Feasibility
-This feature is feasible in the current project and is a medium-complexity extension of the existing architecture.
-
-### Why it fits
-- iOS app already captures and uploads images.
-- Backend already performs detection/cropping/recognition work.
-- Crop quality is already known to be an important driver of recognition quality.
-- Multi-card semantics and artifact logging already exist.
 
 ## Key technical risks
 - On-device rectangle detection quality on real MTG photos

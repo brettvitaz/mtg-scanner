@@ -185,13 +185,8 @@ struct ScanView: View {
 
     @MainActor
     private func handleCapturedImage(_ image: UIImage) async {
-        guard let data = image.jpegData(compressionQuality: 0.9) else {
-            appModel.statusMessage = "Failed to prepare the captured photo."
-            return
-        }
         let filename = "camera-capture-\(UUID().uuidString.prefix(8)).jpg"
-        let contentType = UTType.jpeg.preferredMIMEType ?? "image/jpeg"
-        await appModel.recognizeImage(data: data, filename: filename, contentType: contentType)
+        await appModel.recognizeImage(image: image, filename: filename)
     }
 
     // MARK: - Orientation

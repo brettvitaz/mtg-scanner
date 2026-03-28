@@ -34,24 +34,33 @@ final class AppModel: ObservableObject {
     /// 2. If ≥1 usable crop found → upload to batch endpoint.
     /// 3. Otherwise → fall back to single-image endpoint.
     func recognizeImage(data: Data, filename: String, contentType: String) async {
+        guard let uiImage = UIImage(data: data) else {
+            statusMessage = "Could not decode image for detection."
+            return
+        }
+        await recognizeImage(image: uiImage, filename: filename)
+    }
+
+    /// Recognise cards from a UIImage directly (avoids Data round-trip for camera captures).
+    func recognizeImage(image: UIImage, filename: String) async {
         isRecognizing = true
         lastDetectedCrops = []
         statusMessage = "Detecting cards…"
         lastUploadedFilename = filename
 
-        // --- On-device detection ---
-        guard let uiImage = UIImage(data: data) else {
-            statusMessage = "Could not decode image for detection."
-            isRecognizing = false
-            return
-        }
-
-        let cropResult = await cropService.detectAndCrop(image: uiImage)
+        let cropResult = await cropService.detectAndCrop(image: image)
         lastDetectedCrops = cropResult.crops
 
         if !cropResult.crops.isEmpty {
             await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
         } else {
+            // No crops found — upload the full image.
+            guard let data = image.jpegData(compressionQuality: 0.9) else {
+                statusMessage = "Failed to encode image."
+                isRecognizing = false
+                return
+            }
+            let contentType = "image/jpeg"
             await recognizeViaSingleImage(data: data, filename: filename, contentType: contentType)
         }
 

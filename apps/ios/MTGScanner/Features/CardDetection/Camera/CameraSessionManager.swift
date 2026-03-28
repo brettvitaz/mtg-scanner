@@ -69,13 +69,6 @@ final class CameraSessionManager: NSObject {
         let settings = AVCapturePhotoSettings()
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            // Set portrait rotation on the photo output connection so captured
-            // pixels are in portrait orientation. The preview layer already has
-            // its own rotation applied; the photo output connection is independent.
-            if let connection = self.photoOutput.connection(with: .video),
-               connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
-            }
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
     }

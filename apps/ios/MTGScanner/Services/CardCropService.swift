@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import UIKit
 import Vision
 
@@ -16,63 +17,63 @@ struct CardCropResult {
 /// 1. Running rectangle detection via VNDetectRectanglesRequest
 /// 2. Filtering by MTG-like aspect ratio (2.5:3.5 ≈ 0.714) with tolerance
 /// 3. Suppressing heavily overlapping duplicates (IoU-based)
-/// 4. Cropping each accepted region with mild padding and perspective correction
-///
-/// A minimum confidence threshold is applied so that uncertain detections are
-/// silently dropped rather than generating noisy speculative crops.
+/// 4. Cropping each accepted region with perspective correction
 final class CardCropService {
 
-    // MARK: - Constants
-
-    /// Fraction of the shorter crop dimension added as padding on each side.
     private static let cropPadding: CGFloat = 0.03
-
     private let rectangleFilter = RectangleFilter()
+    private let ciContext = CIContext()
 
     // MARK: - Public API
 
     /// Detects MTG card regions in `image` and returns individual crops.
-    ///
-    /// - Returns: A `CardCropResult` with `crops` ordered top-left to
-    ///   bottom-right. Returns an empty result (not an error) when no usable
-    ///   cards are found.
     func detectAndCrop(image: UIImage) async -> CardCropResult {
-        // Normalize orientation so the CGImage pixels are upright. Without this,
-        // image.cgImage returns raw sensor pixels (often landscape-rotated) and
-        // both Vision and CIPerspectiveCorrection would operate on rotated data,
-        // producing a rotated/mirrored crop.
-        let upright = Self.normalizeOrientation(image)
+        // Step 1: Normalize to an upright UIImage whose cgImage pixels match
+        // the visual orientation. This eliminates ALL orientation complexity
+        // from every downstream step.
+        let upright = normalizedImage(image)
         guard let cgImage = upright.cgImage else {
             return CardCropResult(crops: [], detectedCount: 0)
         }
 
-        let observations = await runRectangleDetection(on: cgImage)
-        let filtered = filterObservations(observations, imageSize: CGSize(width: cgImage.width, height: cgImage.height))
+        // Step 2: Run Vision rectangle detection on upright pixels.
+        let observations = await detectRectangles(in: cgImage)
+        let filtered = rectangleFilter.filter(observations)
 
-        var crops: [UIImage] = []
-        for obs in filtered {
-            if let crop = perspectiveCrop(cgImage: cgImage, observation: obs, originalImage: upright) {
-                crops.append(crop)
-            }
-        }
+        // Step 3: Perspective-correct and crop each detected card.
+        let crops = filtered.compactMap { cropCard(from: cgImage, observation: $0) }
 
         return CardCropResult(crops: crops, detectedCount: filtered.count)
     }
 
-    // MARK: - Detection
+    // MARK: - Orientation Normalization
 
-    private func runRectangleDetection(on cgImage: CGImage) async -> [VNRectangleObservation] {
+    /// Redraws the image so that cgImage pixels are upright (.up orientation).
+    /// If already upright, returns the original to avoid unnecessary work.
+    private func normalizedImage(_ image: UIImage) -> UIImage {
+        guard image.imageOrientation != .up else { return image }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
+    }
+
+    // MARK: - Rectangle Detection
+
+    private func detectRectangles(in cgImage: CGImage) async -> [VNRectangleObservation] {
         await withCheckedContinuation { continuation in
             let request = VNDetectRectanglesRequest { request, _ in
                 let results = (request.results as? [VNRectangleObservation]) ?? []
                 continuation.resume(returning: results)
             }
-            // Allow up to 10 cards in a single image (e.g. 3×3 binder page).
             request.maximumObservations = 10
             request.minimumConfidence = RectangleFilter.minConfidence
             request.minimumAspectRatio = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance))
             request.maximumAspectRatio = Float(RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance))
 
+            // CGImage is already upright, so no orientation hint needed.
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             do {
                 try handler.perform([request])
@@ -82,112 +83,74 @@ final class CardCropService {
         }
     }
 
-    // MARK: - Filtering
+    // MARK: - Perspective Crop
 
-    private func filterObservations(
-        _ observations: [VNRectangleObservation],
-        imageSize: CGSize
-    ) -> [VNRectangleObservation] {
-        rectangleFilter.filter(observations)
-    }
-
-    // MARK: - Cropping
-
-    /// Applies perspective-corrected crop using the four detected corners.
-    private func perspectiveCrop(
-        cgImage: CGImage,
-        observation: VNRectangleObservation,
-        originalImage: UIImage
+    /// Applies CIPerspectiveCorrection to extract a single card from the image.
+    ///
+    /// Coordinate convention:
+    /// - Vision returns normalized coords in [0,1] with bottom-left origin.
+    /// - CIImage(cgImage:) also uses bottom-left origin.
+    /// - Therefore we scale Vision coords to pixel dimensions directly (no Y-flip).
+    private func cropCard(
+        from cgImage: CGImage,
+        observation: VNRectangleObservation
     ) -> UIImage? {
-        let imageWidth = CGFloat(cgImage.width)
-        let imageHeight = CGFloat(cgImage.height)
+        let w = CGFloat(cgImage.width)
+        let h = CGFloat(cgImage.height)
 
-        // CIImage uses a bottom-left origin, which matches Vision's normalised
-        // coordinate space. Scale from [0,1] to pixel dimensions without flipping Y.
-        func scale(_ p: CGPoint) -> CGPoint {
-            CGPoint(x: p.x * imageWidth, y: p.y * imageHeight)
-        }
+        // Scale normalized Vision coords → CIImage pixel coords (both bottom-left origin).
+        let topLeft     = CGPoint(x: observation.topLeft.x * w,     y: observation.topLeft.y * h)
+        let topRight    = CGPoint(x: observation.topRight.x * w,    y: observation.topRight.y * h)
+        let bottomRight = CGPoint(x: observation.bottomRight.x * w, y: observation.bottomRight.y * h)
+        let bottomLeft  = CGPoint(x: observation.bottomLeft.x * w,  y: observation.bottomLeft.y * h)
 
-        let tl = scale(observation.topLeft)
-        let tr = scale(observation.topRight)
-        let br = scale(observation.bottomRight)
-        let bl = scale(observation.bottomLeft)
-
-        // Expand quad outward by padding fraction of the shorter side.
-        let boundW = max(distance(tl, tr), distance(bl, br))
-        let boundH = max(distance(tl, bl), distance(tr, br))
-        let pad = min(boundW, boundH) * Self.cropPadding
-
-        let expanded = expandQuad(tl: tl, tr: tr, br: br, bl: bl, by: pad, in: CGSize(width: imageWidth, height: imageHeight))
-
-        // Target output size preserving aspect ratio.
-        let outWidth = max(boundW + pad * 2, 1)
-        let outHeight = max(outWidth / RectangleFilter.targetAspectRatio, 1)
-
-        let ciImage = CIImage(cgImage: cgImage)
-        let filter = CIFilter(name: "CIPerspectiveCorrection")!
-        filter.setValue(ciImage, forKey: kCIInputImageKey)
-        filter.setValue(CIVector(cgPoint: expanded.tl), forKey: "inputTopLeft")
-        filter.setValue(CIVector(cgPoint: expanded.tr), forKey: "inputTopRight")
-        filter.setValue(CIVector(cgPoint: expanded.br), forKey: "inputBottomRight")
-        filter.setValue(CIVector(cgPoint: expanded.bl), forKey: "inputBottomLeft")
-
-        guard let outputCIImage = filter.outputImage else { return nil }
-
-        let context = CIContext()
-        let outputRect = CGRect(x: 0, y: 0, width: outWidth, height: outHeight)
-        // Scale the corrected image to the output rect.
-        let scaled = outputCIImage.transformed(
-            by: CGAffineTransform(
-                scaleX: outWidth / outputCIImage.extent.width,
-                y: outHeight / outputCIImage.extent.height
-            )
+        // Apply padding.
+        let quadW = max(dist(topLeft, topRight), dist(bottomLeft, bottomRight))
+        let quadH = max(dist(topLeft, bottomLeft), dist(topRight, bottomRight))
+        let pad = min(quadW, quadH) * Self.cropPadding
+        let padded = padQuad(
+            tl: topLeft, tr: topRight, br: bottomRight, bl: bottomLeft,
+            by: pad, bounds: CGSize(width: w, height: h)
         )
-        guard let cgCrop = context.createCGImage(scaled, from: outputRect) else { return nil }
 
-        return UIImage(cgImage: cgCrop, scale: originalImage.scale, orientation: .up)
+        // CIPerspectiveCorrection expects CIImage coordinates (bottom-left origin).
+        let ciImage = CIImage(cgImage: cgImage)
+        guard let filter = CIFilter(name: "CIPerspectiveCorrection") else { return nil }
+        filter.setValue(ciImage, forKey: kCIInputImageKey)
+        filter.setValue(CIVector(cgPoint: padded.tl), forKey: "inputTopLeft")
+        filter.setValue(CIVector(cgPoint: padded.tr), forKey: "inputTopRight")
+        filter.setValue(CIVector(cgPoint: padded.br), forKey: "inputBottomRight")
+        filter.setValue(CIVector(cgPoint: padded.bl), forKey: "inputBottomLeft")
+
+        guard let output = filter.outputImage else { return nil }
+
+        // Render the corrected image at its natural size.
+        guard let cgResult = ciContext.createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: cgResult)
     }
 
-    // MARK: - Orientation
+    // MARK: - Geometry Helpers
 
-    /// Redraws a UIImage into a new bitmap so that its `cgImage` pixels match the
-    /// visual orientation. Returns the original image unchanged if already `.up`.
-    private static func normalizeOrientation(_ image: UIImage) -> UIImage {
-        guard image.imageOrientation != .up else { return image }
-        return UIGraphicsImageRenderer(size: image.size).image { _ in
-            image.draw(at: .zero)
-        }
+    private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+        hypot(a.x - b.x, a.y - b.y)
     }
 
-    // MARK: - Geometry helpers
+    private struct Quad { var tl, tr, br, bl: CGPoint }
 
-    private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-        let dx = a.x - b.x
-        let dy = a.y - b.y
-        return sqrt(dx * dx + dy * dy)
-    }
-
-    private struct Quad {
-        var tl, tr, br, bl: CGPoint
-    }
-
-    private func expandQuad(tl: CGPoint, tr: CGPoint, br: CGPoint, bl: CGPoint, by pad: CGFloat, in size: CGSize) -> Quad {
+    private func padQuad(tl: CGPoint, tr: CGPoint, br: CGPoint, bl: CGPoint,
+                         by pad: CGFloat, bounds: CGSize) -> Quad {
         let cx = (tl.x + tr.x + br.x + bl.x) / 4
         let cy = (tl.y + tr.y + br.y + bl.y) / 4
 
         func expand(_ p: CGPoint) -> CGPoint {
-            let dx = p.x - cx
-            let dy = p.y - cy
-            let len = sqrt(dx * dx + dy * dy)
+            let dx = p.x - cx, dy = p.y - cy
+            let len = hypot(dx, dy)
             guard len > 0 else { return p }
-            let nx = dx / len
-            let ny = dy / len
-            let ex = max(0, min(size.width - 1, p.x + nx * pad))
-            let ey = max(0, min(size.height - 1, p.y + ny * pad))
-            return CGPoint(x: ex, y: ey)
+            return CGPoint(
+                x: max(0, min(bounds.width, p.x + (dx / len) * pad)),
+                y: max(0, min(bounds.height, p.y + (dy / len) * pad))
+            )
         }
-
         return Quad(tl: expand(tl), tr: expand(tr), br: expand(br), bl: expand(bl))
     }
-
 }

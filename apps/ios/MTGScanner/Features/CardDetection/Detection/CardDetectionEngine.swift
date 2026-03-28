@@ -1,15 +1,20 @@
 import AVFoundation
 import CoreGraphics
+import CoreML
 import Vision
 
 /// Processes live camera frames and detects MTG card-shaped rectangles.
 ///
 /// Threading model:
 /// - `processFrame(_:)` is called from the camera queue.
-/// - Vision requests execute synchronously on a dedicated serial Vision queue.
-/// - Frame dropping: if a Vision request is already in flight, incoming frames are
-///   discarded — the camera session will not back up.
+/// - Vision/CoreML requests execute synchronously on a dedicated serial Vision queue.
+/// - Frame dropping: if a request is already in flight, incoming frames are discarded.
 /// - Results are dispatched to the main queue via `onDetection`.
+///
+/// Detection paths:
+/// - Table mode: VNCoreMLRequest using the trained YOLOv8n card detector model.
+/// - Binder mode: VNDetectRectanglesRequest to find the page, then GridInterpolator
+///   to subdivide into a 3×3 grid (no trained model needed for this path).
 final class CardDetectionEngine {
 
     // MARK: - Properties
@@ -20,25 +25,44 @@ final class CardDetectionEngine {
     var onDetection: (([DetectedCard]) -> Void)?
 
     private let visionQueue = DispatchQueue(label: "com.mtgscanner.vision", qos: .userInitiated)
-    private let rectangleFilter = RectangleFilter()
     /// Guarded by visionQueue — never read/written from other queues.
     private var isProcessing = false
     /// Guarded by visionQueue — stabilizes detections with EMA smoothing + hysteresis.
     private let tracker = CardTracker()
 
+    // MARK: - YOLO model (lazy — loaded once on first use on visionQueue)
+
+    private var _coreMLRequest: VNCoreMLRequest?
+
+    private func coreMLRequest() -> VNCoreMLRequest? {
+        if let existing = _coreMLRequest { return existing }
+        guard let modelURL = Bundle.main.url(forResource: "best", withExtension: "mlpackage"),
+              let compiled = try? MLModel(contentsOf: modelURL,
+                                          configuration: mlConfig()),
+              let vnModel = try? VNCoreMLModel(for: compiled) else {
+            return nil
+        }
+        let request = VNCoreMLRequest(model: vnModel)
+        // .scaleFill avoids letterboxing — matches how YOLO was trained (padded square input)
+        request.imageCropAndScaleOption = .scaleFill
+        _coreMLRequest = request
+        return request
+    }
+
+    private func mlConfig() -> MLModelConfiguration {
+        let config = MLModelConfiguration()
+        config.computeUnits = .all   // Neural Engine + GPU + CPU
+        return config
+    }
+
     // MARK: - Frame Processing
 
-    /// Submit a camera frame for card detection.
-    ///
-    /// Frames arriving while a prior request is still running are silently dropped;
-    /// the caller must not assume every frame produces a detection callback.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         let mode = detectionMode
 
-        // tryAsync: if the queue already has a pending item, drop this frame.
         visionQueue.async { [weak self] in
             guard let self, !self.isProcessing else { return }
             self.isProcessing = true
@@ -60,31 +84,41 @@ final class CardDetectionEngine {
     ) -> [DetectedCard] {
         switch mode {
         case .table:
-            return detectCards(in: pixelBuffer, timestamp: timestamp)
+            return detectWithYOLO(pixelBuffer: pixelBuffer, timestamp: timestamp)
         case .binder:
             return detectBinderGrid(in: pixelBuffer, timestamp: timestamp)
         }
     }
 
-    private func detectCards(in pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
-        // Do not pass aspect ratio constraints to VNDetectRectanglesRequest.
-        // The request's aspect ratio parameters operate on Vision's internal coordinate
-        // space (after applying the image orientation), which does not correspond to the
-        // card's on-screen orientation — causing upright cards to be rejected in landscape
-        // mode and sideways cards to be rejected in portrait mode.
-        // RectangleFilter.isCardAspectRatio performs the correct orientation-agnostic
-        // filter after the fact using the normalized bounding box.
-        let observations = runRectangleRequest(
-            pixelBuffer: pixelBuffer,
-            maxObservations: 10,
-            minAspectRatio: 0.1,
-            maxAspectRatio: 1.0
-        )
-        return rectangleFilter.filter(observations).map { DetectedCard(from: $0, timestamp: timestamp) }
+    // MARK: - YOLO Table Detection
+
+    private func detectWithYOLO(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+        guard let request = coreMLRequest() else {
+            // Model failed to load — fall back to rectangle detection
+            return detectWithRectangles(pixelBuffer: pixelBuffer, timestamp: timestamp)
+        }
+
+        // The sensor delivers landscape pixel buffers (1920×1080).
+        // .right tells Vision the image needs a 90° CCW rotation to appear upright.
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
+                                            orientation: .right,
+                                            options: [:])
+        try? handler.perform([request])
+
+        // YOLOv8n exported with nms=False returns a raw MLMultiArray named "var_909"
+        // via VNCoreMLFeatureValueObservation, not VNRecognizedObjectObservation.
+        guard let observations = request.results as? [VNCoreMLFeatureValueObservation],
+              let output = observations.first(where: { $0.featureName == "var_909" })?.featureValue.multiArrayValue
+                        ?? observations.first?.featureValue.multiArrayValue else {
+            return []
+        }
+
+        return YOLODecoder().decode(output: output, timestamp: timestamp)
     }
 
+    // MARK: - Binder Grid Detection (VNDetectRectanglesRequest)
+
     private func detectBinderGrid(in pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
-        // Pass 1: detect the binder page as a single large rectangle.
         let pageObservations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 1,
@@ -94,7 +128,6 @@ final class CardDetectionEngine {
 
         guard let page = pageObservations.first else { return [] }
 
-        // Pass 2: subdivide the page into a 3×3 grid using bilinear interpolation.
         let cells = GridInterpolator.subdivide(
             topLeft: page.topLeft,
             topRight: page.topRight,
@@ -123,6 +156,18 @@ final class CardDetectionEngine {
         }
     }
 
+    // MARK: - Rectangle Request (used for binder mode + fallback)
+
+    private func detectWithRectangles(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+        let observations = runRectangleRequest(
+            pixelBuffer: pixelBuffer,
+            maxObservations: 10,
+            minAspectRatio: 0.1,
+            maxAspectRatio: 1.0
+        )
+        return observations.map { DetectedCard(from: $0, timestamp: timestamp) }
+    }
+
     private func runRectangleRequest(
         pixelBuffer: CVPixelBuffer,
         maxObservations: Int,
@@ -135,33 +180,31 @@ final class CardDetectionEngine {
             results = (req.results as? [VNRectangleObservation]) ?? []
         }
         request.maximumObservations = maxObservations
-        request.minimumConfidence = RectangleFilter.minConfidence
+        request.minimumConfidence = 0.4
         request.minimumAspectRatio = minAspectRatio
         request.maximumAspectRatio = maxAspectRatio
         request.quadratureTolerance = 15.0
 
-        // The sensor delivers landscape pixel buffers (1920×1080, right side up).
-        // .right tells Vision the image needs a 90° CCW rotation to appear upright,
-        // which matches the portrait camera preview shown to the user.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
+                                            orientation: .right,
+                                            options: [:])
         try? handler.perform([request])
-
         return results
     }
 }
 
-// MARK: - DetectedCard convenience init
+// MARK: - DetectedCard convenience init from VNRectangleObservation
 
 private extension DetectedCard {
     init(from obs: VNRectangleObservation, timestamp: TimeInterval) {
         self.init(
             boundingBox: obs.boundingBox,
-            topLeft: obs.topLeft,
-            topRight: obs.topRight,
+            topLeft:     obs.topLeft,
+            topRight:    obs.topRight,
             bottomRight: obs.bottomRight,
-            bottomLeft: obs.bottomLeft,
-            confidence: obs.confidence,
-            timestamp: timestamp
+            bottomLeft:  obs.bottomLeft,
+            confidence:  obs.confidence,
+            timestamp:   timestamp
         )
     }
 }

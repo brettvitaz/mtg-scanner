@@ -6,17 +6,23 @@ import Vision
 ///
 /// YOLOv8n exported with `nms=False` produces a single MultiArray output
 /// of shape [1, 5, 8400]:
-///   - dimension 1, index 0–3: cx, cy, w, h  (normalized 0–1, relative to input size)
+///   - dimension 1, index 0–3: cx, cy, w, h  (pixel space, 0–640 in the model's 640×640 input)
 ///   - dimension 1, index 4:   class confidence for the single "card" class
 ///   - dimension 2: 8400 anchor slots
 ///
-/// Coordinate system: YOLOv8 normalized coords have origin at top-left,
-/// x right, y down — matching Vision's `VNRecognizedObjectObservation`
-/// after a Y-flip from Vision's bottom-left origin.
+/// Coordinate pipeline:
+///   Camera → native landscape pixel buffer (e.g. 1920×1080)
+///   VNImageRequestHandler (no orientation) → passes buffer as-is
+///   VNCoreMLRequest(.scaleFill) → scales to fill 640×640, cropping the longer dimension
+///
+/// Output coordinates are in AVFoundation normalized video space (bottom-left origin, 0–1)
+/// so `AVCaptureVideoPreviewLayer.layerRectConverted(fromMetadataOutputRect:)` can map
+/// them directly to screen coordinates without any device-specific hardcoding.
 ///
 /// The decoder:
 ///   1. Iterates all 8400 slots, discards those below `confidenceThreshold`.
-///   2. Converts cx/cy/w/h → CGRect (top-left origin, normalized).
+///   2. Converts pixel coords → model-normalized (0–1), then undoes scaleFill crop
+///      using actual buffer dimensions to get normalized video coords (bottom-left origin).
 ///   3. Applies IoU-based NMS (`iouThreshold`) to remove duplicates.
 ///   4. Converts surviving boxes to `DetectedCard` with axis-aligned quads.
 struct YOLODecoder {
@@ -35,9 +41,12 @@ struct YOLODecoder {
     ///
     /// - Parameters:
     ///   - output: The model's output MultiArray, shape [1, 5, 8400].
+    ///   - bufferWidth: Width of the source pixel buffer in pixels.
+    ///   - bufferHeight: Height of the source pixel buffer in pixels.
     ///   - timestamp: Frame timestamp to stamp on each DetectedCard.
-    /// - Returns: Filtered, NMS-deduplicated DetectedCard array.
-    func decode(output: MLMultiArray, timestamp: TimeInterval) -> [DetectedCard] {
+    /// - Returns: Filtered, NMS-deduplicated DetectedCard array, coordinates in
+    ///   AVFoundation normalized video space (bottom-left origin, 0–1).
+    func decode(output: MLMultiArray, bufferWidth: Int, bufferHeight: Int, timestamp: TimeInterval) -> [DetectedCard] {
         // Shape: [1, 5, 8400] — strides let us index as [batch, feature, anchor]
         let anchors = output.shape[2].intValue   // 8400
         let strides = output.strides
@@ -47,6 +56,23 @@ struct YOLODecoder {
         let anchorStride  = strides[2].intValue
 
         let ptr = output.dataPointer.bindMemory(to: Float.self, capacity: output.count)
+
+        // Compute scaleFill crop offsets from actual buffer dimensions.
+        // scaleFill scales the buffer to fill the model's 640×640 square by the shorter
+        // dimension, then center-crops the longer dimension.
+        // bufferW/H are the native pixel buffer dimensions (e.g. 1920×1080 landscape).
+        let bW = Float(bufferWidth)
+        let bH = Float(bufferHeight)
+        let modelSize: Float = 640.0
+        // Scale factor: shorter dimension fills modelSize
+        let scale = modelSize / min(bW, bH)
+        let scaledW = bW * scale   // dimension after scaling
+        let scaledH = bH * scale
+        // Crop: longer scaled dimension is center-cropped to modelSize
+        let cropX = max(0, (scaledW - modelSize) / 2.0)  // pixels cropped from each side horizontally
+        let cropY = max(0, (scaledH - modelSize) / 2.0)  // pixels cropped from each side vertically
+        // To undo: model coord → original buffer pixel = (modelCoord + cropOffset) / scale
+        // Then normalize to [0,1]: divide by bW or bH
 
         var candidates: [(box: CGRect, confidence: Float)] = []
 
@@ -60,12 +86,24 @@ struct YOLODecoder {
 
             guard conf >= confidenceThreshold else { continue }
 
-            // Convert cx/cy/w/h (YOLO top-left origin, y down) → CGRect in Vision space
-            // (bottom-left origin, y up) by flipping: visionY = 1 - yoloY
-            let x = CGFloat(cx - w / 2)
-            let yTop = CGFloat(cy - h / 2)
-            let yFlipped = 1.0 - yTop - CGFloat(h)   // flip to Vision bottom-left origin
-            let rect = CGRect(x: x, y: yFlipped, width: CGFloat(w), height: CGFloat(h))
+            // Convert model pixel coords (0–640) back to normalized buffer coords (0–1).
+            // Undo scaleFill: add crop offset, divide by scale, divide by buffer dimension.
+            // Result: normalized coords in AVFoundation video space (top-left origin here;
+            // we flip Y below to get bottom-left origin for layerRectConverted).
+            let bufPxCX = (cx + cropX) / scale   // center x in buffer pixels
+            let bufPxCY = (cy + cropY) / scale   // center y in buffer pixels
+            let bufPxW  = w  / scale             // width in buffer pixels
+            let bufPxH  = h  / scale             // height in buffer pixels
+
+            let ncx = bufPxCX / bW               // normalized 0–1, top-left origin
+            let ncy = bufPxCY / bH
+            let nw  = bufPxW  / bW
+            let nh  = bufPxH  / bH
+
+            // AVFoundation normalized video space uses bottom-left origin (y flipped).
+            let x = CGFloat(ncx - nw / 2)
+            let y = CGFloat(1.0 - (ncy + nh / 2))   // flip Y: top-left → bottom-left origin
+            let rect = CGRect(x: x, y: y, width: CGFloat(nw), height: CGFloat(nh))
                 .clamped()
 
             guard rect.width > 0.01, rect.height > 0.01 else { continue }
@@ -90,9 +128,15 @@ struct YOLODecoder {
             return a.box.minX < b.box.minX
         }
 
-        return sorted2.map { DetectedCard(boundingBox: $0.box,
-                                          confidence: $0.confidence,
-                                          timestamp: timestamp) }
+        let cards = sorted2.map { DetectedCard(boundingBox: $0.box,
+                                               confidence: $0.confidence,
+                                               timestamp: timestamp) }
+        for (i, c) in cards.enumerated() {
+            let b = c.boundingBox
+            print(String(format: "[YOLO] 📦 card[%d] x=%.3f y=%.3f w=%.3f h=%.3f conf=%.2f",
+                         i, b.minX, b.minY, b.width, b.height, c.confidence))
+        }
+        return cards
     }
 }
 
@@ -115,12 +159,14 @@ extension DetectedCard {
     /// Creates a DetectedCard from an axis-aligned bounding box.
     /// The four corner points are derived from the box corners directly.
     init(boundingBox: CGRect, confidence: Float, timestamp: TimeInterval) {
+        // YOLO uses top-left origin (y increases downward), so:
+        // topLeft = (minX, minY), bottomRight = (maxX, maxY)
         self.init(
             boundingBox: boundingBox,
-            topLeft:     CGPoint(x: boundingBox.minX, y: boundingBox.maxY),
-            topRight:    CGPoint(x: boundingBox.maxX, y: boundingBox.maxY),
-            bottomRight: CGPoint(x: boundingBox.maxX, y: boundingBox.minY),
-            bottomLeft:  CGPoint(x: boundingBox.minX, y: boundingBox.minY),
+            topLeft:     CGPoint(x: boundingBox.minX, y: boundingBox.minY),
+            topRight:    CGPoint(x: boundingBox.maxX, y: boundingBox.minY),
+            bottomRight: CGPoint(x: boundingBox.maxX, y: boundingBox.maxY),
+            bottomLeft:  CGPoint(x: boundingBox.minX, y: boundingBox.maxY),
             confidence:  confidence,
             timestamp:   timestamp
         )

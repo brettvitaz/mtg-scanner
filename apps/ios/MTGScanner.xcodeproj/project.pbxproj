@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		181A6E3B2F77655700D59DF1 /* best.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 181A6E3A2F77655700D59DF1 /* best.mlpackage */; };
+		181A6E3B2F77655700D59DF1 /* best.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 181A6E3A2F77655700D59DF1 /* best.mlpackage */; };
 		A00000000000000000000101 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000201 /* AppModel.swift */; };
 		A00000000000000000000102 /* MTGScannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000202 /* MTGScannerApp.swift */; };
 		A00000000000000000000103 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000203 /* RootTabView.swift */; };
@@ -109,7 +109,6 @@
 				A00000000000000000000003 /* MTGScanner */,
 				A00000000000000000000040 /* MTGScannerTests */,
 				A00000000000000000000004 /* Products */,
-				181A6E3A2F77655700D59DF1 /* best.mlpackage */,
 			);
 			sourceTree = "<group>";
 		};
@@ -179,6 +178,7 @@
 				A0000000000000000000020C /* Assets.xcassets */,
 				A00000000000000000000209 /* AppConfig.swift */,
 				A00000000000000000000280 /* Info.plist */,
+				181A6E3A2F77655700D59DF1 /* best.mlpackage */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -375,6 +375,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000010B /* Assets.xcassets in Resources */,
+				181A6E3B2F77655700D59DF1 /* best.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,7 +398,6 @@
 				A00000000000000000000180 /* CorrectionView.swift in Sources */,
 				A0000000000000000000010C /* CardCropService.swift in Sources */,
 				A00000000000000000000110 /* DetectedCard.swift in Sources */,
-				181A6E3B2F77655700D59DF1 /* best.mlpackage in Sources */,
 				A00000000000000000000111 /* DetectionMode.swift in Sources */,
 				A00000000000000000000112 /* RectangleFilter.swift in Sources */,
 				A00000000000000000000113 /* GridInterpolator.swift in Sources */,

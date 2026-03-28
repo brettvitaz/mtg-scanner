@@ -59,67 +59,35 @@ final class DetectionOverlayRenderer {
 
     // MARK: - Coordinate Transform
 
-    /// Converts a Vision normalized point to a point in the `previewLayer`'s coordinate space,
-    /// accounting for the current device orientation.
+    /// Converts a Vision normalized point to a point in the `previewLayer`'s coordinate space.
     ///
-    /// Vision with `.right` orientation always returns coordinates in the upright portrait space
-    /// (origin bottom-left, x right, y up, values 0–1) regardless of device orientation.
-    /// The preview layer connection's `videoRotationAngle` tells us how the camera feed has
-    /// been rotated to fill the screen, so we apply the inverse mapping:
+    /// Vision returns corners in normalized image coordinates: origin bottom-left, x right, y up,
+    /// values 0–1, relative to the native (landscape) pixel buffer passed to the handler.
     ///
-    ///   90°  (portrait):        screenX = visionX * W,       screenY = (1-visionY) * H
-    ///   0°   (landscape right): screenX = (1-visionY) * W,   screenY = (1-visionX) * H
-    ///   180° (landscape left):  screenX = visionY * W,       screenY = visionX * H
-    ///   270° (portrait upside-down): screenX = (1-visionX)*W, screenY = visionY*H
-    static func visionToPreview(point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
-        let bounds = previewLayer.bounds
-        let W = bounds.width, H = bounds.height
-        let angle = previewLayer.connection?.videoRotationAngle ?? 90
-        switch angle {
-        case 0:   return CGPoint(x: (1.0 - point.y) * W, y: (1.0 - point.x) * H)
-        case 180: return CGPoint(x: point.y * W,          y: point.x * H)
-        case 270: return CGPoint(x: (1.0 - point.x) * W, y: point.y * H)
-        default:  return CGPoint(x: point.x * W,          y: (1.0 - point.y) * H) // 90° portrait
-        }
+    /// `layerPointConverted(fromCaptureDevicePoint:)` expects capture device space:
+    /// origin top-left, x right, y down, values 0–1 in the native sensor frame.
+    ///
+    /// The only difference is Y-axis direction, so we flip Y before converting.
+    /// `layerPointConverted` then handles resizeAspectFill crop and videoRotationAngle.
+    static func visionPointToLayer(_ point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
+        previewLayer.layerPointConverted(fromCaptureDevicePoint: CGPoint(x: point.x, y: 1.0 - point.y))
     }
 
     // MARK: - Private Helpers
 
     private func makeQuadPath(for card: DetectedCard, previewLayer: AVCaptureVideoPreviewLayer) -> UIBezierPath {
-        // Convert all four Vision corners to screen coordinates.
-        let points = [card.topLeft, card.topRight, card.bottomRight, card.bottomLeft]
-            .map { Self.visionToPreview(point: $0, previewLayer: previewLayer) }
-
-        // Sort into convex drawing order (top-left → top-right → bottom-right → bottom-left
-        // in screen space) so the polygon never self-intersects regardless of card tilt.
-        let ordered = convexOrder(points)
+        let tl = Self.visionPointToLayer(card.topLeft,     previewLayer: previewLayer)
+        let tr = Self.visionPointToLayer(card.topRight,    previewLayer: previewLayer)
+        let br = Self.visionPointToLayer(card.bottomRight, previewLayer: previewLayer)
+        let bl = Self.visionPointToLayer(card.bottomLeft,  previewLayer: previewLayer)
 
         let path = UIBezierPath()
-        path.move(to: ordered[0])
-        for pt in ordered.dropFirst() { path.addLine(to: pt) }
+        path.move(to: tl)
+        path.addLine(to: tr)
+        path.addLine(to: br)
+        path.addLine(to: bl)
         path.close()
         return path
-    }
-
-    /// Returns the four points sorted in clockwise screen order starting from the
-    /// top-left point (smallest x+y sum).
-    private func convexOrder(_ pts: [CGPoint]) -> [CGPoint] {
-        guard pts.count == 4 else { return pts }
-        // Find centroid.
-        let cx = pts.map(\.x).reduce(0, +) / 4
-        let cy = pts.map(\.y).reduce(0, +) / 4
-        let center = CGPoint(x: cx, y: cy)
-        // Sort by angle from centroid (clockwise in screen coords where y increases downward).
-        let sorted = pts.sorted { a, b in
-            let angleA = atan2(a.y - center.y, a.x - center.x)
-            let angleB = atan2(b.y - center.y, b.x - center.x)
-            return angleA < angleB
-        }
-        // Rotate so the top-left point (min x+y) is first.
-        guard let startIdx = sorted.indices.min(by: { sorted[$0].x + sorted[$0].y < sorted[$1].x + sorted[$1].y }) else {
-            return sorted
-        }
-        return Array(sorted[startIdx...] + sorted[..<startIdx])
     }
 
     private func growPoolIfNeeded(to count: Int, in parent: CALayer?) {

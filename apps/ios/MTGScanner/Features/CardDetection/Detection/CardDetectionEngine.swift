@@ -36,17 +36,27 @@ final class CardDetectionEngine {
 
     private func coreMLRequest() -> VNCoreMLRequest? {
         if let existing = _coreMLRequest { return existing }
-        guard let modelURL = Bundle.main.url(forResource: "best", withExtension: "mlpackage"),
-              let compiled = try? MLModel(contentsOf: modelURL,
-                                          configuration: mlConfig()),
-              let vnModel = try? VNCoreMLModel(for: compiled) else {
+
+        // Core ML compiles .mlpackage → .mlmodelc at build time; load the compiled form.
+        guard let modelURL = Bundle.main.url(forResource: "best", withExtension: "mlmodelc") else {
+            // Log all bundle contents to help diagnose missing model
+            let bundleContents = (try? FileManager.default.contentsOfDirectory(atPath: Bundle.main.bundlePath)) ?? []
+            print("[YOLO] ❌ best.mlmodelc not found. Bundle contains: \(bundleContents.filter { $0.contains("ml") || $0.contains("best") })")
             return nil
         }
-        let request = VNCoreMLRequest(model: vnModel)
-        // .scaleFill avoids letterboxing — matches how YOLO was trained (padded square input)
-        request.imageCropAndScaleOption = .scaleFill
-        _coreMLRequest = request
-        return request
+        print("[YOLO] 📦 Loading model from \(modelURL.lastPathComponent)")
+        do {
+            let compiled = try MLModel(contentsOf: modelURL, configuration: mlConfig())
+            let vnModel = try VNCoreMLModel(for: compiled)
+            let request = VNCoreMLRequest(model: vnModel)
+            request.imageCropAndScaleOption = .scaleFill
+            _coreMLRequest = request
+            print("[YOLO] ✅ Model loaded successfully")
+            return request
+        } catch {
+            print("[YOLO] ❌ Model load error: \(error)")
+            return nil
+        }
     }
 
     private func mlConfig() -> MLModelConfiguration {
@@ -84,36 +94,71 @@ final class CardDetectionEngine {
     ) -> [DetectedCard] {
         switch mode {
         case .table:
-            return detectWithYOLO(pixelBuffer: pixelBuffer, timestamp: timestamp)
+            return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp)
         case .binder:
             return detectBinderGrid(in: pixelBuffer, timestamp: timestamp)
         }
     }
 
-    // MARK: - YOLO Table Detection
+    // MARK: - Rectangle Table Detection
+
+    private func detectTableCards(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+        let observations = runRectangleRequest(
+            pixelBuffer: pixelBuffer,
+            maxObservations: 10,
+            minAspectRatio: 0.55,
+            maxAspectRatio: 0.85
+        )
+        return observations.map { DetectedCard(from: $0, timestamp: timestamp) }
+    }
+
+    // MARK: - YOLO Table Detection (kept for future use)
+
+    private var _debugFrameCount = 0
 
     private func detectWithYOLO(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
         guard let request = coreMLRequest() else {
-            // Model failed to load — fall back to rectangle detection
+            print("[YOLO] ❌ Model failed to load — falling back to rectangles")
             return detectWithRectangles(pixelBuffer: pixelBuffer, timestamp: timestamp)
         }
 
-        // The sensor delivers landscape pixel buffers (1920×1080).
-        // .right tells Vision the image needs a 90° CCW rotation to appear upright.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
-                                            orientation: .right,
-                                            options: [:])
-        try? handler.perform([request])
-
-        // YOLOv8n exported with nms=False returns a raw MLMultiArray named "var_909"
-        // via VNCoreMLFeatureValueObservation, not VNRecognizedObjectObservation.
-        guard let observations = request.results as? [VNCoreMLFeatureValueObservation],
-              let output = observations.first(where: { $0.featureName == "var_909" })?.featureValue.multiArrayValue
-                        ?? observations.first?.featureValue.multiArrayValue else {
+        // Pass the native landscape buffer (1920×1080) with no orientation hint.
+        // scaleFill on landscape 1920×1080 → 640×640 crops left/right — the same
+        // axis as resizeAspectFill on the preview, so YOLO coords map to screen correctly.
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        do {
+            try handler.perform([request])
+        } catch {
+            print("[YOLO] ❌ perform error: \(error)")
             return []
         }
 
-        return YOLODecoder().decode(output: output, timestamp: timestamp)
+        _debugFrameCount += 1
+        let logThisFrame = _debugFrameCount % 30 == 1  // log every 30th frame
+
+        guard let observations = request.results as? [VNCoreMLFeatureValueObservation] else {
+            if logThisFrame { print("[YOLO] ❌ results not VNCoreMLFeatureValueObservation, got: \(type(of: request.results))") }
+            return []
+        }
+
+        if logThisFrame {
+            print("[YOLO] ✅ \(observations.count) observation(s): \(observations.map { "\($0.featureName) \($0.featureValue.multiArrayValue?.shape ?? [])" })")
+        }
+
+        guard let output = observations.first(where: { $0.featureName == "var_909" })?.featureValue.multiArrayValue
+                        ?? observations.first?.featureValue.multiArrayValue else {
+            if logThisFrame { print("[YOLO] ❌ no multiArrayValue in observations") }
+            return []
+        }
+
+        let bufferWidth  = CVPixelBufferGetWidth(pixelBuffer)
+        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let cards = YOLODecoder().decode(output: output,
+                                         bufferWidth: bufferWidth,
+                                         bufferHeight: bufferHeight,
+                                         timestamp: timestamp)
+        if logThisFrame { print("[YOLO] 🃏 decoded \(cards.count) card(s)") }
+        return cards
     }
 
     // MARK: - Binder Grid Detection (VNDetectRectanglesRequest)
@@ -185,9 +230,9 @@ final class CardDetectionEngine {
         request.maximumAspectRatio = maxAspectRatio
         request.quadratureTolerance = 15.0
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
-                                            orientation: .right,
-                                            options: [:])
+        // No orientation hint — pass native landscape buffer so Vision returns corners
+        // in native sensor coordinates, matching layerPointConverted's expected input space.
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
         return results
     }

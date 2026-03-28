@@ -1,20 +1,18 @@
 import CoreGraphics
 
-/// Stabilizes raw per-frame card detections using two techniques:
+/// Stabilizes raw per-frame card detections using three techniques:
 ///
 /// 1. **Identity matching** — each raw detection is matched to the nearest tracked
 ///    card (by IoU) so smoothing is applied per-card identity rather than per-slot.
 ///
 /// 2. **EMA smoothing** — corner positions and bounding box are blended toward
 ///    new observations with `smoothingAlpha`. Lower alpha = smoother but laggier;
-///    higher alpha = more responsive but jitterier. A value around 0.35 works well
-///    for a stationary-card scanning use case.
+///    higher alpha = more responsive but jitterier.
 ///
 /// 3. **Presence hysteresis** — a card must appear in `confirmFrames` consecutive
-///    processed frames before its overlay becomes visible, and must be absent for
-///    `dropFrames` consecutive frames before it is removed. This kills single-frame
-///    phantom detections and prevents overlays from blinking when Vision briefly
-///    misses a card.
+///    processed frames before its overlay becomes visible. A confirmed track stays
+///    visible through up to `gracePeriod` consecutive missed frames (covering brief
+///    Vision detection gaps), and is removed after `dropFrames` total missed frames.
 ///
 /// Must be called from a single serial queue (visionQueue in CardDetectionEngine).
 final class CardTracker {
@@ -22,16 +20,20 @@ final class CardTracker {
     // MARK: - Configuration
 
     /// EMA blend factor: fraction of the new observation applied each frame.
-    /// Range 0…1; 0.35 gives smooth motion with ~150ms of lag at 10 fps.
-    var smoothingAlpha: CGFloat = 0.35
+    /// Range 0…1; 0.20 gives smooth motion with ~250ms of lag at 10 fps.
+    var smoothingAlpha: CGFloat = 0.20
 
     /// Number of consecutive frames a new card must be detected before it is
     /// promoted to the visible set.
-    var confirmFrames: Int = 3
+    var confirmFrames: Int = 10
 
     /// Number of consecutive frames a tracked card must be absent before it is
-    /// removed from the visible set.
-    var dropFrames: Int = 4
+    /// fully removed from tracking.
+    var dropFrames: Int = 10
+
+    /// Number of consecutive missed frames a confirmed track tolerates while
+    /// remaining visible. Covers brief Vision detection gaps without popping.
+    var gracePeriod: Int = 3
 
     // MARK: - Private State
 
@@ -59,7 +61,7 @@ final class CardTracker {
             })
 
             if let (idx, detection) = best,
-               RectangleFilter.iou(detection.boundingBox, track.smoothed.boundingBox) > 0.25 {
+               RectangleFilter.iou(detection.boundingBox, track.smoothed.boundingBox) > 0.30 {
                 track.update(with: detection, alpha: smoothingAlpha)
                 unmatched.remove(at: idx)
             } else {
@@ -69,7 +71,7 @@ final class CardTracker {
 
         // Any detections not matched to an existing track become new candidates.
         for detection in unmatched {
-            tracks.append(Track(initial: detection, confirmFrames: confirmFrames))
+            tracks.append(Track(initial: detection, confirmFrames: confirmFrames, gracePeriod: gracePeriod))
         }
     }
 
@@ -89,16 +91,21 @@ private final class Track {
     private var missedFrames: Int = 0
     private var confirmedFrames: Int
     private let confirmThreshold: Int
+    private let gracePeriod: Int
 
-    var isVisible: Bool { confirmedFrames >= confirmThreshold && missedFrames == 0 }
-    var shouldRemove: Bool { missedFrames > 0 && confirmedFrames < confirmThreshold }
+    /// Visible while confirmed AND within the grace period for missed frames.
+    var isVisible: Bool { confirmedFrames >= confirmThreshold && missedFrames <= gracePeriod }
+
+    /// Remove unconfirmed tracks once they exceed the grace period without a match.
+    var shouldRemove: Bool { missedFrames > gracePeriod && confirmedFrames < confirmThreshold }
 
     // MARK: Init
 
-    init(initial: DetectedCard, confirmFrames: Int) {
+    init(initial: DetectedCard, confirmFrames: Int, gracePeriod: Int) {
         self.smoothed = initial
         self.confirmedFrames = 1
         self.confirmThreshold = confirmFrames
+        self.gracePeriod = gracePeriod
     }
 
     // MARK: Update

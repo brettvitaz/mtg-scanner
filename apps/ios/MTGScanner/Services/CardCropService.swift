@@ -37,7 +37,12 @@ final class CardCropService {
     ///   bottom-right. Returns an empty result (not an error) when no usable
     ///   cards are found.
     func detectAndCrop(image: UIImage) async -> CardCropResult {
-        guard let cgImage = image.cgImage else {
+        // Normalize orientation so the CGImage pixels are upright. Without this,
+        // image.cgImage returns raw sensor pixels (often landscape-rotated) and
+        // both Vision and CIPerspectiveCorrection would operate on rotated data,
+        // producing a rotated/mirrored crop.
+        let upright = Self.normalizeOrientation(image)
+        guard let cgImage = upright.cgImage else {
             return CardCropResult(crops: [], detectedCount: 0)
         }
 
@@ -46,7 +51,7 @@ final class CardCropService {
 
         var crops: [UIImage] = []
         for obs in filtered {
-            if let crop = perspectiveCrop(cgImage: cgImage, observation: obs, originalImage: image) {
+            if let crop = perspectiveCrop(cgImage: cgImage, observation: obs, originalImage: upright) {
                 crops.append(crop)
             }
         }
@@ -141,6 +146,17 @@ final class CardCropService {
         guard let cgCrop = context.createCGImage(scaled, from: outputRect) else { return nil }
 
         return UIImage(cgImage: cgCrop, scale: originalImage.scale, orientation: .up)
+    }
+
+    // MARK: - Orientation
+
+    /// Redraws a UIImage into a new bitmap so that its `cgImage` pixels match the
+    /// visual orientation. Returns the original image unchanged if already `.up`.
+    private static func normalizeOrientation(_ image: UIImage) -> UIImage {
+        guard image.imageOrientation != .up else { return image }
+        return UIGraphicsImageRenderer(size: image.size).image { _ in
+            image.draw(at: .zero)
+        }
     }
 
     // MARK: - Geometry helpers

@@ -83,6 +83,16 @@ final class CameraViewController: UIViewController {
         engine.detectionMode = mode
     }
 
+    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
+        sessionManager.capturePhoto { data in
+            guard let data, let image = UIImage(data: data) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            DispatchQueue.main.async { completion(image) }
+        }
+    }
+
     // MARK: - Setup
 
     private func setupPreviewLayer() {

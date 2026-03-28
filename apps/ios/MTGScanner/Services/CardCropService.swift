@@ -97,15 +97,16 @@ final class CardCropService {
         let imageWidth = CGFloat(cgImage.width)
         let imageHeight = CGFloat(cgImage.height)
 
-        // Vision normalised coordinates: origin bottom-left → flip to top-left.
-        func flip(_ p: CGPoint) -> CGPoint {
-            CGPoint(x: p.x * imageWidth, y: (1 - p.y) * imageHeight)
+        // CIImage uses a bottom-left origin, which matches Vision's normalised
+        // coordinate space. Scale from [0,1] to pixel dimensions without flipping Y.
+        func scale(_ p: CGPoint) -> CGPoint {
+            CGPoint(x: p.x * imageWidth, y: p.y * imageHeight)
         }
 
-        let tl = flip(observation.topLeft)
-        let tr = flip(observation.topRight)
-        let br = flip(observation.bottomRight)
-        let bl = flip(observation.bottomLeft)
+        let tl = scale(observation.topLeft)
+        let tr = scale(observation.topRight)
+        let br = scale(observation.bottomRight)
+        let bl = scale(observation.bottomLeft)
 
         // Expand quad outward by padding fraction of the shorter side.
         let boundW = max(distance(tl, tr), distance(bl, br))

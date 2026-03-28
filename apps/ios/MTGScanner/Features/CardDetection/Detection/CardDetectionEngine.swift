@@ -109,7 +109,8 @@ final class CardDetectionEngine {
             minAspectRatio: 0.55,
             maxAspectRatio: 0.85
         )
-        return observations.map { DetectedCard(from: $0, timestamp: timestamp) }
+        let filtered = RectangleFilter().filter(observations)
+        return filtered.map { DetectedCard(from: $0, timestamp: timestamp) }
     }
 
     // MARK: - YOLO Table Detection (kept for future use)
@@ -210,7 +211,8 @@ final class CardDetectionEngine {
             minAspectRatio: 0.1,
             maxAspectRatio: 1.0
         )
-        return observations.map { DetectedCard(from: $0, timestamp: timestamp) }
+        let filtered = RectangleFilter().filter(observations)
+        return filtered.map { DetectedCard(from: $0, timestamp: timestamp) }
     }
 
     private func runRectangleRequest(

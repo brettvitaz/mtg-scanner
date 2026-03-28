@@ -185,14 +185,7 @@ struct ScanView: View {
 
     @MainActor
     private func handleCapturedImage(_ image: UIImage) async {
-        // Redraw the image into a graphics context to bake the EXIF orientation
-        // transform into the pixel data. CGImage-based processing (Vision, CIFilter)
-        // ignores UIImage.imageOrientation, so a raw photo captured in portrait would
-        // be processed as landscape without this normalization.
-        let normalized = UIGraphicsImageRenderer(size: image.size).image { _ in
-            image.draw(at: .zero)
-        }
-        guard let data = normalized.jpegData(compressionQuality: 0.9) else {
+        guard let data = image.jpegData(compressionQuality: 0.9) else {
             appModel.statusMessage = "Failed to prepare the captured photo."
             return
         }

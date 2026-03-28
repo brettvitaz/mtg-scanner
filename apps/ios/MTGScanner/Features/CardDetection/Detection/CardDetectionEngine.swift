@@ -1,20 +1,19 @@
 import AVFoundation
 import CoreGraphics
-import CoreML
 import Vision
 
 /// Processes live camera frames and detects MTG card-shaped rectangles.
 ///
 /// Threading model:
 /// - `processFrame(_:)` is called from the camera queue.
-/// - Vision/CoreML requests execute synchronously on a dedicated serial Vision queue.
+/// - Vision requests execute synchronously on a dedicated serial Vision queue.
 /// - Frame dropping: if a request is already in flight, incoming frames are discarded.
 /// - Results are dispatched to the main queue via `onDetection`.
 ///
 /// Detection paths:
-/// - Table mode: VNCoreMLRequest using the trained YOLOv8n card detector model.
+/// - Table mode: VNDetectRectanglesRequest filtered by RectangleFilter.
 /// - Binder mode: VNDetectRectanglesRequest to find the page, then GridInterpolator
-///   to subdivide into a 3×3 grid (no trained model needed for this path).
+///   to subdivide into a 3×3 grid.
 final class CardDetectionEngine {
 
     // MARK: - Properties
@@ -29,41 +28,6 @@ final class CardDetectionEngine {
     private var isProcessing = false
     /// Guarded by visionQueue — stabilizes detections with EMA smoothing + hysteresis.
     private let tracker = CardTracker()
-
-    // MARK: - YOLO model (lazy — loaded once on first use on visionQueue)
-
-    private var _coreMLRequest: VNCoreMLRequest?
-
-    private func coreMLRequest() -> VNCoreMLRequest? {
-        if let existing = _coreMLRequest { return existing }
-
-        // Core ML compiles .mlpackage → .mlmodelc at build time; load the compiled form.
-        guard let modelURL = Bundle.main.url(forResource: "best", withExtension: "mlmodelc") else {
-            // Log all bundle contents to help diagnose missing model
-            let bundleContents = (try? FileManager.default.contentsOfDirectory(atPath: Bundle.main.bundlePath)) ?? []
-            print("[YOLO] ❌ best.mlmodelc not found. Bundle contains: \(bundleContents.filter { $0.contains("ml") || $0.contains("best") })")
-            return nil
-        }
-        print("[YOLO] 📦 Loading model from \(modelURL.lastPathComponent)")
-        do {
-            let compiled = try MLModel(contentsOf: modelURL, configuration: mlConfig())
-            let vnModel = try VNCoreMLModel(for: compiled)
-            let request = VNCoreMLRequest(model: vnModel)
-            request.imageCropAndScaleOption = .scaleFill
-            _coreMLRequest = request
-            print("[YOLO] ✅ Model loaded successfully")
-            return request
-        } catch {
-            print("[YOLO] ❌ Model load error: \(error)")
-            return nil
-        }
-    }
-
-    private func mlConfig() -> MLModelConfiguration {
-        let config = MLModelConfiguration()
-        config.computeUnits = .all   // Neural Engine + GPU + CPU
-        return config
-    }
 
     // MARK: - Frame Processing
 
@@ -102,64 +66,39 @@ final class CardDetectionEngine {
 
     // MARK: - Rectangle Table Detection
 
+    #if DEBUG
+    private var _debugTableFrameCount = 0
+    #endif
+
     private func detectTableCards(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
         let observations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 10,
-            minAspectRatio: 0.55,
-            maxAspectRatio: 0.85
+            minAspectRatio: RectangleFilter.visionMinAspectRatio,
+            maxAspectRatio: RectangleFilter.visionMaxAspectRatio
         )
         let filtered = RectangleFilter().filter(observations)
+
+        #if DEBUG
+        _debugTableFrameCount += 1
+        if _debugTableFrameCount % 30 == 1 {
+            print("[RectDetect] bounds=[\(RectangleFilter.visionMinAspectRatio), \(RectangleFilter.visionMaxAspectRatio)] raw=\(observations.count) filtered=\(filtered.count)")
+            for (i, obs) in observations.enumerated() {
+                let box = obs.boundingBox
+                let topEdge = hypot(obs.topRight.x - obs.topLeft.x, obs.topRight.y - obs.topLeft.y)
+                let bottomEdge = hypot(obs.bottomRight.x - obs.bottomLeft.x, obs.bottomRight.y - obs.bottomLeft.y)
+                let leftEdge = hypot(obs.bottomLeft.x - obs.topLeft.x, obs.bottomLeft.y - obs.topLeft.y)
+                let rightEdge = hypot(obs.bottomRight.x - obs.topRight.x, obs.bottomRight.y - obs.topRight.y)
+                let d1 = hypot(obs.topRight.x - obs.bottomLeft.x, obs.topRight.y - obs.bottomLeft.y)
+                let d2 = hypot(obs.topLeft.x - obs.bottomRight.x, obs.topLeft.y - obs.bottomRight.y)
+                print("[RectDetect]   [\(i)] conf=\(String(format: "%.2f", obs.confidence)) box=\(String(format: "%.3f,%.3f %.3fx%.3f", box.minX, box.minY, box.width, box.height))")
+                print("[RectDetect]     corners: tl=\(String(format: "%.3f,%.3f", obs.topLeft.x, obs.topLeft.y)) tr=\(String(format: "%.3f,%.3f", obs.topRight.x, obs.topRight.y)) br=\(String(format: "%.3f,%.3f", obs.bottomRight.x, obs.bottomRight.y)) bl=\(String(format: "%.3f,%.3f", obs.bottomLeft.x, obs.bottomLeft.y))")
+                print("[RectDetect]     edges: top=\(String(format: "%.3f", topEdge)) bot=\(String(format: "%.3f", bottomEdge)) left=\(String(format: "%.3f", leftEdge)) right=\(String(format: "%.3f", rightEdge)) diag=\(String(format: "%.3f", d1)),\(String(format: "%.3f", d2))")
+            }
+        }
+        #endif
+
         return filtered.map { DetectedCard(from: $0, timestamp: timestamp) }
-    }
-
-    // MARK: - YOLO Table Detection (kept for future use)
-
-    private var _debugFrameCount = 0
-
-    private func detectWithYOLO(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
-        guard let request = coreMLRequest() else {
-            print("[YOLO] ❌ Model failed to load — falling back to rectangles")
-            return detectWithRectangles(pixelBuffer: pixelBuffer, timestamp: timestamp)
-        }
-
-        // Pass the native landscape buffer (1920×1080) with no orientation hint.
-        // scaleFill on landscape 1920×1080 → 640×640 crops left/right — the same
-        // axis as resizeAspectFill on the preview, so YOLO coords map to screen correctly.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
-        do {
-            try handler.perform([request])
-        } catch {
-            print("[YOLO] ❌ perform error: \(error)")
-            return []
-        }
-
-        _debugFrameCount += 1
-        let logThisFrame = _debugFrameCount % 30 == 1  // log every 30th frame
-
-        guard let observations = request.results as? [VNCoreMLFeatureValueObservation] else {
-            if logThisFrame { print("[YOLO] ❌ results not VNCoreMLFeatureValueObservation, got: \(type(of: request.results))") }
-            return []
-        }
-
-        if logThisFrame {
-            print("[YOLO] ✅ \(observations.count) observation(s): \(observations.map { "\($0.featureName) \($0.featureValue.multiArrayValue?.shape ?? [])" })")
-        }
-
-        guard let output = observations.first(where: { $0.featureName == "var_909" })?.featureValue.multiArrayValue
-                        ?? observations.first?.featureValue.multiArrayValue else {
-            if logThisFrame { print("[YOLO] ❌ no multiArrayValue in observations") }
-            return []
-        }
-
-        let bufferWidth  = CVPixelBufferGetWidth(pixelBuffer)
-        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
-        let cards = YOLODecoder().decode(output: output,
-                                         bufferWidth: bufferWidth,
-                                         bufferHeight: bufferHeight,
-                                         timestamp: timestamp)
-        if logThisFrame { print("[YOLO] 🃏 decoded \(cards.count) card(s)") }
-        return cards
     }
 
     // MARK: - Binder Grid Detection (VNDetectRectanglesRequest)
@@ -202,18 +141,7 @@ final class CardDetectionEngine {
         }
     }
 
-    // MARK: - Rectangle Request (used for binder mode + fallback)
-
-    private func detectWithRectangles(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
-        let observations = runRectangleRequest(
-            pixelBuffer: pixelBuffer,
-            maxObservations: 10,
-            minAspectRatio: 0.1,
-            maxAspectRatio: 1.0
-        )
-        let filtered = RectangleFilter().filter(observations)
-        return filtered.map { DetectedCard(from: $0, timestamp: timestamp) }
-    }
+    // MARK: - Rectangle Request
 
     private func runRectangleRequest(
         pixelBuffer: CVPixelBuffer,
@@ -227,7 +155,7 @@ final class CardDetectionEngine {
             results = (req.results as? [VNRectangleObservation]) ?? []
         }
         request.maximumObservations = maxObservations
-        request.minimumConfidence = 0.4
+        request.minimumConfidence = RectangleFilter.minConfidence
         request.minimumAspectRatio = minAspectRatio
         request.maximumAspectRatio = maxAspectRatio
         request.quadratureTolerance = 15.0

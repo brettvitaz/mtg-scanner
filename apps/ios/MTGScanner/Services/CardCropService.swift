@@ -70,8 +70,8 @@ final class CardCropService {
             }
             request.maximumObservations = 10
             request.minimumConfidence = RectangleFilter.minConfidence
-            request.minimumAspectRatio = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance))
-            request.maximumAspectRatio = Float(RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance))
+            request.minimumAspectRatio = RectangleFilter.visionMinAspectRatio
+            request.maximumAspectRatio = RectangleFilter.visionMaxAspectRatio
 
             // CGImage is already upright, so no orientation hint needed.
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])

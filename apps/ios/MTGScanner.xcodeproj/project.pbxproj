@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		181A6E3B2F77655700D59DF1 /* best.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 181A6E3A2F77655700D59DF1 /* best.mlpackage */; };
 		A00000000000000000000101 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000201 /* AppModel.swift */; };
 		A00000000000000000000102 /* MTGScannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000202 /* MTGScannerApp.swift */; };
 		A00000000000000000000103 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000203 /* RootTabView.swift */; };
@@ -32,7 +31,6 @@
 		A0000000000000000000011D /* CameraCaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000021D /* CameraCaptureCoordinator.swift */; };
 		A0000000000000000000011E /* CaptureButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000021E /* CaptureButton.swift */; };
 		A0000000000000000000011B /* CardTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000021B /* CardTracker.swift */; };
-		A0000000000000000000011C /* YOLODecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000021C /* YOLODecoder.swift */; };
 		A00000000000000000000180 /* CorrectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000020B /* CorrectionView.swift */; };
 		A00000000000000000000190 /* DetectedCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000290 /* DetectedCardTests.swift */; };
 		A00000000000000000000191 /* RectangleFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000291 /* RectangleFilterTests.swift */; };
@@ -51,7 +49,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		181A6E3A2F77655700D59DF1 /* best.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = best.mlpackage; sourceTree = "<group>"; };
 		A00000000000000000000001 /* MTGScanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MTGScanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000030 /* MTGScannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MTGScannerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000201 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -79,7 +76,6 @@
 		A0000000000000000000021D /* CameraCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCaptureCoordinator.swift; sourceTree = "<group>"; };
 		A0000000000000000000021E /* CaptureButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureButton.swift; sourceTree = "<group>"; };
 		A0000000000000000000021B /* CardTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardTracker.swift; sourceTree = "<group>"; };
-		A0000000000000000000021C /* YOLODecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLODecoder.swift; sourceTree = "<group>"; };
 		A00000000000000000000280 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000290 /* DetectedCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedCardTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000291 /* RectangleFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RectangleFilterTests.swift; sourceTree = "<group>"; };
@@ -180,7 +176,6 @@
 				A0000000000000000000020C /* Assets.xcassets */,
 				A00000000000000000000209 /* AppConfig.swift */,
 				A00000000000000000000280 /* Info.plist */,
-				181A6E3A2F77655700D59DF1 /* best.mlpackage */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -234,7 +229,6 @@
 				A00000000000000000000213 /* GridInterpolator.swift */,
 				A00000000000000000000214 /* CardDetectionEngine.swift */,
 				A0000000000000000000021B /* CardTracker.swift */,
-				A0000000000000000000021C /* YOLODecoder.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -378,7 +372,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000010B /* Assets.xcassets in Resources */,
-				181A6E3B2F77655700D59DF1 /* best.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -406,7 +399,6 @@
 				A00000000000000000000113 /* GridInterpolator.swift in Sources */,
 				A00000000000000000000114 /* CardDetectionEngine.swift in Sources */,
 				A0000000000000000000011B /* CardTracker.swift in Sources */,
-				A0000000000000000000011C /* YOLODecoder.swift in Sources */,
 				A00000000000000000000115 /* CameraSessionManager.swift in Sources */,
 				A00000000000000000000116 /* DetectionOverlayRenderer.swift in Sources */,
 				A00000000000000000000117 /* CameraViewController.swift in Sources */,

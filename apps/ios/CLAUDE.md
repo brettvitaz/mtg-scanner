@@ -13,11 +13,10 @@ MTGScanner/
   Features/
     CardDetection/                   Live camera card detection with overlays
       Detection/
-        CardDetectionEngine.swift    Vision/CoreML dispatch (YOLO table, rectangles binder)
+        CardDetectionEngine.swift    VNDetectRectanglesRequest dispatch (table + binder)
         CardTracker.swift            EMA smoothing + presence hysteresis
-        RectangleFilter.swift        Aspect ratio validation + NMS
+        RectangleFilter.swift        Edge-based aspect ratio validation + NMS
         GridInterpolator.swift       Bilinear interpolation for binder grid
-        YOLODecoder.swift            YOLO model output parsing
       Camera/
         CameraSessionManager.swift   AVCaptureSession lifecycle
         CameraViewController.swift   UIKit controller: session + preview + overlays
@@ -41,15 +40,13 @@ MTGScanner/
     Settings/                        App configuration
   Services/
     APIClient.swift                  Network client for backend communication
-  Support/
-    best.mlpackage                   YOLOv8n Core ML model for card detection
 ```
 
 ## Detection pipeline
 
 1. `CameraSessionManager` delivers `CMSampleBuffer` frames on a dedicated serial queue.
 2. `CardDetectionEngine` processes frames on `visionQueue` (one in flight at a time — drops excess frames).
-3. **Table mode**: `VNCoreMLRequest` with YOLOv8n model → `YOLODecoder` → NMS filtering.
+3. **Table mode**: `VNDetectRectanglesRequest` → `RectangleFilter` (edge-based aspect ratio + NMS).
 4. **Binder mode**: `VNDetectRectanglesRequest` for page → `GridInterpolator` for 3×3 subdivision.
 5. `CardTracker` smooths results with EMA on positions + presence hysteresis.
 6. `DetectionOverlayRenderer` draws `CAShapeLayer` overlays on the preview layer (main thread).

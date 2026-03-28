@@ -15,10 +15,21 @@ struct RectangleFilter {
     static let targetAspectRatio: CGFloat = 63.0 / 88.0
 
     /// Relative tolerance applied to `targetAspectRatio` on each side.
-    static let aspectRatioTolerance: CGFloat = 0.28
+    /// Accommodates slight perspective distortion and detection imprecision
+    /// while rejecting square objects (coasters, books, etc.).
+    static let aspectRatioTolerance: CGFloat = 0.20
 
     /// Minimum Vision confidence required to consider an observation.
     static let minConfidence: Float = 0.4
+
+    /// Minimum aspect ratio for VNDetectRectanglesRequest.
+    /// Vision uses bounding-box width/height which can be distorted for rotated cards,
+    /// so these are wider than the edge-based filter to avoid premature rejection.
+    static let visionMinAspectRatio: Float = 0.30
+
+    /// Maximum aspect ratio for VNDetectRectanglesRequest.
+    /// Reciprocal of visionMinAspectRatio to cover cards rotated in both directions.
+    static let visionMaxAspectRatio: Float = Float(1.0 / Double(visionMinAspectRatio))
 
     /// IoU threshold above which two observations are treated as duplicates.
     static let iouThreshold: CGFloat = 0.45
@@ -34,7 +45,7 @@ struct RectangleFilter {
     func filter(_ observations: [VNRectangleObservation]) -> [VNRectangleObservation] {
         let candidates = observations
             .filter { $0.confidence >= Self.minConfidence }
-            .filter { isCardAspectRatio($0.boundingBox) }
+            .filter { isCardAspectRatio($0) }
             .sorted { $0.confidence > $1.confidence }
 
         var accepted: [VNRectangleObservation] = []
@@ -57,16 +68,30 @@ struct RectangleFilter {
 
     // MARK: - Helpers
 
-    /// Returns true when the bounding box aspect ratio is within tolerance of the card target.
+    /// Returns true when the observation's edge aspect ratio matches an MTG card.
     ///
-    /// Vision `boundingBox` is already in normalized coordinates; we use the shorter/longer
-    /// side ratio so orientation (portrait or landscape) does not matter.
-    private func isCardAspectRatio(_ box: CGRect) -> Bool {
-        guard box.width > 0, box.height > 0 else { return false }
-        let ratio = min(box.width, box.height) / max(box.width, box.height)
+    /// Uses the quad's corner points to compute actual edge lengths rather than the
+    /// axis-aligned bounding box, which distorts the ratio for slightly rotated cards.
+    /// Only accepts cards roughly aligned with the camera orientation — landscape cards
+    /// are intentionally excluded to reduce false positives.
+    private func isCardAspectRatio(_ obs: VNRectangleObservation) -> Bool {
+        let topEdge = dist(obs.topLeft, obs.topRight)
+        let bottomEdge = dist(obs.bottomLeft, obs.bottomRight)
+        let leftEdge = dist(obs.topLeft, obs.bottomLeft)
+        let rightEdge = dist(obs.topRight, obs.bottomRight)
+
+        let avgWidth = (topEdge + bottomEdge) / 2
+        let avgHeight = (leftEdge + rightEdge) / 2
+        guard avgWidth > 0, avgHeight > 0 else { return false }
+
+        let ratio = min(avgWidth, avgHeight) / max(avgWidth, avgHeight)
         let lower = Self.targetAspectRatio * (1 - Self.aspectRatioTolerance)
         let upper = Self.targetAspectRatio * (1 + Self.aspectRatioTolerance)
         return ratio >= lower && ratio <= upper
+    }
+
+    private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+        hypot(a.x - b.x, a.y - b.y)
     }
 
     /// Intersection-over-union of two axis-aligned rectangles in normalized coordinates.

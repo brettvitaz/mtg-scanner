@@ -25,7 +25,7 @@ paths:
 - Overlap suppression must dedupe true duplicates while preserving adjacent binder cards.
 
 ## iOS detection
-- **Table mode**: YOLOv8n Core ML model via `VNCoreMLRequest`. Do not switch to Vision rectangles for table mode.
+- **Table mode**: `VNDetectRectanglesRequest` → `RectangleFilter` (edge-based aspect ratio + NMS).
 - **Binder mode**: `VNDetectRectanglesRequest` for page detection → `GridInterpolator` for 3×3 grid.
 - `CardTracker` provides EMA smoothing + presence hysteresis — do not remove stabilization.
 - Session preset must be `.hd1920x1080`. Do not use `.photo` or `.hd4K`.

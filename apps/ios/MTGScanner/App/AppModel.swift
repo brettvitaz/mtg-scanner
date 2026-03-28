@@ -9,10 +9,11 @@ final class AppModel: ObservableObject {
         didSet { persistAPIBaseURL() }
     }
     @Published var isRecognizing = false
-    @Published var statusMessage = "Pick a card photo to start a mocked scan."
+    @Published var statusMessage = "Point camera at cards to scan."
     @Published var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.
     @Published var lastDetectedCrops: [UIImage] = []
+    @Published var shouldShowResults = false
 
     private let apiClient = APIClient()
     private let cropService = CardCropService()
@@ -55,6 +56,7 @@ final class AppModel: ObservableObject {
         }
 
         isRecognizing = false
+        shouldShowResults = true
     }
 
     // MARK: - Private recognition helpers
@@ -100,11 +102,6 @@ final class AppModel: ObservableObject {
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
         }
-    }
-
-    func loadSampleResult() {
-        latestResult = .sample
-        statusMessage = "Loaded the local sample response without calling the API."
     }
 
     // MARK: - Corrections

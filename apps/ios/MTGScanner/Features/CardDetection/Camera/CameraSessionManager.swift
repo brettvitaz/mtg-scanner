@@ -18,6 +18,8 @@ final class CameraSessionManager: NSObject {
     // MARK: - Private
 
     private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
+    private let photoOutput = AVCapturePhotoOutput()
+    private var photoCaptureCompletion: ((Data?) -> Void)?
 
     // MARK: - Setup
 
@@ -52,6 +54,23 @@ final class CameraSessionManager: NSObject {
 
         guard session.canAddOutput(output) else { return }
         session.addOutput(output)
+
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+        }
+    }
+
+    // MARK: - Photo Capture
+
+    /// Triggers a still photo capture and returns JPEG data via `completion`.
+    /// Must be called from the main thread.
+    func capturePhoto(completion: @escaping (Data?) -> Void) {
+        photoCaptureCompletion = completion
+        let settings = AVCapturePhotoSettings()
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.photoOutput.capturePhoto(with: settings, delegate: self)
+        }
     }
 
     // MARK: - Lifecycle
@@ -80,5 +99,16 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         from connection: AVCaptureConnection
     ) {
         onFrame?(sampleBuffer)
+    }
+}
+
+// MARK: - AVCapturePhotoCaptureDelegate
+
+extension CameraSessionManager: AVCapturePhotoCaptureDelegate {
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        let data = error == nil ? photo.fileDataRepresentation() : nil
+        let completion = photoCaptureCompletion
+        photoCaptureCompletion = nil
+        DispatchQueue.main.async { completion?(data) }
     }
 }

@@ -1,5 +1,7 @@
 # Code Review
 
+**This review is mandatory.** Every code change must be reviewed against ALL criteria below before committing. When performing the review, explicitly state each criterion and whether it passes or fails. Any failure must be fixed before committing.
+
 When reviewing code — whether self-reviewing before commit or evaluating changes — check each of these criteria. If any criterion fails, the change should be fixed before merging.
 
 ## 1. Correctness

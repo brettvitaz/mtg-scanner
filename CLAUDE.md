@@ -28,6 +28,43 @@ scripts/           Bootstrap, run, and test helpers
 - Keep filenames and folders obvious for fast navigation.
 - Prefer mocked or fixture-backed behavior until a real dependency is justified.
 
+## Mandatory agent workflows
+
+### Worktree requirement
+All code changes MUST be made in a git worktree, never directly on main/master. Before writing any code:
+
+1. Create a worktree with a descriptive name: `git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>`
+2. The name must be a short description of the work (e.g., `add-binder-detection`, `fix-crop-rotation`). No generic names like `feature-1` or `dev`.
+3. Bootstrap the worktree environment (see "Worktree setup reference" below).
+4. Do all work in the worktree.
+5. Clean up when done: `git worktree remove ../mtg-scanner-worktrees/<task-description>`
+
+If you are already in a worktree, proceed. If you are on main/master, create a worktree first. No exceptions.
+
+### Pre-implementation baseline
+Before making any code changes, run the relevant test/build commands to establish a passing baseline:
+- Backend: `make api-test`
+- iOS: `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
+
+If the baseline is already failing, note the failures before proceeding so you do not introduce confusion about what you broke vs. what was already broken.
+
+### Code review gate
+All code changes MUST pass a code review before the work is considered done. After implementation, review every changed file against `.claude/rules/code-review.md`. Explicitly state each criterion with pass/fail:
+1. **Complexity** — functions < 30 lines, nesting ≤ 3 levels, no unnecessary abstractions.
+2. **Correctness** — implementation matches the spec, edge cases handled.
+3. **Tests** — new/changed code has tests that exercise real code paths and would fail if the implementation were broken.
+4. **Best practices** — no force unwraps (Swift), no unhandled exceptions (Python), no scope creep, no dead code.
+
+Fix any failures before committing.
+
+### Commit discipline
+- One logical change per commit. Do not bundle unrelated changes.
+- Commit messages must state what changed and why, not just "fix" or "update."
+- Run verification (tests/build) before committing. Do not commit code that fails its own tests.
+
+### Scope guard
+Do not modify files or add features outside the stated task scope. If you discover something that should be fixed but is unrelated to the current task, note it in your report but do not fix it.
+
 ## Development commands
 
 ```bash
@@ -143,17 +180,22 @@ When touching detection, recognition, or cropping:
 
 Do not add provider-specific integrations unless the OpenAI-compatible path proves insufficient.
 
-## Working in a git worktree
+## Worktree setup reference
 
-Place worktrees outside the main repo:
+Worktrees are mandatory for all code changes (see "Mandatory agent workflows" above). Reference commands:
 
 ```bash
-git worktree add ../mtg-scanner-worktrees/<branch-name> -b <branch-name>
+# Create (name must describe the task)
+git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>
+
+# Setup
+cp services/api/.env.example services/api/.env   # set a non-conflicting port
+bash scripts/bootstrap-api.sh
+uvicorn services.api.app.main:app --reload
+
+# Clean up
+git worktree remove ../mtg-scanner-worktrees/<task-description>
 ```
-
-In the worktree: copy `services/api/.env.example` → `.env`, set a non-conflicting port, bootstrap with `bash scripts/bootstrap-api.sh`, run with `uvicorn services.api.app.main:app --reload`.
-
-Clean up: `git worktree remove ../mtg-scanner-worktrees/<branch-name>`
 
 ## Documentation
 

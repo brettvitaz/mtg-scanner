@@ -37,6 +37,7 @@
 		A00000000000000000000192 /* GridInterpolatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000292 /* GridInterpolatorTests.swift */; };
 		A00000000000000000000193 /* DetectionOverlayRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000293 /* DetectionOverlayRendererTests.swift */; };
 		A00000000000000000000194 /* AppModelCropToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000294 /* AppModelCropToggleTests.swift */; };
+		A00000000000000000000195 /* APIClientHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000295 /* APIClientHealthTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +84,7 @@
 		A00000000000000000000292 /* GridInterpolatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridInterpolatorTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000293 /* DetectionOverlayRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionOverlayRendererTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000294 /* AppModelCropToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelCropToggleTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000295 /* APIClientHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientHealthTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -290,6 +292,7 @@
 				A00000000000000000000292 /* GridInterpolatorTests.swift */,
 				A00000000000000000000293 /* DetectionOverlayRendererTests.swift */,
 				A00000000000000000000294 /* AppModelCropToggleTests.swift */,
+				A00000000000000000000295 /* APIClientHealthTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
@@ -421,6 +424,7 @@
 				A00000000000000000000192 /* GridInterpolatorTests.swift in Sources */,
 				A00000000000000000000193 /* DetectionOverlayRendererTests.swift in Sources */,
 				A00000000000000000000194 /* AppModelCropToggleTests.swift in Sources */,
+				A00000000000000000000195 /* APIClientHealthTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

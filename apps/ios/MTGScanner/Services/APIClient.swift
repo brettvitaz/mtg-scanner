@@ -73,6 +73,22 @@ struct APIClient {
         return try await performRequest(request)
     }
 
+    // MARK: - Health check
+
+    func checkHealth(baseURL: String) async throws {
+        guard let url = URL(string: baseURL),
+              url.scheme == "http" || url.scheme == "https" else {
+            throw APIError.invalidBaseURL
+        }
+
+        let healthURL = url.appending(path: "/health")
+        let (_, response) = try await URLSession.shared.data(from: healthURL)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+    }
+
     // MARK: - Shared request helper
 
     private func performRequest(_ request: URLRequest) async throws -> RecognitionResult {

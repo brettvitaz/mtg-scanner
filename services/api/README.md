@@ -85,7 +85,7 @@ The API can post-process recognizer output against a local MTGJSON index before 
 ```bash
 export MTG_SCANNER_ENABLE_MTG_VALIDATION=true
 export MTG_SCANNER_MTGJSON_DB_PATH=services/api/data/mtgjson/mtgjson.sqlite
-export MTG_SCANNER_MTGJSON_SOURCE_PATH=/Users/brettvitaz/Development/mtg-scanner/tmp/AllPrintings.json
+export MTG_SCANNER_MTGJSON_SOURCE_PATH=tmp/AllPrintings.json
 export MTG_SCANNER_MTGJSON_MAX_FUZZY_CANDIDATES=10
 ```
 
@@ -94,7 +94,7 @@ Build the local SQLite index offline from `AllPrintings.json`:
 
 ```bash
 PYTHONPATH=services/api ./services/api/.venv/bin/python scripts/import_mtgjson.py \
-  /Users/brettvitaz/Development/mtg-scanner/tmp/AllPrintings.json
+  tmp/AllPrintings.json
 ```
 
 This writes:

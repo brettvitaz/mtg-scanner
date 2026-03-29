@@ -75,4 +75,4 @@ The backend keeps the current `POST /api/v1/recognitions` contract unchanged and
   - `PYTHONPATH=services/api python evals/run_eval.py`
 - Latest results are written to `evals/results/latest.json`
 
-See [services/api/.env.example](/Users/brettvitaz/Development/mtg-scanner/services/api/.env.example) for a concrete backend setup.
+See [services/api/.env.example](services/api/.env.example) for a concrete backend setup.

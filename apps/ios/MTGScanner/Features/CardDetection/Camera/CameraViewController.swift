@@ -100,6 +100,16 @@ final class CameraViewController: UIViewController {
 
     // MARK: - Zoom
 
+    /// Sets the camera zoom to `factor`, animating smoothly via AVFoundation ramp.
+    func setZoom(_ factor: CGFloat) {
+        guard let device = sessionManager.captureDevice else { return }
+        let maxFactor = min(Self.maxZoomFactor, device.activeFormat.videoMaxZoomFactor)
+        let clamped = max(1.0, min(maxFactor, factor))
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        device.ramp(toVideoZoomFactor: clamped, withRate: 8.0)
+        device.unlockForConfiguration()
+    }
+
     private func setupPinchGesture() {
         let recognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         view.addGestureRecognizer(recognizer)

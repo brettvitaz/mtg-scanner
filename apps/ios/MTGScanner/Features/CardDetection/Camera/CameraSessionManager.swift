@@ -20,6 +20,7 @@ final class CameraSessionManager: NSObject {
     private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
     private var photoCaptureCompletion: ((Data?) -> Void)?
+    private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
     // MARK: - Setup
 
@@ -38,25 +39,27 @@ final class CameraSessionManager: NSObject {
 
         session.sessionPreset = .hd1920x1080
 
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else {
-            return
-        }
+        guard
+            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let input = try? AVCaptureDeviceInput(device: device),
+            session.canAddInput(input)
+        else { return }
         session.addInput(input)
 
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true
-        output.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-        ]
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         output.setSampleBufferDelegate(self, queue: sessionQueue)
 
         guard session.canAddOutput(output) else { return }
         session.addOutput(output)
 
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
+        guard session.canAddOutput(photoOutput) else { return }
+        session.addOutput(photoOutput)
+
+        if let largest = device.activeFormat.supportedMaxPhotoDimensions.last {
+            photoOutput.maxPhotoDimensions = largest
+            maxPhotoDimensions = largest
         }
     }
 
@@ -67,6 +70,9 @@ final class CameraSessionManager: NSObject {
     func capturePhoto(completion: @escaping (Data?) -> Void) {
         photoCaptureCompletion = completion
         let settings = AVCapturePhotoSettings()
+        if maxPhotoDimensions.width > 0 {
+            settings.maxPhotoDimensions = maxPhotoDimensions
+        }
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.photoOutput.capturePhoto(with: settings, delegate: self)

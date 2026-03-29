@@ -30,11 +30,11 @@ make api-run
 ```bash
 open apps/ios/MTGScanner.xcodeproj
 ```
-Run the `MTGScanner` scheme in Xcode. The current MVP flow is:
-1. Capture an image with the camera or pick one from the photo library
-2. Upload it to the FastAPI backend as multipart form data
-3. Save local API artifacts for debugging/evals
-4. Display mocked recognition results in the Results tab
+Run the `MTGScanner` scheme in Xcode. The app flow is:
+1. Capture an image with the camera (live detection overlays) or pick from the photo library
+2. On-device card detection and perspective-corrected cropping
+3. Upload crops to the backend batch endpoint (or full image as fallback)
+4. View results list with card thumbnails; tap a card for full detail view with metadata, edition picker, and purchase links
 
 ## Useful commands
 ```bash
@@ -47,16 +47,61 @@ xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphone
 ```
 
 ## Current status
-This pass establishes a clean MVP foundation:
-- Runnable SwiftUI iOS project with camera/photo upload flow
-- FastAPI multipart upload endpoint with config-driven recognition providers, mocked output by default, and local artifact logging
-- Versioned schema/examples plus validation tests
+- SwiftUI iOS app with camera capture, on-device card detection/cropping, batch upload, results list with card thumbnails, and card detail view with metadata, edition picker, and Card Kingdom links
+- FastAPI backend with config-driven recognition providers, MTGJSON validation and metadata enrichment, card printings endpoint, and local artifact logging
+- Versioned JSON schemas with examples and validation tests
 - Workflow docs and ADRs for future contributors
 
 See `docs/feature-workflow.md` for the preferred low-token workflow for feature implementation, and `docs/development-workflow.md` for broader repo conventions.
 
+## API routes
+
+### Recognition
+- `POST /api/v1/recognitions` — upload a single image for card recognition
+- `POST /api/v1/recognitions/batch` — upload multiple pre-cropped card images
+
+Both return a `RecognitionResponse` containing a list of recognized cards. Each card includes identity fields (title, edition, collector number, foil) plus enriched metadata when the card matches the MTGJSON database:
+
+| Field | Description |
+|-------|-------------|
+| `set_code` | Three-letter set code (e.g. `M10`) |
+| `rarity` | Card rarity (`common`, `uncommon`, `rare`, `mythic`) |
+| `type_line` | Full type line (e.g. `Legendary Creature — Human Wizard`) |
+| `oracle_text` | Rules text from Oracle |
+| `power`, `toughness` | Creature stats |
+| `loyalty` | Planeswalker starting loyalty |
+| `defense` | Battle defense value |
+| `scryfall_id` | Scryfall UUID for the printing |
+| `image_url` | Scryfall card image URL (constructed from scryfall_id) |
+| `set_symbol_url` | Scryfall set symbol SVG URL |
+| `card_kingdom_url` | Card Kingdom purchase link |
+| `card_kingdom_foil_url` | Card Kingdom foil purchase link |
+
+Enriched fields are `null` when the card does not match MTGJSON or when the source data lacks the field.
+
+### Card printings
+- `GET /api/v1/cards/printings?name=Lightning+Bolt` — returns all printings of a card across all sets
+
+Returns a `CardPrintingsResponse` with a `printings` array. Each printing includes the same enriched metadata fields listed above. Results are sorted by release date (newest first). Returns 404 if no printings are found, 503 if the MTGJSON database is unavailable.
+
+### Health
+- `GET /health` — liveness check
+
+## iOS app
+
+The app provides a full scanning pipeline:
+1. **Scan** — capture with camera (live detection overlays) or pick from photo library
+2. **Results list** — card thumbnails with title, set, and collector number
+3. **Card detail** — tap a card to see its full details:
+   - Card image from Scryfall (tap for fullscreen, toggle to on-device crop image)
+   - Edition picker with all printings loaded from the API
+   - Type line, oracle text, power/toughness or loyalty or defense
+   - Rarity badge, foil toggle, confidence bar
+   - "Buy on Card Kingdom" button (opens purchase URL)
+   - Save correction for manual edits
+
 ## Recognition provider config
-The backend keeps the current `POST /api/v1/recognitions` contract unchanged and selects its recognition provider from environment variables.
+The backend selects its recognition provider from environment variables.
 
 - Default: `MTG_SCANNER_RECOGNIZER_PROVIDER=mock`
 - Real provider: `MTG_SCANNER_RECOGNIZER_PROVIDER=openai`

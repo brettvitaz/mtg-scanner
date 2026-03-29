@@ -38,6 +38,9 @@
 		A00000000000000000000193 /* DetectionOverlayRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000293 /* DetectionOverlayRendererTests.swift */; };
 		A00000000000000000000194 /* AppModelCropToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000294 /* AppModelCropToggleTests.swift */; };
 		A00000000000000000000195 /* APIClientHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000295 /* APIClientHealthTests.swift */; };
+		A00000000000000000000120 /* CardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000220 /* CardDetailView.swift */; };
+		A00000000000000000000121 /* CardDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000221 /* CardDetailViewModel.swift */; };
+		A00000000000000000000122 /* FullscreenImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000222 /* FullscreenImageView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +88,9 @@
 		A00000000000000000000293 /* DetectionOverlayRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionOverlayRendererTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000294 /* AppModelCropToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelCropToggleTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000295 /* APIClientHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientHealthTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000220 /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
+		A00000000000000000000221 /* CardDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailViewModel.swift; sourceTree = "<group>"; };
+		A00000000000000000000222 /* FullscreenImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenImageView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +154,7 @@
 		A00000000000000000000012 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				A00000000000000000000025 /* CardDetail */,
 				A00000000000000000000019 /* Correction */,
 				A00000000000000000000020 /* CardDetection */,
 				A00000000000000000000016 /* Results */,
@@ -284,6 +291,16 @@
 			path = CardDetection;
 			sourceTree = "<group>";
 		};
+		A00000000000000000000025 /* CardDetail */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000220 /* CardDetailView.swift */,
+				A00000000000000000000221 /* CardDetailViewModel.swift */,
+				A00000000000000000000222 /* FullscreenImageView.swift */,
+			);
+			path = CardDetail;
+			sourceTree = "<group>";
+		};
 		A00000000000000000000040 /* MTGScannerTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -412,6 +429,9 @@
 				A00000000000000000000119 /* CardDetectionViewModel.swift in Sources */,
 				A0000000000000000000011D /* CameraCaptureCoordinator.swift in Sources */,
 				A0000000000000000000011E /* CaptureButton.swift in Sources */,
+				A00000000000000000000120 /* CardDetailView.swift in Sources */,
+				A00000000000000000000121 /* CardDetailViewModel.swift in Sources */,
+				A00000000000000000000122 /* FullscreenImageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

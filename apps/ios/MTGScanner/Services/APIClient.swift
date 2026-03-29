@@ -89,6 +89,31 @@ struct APIClient {
         }
     }
 
+    // MARK: - Printings route
+
+    func fetchPrintings(name: String, baseURL: String) async throws -> [CardPrinting] {
+        guard var components = URLComponents(string: baseURL) else {
+            throw APIError.invalidBaseURL
+        }
+        components.path += "/api/v1/cards/printings"
+        components.queryItems = [URLQueryItem(name: "name", value: name)]
+        guard let url = components.url else {
+            throw APIError.invalidBaseURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        let decoded = try JSONDecoder().decode(CardPrintingsResponse.self, from: responseData)
+        return decoded.printings
+    }
+
     // MARK: - Shared request helper
 
     private func performRequest(_ request: URLRequest) async throws -> RecognitionResult {

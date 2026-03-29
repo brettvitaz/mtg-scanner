@@ -16,6 +16,8 @@ final class AppModel: ObservableObject {
     @Published var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.
     @Published var lastDetectedCrops: [UIImage] = []
+    /// Crop images keyed by the corresponding RecognizedCard.id.
+    @Published var cardCropImages: [UUID: UIImage] = [:]
     @Published var shouldShowResults = false
 
     private let apiClient = APIClient()
@@ -53,6 +55,7 @@ final class AppModel: ObservableObject {
     func recognizeImage(image: UIImage, filename: String) async {
         isRecognizing = true
         lastDetectedCrops = []
+        cardCropImages = [:]
         lastUploadedFilename = filename
 
         if onDeviceCropEnabled {
@@ -104,6 +107,7 @@ final class AppModel: ObservableObject {
                 crops: cropPairs,
                 baseURL: apiBaseURL
             )
+            associateCropsWithCards()
             statusMessage = "Recognition finished (\(cropPairs.count) crop(s)). Open Results to inspect."
         } catch {
             statusMessage = "Batch recognition failed: \(error.localizedDescription)"
@@ -120,10 +124,29 @@ final class AppModel: ObservableObject {
                 contentType: contentType,
                 baseURL: apiBaseURL
             )
+            associateCropsWithCards()
             statusMessage = "Recognition finished. Open Results to inspect the response."
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
         }
+    }
+
+    private func associateCropsWithCards() {
+        for (index, card) in latestResult.cards.enumerated() {
+            if index < lastDetectedCrops.count {
+                cardCropImages[card.id] = lastDetectedCrops[index]
+            } else if let base64String = card.cropImageData,
+                      let data = Data(base64Encoded: base64String),
+                      let image = UIImage(data: data) {
+                cardCropImages[card.id] = image
+            }
+        }
+    }
+
+    // MARK: - Printings
+
+    func fetchPrintings(name: String) async throws -> [CardPrinting] {
+        return try await apiClient.fetchPrintings(name: name, baseURL: apiBaseURL)
     }
 
     // MARK: - Corrections

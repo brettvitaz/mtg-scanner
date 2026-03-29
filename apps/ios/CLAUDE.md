@@ -35,8 +35,12 @@ MTGScanner/
       Services/
         CardCropService.swift        On-device perspective-corrected cropping
       ScanView.swift, ScanViewModel.swift
-    Results/                         Recognition results display
-    Correction/                      Manual correction UI
+    Results/                         Recognition results list with card thumbnails
+    CardDetail/                      Card detail view with metadata, edition picker, purchase links
+      CardDetailView.swift           Scrollable detail: image, identity, oracle text, stats, actions
+      CardDetailViewModel.swift      State management, printings loading, edition selection
+      FullscreenImageView.swift      Tap-to-dismiss fullscreen card/crop image overlay
+    Correction/                      Legacy manual correction UI (ConfidenceBadge still used)
     Settings/                        App configuration
   Services/
     APIClient.swift                  Network client for backend communication

@@ -20,8 +20,8 @@ def validation_service(tmp_path: Path) -> CardValidationService:
               "name": "Magic 2010",
               "releaseDate": "2009-07-17",
               "cards": [
-                {"uuid": "bolt-m10-146", "name": "Lightning Bolt", "setCode": "M10", "number": "146", "language": "English", "layout": "normal"},
-                {"uuid": "forest-m10-247", "name": "Forest", "setCode": "M10", "number": "247", "language": "English", "layout": "normal"}
+                {"uuid": "bolt-m10-146", "name": "Lightning Bolt", "setCode": "M10", "number": "146", "language": "English", "layout": "normal", "rarity": "common", "type": "Instant", "text": "Lightning Bolt deals 3 damage to any target.", "identifiers": {"scryfallId": "e3285e6b-0000-0000-0000-000000000000"}, "purchaseUrls": {"cardKingdom": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt"}},
+                {"uuid": "forest-m10-247", "name": "Forest", "setCode": "M10", "number": "247", "language": "English", "layout": "normal", "rarity": "common", "type": "Basic Land — Forest"}
               ]
             },
             "2XM": {
@@ -76,6 +76,15 @@ def test_validate_card_exact_match(validation_service: CardValidationService) ->
     assert result.card.confidence == 0.93
     assert result.trace.status == "exact_match"
     assert result.trace.matched_uuid == "bolt-m10-146"
+    # Enriched fields from MTGJSON
+    assert result.card.set_code == "M10"
+    assert result.card.rarity == "common"
+    assert result.card.type_line == "Instant"
+    assert result.card.oracle_text == "Lightning Bolt deals 3 damage to any target."
+    assert result.card.scryfall_id == "e3285e6b-0000-0000-0000-000000000000"
+    assert result.card.image_url is not None and "e3285e6b-0000-0000-0000-000000000000" in result.card.image_url
+    assert result.card.set_symbol_url == "https://svgs.scryfall.io/sets/m10.svg"
+    assert result.card.card_kingdom_url == "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt"
 
 
 def test_validate_card_resolves_set_name(validation_service: CardValidationService) -> None:

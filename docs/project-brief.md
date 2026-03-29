@@ -29,7 +29,9 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
   - On-device card cropping with perspective correction (`CIPerspectiveCorrection`)
   - Batch upload of cropped card images to backend
   - Fallback to single-image upload when no cards detected
-  - Results display and settings flow
+  - Results list with card thumbnails from Scryfall
+  - Card detail view with metadata, edition picker, Card Kingdom links, and correction editing
+  - Settings flow
 - Binder mode: detects binder page via `VNDetectRectanglesRequest`, subdivides into 3x3 grid
 - Detection stabilized with EMA smoothing and presence hysteresis (`CardTracker`)
 - ATS is temporarily permissive for local MVP iteration
@@ -40,9 +42,10 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
   - `GET /health`
   - `POST /api/v1/recognitions` — single image upload
   - `POST /api/v1/recognitions/batch` — multi-image batch upload
+  - `GET /api/v1/cards/printings?name=` — all printings of a card across sets
 - Config-driven recognition providers: mock (default), OpenAI, OpenAI-compatible (Ollama, LM Studio)
 - Server-side card detection and cropping (OpenCV-based) for multi-card images
-- MTGJSON validation: post-recognition normalization against local SQLite card database
+- MTGJSON validation and metadata enrichment: post-recognition normalization against local SQLite card database, populates type line, oracle text, stats, rarity, Scryfall image URLs, set symbol URLs, and Card Kingdom purchase links
 - Parallel per-card recognition with bounded concurrency
 
 ### Artifact Logging
@@ -65,8 +68,8 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
 2. On-device card detection and perspective-corrected cropping
 3. Upload cropped card images to backend batch endpoint (or full image to single endpoint as fallback)
 4. Backend performs optional second-pass detection/cropping, then per-card AI recognition (OpenAI)
-5. Backend validates recognition output against MTGJSON card database
-6. iOS app displays recognized cards with confidence
+5. Backend validates recognition output against MTGJSON card database and enriches with card metadata (type line, oracle text, stats, rarity, images, purchase links)
+6. iOS app displays results list with card thumbnails; detail view shows full card info, edition picker, and Card Kingdom buy links
 7. Backend stores artifacts locally for debugging/evaluation
 
 ## Current Limitations
@@ -75,7 +78,7 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
 - No retention/cleanup policy for artifacts
 - Camera and scanning UX are functional but minimal
 - No account/auth system
-- Correction UI exists but needs refinement
+- Correction editing is embedded in the card detail view but does not yet sync back to the server
 
 ## Recommended Next Step
 Implement the crop-first batch scan flow described in `docs/plans/ios-crop-first-batch-scan.md`:

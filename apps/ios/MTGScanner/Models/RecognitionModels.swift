@@ -10,7 +10,13 @@ struct RecognitionResult: Codable {
             collectorNumber: "146",
             foil: false,
             confidence: 0.98,
-            notes: "Mocked recognition result for upload 'lightning-bolt.jpg' (image/jpeg)."
+            notes: "Mocked recognition result for upload 'lightning-bolt.jpg' (image/jpeg).",
+            setCode: "M10",
+            rarity: "common",
+            typeLine: "Instant",
+            oracleText: "Lightning Bolt deals 3 damage to any target.",
+            imageUrl: "https://api.scryfall.com/cards/e3285e6b-3e79-4d7c-bf96-d920f973b122?format=image&version=normal",
+            setSymbolUrl: "https://svgs.scryfall.io/sets/m10.svg"
         )
     ])
 }
@@ -23,6 +29,20 @@ struct RecognizedCard: Codable, Identifiable {
     let foil: Bool?
     let confidence: Double
     let notes: String?
+    let setCode: String?
+    let rarity: String?
+    let typeLine: String?
+    let oracleText: String?
+    let power: String?
+    let toughness: String?
+    let loyalty: String?
+    let defense: String?
+    let scryfallId: String?
+    let imageUrl: String?
+    let setSymbolUrl: String?
+    let cardKingdomUrl: String?
+    let cardKingdomFoilUrl: String?
+    let cropImageData: String?
 
     init(
         id: UUID = UUID(),
@@ -31,7 +51,21 @@ struct RecognizedCard: Codable, Identifiable {
         collectorNumber: String? = nil,
         foil: Bool? = nil,
         confidence: Double = 0,
-        notes: String? = nil
+        notes: String? = nil,
+        setCode: String? = nil,
+        rarity: String? = nil,
+        typeLine: String? = nil,
+        oracleText: String? = nil,
+        power: String? = nil,
+        toughness: String? = nil,
+        loyalty: String? = nil,
+        defense: String? = nil,
+        scryfallId: String? = nil,
+        imageUrl: String? = nil,
+        setSymbolUrl: String? = nil,
+        cardKingdomUrl: String? = nil,
+        cardKingdomFoilUrl: String? = nil,
+        cropImageData: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -40,6 +74,20 @@ struct RecognizedCard: Codable, Identifiable {
         self.foil = foil
         self.confidence = confidence
         self.notes = notes
+        self.setCode = setCode
+        self.rarity = rarity
+        self.typeLine = typeLine
+        self.oracleText = oracleText
+        self.power = power
+        self.toughness = toughness
+        self.loyalty = loyalty
+        self.defense = defense
+        self.scryfallId = scryfallId
+        self.imageUrl = imageUrl
+        self.setSymbolUrl = setSymbolUrl
+        self.cardKingdomUrl = cardKingdomUrl
+        self.cardKingdomFoilUrl = cardKingdomFoilUrl
+        self.cropImageData = cropImageData
     }
 
     init(from decoder: any Decoder) throws {
@@ -51,6 +99,20 @@ struct RecognizedCard: Codable, Identifiable {
         self.foil = try container.decodeIfPresent(Bool.self, forKey: .foil)
         self.confidence = try container.decode(Double.self, forKey: .confidence)
         self.notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        self.setCode = try container.decodeIfPresent(String.self, forKey: .setCode)
+        self.rarity = try container.decodeIfPresent(String.self, forKey: .rarity)
+        self.typeLine = try container.decodeIfPresent(String.self, forKey: .typeLine)
+        self.oracleText = try container.decodeIfPresent(String.self, forKey: .oracleText)
+        self.power = try container.decodeIfPresent(String.self, forKey: .power)
+        self.toughness = try container.decodeIfPresent(String.self, forKey: .toughness)
+        self.loyalty = try container.decodeIfPresent(String.self, forKey: .loyalty)
+        self.defense = try container.decodeIfPresent(String.self, forKey: .defense)
+        self.scryfallId = try container.decodeIfPresent(String.self, forKey: .scryfallId)
+        self.imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        self.setSymbolUrl = try container.decodeIfPresent(String.self, forKey: .setSymbolUrl)
+        self.cardKingdomUrl = try container.decodeIfPresent(String.self, forKey: .cardKingdomUrl)
+        self.cardKingdomFoilUrl = try container.decodeIfPresent(String.self, forKey: .cardKingdomFoilUrl)
+        self.cropImageData = try container.decodeIfPresent(String.self, forKey: .cropImageData)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -62,6 +124,20 @@ struct RecognizedCard: Codable, Identifiable {
         try container.encodeIfPresent(foil, forKey: .foil)
         try container.encode(confidence, forKey: .confidence)
         try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encodeIfPresent(setCode, forKey: .setCode)
+        try container.encodeIfPresent(rarity, forKey: .rarity)
+        try container.encodeIfPresent(typeLine, forKey: .typeLine)
+        try container.encodeIfPresent(oracleText, forKey: .oracleText)
+        try container.encodeIfPresent(power, forKey: .power)
+        try container.encodeIfPresent(toughness, forKey: .toughness)
+        try container.encodeIfPresent(loyalty, forKey: .loyalty)
+        try container.encodeIfPresent(defense, forKey: .defense)
+        try container.encodeIfPresent(scryfallId, forKey: .scryfallId)
+        try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
+        try container.encodeIfPresent(setSymbolUrl, forKey: .setSymbolUrl)
+        try container.encodeIfPresent(cardKingdomUrl, forKey: .cardKingdomUrl)
+        try container.encodeIfPresent(cardKingdomFoilUrl, forKey: .cardKingdomFoilUrl)
+        try container.encodeIfPresent(cropImageData, forKey: .cropImageData)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -72,6 +148,20 @@ struct RecognizedCard: Codable, Identifiable {
         case foil
         case confidence
         case notes
+        case setCode = "set_code"
+        case rarity
+        case typeLine = "type_line"
+        case oracleText = "oracle_text"
+        case power
+        case toughness
+        case loyalty
+        case defense
+        case scryfallId = "scryfall_id"
+        case imageUrl = "image_url"
+        case setSymbolUrl = "set_symbol_url"
+        case cardKingdomUrl = "card_kingdom_url"
+        case cardKingdomFoilUrl = "card_kingdom_foil_url"
+        case cropImageData = "crop_image_data"
     }
 }
 
@@ -90,4 +180,49 @@ struct CardCorrection: Identifiable, Codable {
         self.collectorNumber = card.collectorNumber ?? ""
         self.foil = card.foil ?? false
     }
+}
+
+/// A printing of a card from the printings endpoint.
+struct CardPrinting: Codable, Identifiable {
+    var id: String { "\(setCode)-\(collectorNumber ?? "unknown")" }
+    let name: String
+    let setCode: String
+    let setName: String?
+    let collectorNumber: String?
+    let rarity: String?
+    let typeLine: String?
+    let oracleText: String?
+    let power: String?
+    let toughness: String?
+    let loyalty: String?
+    let defense: String?
+    let scryfallId: String?
+    let imageUrl: String?
+    let setSymbolUrl: String?
+    let cardKingdomUrl: String?
+    let cardKingdomFoilUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case setCode = "set_code"
+        case setName = "set_name"
+        case collectorNumber = "collector_number"
+        case rarity
+        case typeLine = "type_line"
+        case oracleText = "oracle_text"
+        case power
+        case toughness
+        case loyalty
+        case defense
+        case scryfallId = "scryfall_id"
+        case imageUrl = "image_url"
+        case setSymbolUrl = "set_symbol_url"
+        case cardKingdomUrl = "card_kingdom_url"
+        case cardKingdomFoilUrl = "card_kingdom_foil_url"
+    }
+}
+
+/// Response from the printings endpoint.
+struct CardPrintingsResponse: Codable {
+    let printings: [CardPrinting]
 }

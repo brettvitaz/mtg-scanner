@@ -25,15 +25,22 @@ SPACE_PUNCTUATION = {
 }
 DROP_PUNCTUATION = {
     "'",
-    "’",
-    "‘",
-    "´",
+    "\u2018",
+    "\u2019",
+    "\u00b4",
     "`",
     '"',
-    "“",
-    "”",
+    "\u201c",
+    "\u201d",
 }
 NON_ALNUM_WHITESPACE_RE = re.compile(r"[^0-9a-z\s]+")
+
+_CARD_COLUMNS = (
+    "uuid, name, normalized_name, set_code, set_name, collector_number,"
+    " normalized_collector_number, language, layout, release_date, is_promo,"
+    " rarity, type_line, oracle_text, power, toughness, loyalty, defense,"
+    " scryfall_id, card_kingdom_url, card_kingdom_foil_url"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +56,16 @@ class CardRecord:
     layout: str | None
     release_date: str | None
     is_promo: bool | None
+    rarity: str | None = None
+    type_line: str | None = None
+    oracle_text: str | None = None
+    power: str | None = None
+    toughness: str | None = None
+    loyalty: str | None = None
+    defense: str | None = None
+    scryfall_id: str | None = None
+    card_kingdom_url: str | None = None
+    card_kingdom_foil_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,9 +106,8 @@ class MTGJSONIndex:
         collector_number: str,
     ) -> CardRecord | None:
         rows = self._fetch_cards(
-            """
-            SELECT uuid, name, normalized_name, set_code, set_name, collector_number,
-                   normalized_collector_number, language, layout, release_date, is_promo
+            f"""
+            SELECT {_CARD_COLUMNS}
             FROM cards
             WHERE normalized_name = ?
               AND set_code = ?
@@ -106,9 +122,8 @@ class MTGJSONIndex:
 
     def lookup_by_name_and_set(self, *, title: str, set_code: str) -> list[CardRecord]:
         return self._fetch_cards(
-            """
-            SELECT uuid, name, normalized_name, set_code, set_name, collector_number,
-                   normalized_collector_number, language, layout, release_date, is_promo
+            f"""
+            SELECT {_CARD_COLUMNS}
             FROM cards
             WHERE normalized_name = ?
               AND set_code = ?
@@ -124,15 +139,25 @@ class MTGJSONIndex:
         collector_number: str,
     ) -> list[CardRecord]:
         return self._fetch_cards(
-            """
-            SELECT uuid, name, normalized_name, set_code, set_name, collector_number,
-                   normalized_collector_number, language, layout, release_date, is_promo
+            f"""
+            SELECT {_CARD_COLUMNS}
             FROM cards
             WHERE normalized_name = ?
               AND normalized_collector_number = ?
             ORDER BY release_date DESC, set_code ASC
             """,
             (normalize_title(title), normalize_collector_number(collector_number)),
+        )
+
+    def lookup_all_printings_by_name(self, *, title: str) -> list[CardRecord]:
+        return self._fetch_cards(
+            f"""
+            SELECT {_CARD_COLUMNS}
+            FROM cards
+            WHERE normalized_name = ?
+            ORDER BY release_date DESC, set_code ASC, collector_number ASC
+            """,
+            (normalize_title(title),),
         )
 
     def resolve_set(self, edition_text: str) -> str | None:
@@ -168,9 +193,8 @@ class MTGJSONIndex:
         limit: int = 10,
     ) -> list[CardRecord]:
         query = [
-            """
-            SELECT uuid, name, normalized_name, set_code, set_name, collector_number,
-                   normalized_collector_number, language, layout, release_date, is_promo
+            f"""
+            SELECT {_CARD_COLUMNS}
             FROM cards
             WHERE normalized_name = ?
             """
@@ -206,6 +230,16 @@ class MTGJSONIndex:
                 layout=row[8],
                 release_date=row[9],
                 is_promo=bool(row[10]) if row[10] is not None else None,
+                rarity=row[11],
+                type_line=row[12],
+                oracle_text=row[13],
+                power=row[14],
+                toughness=row[15],
+                loyalty=row[16],
+                defense=row[17],
+                scryfall_id=row[18],
+                card_kingdom_url=row[19],
+                card_kingdom_foil_url=row[20],
             )
             for row in rows
         ]
@@ -279,7 +313,8 @@ def create_schema(db_path: Path) -> None:
                 set_code TEXT PRIMARY KEY,
                 set_name TEXT NOT NULL,
                 normalized_set_name TEXT NOT NULL,
-                release_date TEXT NULL
+                release_date TEXT NULL,
+                keyrune_code TEXT NULL
             );
 
             CREATE TABLE cards (
@@ -294,7 +329,17 @@ def create_schema(db_path: Path) -> None:
                 language TEXT NULL,
                 layout TEXT NULL,
                 release_date TEXT NULL,
-                is_promo INTEGER NULL
+                is_promo INTEGER NULL,
+                rarity TEXT NULL,
+                type_line TEXT NULL,
+                oracle_text TEXT NULL,
+                power TEXT NULL,
+                toughness TEXT NULL,
+                loyalty TEXT NULL,
+                defense TEXT NULL,
+                scryfall_id TEXT NULL,
+                card_kingdom_url TEXT NULL,
+                card_kingdom_foil_url TEXT NULL
             );
 
             CREATE INDEX idx_cards_name ON cards(normalized_name);
@@ -332,12 +377,14 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
 
             set_count += 1
             conn.execute(
-                "INSERT INTO sets (set_code, set_name, normalized_set_name, release_date) VALUES (?, ?, ?, ?)",
+                "INSERT INTO sets (set_code, set_name, normalized_set_name, release_date, keyrune_code)"
+                " VALUES (?, ?, ?, ?, ?)",
                 (
                     canonical_set_code,
                     set_name,
                     normalize_set_name(set_name),
                     set_payload.get("releaseDate"),
+                    set_payload.get("keyruneCode"),
                 ),
             )
 
@@ -351,13 +398,17 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                     skipped_card_count += 1
                     continue
                 collector_number = card.get("number")
+                identifiers = card.get("identifiers") or {}
+                purchase_urls = card.get("purchaseUrls") or {}
                 conn.execute(
                     """
                     INSERT INTO cards (
                         uuid, name, ascii_name, normalized_name, set_code, set_name,
                         collector_number, normalized_collector_number, language, layout,
-                        release_date, is_promo
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        release_date, is_promo, rarity, type_line, oracle_text,
+                        power, toughness, loyalty, defense, scryfall_id,
+                        card_kingdom_url, card_kingdom_foil_url
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         uuid,
@@ -372,6 +423,16 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                         card.get("layout"),
                         set_payload.get("releaseDate"),
                         _normalize_bool(card.get("isPromo")),
+                        card.get("rarity"),
+                        card.get("type"),
+                        card.get("text"),
+                        card.get("power"),
+                        card.get("toughness"),
+                        card.get("loyalty"),
+                        card.get("defense"),
+                        identifiers.get("scryfallId"),
+                        purchase_urls.get("cardKingdom"),
+                        purchase_urls.get("cardKingdomFoil"),
                     ),
                 )
                 card_count += 1
@@ -386,7 +447,7 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
         "total_set_count": set_count,
         "total_card_printing_count": card_count,
         "skipped_card_count": skipped_card_count,
-        "importer_version": 1,
+        "importer_version": 2,
         "db_path": str(db_path),
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")

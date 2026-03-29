@@ -144,6 +144,12 @@ class CardValidationService:
     ) -> ValidatedCardResult:
         confidence_after = _adjust_confidence(card.confidence, status)
         notes = _merge_notes(card.notes, f"Validated against MTGJSON ({status}).")
+        image_url = (
+            f"https://api.scryfall.com/cards/{match.scryfall_id}?format=image&version=normal"
+            if match.scryfall_id
+            else None
+        )
+        set_symbol_url = f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg" if match.set_code else None
         validated_card = card.model_copy(
             update={
                 "title": match.name,
@@ -151,6 +157,19 @@ class CardValidationService:
                 "collector_number": match.collector_number or card.collector_number,
                 "confidence": confidence_after,
                 "notes": notes,
+                "set_code": match.set_code,
+                "rarity": match.rarity,
+                "type_line": match.type_line,
+                "oracle_text": match.oracle_text,
+                "power": match.power,
+                "toughness": match.toughness,
+                "loyalty": match.loyalty,
+                "defense": match.defense,
+                "scryfall_id": match.scryfall_id,
+                "image_url": image_url,
+                "set_symbol_url": set_symbol_url,
+                "card_kingdom_url": match.card_kingdom_url,
+                "card_kingdom_foil_url": match.card_kingdom_foil_url,
             }
         )
         return ValidatedCardResult(

@@ -4,7 +4,6 @@ import json
 import threading
 import time
 from io import BytesIO
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -13,13 +12,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.recognition import RecognitionResponse
 from app.services.card_detector import CardDetector, CardRegion, DetectionResult
-from conftest import requires_sample_images
+from conftest import ARTIFACTS_DIR, SAMPLES_DIR, requires_sample_images
 
 client = TestClient(app)
-
-
-SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples" / "test"
-ARTIFACTS_DIR = SAMPLES_DIR / "artifacts"
 
 
 class TestCardDetector:

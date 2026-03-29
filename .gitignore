@@ -15,9 +15,9 @@ node_modules/
 # Xcode / Swift
 DerivedData/
 .build/
-*.xcworkspace/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
-*.xcodeproj/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
 
 # Logs
 *.log

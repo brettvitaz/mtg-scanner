@@ -29,6 +29,7 @@ class RecognizedCard(BaseModel):
     set_symbol_url: str | None = None
     card_kingdom_url: str | None = None
     card_kingdom_foil_url: str | None = None
+    crop_image_data: str | None = Field(default=None, description="Base64-encoded JPEG crop image")
 
 
 class RecognitionResponse(BaseModel):

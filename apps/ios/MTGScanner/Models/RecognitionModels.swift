@@ -42,6 +42,7 @@ struct RecognizedCard: Codable, Identifiable {
     let setSymbolUrl: String?
     let cardKingdomUrl: String?
     let cardKingdomFoilUrl: String?
+    let cropImageData: String?
 
     init(
         id: UUID = UUID(),
@@ -63,7 +64,8 @@ struct RecognizedCard: Codable, Identifiable {
         imageUrl: String? = nil,
         setSymbolUrl: String? = nil,
         cardKingdomUrl: String? = nil,
-        cardKingdomFoilUrl: String? = nil
+        cardKingdomFoilUrl: String? = nil,
+        cropImageData: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -85,6 +87,7 @@ struct RecognizedCard: Codable, Identifiable {
         self.setSymbolUrl = setSymbolUrl
         self.cardKingdomUrl = cardKingdomUrl
         self.cardKingdomFoilUrl = cardKingdomFoilUrl
+        self.cropImageData = cropImageData
     }
 
     init(from decoder: any Decoder) throws {
@@ -109,6 +112,7 @@ struct RecognizedCard: Codable, Identifiable {
         self.setSymbolUrl = try container.decodeIfPresent(String.self, forKey: .setSymbolUrl)
         self.cardKingdomUrl = try container.decodeIfPresent(String.self, forKey: .cardKingdomUrl)
         self.cardKingdomFoilUrl = try container.decodeIfPresent(String.self, forKey: .cardKingdomFoilUrl)
+        self.cropImageData = try container.decodeIfPresent(String.self, forKey: .cropImageData)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -133,6 +137,7 @@ struct RecognizedCard: Codable, Identifiable {
         try container.encodeIfPresent(setSymbolUrl, forKey: .setSymbolUrl)
         try container.encodeIfPresent(cardKingdomUrl, forKey: .cardKingdomUrl)
         try container.encodeIfPresent(cardKingdomFoilUrl, forKey: .cardKingdomFoilUrl)
+        try container.encodeIfPresent(cropImageData, forKey: .cropImageData)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -156,6 +161,7 @@ struct RecognizedCard: Codable, Identifiable {
         case setSymbolUrl = "set_symbol_url"
         case cardKingdomUrl = "card_kingdom_url"
         case cardKingdomFoilUrl = "card_kingdom_foil_url"
+        case cropImageData = "crop_image_data"
     }
 }
 

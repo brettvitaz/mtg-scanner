@@ -231,10 +231,12 @@ class RecognitionService:
 
             if detection_result.count > 1:
                 crops: list[tuple[bytes, RecognitionUploadMetadata]] = []
+                crop_bytes_list: list[bytes] = []
                 for i, region in enumerate(detection_result.regions):
                     crop_bytes, crop_content_type = self._card_detector.crop_region(
                         image_bytes, region
                     )
+                    crop_bytes_list.append(crop_bytes)
                     crop_metadata = enriched_metadata.model_copy(
                         update={
                             "filename": f"{metadata.filename}-crop-{i}.jpg",
@@ -254,8 +256,10 @@ class RecognitionService:
 
                 combined_response = RecognitionResponse(cards=all_cards)
                 validation_result = self._validate_response(combined_response)
+                final_response = validation_result.response if validation_result else combined_response
+                final_response = _attach_crop_images(final_response, crop_bytes_list)
                 return (
-                    validation_result.response if validation_result else combined_response,
+                    final_response,
                     enriched_metadata,
                     detection_result,
                     validation_result,
@@ -354,3 +358,31 @@ def _load_response_schema() -> dict:
 def _make_data_url(*, content_type: str, image_bytes: bytes) -> str:
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{content_type};base64,{encoded}"
+
+
+def _encode_crop_image(image_bytes: bytes, quality: int = 60) -> str:
+    """Compress a crop image to JPEG and encode as base64."""
+    import cv2
+    import numpy as np
+
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return base64.b64encode(image_bytes).decode("ascii")
+    _, jpeg_bytes = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    return base64.b64encode(jpeg_bytes.tobytes()).decode("ascii")
+
+
+def _attach_crop_images(
+    response: RecognitionResponse,
+    crop_bytes_list: list[bytes],
+) -> RecognitionResponse:
+    """Attach base64-encoded crop images to recognized cards by index."""
+    updated_cards: list[RecognizedCard] = []
+    for i, card in enumerate(response.cards):
+        if i < len(crop_bytes_list):
+            encoded = _encode_crop_image(crop_bytes_list[i])
+            updated_cards.append(card.model_copy(update={"crop_image_data": encoded}))
+        else:
+            updated_cards.append(card)
+    return RecognitionResponse(cards=updated_cards)

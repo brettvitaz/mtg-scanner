@@ -5,6 +5,7 @@ from app.services.artifact_store import get_artifact_store
 from app.services.recognizer import (
     RecognitionConfigurationError,
     RecognitionProviderError,
+    _encode_crop_image,
     get_recognition_service,
 )
 
@@ -113,6 +114,8 @@ async def create_recognition_batch(
             detection_result=detection_result,
             validation_result=validation_result,
         )
-        all_cards.extend(response.cards)
+        encoded_crop = _encode_crop_image(image_bytes)
+        for card in response.cards:
+            all_cards.append(card.model_copy(update={"crop_image_data": encoded_crop}))
 
     return RecognitionResponse(cards=all_cards)

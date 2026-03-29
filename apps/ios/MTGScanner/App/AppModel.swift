@@ -124,6 +124,7 @@ final class AppModel: ObservableObject {
                 contentType: contentType,
                 baseURL: apiBaseURL
             )
+            associateCropsWithCards()
             statusMessage = "Recognition finished. Open Results to inspect the response."
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
@@ -131,8 +132,14 @@ final class AppModel: ObservableObject {
     }
 
     private func associateCropsWithCards() {
-        for (index, card) in latestResult.cards.enumerated() where index < lastDetectedCrops.count {
-            cardCropImages[card.id] = lastDetectedCrops[index]
+        for (index, card) in latestResult.cards.enumerated() {
+            if index < lastDetectedCrops.count {
+                cardCropImages[card.id] = lastDetectedCrops[index]
+            } else if let base64String = card.cropImageData,
+                      let data = Data(base64Encoded: base64String),
+                      let image = UIImage(data: data) {
+                cardCropImages[card.id] = image
+            }
         }
     }
 

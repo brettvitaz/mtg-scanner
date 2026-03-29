@@ -1,6 +1,11 @@
 import Foundation
 import UIKit
 
+extension String {
+    /// Returns `self` if non-empty, otherwise `nil`. Useful for optional chaining with `??`.
+    var nonEmpty: String? { isEmpty ? nil : self }
+}
+
 @MainActor
 final class CardDetailViewModel: ObservableObject {
     let card: RecognizedCard
@@ -32,11 +37,11 @@ final class CardDetailViewModel: ObservableObject {
     }
 
     var displayTitle: String {
-        selectedPrinting?.name ?? card.title ?? "Unknown card"
+        editTitle.nonEmpty ?? selectedPrinting?.name ?? card.title ?? "Unknown card"
     }
 
     var displayEdition: String {
-        selectedPrinting?.setName ?? card.edition ?? ""
+        editEdition.nonEmpty ?? selectedPrinting?.setName ?? card.edition ?? ""
     }
 
     var displaySetCode: String {
@@ -44,7 +49,7 @@ final class CardDetailViewModel: ObservableObject {
     }
 
     var displayCollectorNumber: String {
-        selectedPrinting?.collectorNumber ?? card.collectorNumber ?? ""
+        editCollectorNumber.nonEmpty ?? selectedPrinting?.collectorNumber ?? card.collectorNumber ?? ""
     }
 
     var displayRarity: String? {
@@ -120,6 +125,7 @@ final class CardDetailViewModel: ObservableObject {
 
     func selectPrinting(_ printing: CardPrinting) {
         selectedPrinting = printing
+        editTitle = printing.name ?? editTitle
         editEdition = printing.setName ?? ""
         editCollectorNumber = printing.collectorNumber ?? ""
     }

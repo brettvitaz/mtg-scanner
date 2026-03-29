@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -19,6 +20,11 @@ final class AppModel: ObservableObject {
     /// Crop images keyed by the corresponding RecognizedCard.id.
     @Published var cardCropImages: [UUID: UIImage] = [:]
     @Published var shouldShowResults = false
+    /// Navigation path for the Results tab — reset to dismiss detail views.
+    @Published var resultsNavigationPath = NavigationPath()
+    /// When true, shows a connection-unavailable alert.
+    @Published var showConnectionAlert = false
+    @Published var connectionAlertMessage = ""
 
     private let apiClient = APIClient()
     private let cropService = CardCropService()
@@ -53,6 +59,16 @@ final class AppModel: ObservableObject {
     /// When `onDeviceCropEnabled` is true, runs on-device detection first and uploads
     /// crops to the batch endpoint. When false, sends the full image to the single-image endpoint.
     func recognizeImage(image: UIImage, filename: String) async {
+        resultsNavigationPath = NavigationPath()
+
+        do {
+            try await apiClient.checkHealth(baseURL: apiBaseURL)
+        } catch {
+            connectionAlertMessage = "Cannot reach the server at \(apiBaseURL). Check your connection and API settings."
+            showConnectionAlert = true
+            return
+        }
+
         isRecognizing = true
         lastDetectedCrops = []
         cardCropImages = [:]

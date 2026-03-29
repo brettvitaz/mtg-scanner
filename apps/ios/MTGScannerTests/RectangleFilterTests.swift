@@ -81,7 +81,10 @@ final class RectangleFilterTests: XCTestCase {
         let ratio = RectangleFilter.targetAspectRatio
         let height: CGFloat = 0.4
         let width = height * ratio
-        let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: RectangleFilter.minConfidence)
+        let obs = makeObservation(
+            box: CGRect(x: 0.1, y: 0.1, width: width, height: height),
+            confidence: RectangleFilter.minConfidence
+        )
         let result = filter.filter([obs])
         XCTAssertEqual(result.count, 1)
     }
@@ -156,10 +159,13 @@ final class RectangleFilterTests: XCTestCase {
 
         let allX = [tl.x, tr.x, br.x, bl.x]
         let allY = [tl.y, tr.y, br.y, bl.y]
+        // swiftlint:disable force_unwrapping
         let box = CGRect(
             x: allX.min()!, y: allY.min()!,
-            width: allX.max()! - allX.min()!, height: allY.max()! - allY.min()!
+            width: allX.max()! - allX.min()!,
+            height: allY.max()! - allY.min()!
         )
+        // swiftlint:enable force_unwrapping
 
         let obs = VNRectangleObservation()
         obs.setValue(box, forKey: "boundingBox")
@@ -202,6 +208,7 @@ final class RectangleFilterTests: XCTestCase {
         let low = makeObservation(box: CGRect(x: 0.102, y: 0.102, width: width, height: height), confidence: 0.6)
         let result = filter.filter([low, high])
         XCTAssertEqual(result.count, 1)
+        // swiftlint:disable:next force_unwrapping
         XCTAssertEqual(result.first!.confidence, 0.9, accuracy: 0.001)
     }
 
@@ -230,7 +237,7 @@ final class RectangleFilterTests: XCTestCase {
         let boxes: [CGRect] = [
             CGRect(x: 0.1, y: 0.70, width: 0.18, height: 0.25),  // high minY (top region)
             CGRect(x: 0.1, y: 0.05, width: 0.18, height: 0.25),  // low minY (bottom region)
-            CGRect(x: 0.5, y: 0.05, width: 0.18, height: 0.25),  // low minY, right side
+            CGRect(x: 0.5, y: 0.05, width: 0.18, height: 0.25)  // low minY, right side
         ]
         // Replicate the sort comparator from RectangleFilter.filter:
         let sorted = boxes.sorted { a, b in

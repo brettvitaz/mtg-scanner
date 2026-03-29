@@ -1,0 +1,46 @@
+included:
+  - apps/ios/MTGScanner
+  - apps/ios/MTGScannerTests
+
+excluded:
+  - .build
+  - DerivedData
+
+opt_in_rules:
+  - closure_body_length
+  - force_unwrapping
+  - weak_delegate
+
+disabled_rules:
+  - todo
+
+identifier_name:
+  min_length: 1
+
+function_body_length:
+  warning: 30
+  error: 50
+
+function_parameter_count:
+  warning: 6
+  error: 8
+
+closure_body_length:
+  warning: 30
+  error: 50
+
+nesting:
+  type_level: 3
+  function_level: 3
+
+force_unwrapping:
+  severity: error
+
+line_length:
+  warning: 120
+  error: 200
+  ignores_comments: true
+
+type_body_length:
+  warning: 200
+  error: 400

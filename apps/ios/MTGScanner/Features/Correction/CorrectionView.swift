@@ -13,6 +13,7 @@ struct CorrectionView: View {
     @State private var saved = false
 
     var body: some View {
+        // swiftlint:disable:next closure_body_length
         NavigationStack {
             Form {
                 Section("Card Identity") {

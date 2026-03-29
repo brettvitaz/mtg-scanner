@@ -43,8 +43,9 @@ If you are already in a worktree, proceed. If you are on main/master, create a w
 
 ### Pre-implementation baseline
 Before making any code changes, run the relevant test/build commands to establish a passing baseline:
-- Backend: `make api-test`
+- Backend: `make api-test && make api-lint`
 - iOS: `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
+- Static analysis: `make lint` (runs mypy + SwiftLint)
 
 If the baseline is already failing, note the failures before proceeding so you do not introduce confusion about what you broke vs. what was already broken.
 
@@ -54,6 +55,7 @@ All code changes MUST pass a code review before the work is considered done. Aft
 2. **Correctness** — implementation matches the spec, edge cases handled.
 3. **Tests** — new/changed code has tests that exercise real code paths and would fail if the implementation were broken.
 4. **Best practices** — no force unwraps (Swift), no unhandled exceptions (Python), no scope creep, no dead code.
+5. **Static analysis** — `make lint` passes. For Python-only changes run `make api-lint`; for Swift-only changes run `make ios-lint`.
 
 Fix any failures before committing.
 
@@ -72,11 +74,16 @@ Do not modify files or add features outside the stated task scope. If you discov
 make api-bootstrap          # create venv and install deps
 make api-run                # start FastAPI dev server
 make api-test               # run pytest suite
+make api-lint               # run mypy type checking
 
 # iOS
 open apps/ios/MTGScanner.xcodeproj
 xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner \
   -sdk iphonesimulator -configuration Debug build
+make ios-lint               # run SwiftLint
+
+# Static analysis
+make lint                   # run all static analysis (mypy + SwiftLint)
 
 # Evaluation
 PYTHONPATH=services/api python evals/run_eval.py
@@ -185,17 +192,31 @@ Do not add provider-specific integrations unless the OpenAI-compatible path prov
 Worktrees are mandatory for all code changes (see "Mandatory agent workflows" above). Reference commands:
 
 ```bash
-# Create (name must describe the task)
+# 1. Create worktree (name must describe the task)
 git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>
+cd ../mtg-scanner-worktrees/<task-description>
 
-# Setup
-cp services/api/.env.example services/api/.env   # set a non-conflicting port
+# 2. Copy configuration files
+cp services/api/.env.example services/api/.env
+# Edit services/api/.env to set a non-conflicting port if running alongside main
+
+# 3. Bootstrap Python environment (creates venv, installs all deps including dev tools)
 bash scripts/bootstrap-api.sh
+source .venv/bin/activate
+
+# 4. Verify the environment works
+make api-test
+make api-lint
+
+# 5. Start development
 uvicorn services.api.app.main:app --reload
 
-# Clean up
+# 6. Clean up when done
+cd -
 git worktree remove ../mtg-scanner-worktrees/<task-description>
 ```
+
+The bootstrap script (`scripts/bootstrap-api.sh`) is the single source of truth for Python environment setup. It creates the virtualenv, upgrades pip, and installs all dependencies including dev tools (pytest, mypy). Do not install packages manually — update `pyproject.toml` and re-run the bootstrap script.
 
 ## Documentation
 

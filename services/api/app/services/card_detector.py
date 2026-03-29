@@ -1,6 +1,7 @@
 """Card detection using OpenCV to find multiple cards in an image."""
 
 from dataclasses import dataclass
+from typing import cast
 
 import cv2
 import numpy as np
@@ -94,8 +95,9 @@ class CardDetector:
                 seen_signatures.add(signature)
                 candidates.append(candidate)
 
-        candidates.extend(self._infer_dense_grid_regions(candidates, image.shape[:2]))
-        candidates.extend(self._merge_fragmented_regions(candidates, image.shape[:2]))
+        img_shape = cast(tuple[int, int], image.shape[:2])
+        candidates.extend(self._infer_dense_grid_regions(candidates, img_shape))
+        candidates.extend(self._merge_fragmented_regions(candidates, img_shape))
 
         candidates = self._remove_container_regions(candidates)
         candidates = [candidate for candidate in candidates if candidate.confidence >= self.MIN_REGION_CONFIDENCE]
@@ -157,7 +159,7 @@ class CardDetector:
 
         distances = np.stack([np.linalg.norm(lab - color, axis=2) for color in bg_colors], axis=2)
         min_distance = distances.min(axis=2)
-        normalized = cv2.normalize(min_distance, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        normalized = cv2.normalize(min_distance, np.empty_like(min_distance), 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
         _, mask = cv2.threshold(normalized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         kernel = np.ones((7, 7), np.uint8)
@@ -209,7 +211,8 @@ class CardDetector:
         fill_confidence = min(1.0, max(0.0, (fill_ratio - self.MIN_RECT_FILL_RATIO) / 0.3))
         confidence = float(0.7 * shape_confidence + 0.3 * fill_confidence)
 
-        corners = tuple((int(round(p[0])), int(round(p[1]))) for p in ordered)
+        pts = [(int(round(p[0])), int(round(p[1]))) for p in ordered]
+        corners = (pts[0], pts[1], pts[2], pts[3])
         return CardRegion(
             x=x,
             y=y,

@@ -99,10 +99,10 @@ final class CardCropService {
         let h = CGFloat(cgImage.height)
 
         // Scale normalized Vision coords → CIImage pixel coords (both bottom-left origin).
-        let topLeft     = CGPoint(x: observation.topLeft.x * w,     y: observation.topLeft.y * h)
-        let topRight    = CGPoint(x: observation.topRight.x * w,    y: observation.topRight.y * h)
+        let topLeft     = CGPoint(x: observation.topLeft.x * w, y: observation.topLeft.y * h)
+        let topRight    = CGPoint(x: observation.topRight.x * w, y: observation.topRight.y * h)
         let bottomRight = CGPoint(x: observation.bottomRight.x * w, y: observation.bottomRight.y * h)
-        let bottomLeft  = CGPoint(x: observation.bottomLeft.x * w,  y: observation.bottomLeft.y * h)
+        let bottomLeft  = CGPoint(x: observation.bottomLeft.x * w, y: observation.bottomLeft.y * h)
 
         // Apply padding.
         let quadW = max(dist(topLeft, topRight), dist(bottomLeft, bottomRight))

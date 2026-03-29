@@ -98,6 +98,7 @@ private struct CardRow: View {
     private var isCorrected: Bool { correction != nil }
 
     var body: some View {
+        // swiftlint:disable:next closure_body_length
         VStack(alignment: .leading, spacing: 10) {
             // Title row
             HStack(alignment: .firstTextBaseline) {

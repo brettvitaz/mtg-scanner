@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import json
 import mimetypes
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
 from app.services.card_validation import ValidationBatchResult
 from app.settings import get_settings
+
+if TYPE_CHECKING:
+    from app.services.card_detector import DetectionResult
 
 
 @dataclass(slots=True)
@@ -28,7 +34,7 @@ class LocalArtifactStore:
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         response: RecognitionResponse,
-        detection_result = None,  # type: ignore[no-untyped-def]
+        detection_result: DetectionResult | None = None,
         validation_result: ValidationBatchResult | None = None,
     ) -> StoredRecognitionArtifacts:
         from app.services.card_detector import DetectionResult

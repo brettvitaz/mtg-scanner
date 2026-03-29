@@ -127,7 +127,7 @@ def test_validate_card_handles_ambiguous_match(validation_service: CardValidatio
     assert result.trace.status == "ambiguous_match"
     assert result.card.title == "Forest"
     assert result.card.confidence == 0.6
-    assert "multiple" in result.card.notes.lower()
+    assert result.card.notes is not None and "multiple" in result.card.notes.lower()
 
 
 def test_validate_card_handles_no_match(validation_service: CardValidationService) -> None:
@@ -144,7 +144,7 @@ def test_validate_card_handles_no_match(validation_service: CardValidationServic
 
     assert result.trace.status == "no_match"
     assert result.card.confidence == 0.45
-    assert "title does not exist in that set" in result.card.notes.lower()
+    assert result.card.notes is not None and "title does not exist in that set" in result.card.notes.lower()
 
 
 def test_validate_card_rejects_impossible_title_and_set_combination(validation_service: CardValidationService) -> None:
@@ -165,7 +165,7 @@ def test_validate_card_rejects_impossible_title_and_set_combination(validation_s
     assert result.card.collector_number == "166"
     assert result.card.confidence == 0.67
     assert result.trace.matched_uuid is None
-    assert "title does not exist in that set" in result.card.notes.lower()
+    assert result.card.notes is not None and "title does not exist in that set" in result.card.notes.lower()
 
 
 def test_validate_card_rejects_collector_number_conflict_inside_resolved_set(validation_service: CardValidationService) -> None:
@@ -186,7 +186,7 @@ def test_validate_card_rejects_collector_number_conflict_inside_resolved_set(val
     assert result.card.collector_number == "999"
     assert result.card.confidence == 0.65
     assert result.trace.matched_uuid is None
-    assert "collector number conflicts" in result.card.notes.lower()
+    assert result.card.notes is not None and "collector number conflicts" in result.card.notes.lower()
 
 
 def test_validate_response_gracefully_skips_when_db_missing(tmp_path: Path) -> None:

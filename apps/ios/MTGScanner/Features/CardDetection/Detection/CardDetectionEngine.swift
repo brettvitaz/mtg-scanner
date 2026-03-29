@@ -70,6 +70,7 @@ final class CardDetectionEngine {
     private var _debugTableFrameCount = 0
     #endif
 
+    // swiftlint:disable:next function_body_length
     private func detectTableCards(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
         let observations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
@@ -82,7 +83,11 @@ final class CardDetectionEngine {
         #if DEBUG
         _debugTableFrameCount += 1
         if _debugTableFrameCount % 30 == 1 {
-            print("[RectDetect] bounds=[\(RectangleFilter.visionMinAspectRatio), \(RectangleFilter.visionMaxAspectRatio)] raw=\(observations.count) filtered=\(filtered.count)")
+            let minAR = RectangleFilter.visionMinAspectRatio
+            let maxAR = RectangleFilter.visionMaxAspectRatio
+            print("[RectDetect] bounds=[\(minAR), \(maxAR)]"
+                  + " raw=\(observations.count)"
+                  + " filtered=\(filtered.count)")
             for (i, obs) in observations.enumerated() {
                 let box = obs.boundingBox
                 let topEdge = hypot(obs.topRight.x - obs.topLeft.x, obs.topRight.y - obs.topLeft.y)
@@ -91,9 +96,27 @@ final class CardDetectionEngine {
                 let rightEdge = hypot(obs.bottomRight.x - obs.topRight.x, obs.bottomRight.y - obs.topRight.y)
                 let d1 = hypot(obs.topRight.x - obs.bottomLeft.x, obs.topRight.y - obs.bottomLeft.y)
                 let d2 = hypot(obs.topLeft.x - obs.bottomRight.x, obs.topLeft.y - obs.bottomRight.y)
-                print("[RectDetect]   [\(i)] conf=\(String(format: "%.2f", obs.confidence)) box=\(String(format: "%.3f,%.3f %.3fx%.3f", box.minX, box.minY, box.width, box.height))")
-                print("[RectDetect]     corners: tl=\(String(format: "%.3f,%.3f", obs.topLeft.x, obs.topLeft.y)) tr=\(String(format: "%.3f,%.3f", obs.topRight.x, obs.topRight.y)) br=\(String(format: "%.3f,%.3f", obs.bottomRight.x, obs.bottomRight.y)) bl=\(String(format: "%.3f,%.3f", obs.bottomLeft.x, obs.bottomLeft.y))")
-                print("[RectDetect]     edges: top=\(String(format: "%.3f", topEdge)) bot=\(String(format: "%.3f", bottomEdge)) left=\(String(format: "%.3f", leftEdge)) right=\(String(format: "%.3f", rightEdge)) diag=\(String(format: "%.3f", d1)),\(String(format: "%.3f", d2))")
+                let confStr = String(format: "%.2f", obs.confidence)
+                let boxStr = String(
+                    format: "%.3f,%.3f %.3fx%.3f",
+                    box.minX, box.minY, box.width, box.height
+                )
+                print("[RectDetect]   [\(i)] conf=\(confStr)"
+                      + " box=\(boxStr)")
+                let tlStr = String(format: "%.3f,%.3f", obs.topLeft.x, obs.topLeft.y)
+                let trStr = String(format: "%.3f,%.3f", obs.topRight.x, obs.topRight.y)
+                let brStr = String(format: "%.3f,%.3f", obs.bottomRight.x, obs.bottomRight.y)
+                let blStr = String(format: "%.3f,%.3f", obs.bottomLeft.x, obs.bottomLeft.y)
+                print("[RectDetect]     corners:"
+                      + " tl=\(tlStr) tr=\(trStr)"
+                      + " br=\(brStr) bl=\(blStr)")
+                let edgeStrs = [topEdge, bottomEdge, leftEdge, rightEdge]
+                    .map { String(format: "%.3f", $0) }
+                let diagStr = String(format: "%.3f,%.3f", d1, d2)
+                print("[RectDetect]     edges:"
+                      + " top=\(edgeStrs[0]) bot=\(edgeStrs[1])"
+                      + " left=\(edgeStrs[2]) right=\(edgeStrs[3])"
+                      + " diag=\(diagStr)")
             }
         }
         #endif
@@ -103,6 +126,7 @@ final class CardDetectionEngine {
 
     // MARK: - Binder Grid Detection (VNDetectRectanglesRequest)
 
+    // swiftlint:disable:next function_body_length
     private func detectBinderGrid(in pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
         let pageObservations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
@@ -174,12 +198,12 @@ private extension DetectedCard {
     init(from obs: VNRectangleObservation, timestamp: TimeInterval) {
         self.init(
             boundingBox: obs.boundingBox,
-            topLeft:     obs.topLeft,
-            topRight:    obs.topRight,
+            topLeft: obs.topLeft,
+            topRight: obs.topRight,
             bottomRight: obs.bottomRight,
-            bottomLeft:  obs.bottomLeft,
-            confidence:  obs.confidence,
-            timestamp:   timestamp
+            bottomLeft: obs.bottomLeft,
+            confidence: obs.confidence,
+            timestamp: timestamp
         )
     }
 }

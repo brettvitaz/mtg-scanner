@@ -76,7 +76,10 @@ final class GridInterpolatorTests: XCTestCase {
         let tr = CGPoint(x: 1, y: 1)
         let br = CGPoint(x: 1, y: 0)
         let bl = CGPoint(x: 0, y: 0)
-        let cells = GridInterpolator.subdivide(topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl, rows: 1, cols: 1)
+        let cells = GridInterpolator.subdivide(
+            topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl,
+            rows: 1, cols: 1
+        )
         XCTAssertEqual(cells.count, 1)
         XCTAssertEqual(cells[0].topLeft.x, 0, accuracy: 0.0001)
         XCTAssertEqual(cells[0].topRight.x, 1, accuracy: 0.0001)
@@ -89,7 +92,10 @@ final class GridInterpolatorTests: XCTestCase {
         let tr = CGPoint(x: 3, y: 3)
         let br = CGPoint(x: 3, y: 0)
         let bl = CGPoint(x: 0, y: 0)
-        let cells = GridInterpolator.subdivide(topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl, rows: 3, cols: 3)
+        let cells = GridInterpolator.subdivide(
+            topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl,
+            rows: 3, cols: 3
+        )
         XCTAssertEqual(cells.count, 9)
     }
 
@@ -99,7 +105,10 @@ final class GridInterpolatorTests: XCTestCase {
         let tr = CGPoint(x: 2, y: 2)
         let br = CGPoint(x: 2, y: 0)
         let bl = CGPoint(x: 0, y: 0)
-        let cells = GridInterpolator.subdivide(topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl, rows: 2, cols: 2)
+        let cells = GridInterpolator.subdivide(
+            topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl,
+            rows: 2, cols: 2
+        )
         XCTAssertEqual(cells.count, 4)
         // Top-left cell (row=0, col=0): topLeft=(0,2), topRight=(1,2), bottomRight=(1,1), bottomLeft=(0,1)
         let topLeftCell = cells[0]
@@ -120,7 +129,10 @@ final class GridInterpolatorTests: XCTestCase {
         let tr = CGPoint(x: 8, y: 4)
         let br = CGPoint(x: 6, y: 0)
         let bl = CGPoint(x: 2, y: 0)
-        let cells = GridInterpolator.subdivide(topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl, rows: 2, cols: 2)
+        let cells = GridInterpolator.subdivide(
+            topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl,
+            rows: 2, cols: 2
+        )
         XCTAssertEqual(cells.count, 4)
         // Cell at (row=0, col=0) topRight.x should equal cell at (row=0, col=1) topLeft.x
         XCTAssertEqual(cells[0].topRight.x, cells[1].topLeft.x, accuracy: 0.0001)

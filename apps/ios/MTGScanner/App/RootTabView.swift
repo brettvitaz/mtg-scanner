@@ -30,5 +30,11 @@ struct RootTabView: View {
                 appModel.shouldShowResults = false
             }
         }
+        .alert("Server Unavailable", isPresented: $appModel.showConnectionAlert) {
+            Button("OK", role: .cancel) {}
+            Button("Settings") { selectedTab = 2 }
+        } message: {
+            Text(appModel.connectionAlertMessage)
+        }
     }
 }

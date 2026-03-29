@@ -141,28 +141,29 @@ private struct CardImageSection: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             cardImage
-                .frame(maxWidth: .infinity)
-                .frame(maxHeight: 340)
+                .frame(maxWidth: .infinity, maxHeight: 340)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .contentShape(Rectangle())
                 .onTapGesture { showFullscreen = true }
 
             if appModel.cardCropImages[viewModel.card.id] != nil {
                 cropToggleButton
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 340)
     }
 
     @ViewBuilder
     private var cardImage: some View {
         if viewModel.showingCropImage, let crop = appModel.cardCropImages[viewModel.card.id] {
-            Image(uiImage: crop).resizable().aspectRatio(contentMode: .fit)
+            Image(uiImage: crop).resizable().aspectRatio(contentMode: .fit).frame(height: 340)
         } else if let url = viewModel.displayImageUrl {
             AsyncImage(url: url) { phase in
                 switch phase {
-                case .success(let img): img.resizable().aspectRatio(contentMode: .fit)
+                case .success(let img): img.resizable().aspectRatio(contentMode: .fit).frame(height: 340)
                 case .failure: CardImagePlaceholder()
-                default: ProgressView().frame(height: 280)
+                default: ProgressView().frame(height: 340)
                 }
             }
         } else {
@@ -252,7 +253,7 @@ private struct CardImagePlaceholder: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 8)
             .fill(Color.secondary.opacity(0.15))
-            .frame(height: 280)
+            .frame(height: 340)
             .overlay {
                 Image(systemName: "photo")
                     .font(.system(size: 40))

@@ -4,7 +4,7 @@ struct ResultsView: View {
     @EnvironmentObject private var appModel: AppModel
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $appModel.resultsNavigationPath) {
             Group {
                 if appModel.latestResult.cards.isEmpty {
                     emptyState
@@ -51,7 +51,7 @@ struct ResultsView: View {
             Section {
                 ForEach(appModel.latestResult.cards) { card in
                     NavigationLink(value: card) {
-                        CardRow(card: card)
+                        CardRow(card: card, correction: appModel.corrections[card.id])
                     }
                 }
             } header: {
@@ -70,6 +70,7 @@ struct ResultsView: View {
 
 private struct CardRow: View {
     let card: RecognizedCard
+    let correction: CardCorrection?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -109,15 +110,15 @@ private struct CardRow: View {
 
     private var cardInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(card.title ?? "Unknown card")
+            Text(correction?.title.nonEmpty ?? card.title ?? "Unknown card")
                 .font(.headline)
                 .lineLimit(2)
-            if let edition = card.edition {
+            if let edition = correction?.edition.nonEmpty ?? card.edition {
                 Text(edition)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            if let cn = card.collectorNumber {
+            if let cn = correction?.collectorNumber.nonEmpty ?? card.collectorNumber {
                 Text("#\(cn)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

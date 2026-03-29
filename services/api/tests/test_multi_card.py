@@ -4,7 +4,6 @@ import json
 import threading
 import time
 from io import BytesIO
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -13,12 +12,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.recognition import RecognitionResponse
 from app.services.card_detector import CardDetector, CardRegion, DetectionResult
+from conftest import ARTIFACTS_DIR, SAMPLES_DIR, requires_sample_images
 
 client = TestClient(app)
-
-
-SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples" / "test"
-ARTIFACTS_DIR = Path("/Users/brettvitaz/Development/mtg-scanner/services/.artifacts/recognitions")
 
 
 class TestCardDetector:
@@ -183,6 +179,7 @@ class TestCardDetector:
         assert refined_gray[-16:, :].min() < 40
         assert abs((refined.shape[1] / refined.shape[0]) - CardDetector.TARGET_ASPECT_RATIO) < 0.08
 
+    @requires_sample_images
     def test_real_sample_image_detects_two_cards(self):
         """Regression test for the real two-card sample that previously returned one card."""
         detector = CardDetector()
@@ -193,6 +190,7 @@ class TestCardDetector:
         assert result.count == 2
         assert all(region.corners is not None for region in result.regions)
 
+    @requires_sample_images
     @pytest.mark.parametrize(
         ("filename", "expected_count"),
         [
@@ -218,6 +216,7 @@ class TestCardDetector:
 
         assert result.count == expected_count
 
+    @requires_sample_images
     def test_binder_page_detects_nine_cards(self):
         """Dense 3x3 binder pages should resolve to all nine cards."""
         detector = CardDetector()
@@ -228,30 +227,33 @@ class TestCardDetector:
         assert result.count == 9
         assert len([region for region in result.regions if region.confidence >= 0.6]) == 9
 
+    @requires_sample_images
     def test_real_two_card_artifact_stays_at_two_cards(self):
         """Dense-layout inference should not add a spurious container region to normal two-card shots."""
         detector = CardDetector()
-        image_bytes = (ARTIFACTS_DIR / "20260326T042740-313a4c56" / "upload.jpg").read_bytes()
+        image_bytes = (ARTIFACTS_DIR / "two_card_table.jpg").read_bytes()
 
         result = detector.detect(image_bytes)
 
         assert result.count == 2
         assert all(region.corners is not None for region in result.regions)
 
+    @requires_sample_images
     def test_real_three_card_artifact_stays_at_three_cards(self):
         """Three-card table shots should not produce extra nested crops."""
         detector = CardDetector()
-        image_bytes = (ARTIFACTS_DIR / "20260326T043745-01c5b1b9" / "upload.jpg").read_bytes()
+        image_bytes = (ARTIFACTS_DIR / "three_card_table.jpg").read_bytes()
 
         result = detector.detect(image_bytes)
 
         assert result.count == 3
         assert sum(1 for region in result.regions if region.confidence >= 0.5) >= 2
 
+    @requires_sample_images
     def test_duplicate_crop_bug_keeps_distinct_two_cards(self):
         """Overlapping candidates for the same physical card should collapse to one crop per card."""
         detector = CardDetector()
-        image_bytes = (ARTIFACTS_DIR / "20260326T044827-23ae7d33" / "upload.jpg").read_bytes()
+        image_bytes = (ARTIFACTS_DIR / "duplicate_crop_two_card.jpg").read_bytes()
 
         result = detector.detect(image_bytes)
 
@@ -259,12 +261,13 @@ class TestCardDetector:
         assert all(region.corners is not None for region in result.regions)
         assert max(detector._polygon_iou(result.regions[0], result.regions[1]), detector._polygon_iou(result.regions[1], result.regions[0])) < 0.05
 
+    @requires_sample_images
     def test_binder_page_crop_refinement_trims_spillover_on_real_artifact(self):
         """The crop refinement pass should tighten top-row binder-page crops without changing card count."""
         import cv2
 
         detector = CardDetector()
-        artifact_path = ARTIFACTS_DIR / "20260326T051835-8fe04381" / "upload.jpg"
+        artifact_path = ARTIFACTS_DIR / "binder_page_spillover.jpg"
         image_bytes = artifact_path.read_bytes()
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
         image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
@@ -313,14 +316,15 @@ class TestCardDetector:
 class TestMultiCardRecognitionAPI:
     """Integration tests for multi-card recognition via API."""
 
+    @requires_sample_images
     def test_crop_regression_real_sample_counts(self):
         """Real regression samples should stay pinned to expected crop counts."""
         detector = CardDetector()
 
         cases = [
-            (ARTIFACTS_DIR / "20260326T042740-313a4c56" / "upload.jpg", 2),
-            (ARTIFACTS_DIR / "20260326T043745-01c5b1b9" / "upload.jpg", 3),
-            (ARTIFACTS_DIR / "20260326T044827-23ae7d33" / "upload.jpg", 2),
+            (ARTIFACTS_DIR / "two_card_table.jpg", 2),
+            (ARTIFACTS_DIR / "three_card_table.jpg", 3),
+            (ARTIFACTS_DIR / "duplicate_crop_two_card.jpg", 2),
             *[(SAMPLES_DIR / f"IMG_{index}.png", expected) for index, expected in zip(range(1619, 1628), [1, 2, 3, 4, 5, 6, 7, 9, 9], strict=True)],
             (SAMPLES_DIR / "binder_page_1.jpg", 9),
         ]

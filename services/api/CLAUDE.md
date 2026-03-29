@@ -14,10 +14,11 @@ app/
   api/routes/
     health.py          GET /health
     recognitions.py    POST /api/v1/recognitions, POST /api/v1/recognitions/batch
+    cards.py           GET /api/v1/cards/printings — all printings of a card by name
   services/
     recognizer.py      Provider abstraction (MockRecognitionProvider, OpenAIRecognitionProvider)
     card_detector.py   OpenCV-based multi-card detection and cropping
-    card_validation.py MTGJSON post-recognition validation and normalization
+    card_validation.py MTGJSON post-recognition validation, normalization, and metadata enrichment
     mtgjson_index.py   SQLite-backed card/set lookup
     artifact_store.py  Local artifact logging for debugging and evals
     openai_compat.py   OpenAI API request construction

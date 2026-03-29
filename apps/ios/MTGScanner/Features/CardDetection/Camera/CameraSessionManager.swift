@@ -20,6 +20,7 @@ final class CameraSessionManager: NSObject {
     private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
     private var photoCaptureCompletion: ((Data?) -> Void)?
+    private(set) var captureDevice: AVCaptureDevice?
 
     // MARK: - Setup
 
@@ -44,6 +45,7 @@ final class CameraSessionManager: NSObject {
             return
         }
         session.addInput(input)
+        captureDevice = device
 
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true

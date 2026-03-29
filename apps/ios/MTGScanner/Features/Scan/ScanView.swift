@@ -11,11 +11,18 @@ struct ScanView: View {
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
+    @State private var zoomFactor: CGFloat = 1.0
+    @State private var zoomIndicatorVisible = false
+    @State private var zoomHideWorkItem: DispatchWorkItem?
 
     var body: some View {
         ZStack {
             cameraPreview
                 .ignoresSafeArea()
+
+            zoomIndicator
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 120)
 
             VStack {
                 topBar
@@ -61,8 +68,25 @@ struct ScanView: View {
             onDetectedCardsChanged: { cards in
                 detectionViewModel.handleDetectedCards(cards)
             },
-            captureCoordinator: captureCoordinator
+            captureCoordinator: captureCoordinator,
+            onZoomFactorChanged: { factor in
+                zoomFactor = factor
+                showZoomIndicator()
+            }
         )
+    }
+
+    private var zoomIndicator: some View {
+        Text(String(format: "%.1f×", zoomFactor))
+            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .opacity(zoomIndicatorVisible ? 1 : 0)
+            .animation(.easeOut(duration: 0.3), value: zoomIndicatorVisible)
+            .allowsHitTesting(false)
     }
 
     private var topBar: some View {
@@ -148,6 +172,14 @@ struct ScanView: View {
     }
 
     // MARK: - Actions
+
+    private func showZoomIndicator() {
+        zoomIndicatorVisible = true
+        zoomHideWorkItem?.cancel()
+        let work = DispatchWorkItem { zoomIndicatorVisible = false }
+        zoomHideWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
 
     private func captureCard() {
         triggerShutterFeedback()

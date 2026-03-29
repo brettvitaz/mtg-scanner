@@ -38,6 +38,7 @@
 		A00000000000000000000193 /* DetectionOverlayRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000293 /* DetectionOverlayRendererTests.swift */; };
 		A00000000000000000000194 /* AppModelCropToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000294 /* AppModelCropToggleTests.swift */; };
 		A00000000000000000000195 /* APIClientHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000295 /* APIClientHealthTests.swift */; };
+		A00000000000000000000196 /* ZoomFactorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000296 /* ZoomFactorTests.swift */; };
 		A00000000000000000000120 /* CardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000220 /* CardDetailView.swift */; };
 		A00000000000000000000121 /* CardDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000221 /* CardDetailViewModel.swift */; };
 		A00000000000000000000122 /* FullscreenImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000222 /* FullscreenImageView.swift */; };
@@ -88,6 +89,7 @@
 		A00000000000000000000293 /* DetectionOverlayRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionOverlayRendererTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000294 /* AppModelCropToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelCropToggleTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000295 /* APIClientHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientHealthTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000296 /* ZoomFactorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomFactorTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000220 /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
 		A00000000000000000000221 /* CardDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailViewModel.swift; sourceTree = "<group>"; };
 		A00000000000000000000222 /* FullscreenImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenImageView.swift; sourceTree = "<group>"; };
@@ -310,6 +312,7 @@
 				A00000000000000000000293 /* DetectionOverlayRendererTests.swift */,
 				A00000000000000000000294 /* AppModelCropToggleTests.swift */,
 				A00000000000000000000295 /* APIClientHealthTests.swift */,
+				A00000000000000000000296 /* ZoomFactorTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
@@ -445,6 +448,7 @@
 				A00000000000000000000193 /* DetectionOverlayRendererTests.swift in Sources */,
 				A00000000000000000000194 /* AppModelCropToggleTests.swift in Sources */,
 				A00000000000000000000195 /* APIClientHealthTests.swift in Sources */,
+				A00000000000000000000196 /* ZoomFactorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

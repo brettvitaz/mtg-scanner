@@ -19,6 +19,8 @@ final class CameraViewController: UIViewController {
 
     /// Called on the main thread whenever the detected card list changes.
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
+    /// Called on the main thread whenever the zoom factor changes.
+    var onZoomFactorChanged: ((CGFloat) -> Void)?
 
     // MARK: - Private
 
@@ -28,6 +30,8 @@ final class CameraViewController: UIViewController {
 
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
+    private var zoomFactorAtGestureStart: CGFloat = 1.0
+    private static let maxZoomFactor: CGFloat = 5.0
 
     // MARK: - Lifecycle
 
@@ -35,6 +39,7 @@ final class CameraViewController: UIViewController {
         super.viewDidLoad()
         setupPreviewLayer()
         setupDetectionLayer()
+        setupPinchGesture()
         wireComponents()
         sessionManager.configure()
     }
@@ -91,6 +96,42 @@ final class CameraViewController: UIViewController {
             }
             DispatchQueue.main.async { completion(image) }
         }
+    }
+
+    // MARK: - Zoom
+
+    private func setupPinchGesture() {
+        let recognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        view.addGestureRecognizer(recognizer)
+    }
+
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let device = sessionManager.captureDevice else { return }
+        switch gesture.state {
+        case .began:
+            zoomFactorAtGestureStart = device.videoZoomFactor
+        case .changed:
+            applyZoom(scale: gesture.scale, to: device)
+        default:
+            break
+        }
+    }
+
+    private func applyZoom(scale: CGFloat, to device: AVCaptureDevice) {
+        let desired = Self.clampedZoom(
+            start: zoomFactorAtGestureStart, scale: scale,
+            max: min(Self.maxZoomFactor, device.activeFormat.videoMaxZoomFactor)
+        )
+        do {
+            try device.lockForConfiguration()
+            device.videoZoomFactor = desired
+            device.unlockForConfiguration()
+        } catch { return }
+        onZoomFactorChanged?(desired)
+    }
+
+    static func clampedZoom(start: CGFloat, scale: CGFloat, max maxFactor: CGFloat) -> CGFloat {
+        Swift.max(1.0, Swift.min(maxFactor, start * scale))
     }
 
     // MARK: - Setup

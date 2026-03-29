@@ -20,6 +20,10 @@ struct ScanView: View {
             VStack {
                 topBar
                 Spacer()
+                ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
+                    detectionViewModel.zoomFactor = preset
+                }
+                .padding(.bottom, 12)
                 bottomBar
             }
             .padding(.horizontal, 20)
@@ -58,10 +62,14 @@ struct ScanView: View {
     private var cameraPreview: some View {
         CameraPreviewRepresentable(
             detectionMode: $detectionViewModel.detectionMode,
+            zoomFactor: detectionViewModel.zoomFactor,
             onDetectedCardsChanged: { cards in
                 detectionViewModel.handleDetectedCards(cards)
             },
-            captureCoordinator: captureCoordinator
+            captureCoordinator: captureCoordinator,
+            onZoomFactorChanged: { factor in
+                detectionViewModel.zoomFactor = factor
+            }
         )
     }
 

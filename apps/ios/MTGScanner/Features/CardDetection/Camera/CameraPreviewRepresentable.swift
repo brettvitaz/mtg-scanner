@@ -7,12 +7,15 @@ import SwiftUI
 struct CameraPreviewRepresentable: UIViewControllerRepresentable {
 
     @Binding var detectionMode: DetectionMode
+    var zoomFactor: CGFloat = 1.0
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     var captureCoordinator: CameraCaptureCoordinator?
+    var onZoomFactorChanged: ((CGFloat) -> Void)?
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let vc = CameraViewController()
         vc.onDetectedCardsChanged = onDetectedCardsChanged
+        vc.onZoomFactorChanged = onZoomFactorChanged
         captureCoordinator?.controller = vc
         return vc
     }
@@ -20,6 +23,8 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: CameraViewController, context: Context) {
         vc.updateDetectionMode(detectionMode)
         vc.onDetectedCardsChanged = onDetectedCardsChanged
+        vc.onZoomFactorChanged = onZoomFactorChanged
+        vc.setZoom(zoomFactor)
         captureCoordinator?.controller = vc
     }
 }

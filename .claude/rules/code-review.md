@@ -42,3 +42,7 @@ When reviewing code — whether self-reviewing before commit or evaluating chang
 - Recognition/detection changes still produce useful debug artifacts.
 - Validation metadata recorded for debugging and eval.
 - No silent failures — errors are logged or surfaced.
+
+## 8. Static analysis
+- `make lint` passes (or the relevant subset: `make api-lint` / `make ios-lint`).
+- No new `type: ignore` or `swiftlint:disable` suppressions without justification.

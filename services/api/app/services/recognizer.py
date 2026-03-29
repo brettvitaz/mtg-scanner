@@ -35,8 +35,8 @@ class RecognitionProvider(Protocol):
 
 
 class MockRecognitionProvider:
-    provider_name = "mock"
-    model_name = None
+    provider_name: str = "mock"
+    model_name: str | None = None
 
     def __init__(self) -> None:
         self._example_path = (
@@ -65,7 +65,7 @@ class MockRecognitionProvider:
 
 
 class OpenAIRecognitionProvider:
-    provider_name = "openai"
+    provider_name: str = "openai"
 
     def __init__(
         self,
@@ -76,7 +76,7 @@ class OpenAIRecognitionProvider:
         timeout_seconds: float = 30.0,
         response_mode: str = "json_schema",
     ) -> None:
-        self.model_name = model_name
+        self.model_name: str | None = model_name
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
@@ -89,6 +89,7 @@ class OpenAIRecognitionProvider:
         metadata: RecognitionUploadMetadata,
         prompt_text: str,
     ) -> RecognitionResponse:
+        assert self.model_name is not None
         request_body = build_openai_request_body(
             model_name=self.model_name,
             prompt_text=prompt_text,

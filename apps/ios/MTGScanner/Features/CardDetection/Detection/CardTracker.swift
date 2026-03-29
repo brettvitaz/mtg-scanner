@@ -130,12 +130,12 @@ private final class Track {
     private func blend(from old: DetectedCard, to new: DetectedCard, alpha: CGFloat) -> DetectedCard {
         DetectedCard(
             boundingBox: blendRect(old.boundingBox, new.boundingBox, alpha: alpha),
-            topLeft:     blendPoint(old.topLeft,     new.topLeft,     alpha: alpha),
-            topRight:    blendPoint(old.topRight,     new.topRight,    alpha: alpha),
-            bottomRight: blendPoint(old.bottomRight,  new.bottomRight, alpha: alpha),
-            bottomLeft:  blendPoint(old.bottomLeft,   new.bottomLeft,  alpha: alpha),
-            confidence:  old.confidence * Float(1 - alpha) + new.confidence * Float(alpha),
-            timestamp:   new.timestamp
+            topLeft: blendPoint(old.topLeft, new.topLeft, alpha: alpha),
+            topRight: blendPoint(old.topRight, new.topRight, alpha: alpha),
+            bottomRight: blendPoint(old.bottomRight, new.bottomRight, alpha: alpha),
+            bottomLeft: blendPoint(old.bottomLeft, new.bottomLeft, alpha: alpha),
+            confidence: old.confidence * Float(1 - alpha) + new.confidence * Float(alpha),
+            timestamp: new.timestamp
         )
     }
 
@@ -145,9 +145,9 @@ private final class Track {
     }
 
     private func blendRect(_ a: CGRect, _ b: CGRect, alpha: CGFloat) -> CGRect {
-        CGRect(x:      a.minX   * (1 - alpha) + b.minX   * alpha,
-               y:      a.minY   * (1 - alpha) + b.minY   * alpha,
-               width:  a.width  * (1 - alpha) + b.width  * alpha,
+        CGRect(x: a.minX   * (1 - alpha) + b.minX   * alpha,
+               y: a.minY   * (1 - alpha) + b.minY   * alpha,
+               width: a.width  * (1 - alpha) + b.width  * alpha,
                height: a.height * (1 - alpha) + b.height * alpha)
     }
 }

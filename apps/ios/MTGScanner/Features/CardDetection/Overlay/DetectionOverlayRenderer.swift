@@ -76,10 +76,10 @@ final class DetectionOverlayRenderer {
     // MARK: - Private Helpers
 
     private func makeQuadPath(for card: DetectedCard, previewLayer: AVCaptureVideoPreviewLayer) -> UIBezierPath {
-        let tl = Self.visionPointToLayer(card.topLeft,     previewLayer: previewLayer)
-        let tr = Self.visionPointToLayer(card.topRight,    previewLayer: previewLayer)
+        let tl = Self.visionPointToLayer(card.topLeft, previewLayer: previewLayer)
+        let tr = Self.visionPointToLayer(card.topRight, previewLayer: previewLayer)
         let br = Self.visionPointToLayer(card.bottomRight, previewLayer: previewLayer)
-        let bl = Self.visionPointToLayer(card.bottomLeft,  previewLayer: previewLayer)
+        let bl = Self.visionPointToLayer(card.bottomLeft, previewLayer: previewLayer)
 
         let path = UIBezierPath()
         path.move(to: tl)
@@ -112,7 +112,7 @@ final class DetectionOverlayRenderer {
             "hidden": NSNull(),
             "opacity": NSNull(),
             "position": NSNull(),
-            "bounds": NSNull(),
+            "bounds": NSNull()
         ]
         return layer
     }

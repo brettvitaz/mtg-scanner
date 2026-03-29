@@ -26,7 +26,7 @@ async def create_recognition(
 
     metadata = RecognitionUploadMetadata(
         filename=image.filename or "upload",
-        content_type=image.content_type,
+        content_type=image.content_type or "application/octet-stream",
         prompt_version=prompt_version,
     )
     try:
@@ -87,7 +87,7 @@ async def create_recognition_batch(
         image_bytes = await img.read()
         metadata = RecognitionUploadMetadata(
             filename=img.filename or f"crop-{i}.jpg",
-            content_type=img.content_type,
+            content_type=img.content_type or "application/octet-stream",
             prompt_version=prompt_version,
         )
         try:

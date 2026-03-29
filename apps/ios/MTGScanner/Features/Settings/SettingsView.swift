@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject private var appModel: AppModel
 
     var body: some View {
+        // swiftlint:disable:next closure_body_length
         NavigationStack {
             Form {
                 Section("API") {
@@ -17,7 +18,11 @@ struct SettingsView: View {
                         appModel.resetAPIBaseURL()
                     }
 
-                    Text("The API address is saved between launches. Use your Mac's LAN or tailnet IP instead of 127.0.0.1 when the app runs on a physical iPhone.")
+                    Text(
+                        "The API address is saved between launches. "
+                        + "Use your Mac's LAN or tailnet IP instead of "
+                        + "127.0.0.1 when the app runs on a physical iPhone."
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -25,7 +30,10 @@ struct SettingsView: View {
                 Section("Recognition") {
                     Toggle("On-Device Crop", isOn: $appModel.onDeviceCropEnabled)
 
-                    Text("When enabled, cards are detected and cropped on-device before upload. When disabled, the full image is sent to the server.")
+                    Text(
+                        "When enabled, cards are detected and cropped on-device before upload."
+                        + " When disabled, the full image is sent to the server."
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

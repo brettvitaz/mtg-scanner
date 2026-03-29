@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import sqlite3
+from typing import cast
 
 from app.models.recognition import RecognizedCard, RecognitionResponse
 from app.services.mtgjson_index import (
@@ -155,8 +156,8 @@ class CardValidationService:
         return ValidatedCardResult(
             card=validated_card,
             trace=ValidationTrace(
-                original=trace_base["original"],
-                normalized_inputs=trace_base["normalized_inputs"],
+                original=cast(dict[str, object], trace_base["original"]),
+                normalized_inputs=cast(dict[str, object], trace_base["normalized_inputs"]),
                 status=status,
                 matched_uuid=match.uuid,
                 matched_set_code=match.set_code,
@@ -183,8 +184,8 @@ class CardValidationService:
         return ValidatedCardResult(
             card=validated_card,
             trace=ValidationTrace(
-                original=trace_base["original"],
-                normalized_inputs=trace_base["normalized_inputs"],
+                original=cast(dict[str, object], trace_base["original"]),
+                normalized_inputs=cast(dict[str, object], trace_base["normalized_inputs"]),
                 status=status,
                 matched_uuid=match.uuid if match else None,
                 matched_set_code=match.set_code if match else None,

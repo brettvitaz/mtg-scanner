@@ -3,7 +3,12 @@
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
-        "hook": "bash -c 'BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo detached); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo \"BLOCKED: On $BRANCH branch. All code changes must be done in a worktree. Create one with: git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>\" >&2; exit 1; fi'"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo detached); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo \"BLOCKED: On $BRANCH branch. All code changes must be done in a worktree. Create one with: git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>\" >&2; exit 1; fi'"
+          }
+        ]
       }
     ]
   }

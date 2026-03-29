@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint ios-lint lint tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-update-mtgjson ios-lint lint tree
 
 bootstrap: api-bootstrap
 
@@ -18,6 +18,9 @@ api-lint:
 
 ios-lint:
 	./scripts/lint-ios.sh
+
+api-update-mtgjson:
+	PYTHONPATH=services/api .venv/bin/python scripts/update_mtgjson.py
 
 lint: api-lint ios-lint
 

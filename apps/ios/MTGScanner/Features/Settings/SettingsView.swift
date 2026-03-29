@@ -22,6 +22,14 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Recognition") {
+                    Toggle("On-Device Crop", isOn: $appModel.onDeviceCropEnabled)
+
+                    Text("When enabled, cards are detected and cropped on-device before upload. When disabled, the full image is sent to the server.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Current flow") {
                     Text("Photo Library picker → multipart upload → mocked recognition response.")
                 }

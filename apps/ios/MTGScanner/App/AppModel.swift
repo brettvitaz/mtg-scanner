@@ -8,6 +8,9 @@ final class AppModel: ObservableObject {
     @Published var apiBaseURL: String {
         didSet { persistAPIBaseURL() }
     }
+    @Published var onDeviceCropEnabled: Bool {
+        didSet { persistOnDeviceCrop() }
+    }
     @Published var isRecognizing = false
     @Published var statusMessage = "Point camera at cards to scan."
     @Published var lastUploadedFilename: String?
@@ -19,9 +22,11 @@ final class AppModel: ObservableObject {
     private let cropService = CardCropService()
     private let correctionsStoreKey = "card_corrections"
     private let apiBaseURLStoreKey = "api_base_url"
+    private let onDeviceCropStoreKey = "on_device_crop_enabled"
 
     init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
+        self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
         loadCorrections()
     }
 
@@ -42,26 +47,26 @@ final class AppModel: ObservableObject {
     }
 
     /// Recognise cards from a UIImage directly (avoids Data round-trip for camera captures).
+    ///
+    /// When `onDeviceCropEnabled` is true, runs on-device detection first and uploads
+    /// crops to the batch endpoint. When false, sends the full image to the single-image endpoint.
     func recognizeImage(image: UIImage, filename: String) async {
         isRecognizing = true
         lastDetectedCrops = []
-        statusMessage = "Detecting cards…"
         lastUploadedFilename = filename
 
-        let cropResult = await cropService.detectAndCrop(image: image)
-        lastDetectedCrops = cropResult.crops
-
-        if !cropResult.crops.isEmpty {
-            await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
-        } else {
-            // No crops found — upload the full image.
-            guard let data = image.jpegData(compressionQuality: 0.9) else {
-                statusMessage = "Failed to encode image."
-                isRecognizing = false
-                return
+        if onDeviceCropEnabled {
+            statusMessage = "Detecting cards…"
+            let cropResult = await cropService.detectAndCrop(image: image)
+            lastDetectedCrops = cropResult.crops
+            if !cropResult.crops.isEmpty {
+                await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
+            } else {
+                await uploadFullImage(image: image, filename: filename)
             }
-            let contentType = "image/jpeg"
-            await recognizeViaSingleImage(data: data, filename: filename, contentType: contentType)
+        } else {
+            statusMessage = "Uploading full image…"
+            await uploadFullImage(image: image, filename: filename)
         }
 
         isRecognizing = false
@@ -69,6 +74,14 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: - Private recognition helpers
+
+    private func uploadFullImage(image: UIImage, filename: String) async {
+        guard let data = image.jpegData(compressionQuality: 0.9) else {
+            statusMessage = "Failed to encode image."
+            return
+        }
+        await recognizeViaSingleImage(data: data, filename: filename, contentType: "image/jpeg")
+    }
 
     private func recognizeViaBatch(crops: [UIImage], baseFilename: String) async {
         let stem = (baseFilename as NSString).deletingPathExtension
@@ -98,7 +111,7 @@ final class AppModel: ObservableObject {
     }
 
     private func recognizeViaSingleImage(data: Data, filename: String, contentType: String) async {
-        statusMessage = "No crops found — uploading full image…"
+        statusMessage = "Uploading full image…"
 
         do {
             latestResult = try await apiClient.recognizeImage(
@@ -131,6 +144,10 @@ final class AppModel: ObservableObject {
 
     private func persistAPIBaseURL() {
         UserDefaults.standard.set(apiBaseURL, forKey: apiBaseURLStoreKey)
+    }
+
+    private func persistOnDeviceCrop() {
+        UserDefaults.standard.set(onDeviceCropEnabled, forKey: onDeviceCropStoreKey)
     }
 
     func resetAPIBaseURL() {

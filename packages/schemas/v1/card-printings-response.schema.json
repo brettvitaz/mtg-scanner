@@ -1,23 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/mtg-scanner/recognition-response.schema.json",
-  "title": "RecognitionResponse",
+  "$id": "https://example.com/mtg-scanner/card-printings-response.schema.json",
+  "title": "CardPrintingsResponse",
   "type": "object",
-  "required": ["cards"],
+  "required": ["printings"],
   "properties": {
-    "cards": {
+    "printings": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["confidence"],
+        "required": ["name", "set_code"],
         "properties": {
-          "title": { "type": ["string", "null"] },
-          "edition": { "type": ["string", "null"] },
+          "name": { "type": "string" },
+          "set_code": { "type": "string" },
+          "set_name": { "type": ["string", "null"] },
           "collector_number": { "type": ["string", "null"] },
-          "foil": { "type": ["boolean", "null"] },
-          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-          "notes": { "type": ["string", "null"] },
-          "set_code": { "type": ["string", "null"] },
           "rarity": { "type": ["string", "null"] },
           "type_line": { "type": ["string", "null"] },
           "oracle_text": { "type": ["string", "null"] },

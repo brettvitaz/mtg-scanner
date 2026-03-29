@@ -1,0 +1,40 @@
+{
+  "printings": [
+    {
+      "name": "Lightning Bolt",
+      "set_code": "M10",
+      "set_name": "Magic 2010",
+      "collector_number": "146",
+      "rarity": "common",
+      "type_line": "Instant",
+      "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+      "power": null,
+      "toughness": null,
+      "loyalty": null,
+      "defense": null,
+      "scryfall_id": "e3285e6b-3e79-4d7c-bf96-d920f973b122",
+      "image_url": "https://api.scryfall.com/cards/e3285e6b-3e79-4d7c-bf96-d920f973b122?format=image&version=normal",
+      "set_symbol_url": "https://svgs.scryfall.io/sets/m10.svg",
+      "card_kingdom_url": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt",
+      "card_kingdom_foil_url": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil"
+    },
+    {
+      "name": "Lightning Bolt",
+      "set_code": "2XM",
+      "set_name": "Double Masters",
+      "collector_number": "123",
+      "rarity": "uncommon",
+      "type_line": "Instant",
+      "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+      "power": null,
+      "toughness": null,
+      "loyalty": null,
+      "defense": null,
+      "scryfall_id": "f29ba16f-c8fb-42fe-aabf-87089cb214a7",
+      "image_url": "https://api.scryfall.com/cards/f29ba16f-c8fb-42fe-aabf-87089cb214a7?format=image&version=normal",
+      "set_symbol_url": "https://svgs.scryfall.io/sets/2xm.svg",
+      "card_kingdom_url": "https://www.cardkingdom.com/mtg/double-masters/lightning-bolt",
+      "card_kingdom_foil_url": null
+    }
+  ]
+}

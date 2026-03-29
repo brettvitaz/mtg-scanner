@@ -16,6 +16,8 @@ final class AppModel: ObservableObject {
     @Published var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.
     @Published var lastDetectedCrops: [UIImage] = []
+    /// Crop images keyed by the corresponding RecognizedCard.id.
+    @Published var cardCropImages: [UUID: UIImage] = [:]
     @Published var shouldShowResults = false
 
     private let apiClient = APIClient()
@@ -53,6 +55,7 @@ final class AppModel: ObservableObject {
     func recognizeImage(image: UIImage, filename: String) async {
         isRecognizing = true
         lastDetectedCrops = []
+        cardCropImages = [:]
         lastUploadedFilename = filename
 
         if onDeviceCropEnabled {
@@ -104,6 +107,7 @@ final class AppModel: ObservableObject {
                 crops: cropPairs,
                 baseURL: apiBaseURL
             )
+            associateCropsWithCards()
             statusMessage = "Recognition finished (\(cropPairs.count) crop(s)). Open Results to inspect."
         } catch {
             statusMessage = "Batch recognition failed: \(error.localizedDescription)"
@@ -124,6 +128,18 @@ final class AppModel: ObservableObject {
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
         }
+    }
+
+    private func associateCropsWithCards() {
+        for (index, card) in latestResult.cards.enumerated() where index < lastDetectedCrops.count {
+            cardCropImages[card.id] = lastDetectedCrops[index]
+        }
+    }
+
+    // MARK: - Printings
+
+    func fetchPrintings(name: String) async throws -> [CardPrinting] {
+        return try await apiClient.fetchPrintings(name: name, baseURL: apiBaseURL)
     }
 
     // MARK: - Corrections

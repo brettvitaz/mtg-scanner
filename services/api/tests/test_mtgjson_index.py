@@ -32,6 +32,14 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                         "number": "146",
                         "layout": "normal",
                         "language": "English",
+                        "rarity": "common",
+                        "type": "Instant",
+                        "text": "Lightning Bolt deals 3 damage to any target.",
+                        "identifiers": {"scryfallId": "e3285e6b-3e79-4d7c-bf96-d920f973b122"},
+                        "purchaseUrls": {
+                            "cardKingdom": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt",
+                            "cardKingdomFoil": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil",
+                        },
                     },
                     {
                         "uuid": "forest-m10-247",
@@ -40,6 +48,8 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                         "number": "247",
                         "layout": "normal",
                         "language": "English",
+                        "rarity": "common",
+                        "type": "Basic Land — Forest",
                     },
                 ],
             },
@@ -55,6 +65,13 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                         "number": "123",
                         "layout": "normal",
                         "language": "English",
+                        "rarity": "uncommon",
+                        "type": "Instant",
+                        "text": "Lightning Bolt deals 3 damage to any target.",
+                        "identifiers": {"scryfallId": "f29ba16f-c8fb-42fe-aabf-87089cb214a7"},
+                        "purchaseUrls": {
+                            "cardKingdom": "https://www.cardkingdom.com/mtg/double-masters/lightning-bolt",
+                        },
                     },
                     {
                         "uuid": "forest-2xm-247",
@@ -63,6 +80,8 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                         "number": "247",
                         "layout": "normal",
                         "language": "English",
+                        "rarity": "common",
+                        "type": "Basic Land — Forest",
                     },
                     {
                         "uuid": "skip-me",
@@ -148,3 +167,26 @@ def test_index_lookup_paths(tmp_path: Path, mtgjson_fixture: Path) -> None:
 
     by_name_number = index.lookup_by_name_and_number(title="Forest", collector_number="247")
     assert sorted(card.uuid for card in by_name_number) == ["forest-2xm-247", "forest-m10-247"]
+
+    # Verify enriched fields on exact match
+    assert exact.rarity == "common"
+    assert exact.type_line == "Instant"
+    assert exact.oracle_text == "Lightning Bolt deals 3 damage to any target."
+    assert exact.scryfall_id == "e3285e6b-3e79-4d7c-bf96-d920f973b122"
+    assert exact.card_kingdom_url == "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt"
+    assert exact.card_kingdom_foil_url == "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil"
+    assert exact.power is None
+    assert exact.toughness is None
+
+
+def test_lookup_all_printings_by_name(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    manifest_path = tmp_path / "manifest.json"
+    import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=manifest_path)
+
+    index = MTGJSONIndex(db_path)
+    printings = index.lookup_all_printings_by_name(title="Lightning Bolt")
+    assert len(printings) == 2
+    set_codes = [p.set_code for p in printings]
+    assert "M10" in set_codes
+    assert "2XM" in set_codes

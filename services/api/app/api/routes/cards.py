@@ -58,11 +58,6 @@ async def get_card_printings(
         )
 
     records = index.lookup_all_printings_by_name(title=name)
-    if not records:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No printings found for card: {name}",
-        )
 
     printings = [
         CardPrinting(

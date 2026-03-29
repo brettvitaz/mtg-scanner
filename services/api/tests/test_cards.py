@@ -91,12 +91,13 @@ def test_get_printings_returns_all_printings(mtgjson_db: Path) -> None:
     assert m10["card_kingdom_url"] == "https://www.cardkingdom.com/bolt-m10"
 
 
-def test_get_printings_returns_404_for_unknown_card(mtgjson_db: Path) -> None:
+def test_get_printings_returns_empty_list_for_unknown_card(mtgjson_db: Path) -> None:
     with patch("app.api.routes.cards.get_settings") as mock_settings:
         mock_settings.return_value.mtg_scanner_mtgjson_db_path = str(mtgjson_db)
         resp = client.get("/api/v1/cards/printings", params={"name": "Nonexistent Card"})
 
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.json()["printings"] == []
 
 
 def test_get_printings_returns_503_when_db_missing(tmp_path: Path) -> None:

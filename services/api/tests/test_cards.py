@@ -34,6 +34,7 @@ def mtgjson_db(tmp_path: Path) -> Path:
                                 "rarity": "common",
                                 "type": "Instant",
                                 "text": "Lightning Bolt deals 3 damage to any target.",
+                                "manaCost": "{R}",
                                 "identifiers": {"scryfallId": "e3285e6b-0000-0000-0000-000000000000"},
                                 "purchaseUrls": {"cardKingdom": "https://www.cardkingdom.com/bolt-m10"},
                             },
@@ -54,6 +55,7 @@ def mtgjson_db(tmp_path: Path) -> Path:
                                 "rarity": "uncommon",
                                 "type": "Instant",
                                 "text": "Lightning Bolt deals 3 damage to any target.",
+                                "manaCost": "{R}",
                                 "identifiers": {"scryfallId": "f29ba16f-0000-0000-0000-000000000000"},
                             },
                         ],
@@ -89,6 +91,7 @@ def test_get_printings_returns_all_printings(mtgjson_db: Path) -> None:
     assert m10["image_url"] is not None
     assert m10["set_symbol_url"] == "https://svgs.scryfall.io/sets/m10.svg"
     assert m10["card_kingdom_url"] == "https://www.cardkingdom.com/bolt-m10"
+    assert m10["mana_cost"] == "{R}"
 
 
 def test_get_printings_returns_empty_list_for_unknown_card(mtgjson_db: Path) -> None:

@@ -17,6 +17,7 @@ class CardPrinting(BaseModel):
     rarity: str | None = None
     type_line: str | None = None
     oracle_text: str | None = None
+    mana_cost: str | None = None
     power: str | None = None
     toughness: str | None = None
     loyalty: str | None = None
@@ -68,6 +69,7 @@ async def get_card_printings(
             rarity=r.rarity,
             type_line=r.type_line,
             oracle_text=r.oracle_text,
+            mana_cost=r.mana_cost,
             power=r.power,
             toughness=r.toughness,
             loyalty=r.loyalty,

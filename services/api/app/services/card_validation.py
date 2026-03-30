@@ -161,6 +161,7 @@ class CardValidationService:
                 "rarity": match.rarity,
                 "type_line": match.type_line,
                 "oracle_text": match.oracle_text,
+                "mana_cost": match.mana_cost,
                 "power": match.power,
                 "toughness": match.toughness,
                 "loyalty": match.loyalty,

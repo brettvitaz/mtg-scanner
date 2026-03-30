@@ -38,7 +38,7 @@ NON_ALNUM_WHITESPACE_RE = re.compile(r"[^0-9a-z\s]+")
 _CARD_COLUMNS = (
     "uuid, name, normalized_name, set_code, set_name, collector_number,"
     " normalized_collector_number, language, layout, release_date, is_promo,"
-    " rarity, type_line, oracle_text, power, toughness, loyalty, defense,"
+    " rarity, type_line, oracle_text, mana_cost, power, toughness, loyalty, defense,"
     " scryfall_id, card_kingdom_url, card_kingdom_foil_url"
 )
 
@@ -59,6 +59,7 @@ class CardRecord:
     rarity: str | None = None
     type_line: str | None = None
     oracle_text: str | None = None
+    mana_cost: str | None = None
     power: str | None = None
     toughness: str | None = None
     loyalty: str | None = None
@@ -233,13 +234,14 @@ class MTGJSONIndex:
                 rarity=row[11],
                 type_line=row[12],
                 oracle_text=row[13],
-                power=row[14],
-                toughness=row[15],
-                loyalty=row[16],
-                defense=row[17],
-                scryfall_id=row[18],
-                card_kingdom_url=row[19],
-                card_kingdom_foil_url=row[20],
+                mana_cost=row[14],
+                power=row[15],
+                toughness=row[16],
+                loyalty=row[17],
+                defense=row[18],
+                scryfall_id=row[19],
+                card_kingdom_url=row[20],
+                card_kingdom_foil_url=row[21],
             )
             for row in rows
         ]
@@ -333,6 +335,7 @@ def create_schema(db_path: Path) -> None:
                 rarity TEXT NULL,
                 type_line TEXT NULL,
                 oracle_text TEXT NULL,
+                mana_cost TEXT NULL,
                 power TEXT NULL,
                 toughness TEXT NULL,
                 loyalty TEXT NULL,
@@ -406,9 +409,9 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                         uuid, name, ascii_name, normalized_name, set_code, set_name,
                         collector_number, normalized_collector_number, language, layout,
                         release_date, is_promo, rarity, type_line, oracle_text,
-                        power, toughness, loyalty, defense, scryfall_id,
+                        mana_cost, power, toughness, loyalty, defense, scryfall_id,
                         card_kingdom_url, card_kingdom_foil_url
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         uuid,
@@ -426,6 +429,7 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                         card.get("rarity"),
                         card.get("type"),
                         card.get("text"),
+                        card.get("manaCost"),
                         card.get("power"),
                         card.get("toughness"),
                         card.get("loyalty"),

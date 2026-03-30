@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
+from app.services.ck_prices import CKPriceIndex
 from app.services.mtgjson_index import MTGJSONIndex
 from app.settings import get_settings
 
@@ -17,6 +18,7 @@ class CardPrinting(BaseModel):
     rarity: str | None = None
     type_line: str | None = None
     oracle_text: str | None = None
+    mana_cost: str | None = None
     power: str | None = None
     toughness: str | None = None
     loyalty: str | None = None
@@ -68,6 +70,7 @@ async def get_card_printings(
             rarity=r.rarity,
             type_line=r.type_line,
             oracle_text=r.oracle_text,
+            mana_cost=r.mana_cost,
             power=r.power,
             toughness=r.toughness,
             loyalty=r.loyalty,
@@ -82,3 +85,44 @@ async def get_card_printings(
     ]
 
     return CardPrintingsResponse(printings=printings)
+
+
+class CardPriceResponse(BaseModel):
+    price_retail: str | None = None
+    qty_retail: int | None = None
+    price_buy: str | None = None
+    qty_buying: int | None = None
+    url: str | None = None
+
+
+@router.get("/cards/price", response_model=CardPriceResponse)
+async def get_card_price(
+    name: str = Query(..., description="Card name"),
+    scryfall_id: str | None = Query(default=None, description="Scryfall UUID"),
+    is_foil: bool = Query(default=False, description="Whether the card is foil"),
+) -> CardPriceResponse:
+    settings = get_settings()
+    if not settings.mtg_scanner_enable_ck_prices:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Card Kingdom pricing is not enabled.",
+        )
+
+    index = CKPriceIndex(Path(settings.mtg_scanner_ck_prices_db_path))
+    if not index.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Card Kingdom price database is not available.",
+        )
+
+    result = index.lookup_price(scryfall_id=scryfall_id, name=name, is_foil=is_foil)
+    if result is None:
+        return CardPriceResponse()
+
+    return CardPriceResponse(
+        price_retail=result.price_retail,
+        qty_retail=result.qty_retail,
+        price_buy=result.price_buy,
+        qty_buying=result.qty_buying,
+        url=result.url,
+    )

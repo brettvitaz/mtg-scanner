@@ -35,6 +35,7 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                         "rarity": "common",
                         "type": "Instant",
                         "text": "Lightning Bolt deals 3 damage to any target.",
+                        "manaCost": "{R}",
                         "identifiers": {"scryfallId": "e3285e6b-3e79-4d7c-bf96-d920f973b122"},
                         "purchaseUrls": {
                             "cardKingdom": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt",
@@ -68,6 +69,7 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                         "rarity": "uncommon",
                         "type": "Instant",
                         "text": "Lightning Bolt deals 3 damage to any target.",
+                        "manaCost": "{R}",
                         "identifiers": {"scryfallId": "f29ba16f-c8fb-42fe-aabf-87089cb214a7"},
                         "purchaseUrls": {
                             "cardKingdom": "https://www.cardkingdom.com/mtg/double-masters/lightning-bolt",
@@ -175,8 +177,14 @@ def test_index_lookup_paths(tmp_path: Path, mtgjson_fixture: Path) -> None:
     assert exact.scryfall_id == "e3285e6b-3e79-4d7c-bf96-d920f973b122"
     assert exact.card_kingdom_url == "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt"
     assert exact.card_kingdom_foil_url == "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil"
+    assert exact.mana_cost == "{R}"
     assert exact.power is None
     assert exact.toughness is None
+
+    # Verify land has no mana cost
+    forest = index.lookup_exact(title="Forest", set_code="M10", collector_number="247")
+    assert forest is not None
+    assert forest.mana_cost is None
 
 
 def test_lookup_all_printings_by_name(tmp_path: Path, mtgjson_fixture: Path) -> None:

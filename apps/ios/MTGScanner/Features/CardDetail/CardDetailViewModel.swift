@@ -15,6 +15,8 @@ final class CardDetailViewModel: ObservableObject {
     @Published var printings: [CardPrinting] = []
     @Published var isLoadingPrintings = false
     @Published var selectedPrinting: CardPrinting?
+    @Published var cardPrice: CardPrice?
+    @Published var isLoadingPrice = false
 
     // Editable correction fields
     @Published var editTitle: String
@@ -62,6 +64,10 @@ final class CardDetailViewModel: ObservableObject {
 
     var displayOracleText: String? {
         selectedPrinting?.oracleText ?? card.oracleText
+    }
+
+    var displayManaCost: String? {
+        selectedPrinting?.manaCost ?? card.manaCost
     }
 
     var displayPower: String? {
@@ -121,6 +127,22 @@ final class CardDetailViewModel: ObservableObject {
             printings = []
         }
         isLoadingPrintings = false
+    }
+
+    func loadPrice(using appModel: AppModel) async {
+        let name = displayTitle
+        guard !name.isEmpty else { return }
+        let scryfallId = selectedPrinting?.scryfallId ?? card.scryfallId
+        isLoadingPrice = true
+        do {
+            cardPrice = try await appModel.fetchPrice(
+                name: name, scryfallId: scryfallId, isFoil: editFoil
+            )
+        } catch {
+            print("[CardDetail] Price lookup failed: \(error.localizedDescription)")
+            cardPrice = nil
+        }
+        isLoadingPrice = false
     }
 
     func selectPrinting(_ printing: CardPrinting) {

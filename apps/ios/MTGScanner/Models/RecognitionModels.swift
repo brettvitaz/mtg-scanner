@@ -15,6 +15,7 @@ struct RecognitionResult: Codable {
             rarity: "common",
             typeLine: "Instant",
             oracleText: "Lightning Bolt deals 3 damage to any target.",
+            manaCost: "{R}",
             imageUrl: "https://api.scryfall.com/cards/e3285e6b-3e79-4d7c-bf96-d920f973b122?format=image&version=normal",
             setSymbolUrl: "https://svgs.scryfall.io/sets/m10.svg"
         )
@@ -33,6 +34,7 @@ struct RecognizedCard: Codable, Identifiable {
     let rarity: String?
     let typeLine: String?
     let oracleText: String?
+    let manaCost: String?
     let power: String?
     let toughness: String?
     let loyalty: String?
@@ -56,6 +58,7 @@ struct RecognizedCard: Codable, Identifiable {
         rarity: String? = nil,
         typeLine: String? = nil,
         oracleText: String? = nil,
+        manaCost: String? = nil,
         power: String? = nil,
         toughness: String? = nil,
         loyalty: String? = nil,
@@ -78,6 +81,7 @@ struct RecognizedCard: Codable, Identifiable {
         self.rarity = rarity
         self.typeLine = typeLine
         self.oracleText = oracleText
+        self.manaCost = manaCost
         self.power = power
         self.toughness = toughness
         self.loyalty = loyalty
@@ -103,6 +107,7 @@ struct RecognizedCard: Codable, Identifiable {
         self.rarity = try container.decodeIfPresent(String.self, forKey: .rarity)
         self.typeLine = try container.decodeIfPresent(String.self, forKey: .typeLine)
         self.oracleText = try container.decodeIfPresent(String.self, forKey: .oracleText)
+        self.manaCost = try container.decodeIfPresent(String.self, forKey: .manaCost)
         self.power = try container.decodeIfPresent(String.self, forKey: .power)
         self.toughness = try container.decodeIfPresent(String.self, forKey: .toughness)
         self.loyalty = try container.decodeIfPresent(String.self, forKey: .loyalty)
@@ -128,6 +133,7 @@ struct RecognizedCard: Codable, Identifiable {
         try container.encodeIfPresent(rarity, forKey: .rarity)
         try container.encodeIfPresent(typeLine, forKey: .typeLine)
         try container.encodeIfPresent(oracleText, forKey: .oracleText)
+        try container.encodeIfPresent(manaCost, forKey: .manaCost)
         try container.encodeIfPresent(power, forKey: .power)
         try container.encodeIfPresent(toughness, forKey: .toughness)
         try container.encodeIfPresent(loyalty, forKey: .loyalty)
@@ -152,6 +158,7 @@ struct RecognizedCard: Codable, Identifiable {
         case rarity
         case typeLine = "type_line"
         case oracleText = "oracle_text"
+        case manaCost = "mana_cost"
         case power
         case toughness
         case loyalty
@@ -192,6 +199,7 @@ struct CardPrinting: Codable, Identifiable {
     let rarity: String?
     let typeLine: String?
     let oracleText: String?
+    let manaCost: String?
     let power: String?
     let toughness: String?
     let loyalty: String?
@@ -210,6 +218,7 @@ struct CardPrinting: Codable, Identifiable {
         case rarity
         case typeLine = "type_line"
         case oracleText = "oracle_text"
+        case manaCost = "mana_cost"
         case power
         case toughness
         case loyalty
@@ -225,4 +234,21 @@ struct CardPrinting: Codable, Identifiable {
 /// Response from the printings endpoint.
 struct CardPrintingsResponse: Codable {
     let printings: [CardPrinting]
+}
+
+/// Card Kingdom price data from the price endpoint.
+struct CardPrice: Codable {
+    let priceRetail: String?
+    let qtyRetail: Int?
+    let priceBuy: String?
+    let qtyBuying: Int?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case priceRetail = "price_retail"
+        case qtyRetail = "qty_retail"
+        case priceBuy = "price_buy"
+        case qtyBuying = "qty_buying"
+        case url
+    }
 }

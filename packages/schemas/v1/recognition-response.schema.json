@@ -21,6 +21,7 @@
           "rarity": { "type": ["string", "null"] },
           "type_line": { "type": ["string", "null"] },
           "oracle_text": { "type": ["string", "null"] },
+          "mana_cost": { "type": ["string", "null"] },
           "power": { "type": ["string", "null"] },
           "toughness": { "type": ["string", "null"] },
           "loyalty": { "type": ["string", "null"] },

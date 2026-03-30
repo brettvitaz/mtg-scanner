@@ -114,6 +114,42 @@ struct APIClient {
         return decoded.printings
     }
 
+    // MARK: - Price route
+
+    func fetchPrice(
+        name: String,
+        scryfallId: String?,
+        isFoil: Bool,
+        baseURL: String
+    ) async throws -> CardPrice {
+        guard var components = URLComponents(string: baseURL) else {
+            throw APIError.invalidBaseURL
+        }
+        components.path += "/api/v1/cards/price"
+        var queryItems = [
+            URLQueryItem(name: "name", value: name),
+            URLQueryItem(name: "is_foil", value: isFoil ? "true" : "false"),
+        ]
+        if let scryfallId {
+            queryItems.append(URLQueryItem(name: "scryfall_id", value: scryfallId))
+        }
+        components.queryItems = queryItems
+        guard let url = components.url else {
+            throw APIError.invalidBaseURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(CardPrice.self, from: responseData)
+    }
+
     // MARK: - Shared request helper
 
     private func performRequest(_ request: URLRequest) async throws -> RecognitionResult {

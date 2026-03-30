@@ -17,6 +17,7 @@ struct CardDetailView: View {
                 CardImageSection(viewModel: viewModel, appModel: appModel, showFullscreen: $showFullscreenImage)
                 identitySection
                 detailsSection
+                priceSection
                 actionsSection
             }
             .padding()
@@ -43,17 +44,24 @@ struct CardDetailView: View {
         viewModel.editCollectorNumber = correction?.collectorNumber ?? viewModel.card.collectorNumber ?? ""
         viewModel.editFoil = correction?.foil ?? viewModel.card.foil ?? false
         Task { await viewModel.loadPrintings(using: appModel) }
+        Task { await viewModel.loadPrice(using: appModel) }
     }
 
     // MARK: - Identity
 
     private var identitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(viewModel.displayTitle).font(.title2.bold())
+            HStack {
+                Text(viewModel.displayTitle).font(.title2.bold())
+                Spacer()
+                ConfidenceTag(value: viewModel.card.confidence)
+            }
+            if let manaCost = viewModel.displayManaCost {
+                Text(manaCost).font(.subheadline.monospaced()).foregroundStyle(.secondary)
+            }
             editionButton
             Toggle("Foil", isOn: $viewModel.editFoil).font(.subheadline)
             collectorRarityRow
-            ConfidenceBadge(value: viewModel.card.confidence)
         }
     }
 
@@ -95,10 +103,45 @@ struct CardDetailView: View {
             if let oracleText = viewModel.displayOracleText {
                 Text(oracleText).font(.body).padding(.top, 2)
             }
-            if let stats = viewModel.statsText {
-                Text(stats).font(.headline.monospacedDigit()).padding(.top, 4)
+            if viewModel.hasStats {
+                CardStatsView(viewModel: viewModel).padding(.top, 4)
             }
         }
+    }
+
+    // MARK: - Prices
+
+    @ViewBuilder
+    private var priceSection: some View {
+        if viewModel.isLoadingPrice {
+            HStack {
+                ProgressView()
+                Text("Loading prices...").font(.subheadline).foregroundStyle(.secondary)
+            }
+        } else if let price = viewModel.cardPrice,
+                  price.priceRetail != nil || price.priceBuy != nil {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Card Kingdom Prices").font(.subheadline.bold())
+                HStack(spacing: 16) {
+                    if let retail = price.priceRetail {
+                        PriceLabel(title: "Sell", price: retail, detail: stockText(price.qtyRetail))
+                    }
+                    if let buy = price.priceBuy {
+                        PriceLabel(title: "Buy", price: buy, detail: buyingText(price.qtyBuying))
+                    }
+                }
+            }
+        }
+    }
+
+    private func stockText(_ qty: Int?) -> String? {
+        guard let qty else { return nil }
+        return "\(qty) in stock"
+    }
+
+    private func buyingText(_ qty: Int?) -> String? {
+        guard let qty else { return nil }
+        return "buying \(qty)"
     }
 
     // MARK: - Actions
@@ -249,6 +292,46 @@ private struct PrintingRow: View {
     }
 }
 
+private struct ConfidenceTag: View {
+    let value: Double
+
+    var body: some View {
+        Text("\(Int(value * 100))%")
+            .font(.caption.bold().monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color, in: Capsule())
+    }
+
+    private var color: Color {
+        switch value {
+        case 0.85...: return .green
+        case 0.6..<0.85: return .orange
+        default: return .red
+        }
+    }
+}
+
+private struct PriceLabel: View {
+    let title: String
+    let price: String
+    let detail: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text("$\(price)").font(.headline.monospacedDigit())
+            if let detail {
+                Text(detail).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 private struct CardImagePlaceholder: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 8)
@@ -281,6 +364,45 @@ private struct RarityBadge: View {
         case "uncommon": return .gray
         default: return Color.secondary
         }
+    }
+}
+
+private struct CardStatsView: View {
+    @ObservedObject var viewModel: CardDetailViewModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let power = viewModel.displayPower, let toughness = viewModel.displayToughness {
+                StatBadge(icon: "burst.fill", label: "Power", value: power)
+                Text("/").font(.title3.bold()).foregroundStyle(.secondary)
+                StatBadge(icon: "shield.fill", label: "Toughness", value: toughness)
+            }
+            if let loyalty = viewModel.displayLoyalty {
+                StatBadge(icon: "diamond.fill", label: "Loyalty", value: loyalty)
+            }
+            if let defense = viewModel.displayDefense {
+                StatBadge(icon: "shield.checkered", label: "Defense", value: defense)
+            }
+        }
+    }
+}
+
+private struct StatBadge: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.caption).foregroundStyle(.secondary)
+                Text(value).font(.title3.bold().monospacedDigit())
+            }
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

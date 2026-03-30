@@ -42,13 +42,14 @@ make bootstrap     # prepare local dependencies
 make api-run       # run FastAPI dev server
 make api-test      # run backend tests
 make tree          # print a compact repo tree
+make api-import-ck-prices  # fetch and import Card Kingdom prices
 PYTHONPATH=services/api ./services/api/.venv/bin/python scripts/import_mtgjson.py tmp/AllPrintings.json
 xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build
 ```
 
 ## Current status
 - SwiftUI iOS app with camera capture, on-device card detection/cropping, batch upload, results list with card thumbnails, and card detail view with metadata, edition picker, and Card Kingdom links
-- FastAPI backend with config-driven recognition providers, MTGJSON validation and metadata enrichment, card printings endpoint, and local artifact logging
+- FastAPI backend with config-driven recognition providers, MTGJSON validation and metadata enrichment, card printings endpoint, Card Kingdom pricing, and local artifact logging
 - Versioned JSON schemas with examples and validation tests
 - Workflow docs and ADRs for future contributors
 
@@ -64,6 +65,7 @@ Both return a `RecognitionResponse` containing a list of recognized cards. Each 
 
 | Field | Description |
 |-------|-------------|
+| `mana_cost` | Mana cost string (e.g. `{2}{R}`) |
 | `set_code` | Three-letter set code (e.g. `M10`) |
 | `rarity` | Card rarity (`common`, `uncommon`, `rare`, `mythic`) |
 | `type_line` | Full type line (e.g. `Legendary Creature — Human Wizard`) |
@@ -84,6 +86,11 @@ Enriched fields are `null` when the card does not match MTGJSON or when the sour
 
 Returns a `CardPrintingsResponse` with a `printings` array. Each printing includes the same enriched metadata fields listed above. Results are sorted by release date (newest first). Returns 404 if no printings are found, 503 if the MTGJSON database is unavailable.
 
+### Card Kingdom pricing
+- `GET /api/v1/cards/price?name=Lightning+Bolt&edition=Magic+2010&is_foil=false` — returns Card Kingdom buy/sell prices
+
+Returns a `CardPriceResponse` with `price_retail`, `qty_retail`, `price_buy`, `qty_buying`, and `url`. Requires `MTG_SCANNER_ENABLE_CK_PRICES=true` and a populated price database (run `make api-import-ck-prices`).
+
 ### Health
 - `GET /health` — liveness check
 
@@ -95,8 +102,9 @@ The app provides a full scanning pipeline:
 3. **Card detail** — tap a card to see its full details:
    - Card image from Scryfall (tap for fullscreen, toggle to on-device crop image)
    - Edition picker with all printings loaded from the API
-   - Type line, oracle text, power/toughness or loyalty or defense
+   - Mana cost, type line, oracle text, power/toughness or loyalty or defense (with labeled stat badges)
    - Rarity badge, foil toggle, confidence bar
+   - Card Kingdom buy/sell prices with stock quantities
    - "Buy on Card Kingdom" button (opens purchase URL)
    - Save correction for manual edits
 

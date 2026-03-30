@@ -87,7 +87,7 @@ Enriched fields are `null` when the card does not match MTGJSON or when the sour
 Returns a `CardPrintingsResponse` with a `printings` array. Each printing includes the same enriched metadata fields listed above. Results are sorted by release date (newest first). Returns 404 if no printings are found, 503 if the MTGJSON database is unavailable.
 
 ### Card Kingdom pricing
-- `GET /api/v1/cards/price?name=Lightning+Bolt&edition=Magic+2010&is_foil=false` — returns Card Kingdom buy/sell prices
+- `GET /api/v1/cards/price?name=Lightning+Bolt&scryfall_id=e3285e6b-...&is_foil=false` — returns Card Kingdom buy/sell prices
 
 Returns a `CardPriceResponse` with `price_retail`, `qty_retail`, `price_buy`, `qty_buying`, and `url`. Requires `MTG_SCANNER_ENABLE_CK_PRICES=true` and a populated price database (run `make api-import-ck-prices`).
 

@@ -131,12 +131,12 @@ final class CardDetailViewModel: ObservableObject {
 
     func loadPrice(using appModel: AppModel) async {
         let name = displayTitle
-        let edition = displayEdition
-        guard !name.isEmpty, !edition.isEmpty else { return }
+        guard !name.isEmpty else { return }
+        let scryfallId = selectedPrinting?.scryfallId ?? card.scryfallId
         isLoadingPrice = true
         do {
             cardPrice = try await appModel.fetchPrice(
-                name: name, edition: edition, isFoil: editFoil
+                name: name, scryfallId: scryfallId, isFoil: editFoil
             )
         } catch {
             print("[CardDetail] Price lookup failed: \(error.localizedDescription)")

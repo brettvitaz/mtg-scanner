@@ -98,7 +98,7 @@ class CardPriceResponse(BaseModel):
 @router.get("/cards/price", response_model=CardPriceResponse)
 async def get_card_price(
     name: str = Query(..., description="Card name"),
-    edition: str = Query(..., description="Set/edition name"),
+    scryfall_id: str | None = Query(default=None, description="Scryfall UUID"),
     is_foil: bool = Query(default=False, description="Whether the card is foil"),
 ) -> CardPriceResponse:
     settings = get_settings()
@@ -115,7 +115,7 @@ async def get_card_price(
             detail="Card Kingdom price database is not available.",
         )
 
-    result = index.lookup_price(name=name, edition=edition, is_foil=is_foil)
+    result = index.lookup_price(scryfall_id=scryfall_id, name=name, is_foil=is_foil)
     if result is None:
         return CardPriceResponse()
 

@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+_SELECT_COLS = "price_retail, qty_retail, price_buy, qty_buying, url"
+
+
 @dataclass(frozen=True, slots=True)
 class CKPriceResult:
     price_retail: str | None
@@ -22,8 +25,9 @@ class CKImportSummary:
 
 
 class CKPriceIndex:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, *, base_url: str = "https://www.cardkingdom.com/") -> None:
         self._db_path = db_path
+        self._base_url = base_url.rstrip("/")
 
     def is_available(self) -> bool:
         return self._db_path.is_file()
@@ -31,45 +35,42 @@ class CKPriceIndex:
     def lookup_price(
         self,
         *,
-        name: str,
-        edition: str,
+        scryfall_id: str | None = None,
+        name: str | None = None,
         is_foil: bool = False,
     ) -> CKPriceResult | None:
         if not self.is_available():
             return None
-        normalized_name = _normalize(name)
-        normalized_edition = _normalize(edition)
         foil_int = 1 if is_foil else 0
         try:
             with sqlite3.connect(self._db_path) as conn:
-                # Try exact match on name + edition + foil first
-                row = conn.execute(
-                    "SELECT price_retail, qty_retail, price_buy, qty_buying, url"
-                    " FROM ck_prices"
-                    " WHERE normalized_name = ? AND normalized_edition = ? AND is_foil = ?"
-                    " LIMIT 1",
-                    (normalized_name, normalized_edition, foil_int),
-                ).fetchone()
-                if row is None:
-                    # Fall back to name + foil, cheapest retail price
+                row = None
+                if scryfall_id:
                     row = conn.execute(
-                        "SELECT price_retail, qty_retail, price_buy, qty_buying, url"
-                        " FROM ck_prices"
+                        f"SELECT {_SELECT_COLS} FROM ck_prices"
+                        " WHERE scryfall_id = ? AND is_foil = ? LIMIT 1",
+                        (scryfall_id, foil_int),
+                    ).fetchone()
+                if row is None and name:
+                    row = conn.execute(
+                        f"SELECT {_SELECT_COLS} FROM ck_prices"
                         " WHERE normalized_name = ? AND is_foil = ?"
-                        " ORDER BY CAST(price_retail AS REAL) ASC"
-                        " LIMIT 1",
-                        (normalized_name, foil_int),
+                        " ORDER BY CAST(price_retail AS REAL) ASC LIMIT 1",
+                        (_normalize(name), foil_int),
                     ).fetchone()
         except sqlite3.DatabaseError:
             return None
         if row is None:
             return None
+        url = row[4]
+        if url and not url.startswith("http"):
+            url = f"{self._base_url}/{url}"
         return CKPriceResult(
             price_retail=row[0],
             qty_retail=row[1],
             price_buy=row[2],
             qty_buying=row[3],
-            url=row[4],
+            url=url,
         )
 
 
@@ -86,10 +87,10 @@ def create_ck_schema(db_path: Path) -> None:
 
             CREATE TABLE ck_prices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scryfall_id TEXT,
                 name TEXT NOT NULL,
                 normalized_name TEXT NOT NULL,
                 edition TEXT NOT NULL,
-                normalized_edition TEXT NOT NULL,
                 is_foil INTEGER NOT NULL,
                 price_retail TEXT,
                 qty_retail INTEGER,
@@ -98,8 +99,8 @@ def create_ck_schema(db_path: Path) -> None:
                 url TEXT
             );
 
-            CREATE INDEX idx_ck_lookup
-                ON ck_prices(normalized_name, normalized_edition, is_foil);
+            CREATE INDEX idx_ck_scryfall ON ck_prices(scryfall_id, is_foil);
+            CREATE INDEX idx_ck_name ON ck_prices(normalized_name, is_foil);
             """
         )
 
@@ -122,14 +123,14 @@ def import_ck_prices(
             is_foil = 1 if entry.get("is_foil") == "true" else 0
             conn.execute(
                 "INSERT INTO ck_prices"
-                " (name, normalized_name, edition, normalized_edition,"
+                " (scryfall_id, name, normalized_name, edition,"
                 "  is_foil, price_retail, qty_retail, price_buy, qty_buying, url)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
+                    entry.get("scryfall_id"),
                     name,
                     _normalize(name),
                     edition,
-                    _normalize(edition),
                     is_foil,
                     entry.get("price_retail"),
                     _safe_int(entry.get("qty_retail")),

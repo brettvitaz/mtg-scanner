@@ -118,7 +118,7 @@ struct APIClient {
 
     func fetchPrice(
         name: String,
-        edition: String,
+        scryfallId: String?,
         isFoil: Bool,
         baseURL: String
     ) async throws -> CardPrice {
@@ -126,11 +126,14 @@ struct APIClient {
             throw APIError.invalidBaseURL
         }
         components.path += "/api/v1/cards/price"
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "name", value: name),
-            URLQueryItem(name: "edition", value: edition),
             URLQueryItem(name: "is_foil", value: isFoil ? "true" : "false"),
         ]
+        if let scryfallId {
+            queryItems.append(URLQueryItem(name: "scryfall_id", value: scryfallId))
+        }
+        components.queryItems = queryItems
         guard let url = components.url else {
             throw APIError.invalidBaseURL
         }

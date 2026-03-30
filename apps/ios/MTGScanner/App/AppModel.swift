@@ -167,9 +167,9 @@ final class AppModel: ObservableObject {
 
     // MARK: - Prices
 
-    func fetchPrice(name: String, edition: String, isFoil: Bool) async throws -> CardPrice {
+    func fetchPrice(name: String, scryfallId: String?, isFoil: Bool) async throws -> CardPrice {
         return try await apiClient.fetchPrice(
-            name: name, edition: edition, isFoil: isFoil, baseURL: apiBaseURL
+            name: name, scryfallId: scryfallId, isFoil: isFoil, baseURL: apiBaseURL
         )
     }
 

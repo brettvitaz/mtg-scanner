@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch Card Kingdom singles prices and import into local SQLite cache."""
+"""Fetch Card Kingdom product catalog and import into local SQLite cache."""
 from __future__ import annotations
 
 import argparse
@@ -10,7 +10,7 @@ import cloudscraper  # type: ignore[import-untyped]
 
 from app.services.ck_prices import import_ck_prices
 
-DEFAULT_URL = "https://www.cardkingdom.com/assets/json/singles_prices.json"
+DEFAULT_URL = "https://www.cardkingdom.com/assets/json/product_catalog.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--url",
         default=DEFAULT_URL,
-        help="URL of the Card Kingdom singles_prices.json.",
+        help="URL of the Card Kingdom product_catalog.json.",
     )
     parser.add_argument(
         "--db-path",

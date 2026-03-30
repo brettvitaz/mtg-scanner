@@ -95,8 +95,8 @@ struct CardDetailView: View {
             if let oracleText = viewModel.displayOracleText {
                 Text(oracleText).font(.body).padding(.top, 2)
             }
-            if let stats = viewModel.statsText {
-                Text(stats).font(.headline.monospacedDigit()).padding(.top, 4)
+            if viewModel.hasStats {
+                CardStatsView(viewModel: viewModel).padding(.top, 4)
             }
         }
     }
@@ -281,6 +281,45 @@ private struct RarityBadge: View {
         case "uncommon": return .gray
         default: return Color.secondary
         }
+    }
+}
+
+private struct CardStatsView: View {
+    @ObservedObject var viewModel: CardDetailViewModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let power = viewModel.displayPower, let toughness = viewModel.displayToughness {
+                StatBadge(icon: "burst.fill", label: "Power", value: power)
+                Text("/").font(.title3.bold()).foregroundStyle(.secondary)
+                StatBadge(icon: "shield.fill", label: "Toughness", value: toughness)
+            }
+            if let loyalty = viewModel.displayLoyalty {
+                StatBadge(icon: "diamond.fill", label: "Loyalty", value: loyalty)
+            }
+            if let defense = viewModel.displayDefense {
+                StatBadge(icon: "shield.checkered", label: "Defense", value: defense)
+            }
+        }
+    }
+}
+
+private struct StatBadge: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.caption).foregroundStyle(.secondary)
+                Text(value).font(.title3.bold().monospacedDigit())
+            }
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

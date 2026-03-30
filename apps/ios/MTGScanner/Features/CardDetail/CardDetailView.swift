@@ -17,6 +17,7 @@ struct CardDetailView: View {
                 CardImageSection(viewModel: viewModel, appModel: appModel, showFullscreen: $showFullscreenImage)
                 identitySection
                 detailsSection
+                priceSection
                 actionsSection
             }
             .padding()
@@ -43,6 +44,7 @@ struct CardDetailView: View {
         viewModel.editCollectorNumber = correction?.collectorNumber ?? viewModel.card.collectorNumber ?? ""
         viewModel.editFoil = correction?.foil ?? viewModel.card.foil ?? false
         Task { await viewModel.loadPrintings(using: appModel) }
+        Task { await viewModel.loadPrice(using: appModel) }
     }
 
     // MARK: - Identity
@@ -102,6 +104,41 @@ struct CardDetailView: View {
                 CardStatsView(viewModel: viewModel).padding(.top, 4)
             }
         }
+    }
+
+    // MARK: - Prices
+
+    @ViewBuilder
+    private var priceSection: some View {
+        if viewModel.isLoadingPrice {
+            HStack {
+                ProgressView()
+                Text("Loading prices...").font(.subheadline).foregroundStyle(.secondary)
+            }
+        } else if let price = viewModel.cardPrice,
+                  price.priceRetail != nil || price.priceBuy != nil {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Card Kingdom Prices").font(.subheadline.bold())
+                HStack(spacing: 16) {
+                    if let retail = price.priceRetail {
+                        PriceLabel(title: "Sell", price: retail, detail: stockText(price.qtyRetail))
+                    }
+                    if let buy = price.priceBuy {
+                        PriceLabel(title: "Buy", price: buy, detail: buyingText(price.qtyBuying))
+                    }
+                }
+            }
+        }
+    }
+
+    private func stockText(_ qty: Int?) -> String? {
+        guard let qty else { return nil }
+        return "\(qty) in stock"
+    }
+
+    private func buyingText(_ qty: Int?) -> String? {
+        guard let qty else { return nil }
+        return "buying \(qty)"
     }
 
     // MARK: - Actions
@@ -249,6 +286,25 @@ private struct PrintingRow: View {
                 RarityBadge(rarity: rarity)
             }
         }
+    }
+}
+
+private struct PriceLabel: View {
+    let title: String
+    let price: String
+    let detail: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text("$\(price)").font(.headline.monospacedDigit())
+            if let detail {
+                Text(detail).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

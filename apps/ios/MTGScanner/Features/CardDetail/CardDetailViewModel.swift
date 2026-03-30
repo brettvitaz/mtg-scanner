@@ -15,6 +15,8 @@ final class CardDetailViewModel: ObservableObject {
     @Published var printings: [CardPrinting] = []
     @Published var isLoadingPrintings = false
     @Published var selectedPrinting: CardPrinting?
+    @Published var cardPrice: CardPrice?
+    @Published var isLoadingPrice = false
 
     // Editable correction fields
     @Published var editTitle: String
@@ -125,6 +127,21 @@ final class CardDetailViewModel: ObservableObject {
             printings = []
         }
         isLoadingPrintings = false
+    }
+
+    func loadPrice(using appModel: AppModel) async {
+        let name = displayTitle
+        let edition = displayEdition
+        guard !name.isEmpty, !edition.isEmpty else { return }
+        isLoadingPrice = true
+        do {
+            cardPrice = try await appModel.fetchPrice(
+                name: name, edition: edition, isFoil: editFoil
+            )
+        } catch {
+            cardPrice = nil
+        }
+        isLoadingPrice = false
     }
 
     func selectPrinting(_ printing: CardPrinting) {

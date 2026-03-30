@@ -235,3 +235,20 @@ struct CardPrinting: Codable, Identifiable {
 struct CardPrintingsResponse: Codable {
     let printings: [CardPrinting]
 }
+
+/// Card Kingdom price data from the price endpoint.
+struct CardPrice: Codable {
+    let priceRetail: String?
+    let qtyRetail: Int?
+    let priceBuy: String?
+    let qtyBuying: Int?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case priceRetail = "price_retail"
+        case qtyRetail = "qty_retail"
+        case priceBuy = "price_buy"
+        case qtyBuying = "qty_buying"
+        case url
+    }
+}

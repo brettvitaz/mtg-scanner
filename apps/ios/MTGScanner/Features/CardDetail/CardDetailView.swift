@@ -51,7 +51,11 @@ struct CardDetailView: View {
 
     private var identitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(viewModel.displayTitle).font(.title2.bold())
+            HStack {
+                Text(viewModel.displayTitle).font(.title2.bold())
+                Spacer()
+                ConfidenceTag(value: viewModel.card.confidence)
+            }
             if let manaCost = viewModel.displayManaCost {
                 Text(manaCost).font(.subheadline.monospaced()).foregroundStyle(.secondary)
             }
@@ -84,9 +88,6 @@ struct CardDetailView: View {
             }
             if let rarity = viewModel.displayRarity {
                 RarityBadge(rarity: rarity)
-            }
-            if viewModel.card.confidence < 1.0 {
-                ConfidenceTag(value: viewModel.card.confidence)
             }
         }
     }

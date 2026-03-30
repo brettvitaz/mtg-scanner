@@ -11,7 +11,8 @@ dependencies = [
   "python-multipart>=0.0.20,<1.0.0",
   "httpx>=0.28.0,<1.0.0",
   "opencv-python-headless>=4.9.0,<5.0.0",
-  "numpy>=1.26.0,<2.0.0"
+  "numpy>=1.26.0,<2.0.0",
+  "cloudscraper>=1.2.0,<2.0.0"
 ]
 
 [project.optional-dependencies]
@@ -43,5 +44,9 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["jsonschema", "jsonschema.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["cloudscraper", "cloudscraper.*"]
 ignore_missing_imports = true
 

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     mtg_scanner_mtgjson_source_path: str = Field(default=str(Path(__file__).resolve().parents[3] / "tmp" / "AllPrintings.json"))
     mtg_scanner_mtgjson_max_fuzzy_candidates: int = Field(default=10)
 
+    mtg_scanner_enable_ck_prices: bool = Field(default=False)
+    mtg_scanner_ck_prices_db_path: str = Field(default=str(Path(__file__).resolve().parents[1] / "data" / "ck_prices" / "ck_prices.sqlite"))
+    mtg_scanner_ck_prices_url: str = Field(default="https://www.cardkingdom.com/assets/json/singles_prices.json")
+
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     mtg_scanner_openai_model: str | None = Field(default=None)
     openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")

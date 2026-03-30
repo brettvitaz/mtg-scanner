@@ -64,6 +64,10 @@ final class CardDetailViewModel: ObservableObject {
         selectedPrinting?.oracleText ?? card.oracleText
     }
 
+    var displayManaCost: String? {
+        selectedPrinting?.manaCost ?? card.manaCost
+    }
+
     var displayPower: String? {
         selectedPrinting?.power ?? card.power
     }

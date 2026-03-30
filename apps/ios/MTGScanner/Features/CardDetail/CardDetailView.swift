@@ -50,6 +50,9 @@ struct CardDetailView: View {
     private var identitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(viewModel.displayTitle).font(.title2.bold())
+            if let manaCost = viewModel.displayManaCost {
+                Text(manaCost).font(.subheadline.monospaced()).foregroundStyle(.secondary)
+            }
             editionButton
             Toggle("Foil", isOn: $viewModel.editFoil).font(.subheadline)
             collectorRarityRow

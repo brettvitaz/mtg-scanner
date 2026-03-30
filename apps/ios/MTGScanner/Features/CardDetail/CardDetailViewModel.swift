@@ -139,6 +139,7 @@ final class CardDetailViewModel: ObservableObject {
                 name: name, edition: edition, isFoil: editFoil
             )
         } catch {
+            print("[CardDetail] Price lookup failed: \(error.localizedDescription)")
             cardPrice = nil
         }
         isLoadingPrice = false

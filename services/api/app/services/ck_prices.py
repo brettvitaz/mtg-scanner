@@ -42,6 +42,7 @@ class CKPriceIndex:
         foil_int = 1 if is_foil else 0
         try:
             with sqlite3.connect(self._db_path) as conn:
+                # Try exact match on name + edition + foil first
                 row = conn.execute(
                     "SELECT price_retail, qty_retail, price_buy, qty_buying, url"
                     " FROM ck_prices"
@@ -49,6 +50,16 @@ class CKPriceIndex:
                     " LIMIT 1",
                     (normalized_name, normalized_edition, foil_int),
                 ).fetchone()
+                if row is None:
+                    # Fall back to name + foil, cheapest retail price
+                    row = conn.execute(
+                        "SELECT price_retail, qty_retail, price_buy, qty_buying, url"
+                        " FROM ck_prices"
+                        " WHERE normalized_name = ? AND is_foil = ?"
+                        " ORDER BY CAST(price_retail AS REAL) ASC"
+                        " LIMIT 1",
+                        (normalized_name, foil_int),
+                    ).fetchone()
         except sqlite3.DatabaseError:
             return None
         if row is None:

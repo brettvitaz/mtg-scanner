@@ -88,6 +88,16 @@ def test_lookup_finds_foil_card(tmp_path: Path) -> None:
     assert result.price_retail == "14.99"
 
 
+def test_lookup_falls_back_to_name_only_when_edition_differs(tmp_path: Path) -> None:
+    db_path = _build_db(tmp_path)
+    index = CKPriceIndex(db_path)
+    # MTGJSON uses "Magic 2010" but CK uses different names — should still find by name
+    result = index.lookup_price(name="Lightning Bolt", edition="Totally Different Name")
+    assert result is not None
+    # Should pick the cheapest retail price (Double Masters at $2.99)
+    assert result.price_retail == "2.99"
+
+
 def test_lookup_returns_none_for_missing_card(tmp_path: Path) -> None:
     db_path = _build_db(tmp_path)
     index = CKPriceIndex(db_path)

@@ -58,7 +58,6 @@ struct CardDetailView: View {
             editionButton
             Toggle("Foil", isOn: $viewModel.editFoil).font(.subheadline)
             collectorRarityRow
-            ConfidenceBadge(value: viewModel.card.confidence)
         }
     }
 
@@ -85,6 +84,9 @@ struct CardDetailView: View {
             }
             if let rarity = viewModel.displayRarity {
                 RarityBadge(rarity: rarity)
+            }
+            if viewModel.card.confidence < 1.0 {
+                ConfidenceTag(value: viewModel.card.confidence)
             }
         }
     }
@@ -285,6 +287,27 @@ private struct PrintingRow: View {
             if let rarity = printing.rarity {
                 RarityBadge(rarity: rarity)
             }
+        }
+    }
+}
+
+private struct ConfidenceTag: View {
+    let value: Double
+
+    var body: some View {
+        Text("\(Int(value * 100))%")
+            .font(.caption.bold().monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color, in: Capsule())
+    }
+
+    private var color: Color {
+        switch value {
+        case 0.85...: return .green
+        case 0.6..<0.85: return .orange
+        default: return .red
         }
     }
 }

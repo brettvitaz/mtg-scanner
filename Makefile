@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-update-mtgjson api-import-ck-prices ios-lint lint tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-lint lint security tree
 
 bootstrap: api-bootstrap
 
@@ -25,7 +25,12 @@ api-update-mtgjson:
 api-import-ck-prices:
 	PYTHONPATH=services/api .venv/bin/python scripts/import_ck_prices.py
 
+api-security:
+	./scripts/security-api.sh
+
 lint: api-lint ios-lint
+
+security: api-security
 
 tree:
 	@find . -maxdepth 3 -type f | sort

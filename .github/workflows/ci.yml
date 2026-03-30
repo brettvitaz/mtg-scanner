@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  api-test:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./services/api[dev]
+      - name: Run tests
+        run: pytest services/api/tests/ -v
+
+  api-lint:
+    name: Backend type checking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./services/api[dev]
+      - name: Run mypy
+        run: mypy --config-file services/api/pyproject.toml services/api/app/
+
+  api-security:
+    name: Backend security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./services/api[dev]
+      - name: Run bandit
+        run: bandit -c services/api/pyproject.toml -r services/api/app/ --confidence-level high
+      - name: Run pip-audit
+        run: pip-audit

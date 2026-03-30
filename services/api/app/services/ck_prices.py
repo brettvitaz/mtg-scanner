@@ -74,8 +74,7 @@ def create_ck_schema(db_path: Path) -> None:
             DROP TABLE IF EXISTS ck_prices;
 
             CREATE TABLE ck_prices (
-                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-                ck_id INTEGER,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 normalized_name TEXT NOT NULL,
                 edition TEXT NOT NULL,
@@ -112,11 +111,10 @@ def import_ck_prices(
             is_foil = 1 if entry.get("is_foil") == "true" else 0
             conn.execute(
                 "INSERT INTO ck_prices"
-                " (ck_id, name, normalized_name, edition, normalized_edition,"
+                " (name, normalized_name, edition, normalized_edition,"
                 "  is_foil, price_retail, qty_retail, price_buy, qty_buying, url)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    entry.get("id"),
                     name,
                     _normalize(name),
                     edition,

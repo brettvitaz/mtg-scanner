@@ -6,7 +6,7 @@ struct DeckDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false
-    @State private var selectedItems: Set<PersistentIdentifier> = []
+    @State private var selectedItems: Set<UUID> = []
     @State private var showMoveSheet = false
     @State private var showCopySheet = false
     @State private var showDeleteConfirmation = false
@@ -175,11 +175,11 @@ extension DeckDetailView {
     }
 
     func selectAll() {
-        selectedItems = Set(deck.items.map(\.persistentModelID))
+        selectedItems = Set(deck.items.map(\.id))
     }
 
     func moveSelectedItems(to destination: MoveDestination) {
-        let items = deck.items.filter { selectedItems.contains($0.persistentModelID) }
+        let items = deck.items.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let collection):
             for item in items {
@@ -198,7 +198,7 @@ extension DeckDetailView {
     }
 
     func copySelectedItems(to destination: MoveDestination) {
-        let items = deck.items.filter { selectedItems.contains($0.persistentModelID) }
+        let items = deck.items.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let collection):
             for item in items {
@@ -219,7 +219,7 @@ extension DeckDetailView {
     }
 
     func deleteSelectedItems() {
-        let items = deck.items.filter { selectedItems.contains($0.persistentModelID) }
+        let items = deck.items.filter { selectedItems.contains($0.id) }
         for item in items {
             modelContext.delete(item)
         }

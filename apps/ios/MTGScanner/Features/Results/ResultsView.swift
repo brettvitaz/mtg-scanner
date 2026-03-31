@@ -12,7 +12,7 @@ struct ResultsView: View {
     private var inboxItems: [CollectionItem]
 
     @State private var isSelecting = false
-    @State private var selectedItems: Set<PersistentIdentifier> = []
+    @State private var selectedItems: Set<UUID> = []
     @State private var showMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
@@ -177,11 +177,11 @@ struct ResultsView: View {
     }
 
     private func selectAll() {
-        selectedItems = Set(inboxItems.map(\.persistentModelID))
+        selectedItems = Set(inboxItems.map(\.id))
     }
 
     private func moveSelectedItems(to destination: MoveDestination) {
-        let items = inboxItems.filter { selectedItems.contains($0.persistentModelID) }
+        let items = inboxItems.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let collection):
             for item in items {
@@ -200,7 +200,7 @@ struct ResultsView: View {
     }
 
     private func deleteSelectedItems() {
-        let items = inboxItems.filter { selectedItems.contains($0.persistentModelID) }
+        let items = inboxItems.filter { selectedItems.contains($0.id) }
         for item in items {
             modelContext.delete(item)
         }

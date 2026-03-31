@@ -100,6 +100,7 @@ final class CollectionItem {
     /// Convert to a RecognizedCard for use with CardDetailView.
     func toRecognizedCard() -> RecognizedCard {
         RecognizedCard(
+            id: id,
             title: title,
             edition: edition,
             collectorNumber: collectorNumber,

@@ -6,7 +6,7 @@ struct CollectionDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false
-    @State private var selectedItems: Set<PersistentIdentifier> = []
+    @State private var selectedItems: Set<UUID> = []
     @State private var showMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
@@ -169,11 +169,11 @@ struct CollectionDetailView: View {
     }
 
     private func selectAll() {
-        selectedItems = Set(collection.items.map(\.persistentModelID))
+        selectedItems = Set(collection.items.map(\.id))
     }
 
     private func copySelectedItems(to destination: MoveDestination) {
-        let items = collection.items.filter { selectedItems.contains($0.persistentModelID) }
+        let items = collection.items.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let targetCollection):
             for item in items {
@@ -194,7 +194,7 @@ struct CollectionDetailView: View {
     }
 
     private func deleteSelectedItems() {
-        let items = collection.items.filter { selectedItems.contains($0.persistentModelID) }
+        let items = collection.items.filter { selectedItems.contains($0.id) }
         for item in items {
             modelContext.delete(item)
         }

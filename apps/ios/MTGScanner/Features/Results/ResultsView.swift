@@ -72,7 +72,7 @@ struct ResultsView: View {
 
     private var cardListWithToolbar: some View {
         VStack(spacing: 0) {
-            List(selection: isSelecting ? $selectedItems : nil) {
+            List(selection: $selectedItems) {
                 Section {
                     ForEach(inboxItems) { item in
                         NavigationLink(value: item.toRecognizedCard()) {

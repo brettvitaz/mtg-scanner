@@ -70,7 +70,7 @@ struct DeckDetailView: View {
     private var cardListWithToolbar: some View {
         let sortedItems = deck.items.sorted { $0.addedAt > $1.addedAt }
         return VStack(spacing: 0) {
-            List(selection: isSelecting ? $selectedItems : nil) {
+            List(selection: $selectedItems) {
                 Section {
                     ForEach(sortedItems) { item in
                         NavigationLink(value: item.toRecognizedCard()) {

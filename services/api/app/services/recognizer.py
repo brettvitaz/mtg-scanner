@@ -268,6 +268,7 @@ class RecognitionService:
         *,
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
+        skip_detection: bool = False,
     ) -> tuple[
         RecognitionResponse,
         RecognitionUploadMetadata,
@@ -278,6 +279,10 @@ class RecognitionService:
 
         If a card detector is configured and multiple cards are detected,
         each card is cropped and recognized individually.
+
+        When *skip_detection* is True the card-detector step is bypassed and
+        the image is sent directly to the LLM provider.  The batch endpoint
+        uses this for pre-cropped images that should not be re-cropped.
 
         Returns:
             Tuple of (RecognitionResponse, enriched metadata, detection result, validation result)
@@ -292,7 +297,7 @@ class RecognitionService:
 
         # Try multi-card detection if detector is available
         detection_result: DetectionResult | None = None
-        if self._card_detector is not None:
+        if self._card_detector is not None and not skip_detection:
             detection_result = self._card_detector.detect(image_bytes)
 
             if detection_result.count > 1:

@@ -95,6 +95,7 @@ async def create_recognition_batch(
             response, enriched_metadata, detection_result, validation_result = service.recognize(
                 image_bytes=image_bytes,
                 metadata=metadata,
+                skip_detection=True,
             )
         except RecognitionConfigurationError as exc:
             raise HTTPException(

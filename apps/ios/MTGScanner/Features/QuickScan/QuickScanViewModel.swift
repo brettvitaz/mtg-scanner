@@ -13,7 +13,7 @@ import UIKit
 /// ```
 /// watching  ──(new card signal)──► settling
 /// settling  ──(timer fires)──────► capturing ──► watching
-/// settling  ──(new signal)───────► settling   (timer restarts)
+/// settling  ──(new signal)───────► (ignored — timer keeps running)
 /// ```
 @MainActor
 final class QuickScanViewModel: ObservableObject {
@@ -89,9 +89,10 @@ final class QuickScanViewModel: ObservableObject {
     private func handleNewCardSignal() {
         guard isActive else { return }
         switch captureState {
-        case .watching, .settling:
+        case .watching:
             startSettleTimer()
-        case .capturing:
+        case .settling, .capturing:
+            // Timer is already running (settling) or capture is in progress — don't interrupt.
             break
         }
     }

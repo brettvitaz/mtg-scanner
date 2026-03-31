@@ -69,7 +69,9 @@ final class QuickScanViewModelTests: XCTestCase {
         XCTAssertEqual(vm.captureState, .watching)
     }
 
-    func testNewSignalWhileSettlingRestartsTimer() async throws {
+    func testNewSignalWhileSettlingDoesNotRestartTimer() async throws {
+        // After the first signal starts the settle timer, additional signals while in
+        // .settling must be ignored so the timer can actually complete.
         let vm = QuickScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
@@ -78,10 +80,33 @@ final class QuickScanViewModelTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, .settling)
 
-        // Fire again while settling — should stay settling (timer restarted).
+        // Subsequent signals should be ignored — state stays .settling.
+        vm.presenceTracker.onNewCardSignal?(nil)
         vm.presenceTracker.onNewCardSignal?(nil)
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, .settling)
+    }
+
+    func testSettleTimerCompletesWhenSignalsAreNotResent() async throws {
+        // Verifies the core behaviour: settle timer must run to completion when
+        // subsequent signals are ignored (the fix for the "always settling" bug).
+        let vm = QuickScanViewModel(detector: nil)
+        vm.captureDelay = 0.1  // short timer for the test
+        vm.start()
+
+        vm.presenceTracker.onNewCardSignal?(nil)
+        // Keep firing signals — they must NOT reset the timer.
+        for _ in 0..<5 {
+            try await Task.sleep(for: .milliseconds(20))
+            vm.presenceTracker.onNewCardSignal?(nil)
+        }
+
+        // Allow the 0.1 s timer to expire (plus a small buffer).
+        try await Task.sleep(for: .milliseconds(200))
+
+        // captureCoordinator is nil in this test, so triggerCapture returns early
+        // but the state must have advanced past .settling.
+        XCTAssertNotEqual(vm.captureState, .settling)
     }
 
     func testSignalIgnoredWhenInactive() async throws {

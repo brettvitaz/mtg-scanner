@@ -44,6 +44,17 @@
 		A00000000000000000000120 /* CardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000220 /* CardDetailView.swift */; };
 		A00000000000000000000121 /* CardDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000221 /* CardDetailViewModel.swift */; };
 		A00000000000000000000122 /* FullscreenImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000222 /* FullscreenImageView.swift */; };
+		A00000000000000000000124 /* CollectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000224 /* CollectionModels.swift */; };
+		A00000000000000000000198 /* CollectionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000298 /* CollectionModelsTests.swift */; };
+		A00000000000000000000125 /* MoveToSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000225 /* MoveToSheet.swift */; };
+		A00000000000000000000126 /* CollectionItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000226 /* CollectionItemRow.swift */; };
+		A00000000000000000000127 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000227 /* LibraryView.swift */; };
+		A00000000000000000000128 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000228 /* LibraryViewModel.swift */; };
+		A00000000000000000000129 /* CollectionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000229 /* CollectionDetailView.swift */; };
+		A0000000000000000000012A /* DeckDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000022A /* DeckDetailView.swift */; };
+		B00000000000000000000011 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* ExportService.swift */; };
+		B00000000000000000000012 /* ExportButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* ExportButton.swift */; };
+		B00000000000000000000013 /* ExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* ExportServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,6 +108,17 @@
 		A00000000000000000000220 /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
 		A00000000000000000000221 /* CardDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailViewModel.swift; sourceTree = "<group>"; };
 		A00000000000000000000222 /* FullscreenImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenImageView.swift; sourceTree = "<group>"; };
+		A00000000000000000000224 /* CollectionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionModels.swift; sourceTree = "<group>"; };
+		A00000000000000000000298 /* CollectionModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionModelsTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000225 /* MoveToSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveToSheet.swift; sourceTree = "<group>"; };
+		A00000000000000000000226 /* CollectionItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionItemRow.swift; sourceTree = "<group>"; };
+		A00000000000000000000227 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		A00000000000000000000228 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		A00000000000000000000229 /* CollectionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailView.swift; sourceTree = "<group>"; };
+		A0000000000000000000022A /* DeckDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckDetailView.swift; sourceTree = "<group>"; };
+		B00000000000000000000001 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 /* ExportButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportButton.swift; sourceTree = "<group>"; };
+		B00000000000000000000003 /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,13 +188,37 @@
 				A00000000000000000000016 /* Results */,
 				A00000000000000000000017 /* Scan */,
 				A00000000000000000000018 /* Settings */,
+				A00000000000000000000027 /* Library */,
+				A00000000000000000000026 /* Shared */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000026 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000002 /* ExportButton.swift */,
+				A00000000000000000000225 /* MoveToSheet.swift */,
+				A00000000000000000000226 /* CollectionItemRow.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000027 /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000227 /* LibraryView.swift */,
+				A00000000000000000000228 /* LibraryViewModel.swift */,
+				A00000000000000000000229 /* CollectionDetailView.swift */,
+				A0000000000000000000022A /* DeckDetailView.swift */,
+			);
+			path = Library;
 			sourceTree = "<group>";
 		};
 		A00000000000000000000013 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A00000000000000000000224 /* CollectionModels.swift */,
 				A00000000000000000000207 /* RecognitionModels.swift */,
 			);
 			path = Models;
@@ -183,6 +229,7 @@
 			children = (
 				A00000000000000000000208 /* APIClient.swift */,
 				A0000000000000000000020D /* CardCropService.swift */,
+				B00000000000000000000001 /* ExportService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -319,6 +366,8 @@
 				A00000000000000000000295 /* APIClientHealthTests.swift */,
 				A00000000000000000000296 /* ZoomFactorTests.swift */,
 				A00000000000000000000297 /* ZoomPresetTests.swift */,
+				A00000000000000000000298 /* CollectionModelsTests.swift */,
+				B00000000000000000000003 /* ExportServiceTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
@@ -442,6 +491,15 @@
 				A00000000000000000000120 /* CardDetailView.swift in Sources */,
 				A00000000000000000000121 /* CardDetailViewModel.swift in Sources */,
 				A00000000000000000000122 /* FullscreenImageView.swift in Sources */,
+				A00000000000000000000124 /* CollectionModels.swift in Sources */,
+				A00000000000000000000125 /* MoveToSheet.swift in Sources */,
+				A00000000000000000000126 /* CollectionItemRow.swift in Sources */,
+				A00000000000000000000127 /* LibraryView.swift in Sources */,
+				A00000000000000000000128 /* LibraryViewModel.swift in Sources */,
+				A00000000000000000000129 /* CollectionDetailView.swift in Sources */,
+				A0000000000000000000012A /* DeckDetailView.swift in Sources */,
+				B00000000000000000000011 /* ExportService.swift in Sources */,
+				B00000000000000000000012 /* ExportButton.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -457,6 +515,8 @@
 				A00000000000000000000195 /* APIClientHealthTests.swift in Sources */,
 				A00000000000000000000196 /* ZoomFactorTests.swift in Sources */,
 				A00000000000000000000197 /* ZoomPresetTests.swift in Sources */,
+				A00000000000000000000198 /* CollectionModelsTests.swift in Sources */,
+				B00000000000000000000013 /* ExportServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

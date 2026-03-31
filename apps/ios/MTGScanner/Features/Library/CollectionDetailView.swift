@@ -1,15 +1,9 @@
 import SwiftData
 import SwiftUI
 
-struct ResultsView: View {
-    @EnvironmentObject private var appModel: AppModel
+struct CollectionDetailView: View {
+    @Bindable var collection: CardCollection
     @Environment(\.modelContext) private var modelContext
-    @Query(
-        filter: #Predicate<CollectionItem> { $0.collection == nil && $0.deck == nil },
-        sort: \CollectionItem.addedAt,
-        order: .reverse
-    )
-    private var inboxItems: [CollectionItem]
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
@@ -18,23 +12,20 @@ struct ResultsView: View {
     @State private var exportFile: ExportActivityItem?
 
     var body: some View {
-        NavigationStack(path: $appModel.resultsNavigationPath) {
-            Group {
-                if inboxItems.isEmpty {
-                    emptyState
-                } else {
-                    cardListWithToolbar
-                }
-            }
-            .navigationTitle("Results")
-            .toolbar { topToolbar }
-            .navigationDestination(for: RecognizedCard.self) { card in
-                CardDetailView(card: card)
-                    .environmentObject(appModel)
+        Group {
+            if collection.items.isEmpty {
+                emptyState
+            } else {
+                cardListWithToolbar
             }
         }
+        .navigationTitle(collection.name)
+        .navigationDestination(for: RecognizedCard.self) { card in
+            CardDetailView(card: card)
+        }
+        .toolbar { topToolbar }
         .sheet(isPresented: $showMoveSheet) {
-            MoveToSheet(title: "Copy To") { destination in
+            MoveToSheet(title: "Copy To Deck") { destination in
                 copySelectedItems(to: destination)
             }
         }
@@ -54,12 +45,12 @@ struct ResultsView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Image(systemName: "rectangle.and.text.magnifyingglass")
+            Image(systemName: "folder")
                 .font(.system(size: 52))
                 .foregroundStyle(.secondary)
-            Text("No results yet")
+            Text("No cards in this collection")
                 .font(.title3.bold())
-            Text("Scan a card to see recognition results here.")
+            Text("Move cards here from the Results tab.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -71,23 +62,24 @@ struct ResultsView: View {
     // MARK: - Card List
 
     private var cardListWithToolbar: some View {
-        VStack(spacing: 0) {
+        let sortedItems = collection.items.sorted { $0.addedAt > $1.addedAt }
+        return VStack(spacing: 0) {
             List(selection: $selectedItems) {
                 Section {
-                    ForEach(inboxItems) { item in
+                    ForEach(sortedItems) { item in
                         if isSelecting {
                             CollectionItemRow(item: item)
                         } else {
                             NavigationLink(value: item.toRecognizedCard()) {
-                                CollectionItemRow(item: item)
+                                CollectionItemRow(item: item, showQuantityStepper: true)
                             }
                         }
                     }
                 } header: {
                     HStack {
-                        Text("Scanned Cards")
+                        Text("Cards")
                         Spacer()
-                        Text("\(inboxItems.totalQuantity) card(s)")
+                        Text("\(collection.items.totalQuantity) card(s)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -113,16 +105,16 @@ struct ResultsView: View {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if isSelecting {
                 Menu {
-                    ExportMenuContent(items: inboxItems, name: "results", exportFile: $exportFile)
+                    ExportMenuContent(items: collection.items, name: collection.name, exportFile: $exportFile)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
                 Button { exitSelecting() } label: {
                     Image(systemName: "xmark")
                 }
-            } else if !inboxItems.isEmpty {
+            } else if !collection.items.isEmpty {
                 Menu {
-                    ExportMenuContent(items: inboxItems, name: "results", exportFile: $exportFile)
+                    ExportMenuContent(items: collection.items, name: collection.name, exportFile: $exportFile)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -140,8 +132,8 @@ struct ResultsView: View {
                 showMoveSheet = true
             } label: {
                 VStack(spacing: 2) {
-                    Image(systemName: "doc.on.doc")
-                    Text("Copy").font(.caption2)
+                    Image(systemName: "rectangle.stack")
+                    Text("Copy to Deck").font(.caption2)
                 }
             }
             .disabled(selectedItems.isEmpty)
@@ -177,19 +169,19 @@ struct ResultsView: View {
     }
 
     private func selectAll() {
-        selectedItems = Set(inboxItems.map(\.id))
+        selectedItems = Set(collection.items.map(\.id))
     }
 
     private func copySelectedItems(to destination: MoveDestination) {
-        let items = inboxItems.filter { selectedItems.contains($0.id) }
+        let items = collection.items.filter { selectedItems.contains($0.id) }
         switch destination {
-        case .collection(let collection):
+        case .collection(let targetCollection):
             for item in items {
                 let copy = item.duplicate()
-                copy.collection = collection
-                mergeOrInsert(copy, into: collection.items, context: modelContext)
+                copy.collection = targetCollection
+                mergeOrInsert(copy, into: targetCollection.items, context: modelContext)
             }
-            collection.updatedAt = Date()
+            targetCollection.updatedAt = Date()
         case .deck(let deck):
             for item in items {
                 let copy = item.duplicate()
@@ -202,22 +194,11 @@ struct ResultsView: View {
     }
 
     private func deleteSelectedItems() {
-        let items = inboxItems.filter { selectedItems.contains($0.id) }
+        let items = collection.items.filter { selectedItems.contains($0.id) }
         for item in items {
             modelContext.delete(item)
         }
+        collection.updatedAt = Date()
         exitSelecting()
-    }
-}
-
-// MARK: - Hashable conformance for NavigationLink
-
-extension RecognizedCard: Hashable {
-    static func == (lhs: RecognizedCard, rhs: RecognizedCard) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
     }
 }

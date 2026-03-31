@@ -70,8 +70,8 @@ Do not modify files or add features outside the stated task scope. If you discov
 ## Development commands
 
 ```bash
-# Backend
-make api-bootstrap          # create venv and install deps
+# Backend (requires uv: brew install uv)
+make api-bootstrap          # create venv and install deps via uv
 make api-run                # start FastAPI dev server
 make api-test               # run pytest suite
 make api-lint               # run mypy type checking
@@ -89,7 +89,7 @@ make lint                   # run all static analysis (mypy + SwiftLint)
 PYTHONPATH=services/api python evals/run_eval.py
 
 # MTGJSON import
-PYTHONPATH=services/api ./services/api/.venv/bin/python scripts/import_mtgjson.py \
+PYTHONPATH=services/api .venv/bin/python scripts/import_mtgjson.py \
   tmp/AllPrintings.json
 ```
 
@@ -216,7 +216,7 @@ cd -
 git worktree remove ../mtg-scanner-worktrees/<task-description>
 ```
 
-The bootstrap script (`scripts/bootstrap-api.sh`) is the single source of truth for Python environment setup. It creates the virtualenv, upgrades pip, and installs all dependencies including dev tools (pytest, mypy). Do not install packages manually — update `pyproject.toml` and re-run the bootstrap script.
+The bootstrap script (`scripts/bootstrap-api.sh`) is the single source of truth for Python environment setup. It uses `uv` to create the virtualenv and install all dependencies including dev tools (pytest, mypy). Do not install packages manually — update `pyproject.toml` and re-run the bootstrap script. Install uv with `brew install uv`.
 
 ## Documentation
 

@@ -8,6 +8,6 @@ bandit -c services/api/pyproject.toml -r services/api/app/ --confidence-level hi
 echo "bandit passed."
 
 echo ""
-echo "Running pip-audit dependency scan..."
-pip-audit
-echo "pip-audit passed."
+echo "Running uv dependency audit..."
+uv audit --directory services/api
+echo "uv audit passed."

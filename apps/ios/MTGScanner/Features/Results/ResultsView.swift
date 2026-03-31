@@ -75,8 +75,12 @@ struct ResultsView: View {
             List(selection: $selectedItems) {
                 Section {
                     ForEach(inboxItems) { item in
-                        NavigationLink(value: item.toRecognizedCard()) {
+                        if isSelecting {
                             CollectionItemRow(item: item)
+                        } else {
+                            NavigationLink(value: item.toRecognizedCard()) {
+                                CollectionItemRow(item: item)
+                            }
                         }
                     }
                 } header: {

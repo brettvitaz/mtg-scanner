@@ -33,7 +33,11 @@ struct CardDetailView: View {
         .onChange(of: viewModel.editTitle) { _, _ in autoSave() }
         .onChange(of: viewModel.editEdition) { _, _ in autoSave() }
         .onChange(of: viewModel.editCollectorNumber) { _, _ in autoSave() }
-        .onChange(of: viewModel.editFoil) { _, _ in autoSave() }
+        .onChange(of: viewModel.editFoil) { _, _ in
+            autoSave()
+            guard isInitialized else { return }
+            Task { await viewModel.loadPrice(using: appModel) }
+        }
         .onChange(of: viewModel.selectedPrinting) { _, _ in autoSave() }
         .fullScreenCover(isPresented: $showFullscreenImage) {
             FullscreenImageView(
@@ -42,7 +46,7 @@ struct CardDetailView: View {
             )
         }
         .sheet(isPresented: $showEditionPicker) {
-            EditionPickerSheet(viewModel: viewModel, isPresented: $showEditionPicker)
+            EditionPickerSheet(viewModel: viewModel, appModel: appModel, isPresented: $showEditionPicker)
         }
         .sheet(isPresented: $showAddToSheet) {
             MoveToSheet(title: "Add To") { destination in
@@ -74,7 +78,7 @@ struct CardDetailView: View {
         Button { showEditionPicker = true } label: {
             HStack(spacing: 6) {
                 if let symbolUrl = viewModel.displaySetSymbolUrl {
-                    AsyncImage(url: symbolUrl) { phase in
+                    CachedAsyncImage(url: symbolUrl) { phase in
                         if case .success(let img) = phase { img.resizable().aspectRatio(contentMode: .fit) }
                     }
                     .frame(width: 16, height: 16)
@@ -186,6 +190,7 @@ extension CardDetailView {
         viewModel.editEdition = correction?.edition ?? viewModel.card.edition ?? ""
         viewModel.editCollectorNumber = correction?.collectorNumber ?? viewModel.card.collectorNumber ?? ""
         viewModel.editFoil = correction?.foil ?? viewModel.card.foil ?? false
+        viewModel.selectedPrinting = correction?.selectedPrintingSnapshot
         isInitialized = true
         Task { await viewModel.loadPrintings(using: appModel) }
         Task { await viewModel.loadPrice(using: appModel) }
@@ -237,13 +242,15 @@ extension CardDetailView {
         let item = CollectionItem(from: viewModel.card, correction: correction)
         switch destination {
         case .collection(let collection):
-            item.collection = collection
-            mergeOrInsert(item, into: collection.items, context: modelContext)
+            mergeOrInsert(item, into: collection.items, context: modelContext) {
+                $0.collection = collection
+            }
             collection.updatedAt = Date()
             showAddedMessage("Added to \(collection.name)")
         case .deck(let deck):
-            item.deck = deck
-            mergeOrInsert(item, into: deck.items, context: modelContext)
+            mergeOrInsert(item, into: deck.items, context: modelContext) {
+                $0.deck = deck
+            }
             deck.updatedAt = Date()
             showAddedMessage("Added to \(deck.name)")
         }
@@ -285,7 +292,7 @@ private struct CardImageSection: View {
         if viewModel.showingCropImage, let crop = appModel.cardCropImages[viewModel.card.id] {
             Image(uiImage: crop).resizable().aspectRatio(contentMode: .fit).frame(height: 340)
         } else if let url = viewModel.displayImageUrl {
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let img): img.resizable().aspectRatio(contentMode: .fit).frame(height: 340)
                 case .failure: CardImagePlaceholder()
@@ -312,6 +319,7 @@ private struct CardImageSection: View {
 
 private struct EditionPickerSheet: View {
     @ObservedObject var viewModel: CardDetailViewModel
+    let appModel: AppModel
     @Binding var isPresented: Bool
 
     var body: some View {
@@ -344,7 +352,7 @@ private struct EditionPickerSheet: View {
     private var printingsList: some View {
         List(viewModel.printings) { printing in
             Button {
-                viewModel.selectPrinting(printing)
+                viewModel.selectPrinting(printing, using: appModel)
                 isPresented = false
             } label: {
                 PrintingRow(printing: printing)

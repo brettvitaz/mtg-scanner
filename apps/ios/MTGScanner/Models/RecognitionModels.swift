@@ -179,6 +179,7 @@ struct CardCorrection: Identifiable, Codable {
     var edition: String
     var collectorNumber: String
     var foil: Bool
+    var selectedPrintingSnapshot: CardPrinting?
 
     init(from card: RecognizedCard) {
         self.id = card.id
@@ -186,6 +187,7 @@ struct CardCorrection: Identifiable, Codable {
         self.edition = card.edition ?? ""
         self.collectorNumber = card.collectorNumber ?? ""
         self.foil = card.foil ?? false
+        self.selectedPrintingSnapshot = nil
     }
 }
 

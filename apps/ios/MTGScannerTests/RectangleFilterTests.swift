@@ -99,6 +99,20 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
     }
 
+    func testFilterAcceptsPortraitCardInLandscapeBuffer() {
+        // When the device is in landscape, a card standing upright appears portrait-shaped in the
+        // 1920×1080 sensor buffer. The normalized short/long ratio is NOT the physical card ratio;
+        // it equals targetAspectRatio × (1080/1920) ≈ 0.402 because Vision normalizes x over 1920
+        // pixels but y over only 1080 pixels — compressing x-distances by 9/16.
+        // The portrait-in-buffer acceptance band [portraitLower, portraitUpper] must cover this.
+        let portraitInBufferRatio = RectangleFilter.targetAspectRatio * (1080.0 / 1920.0)
+        let height: CGFloat = 0.4
+        let width = height * portraitInBufferRatio  // narrow: card's 63 mm squeezed by 1/1920
+        let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
+        let result = filter.filter([obs])
+        XCTAssertEqual(result.count, 1)
+    }
+
     func testFilterAcceptsAtLowerToleranceBound() {
         // Edge ratio at the lower bound of tolerance should be accepted.
         let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)

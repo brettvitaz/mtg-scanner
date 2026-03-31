@@ -19,6 +19,21 @@ struct RectangleFilter {
     /// while rejecting square objects (coasters, books, etc.).
     static let aspectRatioTolerance: CGFloat = 0.20
 
+    /// The camera buffer is 1920×1080 (16:9) per CameraSessionManager's `.hd1920x1080` preset.
+    /// In Vision normalized coordinates (0–1), 1 unit in x = 1920 pixels and 1 unit in y = 1080
+    /// pixels. Distances are therefore NOT square-pixel-equal: x-distances are compressed by 9/16
+    /// relative to y-distances.
+    ///
+    /// When a card is portrait-oriented (upright) in the landscape buffer, its normalized short/long
+    /// edge ratio is targetAspectRatio × (1080/1920) ≈ 0.402 — well below the landscape-oriented
+    /// card ratio of ≈ 0.785. A second acceptance band covers this case so that vertical cards are
+    /// detected when the device is held in landscape.
+    ///
+    /// Derivation: for a 63mm-wide × 88mm-tall card in the 1920×1080 buffer —
+    ///   norm_width  = 63k / 1920,  norm_height = 88k / 1080
+    ///   ratio = norm_width / norm_height = (63/88) × (1080/1920) ≈ 0.402
+    private static let portraitInBufferRatio: CGFloat = targetAspectRatio * (1080.0 / 1920.0)
+
     /// Minimum Vision confidence required to consider an observation.
     static let minConfidence: Float = 0.4
 
@@ -72,8 +87,12 @@ struct RectangleFilter {
     ///
     /// Uses the quad's corner points to compute actual edge lengths rather than the
     /// axis-aligned bounding box, which distorts the ratio for slightly rotated cards.
-    /// Only accepts cards roughly aligned with the camera orientation — landscape cards
-    /// are intentionally excluded to reduce false positives.
+    ///
+    /// Two acceptance bands cover both device orientations:
+    /// - Landscape-in-buffer (~0.785): card's long axis is horizontal in the sensor (portrait phone).
+    /// - Portrait-in-buffer (~0.402): card's long axis is vertical in the sensor (landscape phone).
+    ///   The 16:9 buffer compresses normalized x-distances by 9/16, shifting the observed ratio to
+    ///   targetAspectRatio × (1080/1920) ≈ 0.402.
     private func isCardAspectRatio(_ obs: VNRectangleObservation) -> Bool {
         let topEdge = dist(obs.topLeft, obs.topRight)
         let bottomEdge = dist(obs.bottomLeft, obs.bottomRight)
@@ -85,9 +104,14 @@ struct RectangleFilter {
         guard avgWidth > 0, avgHeight > 0 else { return false }
 
         let ratio = min(avgWidth, avgHeight) / max(avgWidth, avgHeight)
-        let lower = Self.targetAspectRatio * (1 - Self.aspectRatioTolerance)
-        let upper = Self.targetAspectRatio * (1 + Self.aspectRatioTolerance)
-        return ratio >= lower && ratio <= upper
+
+        let landscapeLower = Self.targetAspectRatio * (1 - Self.aspectRatioTolerance)
+        let landscapeUpper = Self.targetAspectRatio * (1 + Self.aspectRatioTolerance)
+        let portraitLower = Self.portraitInBufferRatio * (1 - Self.aspectRatioTolerance)
+        let portraitUpper = Self.portraitInBufferRatio * (1 + Self.aspectRatioTolerance)
+
+        return (ratio >= landscapeLower && ratio <= landscapeUpper)
+            || (ratio >= portraitLower && ratio <= portraitUpper)
     }
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {

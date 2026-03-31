@@ -18,7 +18,7 @@ struct ScanView: View {
             cameraPreview
                 .ignoresSafeArea()
 
-            if detectionViewModel.detectionMode == .quickScan {
+            if appModel.quickScanEnabled {
                 QuickScanView(
                     viewModel: quickScanViewModel,
                     recognitionQueue: quickScanViewModel.recognitionQueue
@@ -51,6 +51,7 @@ struct ScanView: View {
             detectionViewModel.requestCameraPermissionIfNeeded()
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             configureQuickScan()
+            detectionViewModel.detectionMode = appModel.quickScanEnabled ? .quickScan : .table
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
@@ -68,13 +69,11 @@ struct ScanView: View {
             quickScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
         }
         .onChange(of: appModel.quickScanEnabled) { _, enabled in
-            if !enabled, detectionViewModel.detectionMode == .quickScan {
-                detectionViewModel.detectionMode = .table
-            }
-        }
-        .onChange(of: detectionViewModel.detectionMode) { _, mode in
-            if mode != .quickScan {
+            if enabled {
+                detectionViewModel.detectionMode = .quickScan
+            } else {
                 quickScanViewModel.stop()
+                detectionViewModel.detectionMode = .table
             }
         }
         .alert("Camera Access Required", isPresented: $detectionViewModel.cameraPermissionDenied) {
@@ -111,7 +110,7 @@ struct ScanView: View {
             onZoomFactorChanged: { factor in
                 detectionViewModel.zoomFactor = factor
             },
-            onQuickScanFrame: detectionViewModel.detectionMode == .quickScan
+            onQuickScanFrame: appModel.quickScanEnabled
                 ? { [weak quickScanViewModel] buffer in quickScanViewModel?.processFrame(buffer) }
                 : nil
         )
@@ -171,20 +170,14 @@ struct ScanView: View {
         .disabled(appModel.isRecognizing)
     }
 
-    private var availableModes: [DetectionMode] {
-        var modes: [DetectionMode] = [.table, .binder]
-        if appModel.quickScanEnabled { modes.append(.quickScan) }
-        return modes
-    }
-
     private var modeToggle: some View {
         Picker("Mode", selection: $detectionViewModel.detectionMode) {
-            ForEach(availableModes) { mode in
+            ForEach([DetectionMode.table, .binder]) { mode in
                 Text(mode.displayName).tag(mode)
             }
         }
         .pickerStyle(.segmented)
-        .frame(width: appModel.quickScanEnabled ? 200 : 130)
+        .frame(width: 130)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 

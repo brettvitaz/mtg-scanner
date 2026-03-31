@@ -6,6 +6,15 @@ struct MTGScannerApp: App {
     @StateObject private var appModel = AppModel()
     @StateObject private var libraryViewModel = LibraryViewModel()
 
+    init() {
+        let cacheDir = URL.cachesDirectory.appending(path: "card-images")
+        URLCache.shared = URLCache(
+            memoryCapacity: 50 * 1024 * 1024,
+            diskCapacity: 200 * 1024 * 1024,
+            directory: cacheDir
+        )
+    }
+
     let modelContainer: ModelContainer = {
         let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self])
         let configuration = ModelConfiguration(isStoredInMemoryOnly: false)

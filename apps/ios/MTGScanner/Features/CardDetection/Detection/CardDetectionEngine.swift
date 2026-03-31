@@ -78,7 +78,11 @@ final class CardDetectionEngine {
     #endif
 
     // swiftlint:disable:next function_body_length
-    private func detectTableCards(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, isLandscape: Bool) -> [DetectedCard] {
+    private func detectTableCards(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        isLandscape: Bool
+    ) -> [DetectedCard] {
         let observations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 10,

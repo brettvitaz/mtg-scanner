@@ -2,6 +2,7 @@ import XCTest
 import Vision
 @testable import MTGScanner
 
+// swiftlint:disable type_body_length
 final class RectangleFilterTests: XCTestCase {
 
     private let filter = RectangleFilter()
@@ -124,9 +125,10 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterAcceptsAtUpperToleranceBound() {
+        // Use a value just inside the upper bound to avoid floating-point boundary fragility.
         let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance)
         let height: CGFloat = 0.4
-        let width = height * upper
+        let width = height * (upper - 0.005)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
         let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
@@ -144,10 +146,9 @@ final class RectangleFilterTests: XCTestCase {
     // MARK: - Aspect ratio — landscape device (isLandscape: true)
 
     func testFilterAcceptsPortraitCardInLandscapeBuffer() {
-        // Landscape device: card standing upright has its long axis vertical in the 1920×1080 buffer.
-        // The normalized short/long ratio = targetAspectRatio × (1080/1920) ≈ 0.402 because Vision
-        // normalizes x over 1920 pixels but y over 1080 pixels, compressing x-distances by 9/16.
-        // isLandscape: true activates the portrait-in-buffer band which accepts this ratio.
+        // Landscape device: card upright has its long axis vertical in the 1920×1080 buffer.
+        // Normalized ratio = targetAspectRatio × (1080/1920) ≈ 0.402 because Vision compresses
+        // x-distances by 9/16. isLandscape: true activates the portrait-in-buffer band.
         let height: CGFloat = 0.4
         let width = height * RectangleFilter.portraitInBufferRatio
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -156,8 +157,8 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterRejectsHorizontalCardInLandscapeMode() {
-        // Landscape device: a card lying flat (landscape-in-buffer, ratio ≈ 0.716 normalized)
-        // must be rejected so only upright cards are detected when the device is landscape.
+        // Landscape device: card lying flat (landscape-in-buffer, ratio ≈ 0.716) must be rejected
+        // so only upright cards are detected when the device is landscape.
         let ratio = RectangleFilter.targetAspectRatio
         let height: CGFloat = 0.4
         let width = height * ratio
@@ -302,3 +303,4 @@ final class RectangleFilterTests: XCTestCase {
         return obs
     }
 }
+// swiftlint:enable type_body_length

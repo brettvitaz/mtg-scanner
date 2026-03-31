@@ -1,0 +1,126 @@
+import AVFoundation
+import Foundation
+import SwiftData
+import UIKit
+
+/// State machine for the Quick Scan mode.
+///
+/// Observes `CardPresenceTracker` for new-card signals, runs a configurable settle
+/// timer to wait for the card to stop moving, triggers a still-photo capture, then
+/// enqueues the image for asynchronous recognition via `RecognitionQueue`.
+///
+/// State transitions:
+/// ```
+/// watching  ──(new card signal)──► settling
+/// settling  ──(timer fires)──────► capturing ──► watching
+/// settling  ──(new signal)───────► settling   (timer restarts)
+/// ```
+@MainActor
+final class QuickScanViewModel: ObservableObject {
+
+    // MARK: - State
+
+    enum CaptureState {
+        case watching
+        case settling
+        case capturing
+    }
+
+    @Published private(set) var isActive = false
+    @Published private(set) var captureState: CaptureState = .watching
+    @Published private(set) var statusMessage = "Tap Start to begin."
+
+    // MARK: - Child Objects
+
+    let presenceTracker: CardPresenceTracker
+    let recognitionQueue: RecognitionQueue
+
+    // MARK: - Configuration
+
+    var captureDelay: TimeInterval = 2.0
+
+    // MARK: - Wiring (set by ScanView after init)
+
+    weak var captureCoordinator: CameraCaptureCoordinator?
+    var modelContext: ModelContext?
+    var apiBaseURL: String = ""
+
+    // MARK: - Private
+
+    private var settleTask: Task<Void, Never>?
+
+    // MARK: - Init
+
+    init(detector: YOLOCardDetector?) {
+        presenceTracker = CardPresenceTracker(detector: detector)
+        recognitionQueue = RecognitionQueue()
+
+        presenceTracker.onNewCardSignal = { [weak self] _ in
+            Task { @MainActor [weak self] in self?.handleNewCardSignal() }
+        }
+    }
+
+    // MARK: - Controls
+
+    func start() {
+        isActive = true
+        captureState = .watching
+        statusMessage = "Watching for cards…"
+    }
+
+    func stop() {
+        isActive = false
+        settleTask?.cancel()
+        settleTask = nil
+        captureState = .watching
+        statusMessage = "Tap Start to begin."
+    }
+
+    // MARK: - Frame Forwarding
+
+    /// Forward camera frames to the presence tracker while active.
+    func processFrame(_ sampleBuffer: CMSampleBuffer) {
+        guard isActive, captureState != .capturing else { return }
+        presenceTracker.processFrame(sampleBuffer)
+    }
+
+    // MARK: - State Machine
+
+    private func handleNewCardSignal() {
+        guard isActive else { return }
+        switch captureState {
+        case .watching, .settling:
+            startSettleTimer()
+        case .capturing:
+            break
+        }
+    }
+
+    private func startSettleTimer() {
+        captureState = .settling
+        statusMessage = "Card detected — settling…"
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(captureDelay))
+            guard !Task.isCancelled else { return }
+            await triggerCapture()
+        }
+    }
+
+    private func triggerCapture() async {
+        captureState = .capturing
+        statusMessage = "Capturing…"
+
+        guard let image = await captureCoordinator?.capturePhoto() else {
+            captureState = .watching
+            statusMessage = "Capture failed — watching…"
+            return
+        }
+
+        presenceTracker.markCaptured()
+        recognitionQueue.enqueue(image: image, apiBaseURL: apiBaseURL, modelContext: modelContext)
+        captureState = .watching
+        statusMessage = "Captured! Watching for next card…"
+    }
+}

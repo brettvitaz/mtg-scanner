@@ -57,6 +57,18 @@
 		B00000000000000000000011 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* ExportService.swift */; };
 		B00000000000000000000012 /* ExportButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* ExportButton.swift */; };
 		B00000000000000000000013 /* ExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* ExportServiceTests.swift */; };
+		C000000000000000000001A0 /* MTGCardDetector.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A0 /* MTGCardDetector.mlpackage */; };
+		C000000000000000000001A1 /* YOLOCardDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A1 /* YOLOCardDetector.swift */; };
+		C000000000000000000001A2 /* FrameDifferenceAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A2 /* FrameDifferenceAnalyzer.swift */; };
+		C000000000000000000001A3 /* CardPresenceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A3 /* CardPresenceTracker.swift */; };
+		C000000000000000000001A4 /* QuickScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A4 /* QuickScanView.swift */; };
+		C000000000000000000001A5 /* QuickScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A5 /* QuickScanViewModel.swift */; };
+		C000000000000000000001A6 /* RecognitionQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A6 /* RecognitionQueue.swift */; };
+		C000000000000000000001B0 /* YOLOCardDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B0 /* YOLOCardDetectorTests.swift */; };
+		C000000000000000000001B1 /* FrameDifferenceAnalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */; };
+		C000000000000000000001B2 /* CardPresenceTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B2 /* CardPresenceTrackerTests.swift */; };
+		C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B3 /* QuickScanViewModelTests.swift */; };
+		C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B4 /* RecognitionQueueTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -123,6 +135,18 @@
 		B00000000000000000000001 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
 		B00000000000000000000002 /* ExportButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportButton.swift; sourceTree = "<group>"; };
 		B00000000000000000000003 /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002A0 /* MTGCardDetector.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = MTGCardDetector.mlpackage; sourceTree = "<group>"; };
+		C000000000000000000002A1 /* YOLOCardDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCardDetector.swift; sourceTree = "<group>"; };
+		C000000000000000000002A2 /* FrameDifferenceAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDifferenceAnalyzer.swift; sourceTree = "<group>"; };
+		C000000000000000000002A3 /* CardPresenceTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPresenceTracker.swift; sourceTree = "<group>"; };
+		C000000000000000000002A4 /* QuickScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanView.swift; sourceTree = "<group>"; };
+		C000000000000000000002A5 /* QuickScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModel.swift; sourceTree = "<group>"; };
+		C000000000000000000002A6 /* RecognitionQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueue.swift; sourceTree = "<group>"; };
+		C000000000000000000002B0 /* YOLOCardDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCardDetectorTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDifferenceAnalyzerTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B2 /* CardPresenceTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPresenceTrackerTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B3 /* QuickScanViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModelTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B4 /* RecognitionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueueTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -194,6 +218,7 @@
 				A00000000000000000000018 /* Settings */,
 				A00000000000000000000027 /* Library */,
 				A00000000000000000000026 /* Shared */,
+				C00000000000000000000001 /* QuickScan */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -245,6 +270,7 @@
 				A0000000000000000000020C /* Assets.xcassets */,
 				A00000000000000000000209 /* AppConfig.swift */,
 				A00000000000000000000280 /* Info.plist */,
+				C000000000000000000002A0 /* MTGCardDetector.mlpackage */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -299,6 +325,9 @@
 				A00000000000000000000213 /* GridInterpolator.swift */,
 				A00000000000000000000214 /* CardDetectionEngine.swift */,
 				A0000000000000000000021B /* CardTracker.swift */,
+				C000000000000000000002A1 /* YOLOCardDetector.swift */,
+				C000000000000000000002A2 /* FrameDifferenceAnalyzer.swift */,
+				C000000000000000000002A3 /* CardPresenceTracker.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -374,8 +403,23 @@
 				A00000000000000000000297 /* ZoomPresetTests.swift */,
 				A00000000000000000000298 /* CollectionModelsTests.swift */,
 				B00000000000000000000003 /* ExportServiceTests.swift */,
+				C000000000000000000002B0 /* YOLOCardDetectorTests.swift */,
+				C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */,
+				C000000000000000000002B2 /* CardPresenceTrackerTests.swift */,
+				C000000000000000000002B3 /* QuickScanViewModelTests.swift */,
+				C000000000000000000002B4 /* RecognitionQueueTests.swift */,
 			);
 			path = MTGScannerTests;
+			sourceTree = "<group>";
+		};
+		C00000000000000000000001 /* QuickScan */ = {
+			isa = PBXGroup;
+			children = (
+				C000000000000000000002A4 /* QuickScanView.swift */,
+				C000000000000000000002A5 /* QuickScanViewModel.swift */,
+				C000000000000000000002A6 /* RecognitionQueue.swift */,
+			);
+			path = QuickScan;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -459,6 +503,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000010B /* Assets.xcassets in Resources */,
+				C000000000000000000001A0 /* MTGCardDetector.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -508,6 +553,12 @@
 				A0000000000000000000012A /* DeckDetailView.swift in Sources */,
 				B00000000000000000000011 /* ExportService.swift in Sources */,
 				B00000000000000000000012 /* ExportButton.swift in Sources */,
+				C000000000000000000001A1 /* YOLOCardDetector.swift in Sources */,
+				C000000000000000000001A2 /* FrameDifferenceAnalyzer.swift in Sources */,
+				C000000000000000000001A3 /* CardPresenceTracker.swift in Sources */,
+				C000000000000000000001A4 /* QuickScanView.swift in Sources */,
+				C000000000000000000001A5 /* QuickScanViewModel.swift in Sources */,
+				C000000000000000000001A6 /* RecognitionQueue.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -525,6 +576,11 @@
 				A00000000000000000000197 /* ZoomPresetTests.swift in Sources */,
 				A00000000000000000000198 /* CollectionModelsTests.swift in Sources */,
 				B00000000000000000000013 /* ExportServiceTests.swift in Sources */,
+				C000000000000000000001B0 /* YOLOCardDetectorTests.swift in Sources */,
+				C000000000000000000001B1 /* FrameDifferenceAnalyzerTests.swift in Sources */,
+				C000000000000000000001B2 /* CardPresenceTrackerTests.swift in Sources */,
+				C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */,
+				C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

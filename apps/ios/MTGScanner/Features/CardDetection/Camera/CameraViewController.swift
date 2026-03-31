@@ -21,6 +21,11 @@ final class CameraViewController: UIViewController {
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     /// Called on the main thread whenever the zoom factor changes.
     var onZoomFactorChanged: ((CGFloat) -> Void)?
+    /// Called on the session queue for every camera frame when in Quick Scan mode.
+    ///
+    /// Used by `QuickScanViewModel` to feed frames into `CardPresenceTracker`.
+    /// Set to `nil` when not in Quick Scan mode to avoid unnecessary overhead.
+    var onQuickScanFrame: ((CMSampleBuffer) -> Void)?
 
     // MARK: - Private
 
@@ -164,6 +169,7 @@ final class CameraViewController: UIViewController {
     private func wireComponents() {
         sessionManager.onFrame = { [weak self] sampleBuffer in
             self?.engine.processFrame(sampleBuffer)
+            self?.onQuickScanFrame?(sampleBuffer)
         }
 
         engine.onDetection = { [weak self] cards in

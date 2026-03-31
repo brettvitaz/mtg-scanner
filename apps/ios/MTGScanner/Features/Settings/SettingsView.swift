@@ -22,6 +22,7 @@ struct SettingsView: View {
             Form {
                 apiSection
                 recognitionSection
+                quickScanSection
             }
             .navigationTitle("Settings")
         }
@@ -66,6 +67,47 @@ struct SettingsView: View {
             )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var quickScanSection: some View {
+        Section("Quick Scan") {
+            Toggle("Enable Quick Scan Mode", isOn: $appModel.quickScanEnabled)
+            if appModel.quickScanEnabled {
+                quickScanCaptureDelayRow
+                quickScanConfidenceRow
+            }
+            Text(
+                "When enabled, Quick Scan mode appears in the Scan tab. "
+                + "Place your phone above a scanning station and drop cards in — "
+                + "each card is automatically captured and recognized."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var quickScanCaptureDelayRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Capture Delay")
+                Spacer()
+                Text(String(format: "%.1f s", appModel.quickScanCaptureDelay))
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: $appModel.quickScanCaptureDelay, in: 0.5...5.0, step: 0.5)
+        }
+    }
+
+    private var quickScanConfidenceRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Detection Confidence")
+                Spacer()
+                Text(String(format: "%.1f", appModel.quickScanConfidenceThreshold))
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: $appModel.quickScanConfidenceThreshold, in: 0.3...0.9, step: 0.1)
         }
     }
 

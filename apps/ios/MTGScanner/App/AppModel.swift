@@ -16,6 +16,15 @@ final class AppModel: ObservableObject {
     @Published var onDeviceCropEnabled: Bool {
         didSet { persistOnDeviceCrop() }
     }
+    @Published var quickScanEnabled: Bool {
+        didSet { UserDefaults.standard.set(quickScanEnabled, forKey: quickScanEnabledKey) }
+    }
+    @Published var quickScanCaptureDelay: Double {
+        didSet { UserDefaults.standard.set(quickScanCaptureDelay, forKey: quickScanCaptureDelayKey) }
+    }
+    @Published var quickScanConfidenceThreshold: Double {
+        didSet { UserDefaults.standard.set(quickScanConfidenceThreshold, forKey: quickScanConfidenceKey) }
+    }
     @Published var isRecognizing = false
     @Published var statusMessage = "Point camera at cards to scan."
     @Published var lastUploadedFilename: String?
@@ -35,10 +44,18 @@ final class AppModel: ObservableObject {
     private let correctionsStoreKey = "card_corrections"
     private let apiBaseURLStoreKey = "api_base_url"
     private let onDeviceCropStoreKey = "on_device_crop_enabled"
+    private let quickScanEnabledKey = "quick_scan_enabled"
+    private let quickScanCaptureDelayKey = "quick_scan_capture_delay"
+    private let quickScanConfidenceKey = "quick_scan_confidence_threshold"
 
     init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
+        self.quickScanEnabled = UserDefaults.standard.bool(forKey: quickScanEnabledKey)
+        let storedDelay = UserDefaults.standard.double(forKey: quickScanCaptureDelayKey)
+        self.quickScanCaptureDelay = storedDelay > 0 ? storedDelay : 2.0
+        let storedConf = UserDefaults.standard.double(forKey: quickScanConfidenceKey)
+        self.quickScanConfidenceThreshold = storedConf > 0 ? storedConf : 0.5
         loadCorrections()
     }
 

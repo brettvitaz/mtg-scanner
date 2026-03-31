@@ -8,6 +8,7 @@ import SwiftUI
 struct QuickScanView: View {
     @ObservedObject var viewModel: QuickScanViewModel
     @ObservedObject var recognitionQueue: RecognitionQueue
+    @Binding var torchLevel: Float
 
     var body: some View {
         VStack {
@@ -103,6 +104,7 @@ struct QuickScanView: View {
 
     private var bottomBar: some View {
         HStack {
+            TorchControl(level: $torchLevel)
             Spacer()
             startStopButton
             Spacer()

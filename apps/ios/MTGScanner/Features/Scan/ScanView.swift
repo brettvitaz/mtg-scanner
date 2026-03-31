@@ -21,7 +21,8 @@ struct ScanView: View {
             if appModel.quickScanEnabled {
                 QuickScanView(
                     viewModel: quickScanViewModel,
-                    recognitionQueue: quickScanViewModel.recognitionQueue
+                    recognitionQueue: quickScanViewModel.recognitionQueue,
+                    torchLevel: $detectionViewModel.torchLevel
                 )
             } else {
                 VStack {
@@ -112,13 +113,15 @@ struct ScanView: View {
             },
             onQuickScanFrame: appModel.quickScanEnabled
                 ? { [weak quickScanViewModel] buffer in quickScanViewModel?.processFrame(buffer) }
-                : nil
+                : nil,
+            torchLevel: detectionViewModel.torchLevel
         )
     }
 
     private var topBar: some View {
-        HStack {
+        HStack(alignment: .center) {
             cardCountBadge
+            TorchControl(level: $detectionViewModel.torchLevel)
             Spacer()
             statusBadge
         }

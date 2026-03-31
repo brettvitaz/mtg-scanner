@@ -104,6 +104,13 @@ final class CameraViewController: UIViewController {
         }
     }
 
+    // MARK: - Torch
+
+    /// Sets the torch brightness. Level 0 turns the torch off; 0.1–1.0 turns it on at that brightness.
+    func setTorchLevel(_ level: Float) {
+        sessionManager.setTorchLevel(level)
+    }
+
     // MARK: - Zoom
 
     /// Sets the camera zoom to `factor`, animating smoothly via AVFoundation ramp.

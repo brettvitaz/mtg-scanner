@@ -41,7 +41,7 @@ struct ScanView: View {
         }
         .onAppear {
             detectionViewModel.requestCameraPermissionIfNeeded()
-            lockOrientation(.portrait)
+            lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])

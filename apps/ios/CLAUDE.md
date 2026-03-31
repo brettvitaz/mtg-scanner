@@ -57,11 +57,22 @@ MTGScanner/
 
 ## Critical coordinate transform rules
 
-These were hard-won through debugging. Do not deviate:
+These were established through debugging. The pipeline passes an orientation hint to Vision so detection works correctly in all device orientations (portrait and landscape).
 
-- **VNDetectRectanglesRequest**: Pass native landscape `CVPixelBuffer` to `VNImageRequestHandler` with **no orientation hint**. An orientation hint causes a 90° coordinate mismatch with `layerPointConverted`.
-- **Vision → screen**: Use `previewLayer.layerPointConverted(fromCaptureDevicePoint:)` — do NOT attempt manual coordinate math. Apply Y-flip first (Vision origin is bottom-left).
-- **Pipeline**: native landscape buffer → Vision normalized coords → Y-flip → `layerPointConverted` → screen points.
+- **VNDetectRectanglesRequest**: Pass the current `CGImagePropertyOrientation` (derived from `interfaceOrientation`) to `VNImageRequestHandler`. This tells Vision how to interpret the native landscape pixel buffer so it detects cards that are upright relative to the user.
+- **Orientation → `CGImagePropertyOrientation` mapping** (in `CardDetectionEngine.cgOrientation(for:)`):
+  - `.landscapeRight` → `.up` (buffer is already upright)
+  - `.landscapeLeft` → `.down` (buffer is 180° rotated)
+  - `.portrait` → `.right` (buffer needs 90° CW rotation)
+  - `.portraitUpsideDown` → `.left` (buffer needs 90° CCW rotation)
+- **Vision → screen**: After Vision returns coordinates in the *oriented* image space, un-rotate them to native sensor (capture device) space, then call `previewLayer.layerPointConverted(fromCaptureDevicePoint:)`. Do NOT attempt manual coordinate math beyond this un-rotation.
+- **Un-rotation formulas** (Vision oriented `(vx, vy)` → capture device point, in `DetectionOverlayRenderer.visionPointToLayer`):
+  - `.landscapeRight`: `(vx, 1-vy)` — Y-flip only
+  - `.landscapeLeft`: `(1-vx, vy)` — X-flip only
+  - `.portrait`: `(1-vy, 1-vx)` — swap axes, flip both
+  - `.portraitUpsideDown`: `(vy, vx)` — swap axes only
+- **Pipeline**: native landscape buffer + orientation hint → Vision oriented coords → un-rotate to sensor space → `layerPointConverted` → screen points.
+- **Orientation is threaded** from `CameraViewController.viewDidLayoutSubviews` → `CardDetectionEngine.interfaceOrientation` (for Vision) and inline in `engine.onDetection` closure (for renderer).
 
 ## Coding rules
 

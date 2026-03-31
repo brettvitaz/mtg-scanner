@@ -1,5 +1,7 @@
 import AVFoundation
 import CoreGraphics
+import ImageIO
+import UIKit
 import Vision
 
 /// Processes live camera frames and detects MTG card-shaped rectangles.
@@ -20,6 +22,10 @@ final class CardDetectionEngine {
 
     var detectionMode: DetectionMode = .table
 
+    /// The current interface orientation, used to pass the correct image orientation hint
+    /// to Vision so it can find cards that are upright relative to the user (not the sensor).
+    var interfaceOrientation: UIInterfaceOrientation = .portrait
+
     /// Called on the main queue with the latest detected cards after each processed frame.
     var onDetection: (([DetectedCard]) -> Void)?
 
@@ -36,11 +42,12 @@ final class CardDetectionEngine {
 
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         let mode = detectionMode
+        let orientation = interfaceOrientation
 
         visionQueue.async { [weak self] in
             guard let self, !self.isProcessing else { return }
             self.isProcessing = true
-            let raw = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode)
+            let raw = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode, orientation: orientation)
             let cards = self.tracker.update(detections: raw)
             self.isProcessing = false
             DispatchQueue.main.async {
@@ -54,13 +61,14 @@ final class CardDetectionEngine {
     private func detect(
         in pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval,
-        mode: DetectionMode
+        mode: DetectionMode,
+        orientation: UIInterfaceOrientation
     ) -> [DetectedCard] {
         switch mode {
         case .table:
-            return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp)
+            return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp, orientation: orientation)
         case .binder:
-            return detectBinderGrid(in: pixelBuffer, timestamp: timestamp)
+            return detectBinderGrid(in: pixelBuffer, timestamp: timestamp, orientation: orientation)
         }
     }
 
@@ -71,12 +79,17 @@ final class CardDetectionEngine {
     #endif
 
     // swiftlint:disable:next function_body_length
-    private func detectTableCards(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+    private func detectTableCards(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        orientation: UIInterfaceOrientation
+    ) -> [DetectedCard] {
         let observations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 10,
             minAspectRatio: RectangleFilter.visionMinAspectRatio,
-            maxAspectRatio: RectangleFilter.visionMaxAspectRatio
+            maxAspectRatio: RectangleFilter.visionMaxAspectRatio,
+            orientation: orientation
         )
         let filtered = RectangleFilter().filter(observations)
 
@@ -127,12 +140,17 @@ final class CardDetectionEngine {
     // MARK: - Binder Grid Detection (VNDetectRectanglesRequest)
 
     // swiftlint:disable:next function_body_length
-    private func detectBinderGrid(in pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+    private func detectBinderGrid(
+        in pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        orientation: UIInterfaceOrientation
+    ) -> [DetectedCard] {
         let pageObservations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 1,
             minAspectRatio: 0.60,
-            maxAspectRatio: 0.95
+            maxAspectRatio: 0.95,
+            orientation: orientation
         )
 
         guard let page = pageObservations.first else { return [] }
@@ -171,7 +189,8 @@ final class CardDetectionEngine {
         pixelBuffer: CVPixelBuffer,
         maxObservations: Int,
         minAspectRatio: Float,
-        maxAspectRatio: Float
+        maxAspectRatio: Float,
+        orientation: UIInterfaceOrientation
     ) -> [VNRectangleObservation] {
         var results: [VNRectangleObservation] = []
 
@@ -184,11 +203,31 @@ final class CardDetectionEngine {
         request.maximumAspectRatio = maxAspectRatio
         request.quadratureTolerance = 15.0
 
-        // No orientation hint — pass native landscape buffer so Vision returns corners
-        // in native sensor coordinates, matching layerPointConverted's expected input space.
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        // Pass the current interface orientation so Vision interprets the pixel buffer
+        // relative to what the user sees, not the native sensor orientation.
+        // Without this, landscape mode only detects cards that are horizontal in
+        // sensor space (i.e. horizontal relative to the camera), missing upright cards.
+        let cgOrient = cgOrientation(for: orientation)
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: cgOrient, options: [:])
         try? handler.perform([request])
         return results
+    }
+
+    /// Maps the current interface orientation to the `CGImagePropertyOrientation`
+    /// that tells Vision how to rotate the native landscape pixel buffer before processing.
+    ///
+    /// The rear camera delivers buffers in native landscape (sensor right = buffer right).
+    /// - `.landscapeRight` (home button right / USB-C right): buffer is already upright → `.up`
+    /// - `.landscapeLeft` (home button left / USB-C left): buffer is 180° rotated → `.down`
+    /// - `.portrait`: buffer needs 90° CCW rotation to be upright → `.right`
+    /// - `.portraitUpsideDown`: buffer needs 90° CW rotation → `.left`
+    private func cgOrientation(for orientation: UIInterfaceOrientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .landscapeRight:       return .up
+        case .landscapeLeft:        return .down
+        case .portraitUpsideDown:   return .left
+        default:                    return .right  // .portrait or unknown
+        }
     }
 }
 

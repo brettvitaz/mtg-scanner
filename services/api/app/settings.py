@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
     mtg_scanner_openai_timeout_seconds: float = Field(default=30.0)
     mtg_scanner_openai_response_mode: str = Field(default="json_schema")
+    mtg_scanner_enable_llm_correction: bool = Field(default=True)
+    mtg_scanner_correction_prompt_version: str = Field(default="card-correction.md")
 
 
 def get_settings() -> Settings:

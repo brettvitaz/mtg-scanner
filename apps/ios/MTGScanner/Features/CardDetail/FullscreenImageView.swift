@@ -14,7 +14,7 @@ struct FullscreenImageView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else if let imageUrl {
-                AsyncImage(url: imageUrl) { phase in
+                CachedAsyncImage(url: imageUrl) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().aspectRatio(contentMode: .fit)

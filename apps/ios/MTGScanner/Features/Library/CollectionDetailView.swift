@@ -178,15 +178,17 @@ struct CollectionDetailView: View {
         case .collection(let targetCollection):
             for item in items {
                 let copy = item.duplicate()
-                copy.collection = targetCollection
-                mergeOrInsert(copy, into: targetCollection.items, context: modelContext)
+                mergeOrInsert(copy, into: targetCollection.items, context: modelContext) {
+                    $0.collection = targetCollection
+                }
             }
             targetCollection.updatedAt = Date()
         case .deck(let deck):
             for item in items {
                 let copy = item.duplicate()
-                copy.deck = deck
-                mergeOrInsert(copy, into: deck.items, context: modelContext)
+                mergeOrInsert(copy, into: deck.items, context: modelContext) {
+                    $0.deck = deck
+                }
             }
             deck.updatedAt = Date()
         }

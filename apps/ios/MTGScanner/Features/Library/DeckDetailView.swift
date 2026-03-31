@@ -203,15 +203,17 @@ extension DeckDetailView {
         case .collection(let collection):
             for item in items {
                 let copy = item.duplicate()
-                copy.collection = collection
-                mergeOrInsert(copy, into: collection.items, context: modelContext)
+                mergeOrInsert(copy, into: collection.items, context: modelContext) {
+                    $0.collection = collection
+                }
             }
             collection.updatedAt = Date()
         case .deck(let targetDeck):
             for item in items {
                 let copy = item.duplicate()
-                copy.deck = targetDeck
-                mergeOrInsert(copy, into: targetDeck.items, context: modelContext)
+                mergeOrInsert(copy, into: targetDeck.items, context: modelContext) {
+                    $0.deck = targetDeck
+                }
             }
             targetDeck.updatedAt = Date()
         }

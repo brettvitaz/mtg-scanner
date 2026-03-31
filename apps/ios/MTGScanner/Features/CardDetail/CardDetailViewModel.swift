@@ -133,7 +133,8 @@ final class CardDetailViewModel: ObservableObject {
         let name = displayTitle
         guard !name.isEmpty else { return }
         let scryfallId = selectedPrinting?.scryfallId ?? card.scryfallId
-        isLoadingPrice = true
+        let isRefresh = cardPrice != nil
+        if !isRefresh { isLoadingPrice = true }
         do {
             cardPrice = try await appModel.fetchPrice(
                 name: name, scryfallId: scryfallId, isFoil: editFoil
@@ -145,11 +146,12 @@ final class CardDetailViewModel: ObservableObject {
         isLoadingPrice = false
     }
 
-    func selectPrinting(_ printing: CardPrinting) {
+    func selectPrinting(_ printing: CardPrinting, using appModel: AppModel) {
         selectedPrinting = printing
         editTitle = printing.name ?? editTitle
         editEdition = printing.setName ?? ""
         editCollectorNumber = printing.collectorNumber ?? ""
+        Task { await loadPrice(using: appModel) }
     }
 
     func saveCorrection(to appModel: AppModel) {
@@ -158,6 +160,7 @@ final class CardDetailViewModel: ObservableObject {
         correction.edition = editEdition
         correction.collectorNumber = editCollectorNumber
         correction.foil = editFoil
+        correction.selectedPrintingSnapshot = selectedPrinting
         appModel.saveCorrection(correction)
     }
 }

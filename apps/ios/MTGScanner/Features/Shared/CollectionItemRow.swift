@@ -17,7 +17,7 @@ struct CollectionItemRow: View {
     private var cardThumbnail: some View {
         Group {
             if let urlString = item.imageUrl, let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
+                CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().aspectRatio(contentMode: .fill)

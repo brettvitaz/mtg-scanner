@@ -78,25 +78,28 @@ final class CollectionItem {
     }
 
     /// Create a CollectionItem from a recognized card, applying corrections if present.
+    /// When a correction includes a `selectedPrintingSnapshot`, its fields take priority
+    /// for image URL, Card Kingdom link, and other printing-specific metadata.
     convenience init(from card: RecognizedCard, correction: CardCorrection? = nil) {
+        let printing = correction?.selectedPrintingSnapshot
         self.init(
             title: correction?.title.nonEmpty ?? card.title ?? "Unknown",
             edition: correction?.edition.nonEmpty ?? card.edition ?? "Unknown",
-            setCode: card.setCode,
+            setCode: printing?.setCode ?? card.setCode,
             collectorNumber: correction?.collectorNumber.nonEmpty ?? card.collectorNumber,
             foil: correction?.foil ?? card.foil ?? false,
-            rarity: card.rarity,
-            typeLine: card.typeLine,
-            oracleText: card.oracleText,
-            manaCost: card.manaCost,
-            power: card.power,
-            toughness: card.toughness,
-            loyalty: card.loyalty,
-            defense: card.defense,
-            scryfallId: card.scryfallId,
-            imageUrl: card.imageUrl,
-            setSymbolUrl: card.setSymbolUrl,
-            cardKingdomUrl: card.cardKingdomUrl
+            rarity: printing?.rarity ?? card.rarity,
+            typeLine: printing?.typeLine ?? card.typeLine,
+            oracleText: printing?.oracleText ?? card.oracleText,
+            manaCost: printing?.manaCost ?? card.manaCost,
+            power: printing?.power ?? card.power,
+            toughness: printing?.toughness ?? card.toughness,
+            loyalty: printing?.loyalty ?? card.loyalty,
+            defense: printing?.defense ?? card.defense,
+            scryfallId: printing?.scryfallId ?? card.scryfallId,
+            imageUrl: printing?.imageUrl ?? card.imageUrl,
+            setSymbolUrl: printing?.setSymbolUrl ?? card.setSymbolUrl,
+            cardKingdomUrl: printing?.cardKingdomUrl ?? card.cardKingdomUrl
         )
     }
 
@@ -206,17 +209,23 @@ extension Array where Element == CollectionItem {
 }
 
 /// Merge `item` into `existingItems` if a matching card is found, otherwise insert as a new row.
+///
+/// The `assign` closure is called on the item only when it is newly inserted (no match found).
+/// Use it to set the collection/deck relationship so it is never set before the duplicate check,
+/// which would cause SwiftData to auto-track the item as a duplicate.
 /// Returns the item that was updated or inserted.
 @discardableResult
 func mergeOrInsert(
     _ item: CollectionItem,
     into existingItems: [CollectionItem],
-    context: ModelContext
+    context: ModelContext,
+    assign: (CollectionItem) -> Void = { _ in }
 ) -> CollectionItem {
     if let existing = existingItems.first(where: { $0.matches(item) }) {
         existing.quantity += item.quantity
         return existing
     }
+    assign(item)
     context.insert(item)
     return item
 }

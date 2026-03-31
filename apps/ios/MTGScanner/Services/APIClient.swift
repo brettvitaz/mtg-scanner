@@ -128,7 +128,7 @@ struct APIClient {
         components.path += "/api/v1/cards/price"
         var queryItems = [
             URLQueryItem(name: "name", value: name),
-            URLQueryItem(name: "is_foil", value: isFoil ? "true" : "false"),
+            URLQueryItem(name: "is_foil", value: isFoil ? "true" : "false")
         ]
         if let scryfallId {
             queryItems.append(URLQueryItem(name: "scryfall_id", value: scryfallId))

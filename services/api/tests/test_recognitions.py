@@ -100,9 +100,10 @@ def test_recognition_rejects_non_image_upload() -> None:
     assert response.json()["detail"] == "Uploaded file must be an image."
 
 
-def test_recognition_does_not_canonicalize_impossible_title_and_set_combination(
+def test_recognition_auto_corrects_impossible_title_and_set_combination(
     tmp_path, monkeypatch, mtgjson_db: Path
 ) -> None:
+    """Autarch Mammoth only exists in DFT. When the LLM says OTJ, validation auto-corrects it."""
     monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
     monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
@@ -142,15 +143,16 @@ def test_recognition_does_not_canonicalize_impossible_title_and_set_combination(
     assert response.status_code == 200
     payload = response.json()
     assert payload["cards"][0]["title"] == "Autarch Mammoth"
-    assert payload["cards"][0]["edition"] == "Outlaws of Thunder Junction"
+    # Auto-corrected: OTJ is invalid for this card, DFT is the only valid set
+    assert payload["cards"][0]["edition"] == "Aetherdrift"
+    assert payload["cards"][0]["set_code"] == "DFT"
     assert payload["cards"][0]["collector_number"] == "166"
-    assert payload["cards"][0]["confidence"] == 0.67
-    assert "title does not exist in that set" in payload["cards"][0]["notes"].lower()
+    assert "corrected_match" in payload["cards"][0]["notes"].lower()
 
     recognition_dirs = list((tmp_path / "recognitions").iterdir())
     saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
-    assert saved_metadata["validation"]["cards"][0]["status"] == "no_match"
-    assert saved_metadata["validation"]["cards"][0]["matched_uuid"] is None
+    assert saved_metadata["validation"]["cards"][0]["status"] == "corrected_match"
+    assert saved_metadata["validation"]["cards"][0]["matched_uuid"] == "autarch-mammoth-dft-166"
 
 
 def test_recognition_upload_saves_artifacts(tmp_path, monkeypatch, mtgjson_db: Path) -> None:

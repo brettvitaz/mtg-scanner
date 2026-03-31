@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import sqlite3
 from typing import cast
 
@@ -32,6 +32,7 @@ class ValidationTrace:
 class ValidatedCardResult:
     card: RecognizedCard
     trace: ValidationTrace
+    correction_candidates: list[CardRecord] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,7 @@ class ValidationBatchResult:
     traces: list[ValidationTrace]
     enabled: bool
     available: bool
+    correction_candidates: list[list[CardRecord]] = field(default_factory=list)
 
 
 class CardValidationService:
@@ -50,19 +52,32 @@ class CardValidationService:
     def validate_response(self, response: RecognitionResponse) -> ValidationBatchResult:
         if not self._index.is_available():
             traces = [self._unavailable_trace(card) for card in response.cards]
-            return ValidationBatchResult(response=response, traces=traces, enabled=True, available=False)
+            return ValidationBatchResult(
+                response=response,
+                traces=traces,
+                enabled=True,
+                available=False,
+                correction_candidates=[[] for _ in response.cards],
+            )
 
         try:
             results = [self.validate_card(card) for card in response.cards]
         except sqlite3.Error:
             traces = [self._unavailable_trace(card, reason="MTGJSON database unreadable; validation skipped.") for card in response.cards]
-            return ValidationBatchResult(response=response, traces=traces, enabled=True, available=False)
+            return ValidationBatchResult(
+                response=response,
+                traces=traces,
+                enabled=True,
+                available=False,
+                correction_candidates=[[] for _ in response.cards],
+            )
 
         return ValidationBatchResult(
             response=RecognitionResponse(cards=[result.card for result in results]),
             traces=[result.trace for result in results],
             enabled=True,
             available=True,
+            correction_candidates=[result.correction_candidates for result in results],
         )
 
     def validate_card(self, card: RecognizedCard) -> ValidatedCardResult:
@@ -86,6 +101,9 @@ class CardValidationService:
             return self._result(card, trace_base, "no_match", None, "Missing title; validation skipped.")
 
         resolved_set_code = self._index.resolve_set(card.edition or "")
+        # Track if the LLM's set claim was wrong: either the set doesn't exist, or the
+        # card title is absent from the resolved set. Either case warrants correction.
+        wrong_set = bool(card.edition) and resolved_set_code is None
 
         if normalized_number and resolved_set_code:
             match = self._index.lookup_exact(
@@ -98,27 +116,34 @@ class CardValidationService:
 
         if resolved_set_code:
             candidates = self._index.lookup_by_name_and_set(title=card.title or "", set_code=resolved_set_code)
+            if not candidates:
+                wrong_set = True
             if normalized_number:
                 narrowed = [c for c in candidates if c.normalized_collector_number == normalized_number]
                 if len(narrowed) == 1:
                     return self._matched(card, trace_base, narrowed[0], "normalized_match", "Resolved set and collector number after title match.")
                 if len(narrowed) > 1:
                     return self._result(card, trace_base, "ambiguous_match", None, "Multiple printings share the same title and collector number in the resolved set.")
-                if candidates:
-                    return self._result(card, trace_base, "no_match", None, "Resolved set and title matched MTGJSON, but collector number conflicts with every printing in that set.")
-                return self._result(card, trace_base, "no_match", None, "Resolved set is valid, but title does not exist in that set.")
-
-            if len(candidates) == 1:
+                # Collector not in set — fall through to cross-set lookup
+            elif len(candidates) == 1:
                 return self._matched(card, trace_base, candidates[0], "normalized_match", "Resolved set and title to a single printing.")
-            if len(candidates) > 1:
+            elif len(candidates) > 1:
                 return self._result(card, trace_base, "ambiguous_match", None, "Multiple printings share the same title in the resolved set.")
-            return self._result(card, trace_base, "no_match", None, "Resolved set is valid, but title does not exist in that set.")
+            # Title not in the resolved set — fall through to cross-set lookup
 
         if normalized_number:
             candidates = self._index.lookup_by_name_and_number(title=card.title or "", collector_number=card.collector_number or "")
             if len(candidates) == 1:
-                return self._matched(card, trace_base, candidates[0], "normalized_match", "Matched title and collector number across sets.")
+                status = "corrected_match" if wrong_set else "normalized_match"
+                reason = (
+                    "Auto-corrected: matched title and collector number across sets; original set was invalid."
+                    if wrong_set
+                    else "Matched title and collector number across sets."
+                )
+                return self._matched(card, trace_base, candidates[0], status, reason)
             if len(candidates) > 1:
+                if wrong_set:
+                    return self._needs_correction(card, trace_base, candidates, "Title and collector number matched multiple printings; original set was invalid.")
                 return self._result(card, trace_base, "ambiguous_match", None, "Title and collector number matched multiple printings across sets.")
 
         candidates = self._index.search_candidates(
@@ -128,9 +153,24 @@ class CardValidationService:
             limit=self._max_fuzzy_candidates,
         )
         if len(candidates) == 1:
-            return self._matched(card, trace_base, candidates[0], "normalized_match", "Single normalized candidate match.")
+            status = "corrected_match" if wrong_set else "normalized_match"
+            reason = (
+                "Auto-corrected: single normalized candidate; original set was invalid."
+                if wrong_set
+                else "Single normalized candidate match."
+            )
+            return self._matched(card, trace_base, candidates[0], status, reason)
         if len(candidates) > 1:
+            if wrong_set:
+                return self._needs_correction(card, trace_base, candidates, "Multiple normalized candidates; original set was invalid.")
             return self._result(card, trace_base, "ambiguous_match", None, "Multiple normalized candidates remain; keeping recognizer output.")
+
+        # Final fallback: look up all printings by title to enable auto-correction
+        all_printings = self._index.lookup_all_printings_by_name(title=card.title or "")
+        if len(all_printings) == 1:
+            return self._matched(card, trace_base, all_printings[0], "corrected_match", "Auto-corrected: title found in exactly one set; original set/collector ignored.")
+        if len(all_printings) > 1:
+            return self._needs_correction(card, trace_base, all_printings, "Title found in multiple sets; cannot auto-correct without LLM retry.")
 
         return self._result(card, trace_base, "no_match", None, "No MTGJSON match found; keeping recognizer output.")
 
@@ -144,6 +184,12 @@ class CardValidationService:
     ) -> ValidatedCardResult:
         confidence_after = _adjust_confidence(card.confidence, status)
         notes = _merge_notes(card.notes, f"Validated against MTGJSON ({status}).")
+
+        foil_note, foil_penalty = _check_foil_mismatch(card.foil, match)
+        if foil_note:
+            notes = _merge_notes(notes, foil_note)
+        confidence_after = max(0.0, round(confidence_after - foil_penalty, 4))
+
         image_url = (
             f"https://api.scryfall.com/cards/{match.scryfall_id}?format=image&version=normal"
             if match.scryfall_id
@@ -216,6 +262,34 @@ class CardValidationService:
             ),
         )
 
+    def _needs_correction(
+        self,
+        card: RecognizedCard,
+        trace_base: dict[str, object],
+        candidates: list[CardRecord],
+        reason: str,
+    ) -> ValidatedCardResult:
+        confidence_after = _adjust_confidence(card.confidence, "needs_correction")
+        validated_card = card.model_copy(update={
+            "confidence": confidence_after,
+            "notes": _merge_notes(card.notes, reason),
+        })
+        return ValidatedCardResult(
+            card=validated_card,
+            trace=ValidationTrace(
+                original=cast(dict[str, object], trace_base["original"]),
+                normalized_inputs=cast(dict[str, object], trace_base["normalized_inputs"]),
+                status="needs_correction",
+                matched_uuid=None,
+                matched_set_code=None,
+                matched_collector_number=None,
+                confidence_before=card.confidence,
+                confidence_after=confidence_after,
+                reason=reason,
+            ),
+            correction_candidates=candidates,
+        )
+
     def _unavailable_trace(
         self,
         card: RecognizedCard,
@@ -240,15 +314,31 @@ class CardValidationService:
         )
 
 
+def _check_foil_mismatch(foil: bool | None, match: CardRecord) -> tuple[str | None, float]:
+    """Return (note_text, confidence_penalty) if the foil claim conflicts with known finishes."""
+    if foil is None or not match.finishes:
+        return None, 0.0
+
+    if foil is True and not match.has_foil and not match.has_etched:
+        return "This printing is not available in foil.", 0.05
+    if foil is False and not match.has_non_foil:
+        return "This printing is only available in foil/etched.", 0.05
+    return None, 0.0
+
+
 def _adjust_confidence(value: float, status: str) -> float:
     if status == "exact_match":
         return min(1.0, round(value + 0.02, 4))
     if status == "normalized_match":
         return round(value, 4)
+    if status == "corrected_match":
+        return max(0.0, round(value - 0.05, 4))
     if status == "fuzzy_match":
         return max(0.0, round(value - 0.05, 4))
     if status == "ambiguous_match":
         return max(0.0, round(value - 0.2, 4))
+    if status == "needs_correction":
+        return max(0.0, round(value - 0.1, 4))
     return max(0.0, round(value - 0.25, 4)) if status == "no_match" else round(value, 4)
 
 

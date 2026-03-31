@@ -14,7 +14,7 @@ from app.models.recognition import (
 from app.services.card_detector import CardDetector, DetectionResult
 from app.services.card_validation import CardValidationService, ValidationBatchResult
 from app.services.errors import RecognitionConfigurationError, RecognitionProviderError
-from app.services.mtgjson_index import MTGJSONIndex
+from app.services.mtgjson_index import CardRecord, MTGJSONIndex
 from app.services.openai_compat import (
     build_openai_request_body,
     extract_recognition_response,
@@ -128,11 +128,15 @@ class RecognitionService:
         card_detector: CardDetector | None = None,
         validator: CardValidationService | None = None,
         max_concurrent_recognitions: int = 4,
+        enable_llm_correction: bool = True,
+        correction_prompt_version: str = "card-correction.md",
     ) -> None:
         self._provider = provider
         self._card_detector = card_detector
         self._validator = validator
         self._max_concurrent_recognitions = max(1, max_concurrent_recognitions)
+        self._enable_llm_correction = enable_llm_correction
+        self._correction_prompt_version = correction_prompt_version
 
     def _validate_response(
         self,
@@ -141,6 +145,68 @@ class RecognitionService:
         if self._validator is None:
             return None
         return self._validator.validate_response(response)
+
+    def _apply_llm_correction(
+        self,
+        validation_result: ValidationBatchResult,
+        image_bytes: bytes,
+        metadata: RecognitionUploadMetadata,
+    ) -> ValidationBatchResult:
+        """Re-query the LLM for any cards with needs_correction status.
+
+        Builds a constrained correction prompt with valid candidate printings and
+        calls the provider again. Falls back to the original result if correction fails.
+        """
+        if not self._enable_llm_correction or self._validator is None:
+            return validation_result
+
+        needs_correction_indices = [
+            i for i, trace in enumerate(validation_result.traces)
+            if trace.status == "needs_correction"
+        ]
+        if not needs_correction_indices:
+            return validation_result
+
+        correction_prompt_text = _load_prompt(self._correction_prompt_version)
+        updated_cards = list(validation_result.response.cards)
+        updated_traces = list(validation_result.traces)
+        updated_candidates = list(validation_result.correction_candidates)
+
+        for idx in needs_correction_indices:
+            card = validation_result.response.cards[idx]
+            candidates = validation_result.correction_candidates[idx]
+            reason = validation_result.traces[idx].reason
+
+            filled_prompt = _build_correction_prompt(
+                correction_prompt_text, card, candidates, reason
+            )
+            try:
+                corrected_response = self._provider.recognize(
+                    image_bytes=image_bytes,
+                    metadata=metadata,
+                    prompt_text=filled_prompt,
+                )
+            except RecognitionProviderError:
+                continue
+
+            if not corrected_response.cards:
+                continue
+
+            corrected_card = corrected_response.cards[0]
+            re_validated = self._validator.validate_card(corrected_card)
+
+            if re_validated.trace.status not in {"no_match", "needs_correction"}:
+                updated_cards[idx] = re_validated.card
+                updated_traces[idx] = re_validated.trace
+                updated_candidates[idx] = re_validated.correction_candidates
+
+        return ValidationBatchResult(
+            response=RecognitionResponse(cards=updated_cards),
+            traces=updated_traces,
+            enabled=validation_result.enabled,
+            available=validation_result.available,
+            correction_candidates=updated_candidates,
+        )
 
     def _recognize_multiple_crops(
         self,
@@ -256,6 +322,10 @@ class RecognitionService:
 
                 combined_response = RecognitionResponse(cards=all_cards)
                 validation_result = self._validate_response(combined_response)
+                if validation_result:
+                    validation_result = self._apply_llm_correction(
+                        validation_result, image_bytes, enriched_metadata
+                    )
                 final_response = validation_result.response if validation_result else combined_response
                 final_response = _attach_crop_images(final_response, crop_bytes_list)
                 return (
@@ -272,6 +342,10 @@ class RecognitionService:
             prompt_text=prompt_text,
         )
         validation_result = self._validate_response(response)
+        if validation_result:
+            validation_result = self._apply_llm_correction(
+                validation_result, image_bytes, enriched_metadata
+            )
         return (
             validation_result.response if validation_result else response,
             enriched_metadata,
@@ -302,6 +376,8 @@ def get_recognition_service() -> RecognitionService:
             detector,
             validator,
             max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
+            enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
+            correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
         )
 
     if provider_name == "openai":
@@ -328,6 +404,8 @@ def get_recognition_service() -> RecognitionService:
             detector,
             validator,
             max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
+            enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
+            correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
         )
 
     raise RecognitionConfigurationError(
@@ -386,3 +464,28 @@ def _attach_crop_images(
         else:
             updated_cards.append(card)
     return RecognitionResponse(cards=updated_cards)
+
+
+def _build_correction_prompt(
+    template: str,
+    card: RecognizedCard,
+    candidates: list[CardRecord],
+    reason: str,
+) -> str:
+    """Fill the correction prompt template with card data and candidate table."""
+    rows = ["| Set Name | Set Code | Collector # | Rarity | Finishes |", "| --- | --- | --- | --- | --- |"]
+    for c in candidates:
+        finishes_display = c.finishes or "unknown"
+        rows.append(
+            f"| {c.set_name or ''} | {c.set_code} | {c.collector_number or ''} | {c.rarity or ''} | {finishes_display} |"
+        )
+    candidates_table = "\n".join(rows)
+
+    filled = template
+    filled = filled.replace("{{title}}", card.title or "")
+    filled = filled.replace("{{edition}}", card.edition or "")
+    filled = filled.replace("{{collector_number}}", card.collector_number or "")
+    filled = filled.replace("{{foil}}", str(card.foil) if card.foil is not None else "unknown")
+    filled = filled.replace("{{reason}}", reason)
+    filled = filled.replace("{{candidates_table}}", candidates_table)
+    return filled

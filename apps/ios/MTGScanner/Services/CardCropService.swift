@@ -38,7 +38,7 @@ final class CardCropService {
 
         // Step 2: Run Vision rectangle detection on upright pixels.
         let observations = await detectRectangles(in: cgImage)
-        let filtered = rectangleFilter.filter(observations)
+        let filtered = rectangleFilter.filter(observations, isLandscape: false)
 
         // Step 3: Perspective-correct and crop each detected card.
         let crops = filtered.compactMap { cropCard(from: cgImage, observation: $0) }

@@ -68,7 +68,8 @@ final class DetectionOverlayRenderer {
     /// origin top-left, x right, y down, values 0–1 in the native sensor frame.
     ///
     /// The only difference is Y-axis direction, so we flip Y before converting.
-    /// `layerPointConverted` then handles resizeAspectFill crop and videoRotationAngle.
+    /// `layerPointConverted` then handles resizeAspectFill crop and videoRotationAngle
+    /// for all device orientations (portrait, landscape left/right, portrait upside-down).
     static func visionPointToLayer(_ point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
         previewLayer.layerPointConverted(fromCaptureDevicePoint: CGPoint(x: point.x, y: 1.0 - point.y))
     }

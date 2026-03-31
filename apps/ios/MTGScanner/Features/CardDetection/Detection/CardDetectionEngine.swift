@@ -20,6 +20,11 @@ final class CardDetectionEngine {
 
     var detectionMode: DetectionMode = .table
 
+    /// Set to `true` when the device interface orientation is landscape.
+    /// Written from the main thread; read on the camera queue in `processFrame` — same
+    /// pattern as `detectionMode`. The worst-case race during rotation is one stale frame.
+    var isLandscape: Bool = false
+
     /// Called on the main queue with the latest detected cards after each processed frame.
     var onDetection: (([DetectedCard]) -> Void)?
 
@@ -36,11 +41,12 @@ final class CardDetectionEngine {
 
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         let mode = detectionMode
+        let landscape = isLandscape
 
         visionQueue.async { [weak self] in
             guard let self, !self.isProcessing else { return }
             self.isProcessing = true
-            let raw = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode)
+            let raw = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode, isLandscape: landscape)
             let cards = self.tracker.update(detections: raw)
             self.isProcessing = false
             DispatchQueue.main.async {
@@ -54,11 +60,12 @@ final class CardDetectionEngine {
     private func detect(
         in pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval,
-        mode: DetectionMode
+        mode: DetectionMode,
+        isLandscape: Bool
     ) -> [DetectedCard] {
         switch mode {
         case .table:
-            return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp)
+            return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp, isLandscape: isLandscape)
         case .binder:
             return detectBinderGrid(in: pixelBuffer, timestamp: timestamp)
         }
@@ -71,14 +78,18 @@ final class CardDetectionEngine {
     #endif
 
     // swiftlint:disable:next function_body_length
-    private func detectTableCards(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
+    private func detectTableCards(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        isLandscape: Bool
+    ) -> [DetectedCard] {
         let observations = runRectangleRequest(
             pixelBuffer: pixelBuffer,
             maxObservations: 10,
             minAspectRatio: RectangleFilter.visionMinAspectRatio,
             maxAspectRatio: RectangleFilter.visionMaxAspectRatio
         )
-        let filtered = RectangleFilter().filter(observations)
+        let filtered = RectangleFilter().filter(observations, isLandscape: isLandscape)
 
         #if DEBUG
         _debugTableFrameCount += 1
@@ -186,6 +197,9 @@ final class CardDetectionEngine {
 
         // No orientation hint — pass native landscape buffer so Vision returns corners
         // in native sensor coordinates, matching layerPointConverted's expected input space.
+        // Vision detects cards of any aspect ratio within the specified range regardless of
+        // whether the card is portrait or landscape relative to the sensor, so no hint is needed
+        // to support landscape device orientation.
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
         return results

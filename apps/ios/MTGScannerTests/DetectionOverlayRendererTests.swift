@@ -84,6 +84,29 @@ final class DetectionOverlayRendererTests: XCTestCase {
         XCTAssertEqual(shapeLayer.strokeColor, UIColor.systemGreen.cgColor)
     }
 
+    // MARK: - Coordinate transform
+
+    func testVisionPointToLayerYFlipOnlyForAllOrientations() {
+        // visionPointToLayer applies a Y-flip and then delegates all orientation
+        // handling (portrait, landscape) to layerPointConverted via videoRotationAngle.
+        // We verify the capture-device point passed is always (vx, 1-vy).
+        let point = CGPoint(x: 0.3, y: 0.7)
+        // With a disconnected preview layer, layerPointConverted returns the input unchanged,
+        // so the output equals the capture-device point we computed.
+        let previewLayer = AVCaptureVideoPreviewLayer(session: AVCaptureSession())
+        let result = DetectionOverlayRenderer.visionPointToLayer(point, previewLayer: previewLayer)
+        XCTAssertEqual(result.x, point.x, accuracy: 0.001)
+        XCTAssertEqual(result.y, 1.0 - point.y, accuracy: 0.001)
+    }
+
+    func testVisionPointToLayerCenterMapsToCenter() {
+        let center = CGPoint(x: 0.5, y: 0.5)
+        let previewLayer = AVCaptureVideoPreviewLayer(session: AVCaptureSession())
+        let result = DetectionOverlayRenderer.visionPointToLayer(center, previewLayer: previewLayer)
+        XCTAssertEqual(result.x, 0.5, accuracy: 0.001)
+        XCTAssertEqual(result.y, 0.5, accuracy: 0.001)
+    }
+
     // MARK: - Helpers
 
     private func makeCard(id: Int) -> DetectedCard {

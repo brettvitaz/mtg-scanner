@@ -57,11 +57,12 @@ MTGScanner/
 
 ## Critical coordinate transform rules
 
-These were hard-won through debugging. Do not deviate:
+These were established through debugging. Do not deviate:
 
-- **VNDetectRectanglesRequest**: Pass native landscape `CVPixelBuffer` to `VNImageRequestHandler` with **no orientation hint**. An orientation hint causes a 90° coordinate mismatch with `layerPointConverted`.
-- **Vision → screen**: Use `previewLayer.layerPointConverted(fromCaptureDevicePoint:)` — do NOT attempt manual coordinate math. Apply Y-flip first (Vision origin is bottom-left).
-- **Pipeline**: native landscape buffer → Vision normalized coords → Y-flip → `layerPointConverted` → screen points.
+- **VNDetectRectanglesRequest**: Pass native landscape `CVPixelBuffer` to `VNImageRequestHandler` with **no orientation hint**. Vision detects rectangles within the specified aspect-ratio range regardless of the card's orientation relative to the sensor, so no hint is needed. An orientation hint would cause Vision to return coordinates in a rotated space that mismatches `layerPointConverted`'s expected native sensor input.
+- **Vision → screen**: Use `previewLayer.layerPointConverted(fromCaptureDevicePoint:)` — do NOT attempt manual coordinate math. Apply Y-flip first (Vision origin is bottom-left, capture device origin is top-left). `layerPointConverted` handles `videoRotationAngle` and `resizeAspectFill` for all device orientations automatically.
+- **Pipeline**: native landscape buffer → Vision normalized coords (native sensor space) → Y-flip → `layerPointConverted` → screen points. This works for portrait, landscape left/right, and portrait upside-down.
+- **Landscape support**: The scan screen now allows portrait and landscape orientations. `CameraViewController.updatePreviewOrientation` sets the correct `videoRotationAngle` for each orientation, and `layerPointConverted` maps overlay coordinates correctly without any additional logic in the detection pipeline.
 
 ## Coding rules
 

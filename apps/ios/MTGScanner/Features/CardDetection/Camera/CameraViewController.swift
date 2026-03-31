@@ -60,6 +60,7 @@ final class CameraViewController: UIViewController {
         previewLayer?.frame = view.bounds
         detectionLayer.frame = view.bounds
         updatePreviewOrientation()
+        engine.isLandscape = view.bounds.width > view.bounds.height
     }
 
     // MARK: - Orientation

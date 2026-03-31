@@ -71,7 +71,7 @@ struct CollectionDetailView: View {
                             CollectionItemRow(item: item)
                         } else {
                             NavigationLink(value: item.toRecognizedCard()) {
-                                CollectionItemRow(item: item)
+                                CollectionItemRow(item: item, showQuantityStepper: true)
                             }
                         }
                     }
@@ -179,14 +179,14 @@ struct CollectionDetailView: View {
             for item in items {
                 let copy = item.duplicate()
                 copy.collection = targetCollection
-                modelContext.insert(copy)
+                mergeOrInsert(copy, into: targetCollection.items, context: modelContext)
             }
             targetCollection.updatedAt = Date()
         case .deck(let deck):
             for item in items {
                 let copy = item.duplicate()
                 copy.deck = deck
-                modelContext.insert(copy)
+                mergeOrInsert(copy, into: deck.items, context: modelContext)
             }
             deck.updatedAt = Date()
         }

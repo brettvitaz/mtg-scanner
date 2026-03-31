@@ -3,7 +3,8 @@ import SwiftUI
 /// Shared row view for displaying a CollectionItem in lists.
 /// Used by Results, Collection detail, and Deck detail views.
 struct CollectionItemRow: View {
-    let item: CollectionItem
+    @Bindable var item: CollectionItem
+    var showQuantityStepper: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -43,16 +44,9 @@ struct CollectionItemRow: View {
 
     private var cardInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(item.title)
-                    .font(.headline)
-                    .lineLimit(2)
-                if item.quantity > 1 {
-                    Text("×\(item.quantity)")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(item.title)
+                .font(.headline)
+                .lineLimit(2)
             Text(item.edition)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -61,6 +55,17 @@ struct CollectionItemRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            if showQuantityStepper {
+                quantityStepper
+            }
+        }
+    }
+
+    private var quantityStepper: some View {
+        Stepper(value: $item.quantity, in: 1...999) {
+            Text("Qty: \(item.quantity)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

@@ -238,13 +238,13 @@ extension CardDetailView {
         switch destination {
         case .collection(let collection):
             item.collection = collection
+            mergeOrInsert(item, into: collection.items, context: modelContext)
             collection.updatedAt = Date()
-            modelContext.insert(item)
             showAddedMessage("Added to \(collection.name)")
         case .deck(let deck):
             item.deck = deck
+            mergeOrInsert(item, into: deck.items, context: modelContext)
             deck.updatedAt = Date()
-            modelContext.insert(item)
             showAddedMessage("Added to \(deck.name)")
         }
     }

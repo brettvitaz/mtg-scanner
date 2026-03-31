@@ -77,7 +77,7 @@ struct DeckDetailView: View {
                             CollectionItemRow(item: item)
                         } else {
                             NavigationLink(value: item.toRecognizedCard()) {
-                                CollectionItemRow(item: item)
+                                CollectionItemRow(item: item, showQuantityStepper: true)
                             }
                         }
                     }
@@ -204,14 +204,14 @@ extension DeckDetailView {
             for item in items {
                 let copy = item.duplicate()
                 copy.collection = collection
-                modelContext.insert(copy)
+                mergeOrInsert(copy, into: collection.items, context: modelContext)
             }
             collection.updatedAt = Date()
         case .deck(let targetDeck):
             for item in items {
                 let copy = item.duplicate()
                 copy.deck = targetDeck
-                modelContext.insert(copy)
+                mergeOrInsert(copy, into: targetDeck.items, context: modelContext)
             }
             targetDeck.updatedAt = Date()
         }

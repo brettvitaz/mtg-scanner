@@ -125,7 +125,19 @@ final class CollectionItem {
         )
     }
 
-    /// Create a copy of this item (for "Copy to" operations).
+    /// Returns true if this item represents the same card as another.
+    /// Keyed by scryfallId when available; falls back to (title, edition, collectorNumber, foil).
+    func matches(_ other: CollectionItem) -> Bool {
+        if let a = scryfallId, let b = other.scryfallId, !a.isEmpty, !b.isEmpty {
+            return a == b && foil == other.foil
+        }
+        return title == other.title
+            && edition == other.edition
+            && collectorNumber == other.collectorNumber
+            && foil == other.foil
+    }
+
+    /// Create a copy of this item (for operations that need a standalone duplicate).
     func duplicate() -> CollectionItem {
         CollectionItem(
             title: title,
@@ -191,4 +203,20 @@ extension Array where Element == CollectionItem {
     var totalQuantity: Int {
         reduce(0) { $0 + Swift.max(1, $1.quantity) }
     }
+}
+
+/// Merge `item` into `existingItems` if a matching card is found, otherwise insert as a new row.
+/// Returns the item that was updated or inserted.
+@discardableResult
+func mergeOrInsert(
+    _ item: CollectionItem,
+    into existingItems: [CollectionItem],
+    context: ModelContext
+) -> CollectionItem {
+    if let existing = existingItems.first(where: { $0.matches(item) }) {
+        existing.quantity += item.quantity
+        return existing
+    }
+    context.insert(item)
+    return item
 }

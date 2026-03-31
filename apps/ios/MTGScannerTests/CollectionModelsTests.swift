@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 @testable import MTGScanner
 
@@ -173,6 +174,80 @@ final class CollectionModelsTests: XCTestCase {
         XCTAssertEqual(copy.quantity, 2)
         XCTAssertNil(copy.collection)
         XCTAssertNil(copy.deck)
+    }
+
+}
+
+// MARK: - matches tests
+
+extension CollectionModelsTests {
+    func testMatchesByScryfallIdAndFoil() {
+        let a = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "abc-123")
+        let b = CollectionItem(title: "Lightning Bolt", edition: "M11", foil: false, scryfallId: "abc-123")
+        XCTAssertTrue(a.matches(b))
+    }
+
+    func testMatchesByScryfallIdDistinguishesFoil() {
+        let a = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "abc-123")
+        let b = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: true, scryfallId: "abc-123")
+        XCTAssertFalse(a.matches(b))
+    }
+
+    func testMatchesFallsBackToIdentityFields() {
+        let a = CollectionItem(title: "Forest", edition: "Foundations", collectorNumber: "276", foil: false)
+        let b = CollectionItem(title: "Forest", edition: "Foundations", collectorNumber: "276", foil: false)
+        XCTAssertTrue(a.matches(b))
+    }
+
+    func testMatchesFallbackDistinguishesByCollectorNumber() {
+        let a = CollectionItem(title: "Forest", edition: "Foundations", collectorNumber: "276", foil: false)
+        let b = CollectionItem(title: "Forest", edition: "Foundations", collectorNumber: "277", foil: false)
+        XCTAssertFalse(a.matches(b))
+    }
+
+    func testMatchesReturnsFalseForDifferentCards() {
+        let a = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "abc-123")
+        let b = CollectionItem(title: "Counterspell", edition: "DMR", foil: false, scryfallId: "def-456")
+        XCTAssertFalse(a.matches(b))
+    }
+
+}
+
+// MARK: - mergeOrInsert tests
+
+extension CollectionModelsTests {
+    func testMergeOrInsertIncrementsQuantityWhenMatchFound() throws {
+        let container = try ModelContainer(
+            for: CollectionItem.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let existing = CollectionItem(title: "Sol Ring", edition: "C21", foil: false, scryfallId: "sr-1", quantity: 2)
+        context.insert(existing)
+        let incoming = CollectionItem(title: "Sol Ring", edition: "C21", foil: false, scryfallId: "sr-1", quantity: 1)
+        let result = mergeOrInsert(incoming, into: [existing], context: context)
+        XCTAssertEqual(result.id, existing.id)
+        XCTAssertEqual(existing.quantity, 3)
+    }
+
+    func testMergeOrInsertCreatesNewRowWhenNoMatch() throws {
+        let container = try ModelContainer(
+            for: CollectionItem.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let existing = CollectionItem(
+            title: "Forest", edition: "Foundations", foil: false, scryfallId: "f-1", quantity: 1
+        )
+        context.insert(existing)
+        let incoming = CollectionItem(
+            title: "Island", edition: "Foundations", foil: false, scryfallId: "i-1", quantity: 1
+        )
+        let result = mergeOrInsert(incoming, into: [existing], context: context)
+        XCTAssertNotEqual(result.id, existing.id)
+        XCTAssertEqual(existing.quantity, 1)
+        let fetched = try context.fetch(FetchDescriptor<CollectionItem>())
+        XCTAssertEqual(fetched.count, 2)
     }
 
     // MARK: - CardCollection

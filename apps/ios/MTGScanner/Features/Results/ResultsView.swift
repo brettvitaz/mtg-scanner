@@ -187,14 +187,14 @@ struct ResultsView: View {
             for item in items {
                 let copy = item.duplicate()
                 copy.collection = collection
-                modelContext.insert(copy)
+                mergeOrInsert(copy, into: collection.items, context: modelContext)
             }
             collection.updatedAt = Date()
         case .deck(let deck):
             for item in items {
                 let copy = item.duplicate()
                 copy.deck = deck
-                modelContext.insert(copy)
+                mergeOrInsert(copy, into: deck.items, context: modelContext)
             }
             deck.updatedAt = Date()
         }

@@ -15,10 +15,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ./services/api[dev]
+        run: uv pip install --system -e "./services/api[dev]"
       - name: Run tests
         run: pytest services/api/tests/ -v
 
@@ -30,10 +29,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ./services/api[dev]
+        run: uv pip install --system -e "./services/api[dev]"
       - name: Run mypy
         run: mypy --config-file services/api/pyproject.toml services/api/app/
 
@@ -45,11 +43,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ./services/api[dev]
+        run: uv pip install --system -e "./services/api[dev]"
       - name: Run bandit
         run: bandit -c services/api/pyproject.toml -r services/api/app/ --confidence-level high
-      - name: Run pip-audit
-        run: pip-audit
+      - name: Run uv audit
+        run: uv audit --directory services/api

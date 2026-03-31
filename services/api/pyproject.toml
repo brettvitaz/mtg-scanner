@@ -21,12 +21,14 @@ dev = [
   "jsonschema>=4.25.0,<5.0.0",
   "mypy>=1.13.0,<2.0.0",
   "bandit>=1.8.0,<2.0.0",
-  "pip-audit>=2.7.0,<3.0.0"
 ]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
 
 [tool.mypy]
 python_version = "3.11"

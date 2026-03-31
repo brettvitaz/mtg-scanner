@@ -1,11 +1,15 @@
+import SwiftData
 import SwiftUI
 
 struct CardDetailView: View {
     @EnvironmentObject private var appModel: AppModel
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: CardDetailViewModel
     @State private var showFullscreenImage = false
     @State private var showEditionPicker = false
+    @State private var showAddToSheet = false
     @State private var saved = false
+    @State private var addedMessage: String?
 
     init(card: RecognizedCard) {
         _viewModel = StateObject(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
@@ -34,7 +38,13 @@ struct CardDetailView: View {
         .sheet(isPresented: $showEditionPicker) {
             EditionPickerSheet(viewModel: viewModel, isPresented: $showEditionPicker)
         }
-        .overlay { if saved { SavedOverlay() } }
+        .sheet(isPresented: $showAddToSheet) {
+            MoveToSheet(title: "Add To") { destination in
+                addCardTo(destination)
+            }
+        }
+        .overlay { if saved { ToastOverlay(message: "Correction saved") } }
+        .overlay { if let msg = addedMessage { ToastOverlay(message: msg, color: .blue) } }
     }
 
     private func initializeViewModel() {
@@ -158,6 +168,13 @@ struct CardDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+            Button { showAddToSheet = true } label: {
+                Label("Add to Collection or Deck", systemImage: "plus.rectangle.on.folder")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.bordered)
             Button {
                 viewModel.saveCorrection(to: appModel)
                 withAnimation { saved = true }
@@ -171,6 +188,30 @@ struct CardDetailView: View {
             .buttonStyle(.bordered)
         }
         .padding(.top, 8)
+    }
+
+    private func addCardTo(_ destination: MoveDestination) {
+        let correction = appModel.corrections[viewModel.card.id]
+        let item = CollectionItem(from: viewModel.card, correction: correction)
+        switch destination {
+        case .collection(let collection):
+            item.collection = collection
+            collection.updatedAt = Date()
+            modelContext.insert(item)
+            showAddedMessage("Added to \(collection.name)")
+        case .deck(let deck):
+            item.deck = deck
+            deck.updatedAt = Date()
+            modelContext.insert(item)
+            showAddedMessage("Added to \(deck.name)")
+        }
+    }
+
+    private func showAddedMessage(_ message: String) {
+        withAnimation { addedMessage = message }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation { addedMessage = nil }
+        }
     }
 }
 
@@ -406,15 +447,18 @@ private struct StatBadge: View {
     }
 }
 
-private struct SavedOverlay: View {
+private struct ToastOverlay: View {
+    let message: String
+    var color: Color = .green
+
     var body: some View {
         VStack {
-            Label("Correction saved", systemImage: "checkmark.circle.fill")
+            Label(message, systemImage: "checkmark.circle.fill")
                 .font(.subheadline.bold())
                 .foregroundStyle(.white)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.green, in: Capsule())
+                .background(color, in: Capsule())
                 .padding(.top, 12)
             Spacer()
         }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -6,6 +7,9 @@ import UIKit
 final class AppModel: ObservableObject {
     @Published var latestResult: RecognitionResult = .sample
     @Published var corrections: [UUID: CardCorrection] = [:]
+
+    /// SwiftData model context, set after app launch.
+    var modelContext: ModelContext?
     @Published var apiBaseURL: String {
         didSet { persistAPIBaseURL() }
     }
@@ -89,6 +93,7 @@ final class AppModel: ObservableObject {
         }
 
         isRecognizing = false
+        persistRecognizedCards()
         shouldShowResults = true
     }
 
@@ -156,6 +161,18 @@ final class AppModel: ObservableObject {
                       let image = UIImage(data: data) {
                 cardCropImages[card.id] = image
             }
+        }
+    }
+
+    // MARK: - Persistence
+
+    /// Insert recognized cards into SwiftData as inbox items (no collection or deck).
+    private func persistRecognizedCards() {
+        guard let modelContext else { return }
+        for card in latestResult.cards {
+            let correction = corrections[card.id]
+            let item = CollectionItem(from: card, correction: correction)
+            modelContext.insert(item)
         }
     }
 

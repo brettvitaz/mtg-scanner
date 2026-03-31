@@ -123,7 +123,7 @@ struct ScanView: View {
             cardCountBadge
             TorchControl(level: $detectionViewModel.torchLevel)
             Spacer()
-            statusBadge
+            modeToggle
         }
     }
 
@@ -137,26 +137,13 @@ struct ScanView: View {
             .clipShape(Capsule())
     }
 
-    private var statusBadge: some View {
-        Text(appModel.statusMessage)
-            .font(.caption)
-            .foregroundStyle(.white)
-            .lineLimit(2)
-            .multilineTextAlignment(.trailing)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .frame(maxWidth: 180)
-    }
-
     private var bottomBar: some View {
         HStack(alignment: .center) {
             photoPickerButton
             Spacer()
             CaptureButton(action: captureCard, isDisabled: appModel.isRecognizing)
             Spacer()
-            modeToggle
+            Color.clear.frame(width: 54, height: 54)
         }
         .padding(.bottom, 8)
     }

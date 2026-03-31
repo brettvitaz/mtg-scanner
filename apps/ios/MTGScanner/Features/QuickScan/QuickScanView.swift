@@ -26,6 +26,7 @@ struct QuickScanView: View {
     private var topBar: some View {
         HStack(alignment: .top) {
             scannedCountBadge
+            TorchControl(level: $torchLevel)
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 if recognitionQueue.pendingCount > 0 {
@@ -104,7 +105,6 @@ struct QuickScanView: View {
 
     private var bottomBar: some View {
         HStack {
-            TorchControl(level: $torchLevel)
             Spacer()
             startStopButton
             Spacer()

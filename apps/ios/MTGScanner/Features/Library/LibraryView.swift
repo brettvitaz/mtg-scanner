@@ -68,7 +68,7 @@ struct LibraryView: View {
             }
             ForEach(collections) { collection in
                 NavigationLink(value: collection) {
-                    CollectionRow(name: collection.name, count: collection.items.count, date: collection.updatedAt)
+                    CollectionRow(name: collection.name, count: collection.items.totalQuantity)
                 }
             }
             .onDelete { offsets in
@@ -87,7 +87,7 @@ struct LibraryView: View {
             }
             ForEach(decks) { deck in
                 NavigationLink(value: deck) {
-                    CollectionRow(name: deck.name, count: deck.items.count, date: deck.updatedAt)
+                    CollectionRow(name: deck.name, count: deck.items.totalQuantity)
                 }
             }
             .onDelete { offsets in
@@ -118,18 +118,14 @@ struct LibraryView: View {
 private struct CollectionRow: View {
     let name: String
     let count: Int
-    let date: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(name)
                 .font(.headline)
-            HStack(spacing: 8) {
-                Text("\(count) card(s)")
-                Text(date, style: .relative)
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            Text("\(count) card(s)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }

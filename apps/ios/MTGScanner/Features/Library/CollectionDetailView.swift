@@ -79,7 +79,7 @@ struct CollectionDetailView: View {
                     HStack {
                         Text("Cards")
                         Spacer()
-                        Text("\(collection.items.count) card(s)")
+                        Text("\(collection.items.totalQuantity) card(s)")
                             .foregroundStyle(.secondary)
                     }
                 }

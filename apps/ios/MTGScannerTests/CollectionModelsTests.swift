@@ -19,7 +19,8 @@ final class CollectionModelsTests: XCTestCase {
             scryfallId: "abc-123",
             imageUrl: "https://example.com/image.png",
             setSymbolUrl: "https://example.com/symbol.svg",
-            cardKingdomUrl: "https://example.com/ck"
+            cardKingdomUrl: "https://example.com/ck",
+            quantity: 3
         )
 
         XCTAssertEqual(item.title, "Lightning Bolt")
@@ -31,8 +32,14 @@ final class CollectionModelsTests: XCTestCase {
         XCTAssertEqual(item.typeLine, "Instant")
         XCTAssertEqual(item.oracleText, "Lightning Bolt deals 3 damage to any target.")
         XCTAssertEqual(item.manaCost, "{R}")
+        XCTAssertEqual(item.quantity, 3)
         XCTAssertNil(item.collection)
         XCTAssertNil(item.deck)
+    }
+
+    func testCollectionItemDefaultQuantityIsOne() {
+        let item = CollectionItem(title: "Test", edition: "Test Set")
+        XCTAssertEqual(item.quantity, 1)
     }
 
     func testCollectionItemInitDefaultsToCurrentDate() {
@@ -77,6 +84,7 @@ final class CollectionModelsTests: XCTestCase {
         XCTAssertEqual(item.manaCost, "{U}{U}")
         XCTAssertEqual(item.scryfallId, "def-456")
         XCTAssertEqual(item.imageUrl, "https://example.com/cs.png")
+        XCTAssertEqual(item.quantity, 1)
     }
 
     func testCollectionItemFromRecognizedCardWithNilFields() {
@@ -149,7 +157,8 @@ final class CollectionModelsTests: XCTestCase {
             setCode: "C21",
             collectorNumber: "263",
             foil: true,
-            rarity: "uncommon"
+            rarity: "uncommon",
+            quantity: 2
         )
 
         let copy = original.duplicate()
@@ -161,6 +170,7 @@ final class CollectionModelsTests: XCTestCase {
         XCTAssertEqual(copy.collectorNumber, original.collectorNumber)
         XCTAssertEqual(copy.foil, original.foil)
         XCTAssertEqual(copy.rarity, original.rarity)
+        XCTAssertEqual(copy.quantity, 2)
         XCTAssertNil(copy.collection)
         XCTAssertNil(copy.deck)
     }

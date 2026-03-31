@@ -85,7 +85,7 @@ struct DeckDetailView: View {
                     HStack {
                         Text("Cards")
                         Spacer()
-                        Text("\(deck.items.count) card(s)")
+                        Text("\(deck.items.totalQuantity) card(s)")
                             .foregroundStyle(.secondary)
                     }
                 }

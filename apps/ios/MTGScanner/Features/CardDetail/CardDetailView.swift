@@ -8,8 +8,9 @@ struct CardDetailView: View {
     @State private var showFullscreenImage = false
     @State private var showEditionPicker = false
     @State private var showAddToSheet = false
-    @State private var saved = false
     @State private var addedMessage: String?
+    @State private var isInitialized = false
+    @State private var autoSaveTask: Task<Void, Never>?
 
     init(card: RecognizedCard) {
         _viewModel = StateObject(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
@@ -29,6 +30,11 @@ struct CardDetailView: View {
         .navigationTitle(viewModel.displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { initializeViewModel() }
+        .onChange(of: viewModel.editTitle) { _, _ in autoSave() }
+        .onChange(of: viewModel.editEdition) { _, _ in autoSave() }
+        .onChange(of: viewModel.editCollectorNumber) { _, _ in autoSave() }
+        .onChange(of: viewModel.editFoil) { _, _ in autoSave() }
+        .onChange(of: viewModel.selectedPrinting) { _, _ in autoSave() }
         .fullScreenCover(isPresented: $showFullscreenImage) {
             FullscreenImageView(
                 imageUrl: viewModel.showingCropImage ? nil : viewModel.displayImageUrl,
@@ -43,18 +49,7 @@ struct CardDetailView: View {
                 addCardTo(destination)
             }
         }
-        .overlay { if saved { ToastOverlay(message: "Correction saved") } }
         .overlay { if let msg = addedMessage { ToastOverlay(message: msg, color: .blue) } }
-    }
-
-    private func initializeViewModel() {
-        let correction = appModel.corrections[viewModel.card.id]
-        viewModel.editTitle = correction?.title ?? viewModel.card.title ?? ""
-        viewModel.editEdition = correction?.edition ?? viewModel.card.edition ?? ""
-        viewModel.editCollectorNumber = correction?.collectorNumber ?? viewModel.card.collectorNumber ?? ""
-        viewModel.editFoil = correction?.foil ?? viewModel.card.foil ?? false
-        Task { await viewModel.loadPrintings(using: appModel) }
-        Task { await viewModel.loadPrice(using: appModel) }
     }
 
     // MARK: - Identity
@@ -175,22 +170,69 @@ struct CardDetailView: View {
                     .padding(.vertical, 10)
             }
             .buttonStyle(.bordered)
-            Button {
-                viewModel.saveCorrection(to: appModel)
-                withAnimation { saved = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { saved = false } }
-            } label: {
-                Label("Save Correction", systemImage: "checkmark.circle")
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-            }
-            .buttonStyle(.bordered)
         }
         .padding(.top, 8)
     }
 
-    private func addCardTo(_ destination: MoveDestination) {
+}
+
+// MARK: - Actions
+
+extension CardDetailView {
+    func initializeViewModel() {
+        isInitialized = false
+        let correction = appModel.corrections[viewModel.card.id]
+        viewModel.editTitle = correction?.title ?? viewModel.card.title ?? ""
+        viewModel.editEdition = correction?.edition ?? viewModel.card.edition ?? ""
+        viewModel.editCollectorNumber = correction?.collectorNumber ?? viewModel.card.collectorNumber ?? ""
+        viewModel.editFoil = correction?.foil ?? viewModel.card.foil ?? false
+        isInitialized = true
+        Task { await viewModel.loadPrintings(using: appModel) }
+        Task { await viewModel.loadPrice(using: appModel) }
+    }
+
+    func autoSave() {
+        guard isInitialized else { return }
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            viewModel.saveCorrection(to: appModel)
+            updateCollectionItem()
+        }
+    }
+
+    func updateCollectionItem() {
+        let targetId = viewModel.card.id
+        var descriptor = FetchDescriptor<CollectionItem>(
+            predicate: #Predicate { $0.id == targetId }
+        )
+        descriptor.fetchLimit = 1
+        guard let item = try? modelContext.fetch(descriptor).first else { return }
+        item.title = viewModel.displayTitle
+        item.edition = viewModel.displayEdition
+        item.setCode = viewModel.displaySetCode.isEmpty ? item.setCode : viewModel.displaySetCode
+        item.collectorNumber = viewModel.displayCollectorNumber.nonEmpty
+        item.foil = viewModel.editFoil
+        item.rarity = viewModel.displayRarity
+        item.typeLine = viewModel.displayTypeLine
+        item.oracleText = viewModel.displayOracleText
+        item.manaCost = viewModel.displayManaCost
+        item.power = viewModel.displayPower
+        item.toughness = viewModel.displayToughness
+        item.loyalty = viewModel.displayLoyalty
+        item.defense = viewModel.displayDefense
+        if let scryfallId = viewModel.selectedPrinting?.scryfallId {
+            item.scryfallId = scryfallId
+        }
+        item.imageUrl = viewModel.displayImageUrl?.absoluteString
+        item.setSymbolUrl = viewModel.displaySetSymbolUrl?.absoluteString
+        if let ckUrl = viewModel.displayCardKingdomUrl?.absoluteString {
+            item.cardKingdomUrl = ckUrl
+        }
+    }
+
+    func addCardTo(_ destination: MoveDestination) {
         let correction = appModel.corrections[viewModel.card.id]
         let item = CollectionItem(from: viewModel.card, correction: correction)
         switch destination {
@@ -207,7 +249,7 @@ struct CardDetailView: View {
         }
     }
 
-    private func showAddedMessage(_ message: String) {
+    func showAddedMessage(_ message: String) {
         withAnimation { addedMessage = message }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation { addedMessage = nil }

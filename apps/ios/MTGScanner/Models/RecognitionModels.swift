@@ -190,7 +190,7 @@ struct CardCorrection: Identifiable, Codable {
 }
 
 /// A printing of a card from the printings endpoint.
-struct CardPrinting: Codable, Identifiable {
+struct CardPrinting: Codable, Identifiable, Equatable {
     var id: String { "\(setCode)-\(collectorNumber ?? "unknown")" }
     let name: String
     let setCode: String

@@ -43,9 +43,16 @@ struct CollectionItemRow: View {
 
     private var cardInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(item.title)
-                .font(.headline)
-                .lineLimit(2)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(item.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                if item.quantity > 1 {
+                    Text("×\(item.quantity)")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.secondary)
+                }
+            }
             Text(item.edition)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

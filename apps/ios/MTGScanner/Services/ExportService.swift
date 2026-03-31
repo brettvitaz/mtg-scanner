@@ -59,11 +59,12 @@ struct ExportService {
     }
 
     private var csvHeader: String {
-        "title,edition,set_code,collector_number,foil,rarity,mana_cost,type_line,scryfall_id"
+        "quantity,title,edition,set_code,collector_number,foil,rarity,mana_cost,type_line,scryfall_id"
     }
 
     private func csvRow(for item: CollectionItem) -> String {
         [
+            "\(Swift.max(1, item.quantity))",
             csvEscape(item.title),
             csvEscape(item.edition),
             csvEscape(item.setCode ?? ""),
@@ -93,6 +94,7 @@ struct ExportFile {
 }
 
 struct ExportRecord: Codable {
+    let quantity: Int
     let title: String
     let edition: String
     let setCode: String?
@@ -111,6 +113,7 @@ struct ExportRecord: Codable {
     let addedAt: Date
 
     init(from item: CollectionItem) {
+        self.quantity = Swift.max(1, item.quantity)
         self.title = item.title
         self.edition = item.edition
         self.setCode = item.setCode
@@ -130,7 +133,7 @@ struct ExportRecord: Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case title, edition, foil, rarity, power, toughness, loyalty, defense
+        case quantity, title, edition, foil, rarity, power, toughness, loyalty, defense
         case setCode = "set_code"
         case collectorNumber = "collector_number"
         case typeLine = "type_line"

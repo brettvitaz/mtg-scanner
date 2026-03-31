@@ -18,6 +18,7 @@ final class ExportServiceTests: XCTestCase {
         XCTAssertEqual(parsed.count, 1)
         XCTAssertEqual(parsed[0]["title"] as? String, "Lightning Bolt")
         XCTAssertEqual(parsed[0]["edition"] as? String, "M10")
+        XCTAssertEqual(parsed[0]["quantity"] as? Int, 1)
     }
 
     func testExportJSONMultipleItems() throws {
@@ -52,7 +53,9 @@ final class ExportServiceTests: XCTestCase {
         let text = try XCTUnwrap(String(data: file.data, encoding: .utf8))
         let lines = text.components(separatedBy: "\n")
         XCTAssertEqual(lines.count, 2) // header + 1 data row
+        XCTAssertTrue(lines[0].contains("quantity"))
         XCTAssertTrue(lines[0].contains("title"))
+        XCTAssertTrue(lines[1].contains("1"))
         XCTAssertTrue(lines[1].contains("Lightning Bolt"))
         XCTAssertTrue(lines[1].contains("M10"))
         XCTAssertTrue(lines[1].contains("146"))

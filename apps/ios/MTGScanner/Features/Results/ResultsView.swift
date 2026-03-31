@@ -34,8 +34,8 @@ struct ResultsView: View {
             }
         }
         .sheet(isPresented: $showMoveSheet) {
-            MoveToSheet(title: "Move To") { destination in
-                moveSelectedItems(to: destination)
+            MoveToSheet(title: "Copy To") { destination in
+                copySelectedItems(to: destination)
             }
         }
         .confirmationDialog(
@@ -87,7 +87,7 @@ struct ResultsView: View {
                     HStack {
                         Text("Scanned Cards")
                         Spacer()
-                        Text("\(inboxItems.count) card(s)")
+                        Text("\(inboxItems.totalQuantity) card(s)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -140,8 +140,8 @@ struct ResultsView: View {
                 showMoveSheet = true
             } label: {
                 VStack(spacing: 2) {
-                    Image(systemName: "folder")
-                    Text("Move").font(.caption2)
+                    Image(systemName: "doc.on.doc")
+                    Text("Copy").font(.caption2)
                 }
             }
             .disabled(selectedItems.isEmpty)
@@ -180,19 +180,21 @@ struct ResultsView: View {
         selectedItems = Set(inboxItems.map(\.id))
     }
 
-    private func moveSelectedItems(to destination: MoveDestination) {
+    private func copySelectedItems(to destination: MoveDestination) {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let collection):
             for item in items {
-                item.collection = collection
-                item.deck = nil
+                let copy = item.duplicate()
+                copy.collection = collection
+                modelContext.insert(copy)
             }
             collection.updatedAt = Date()
         case .deck(let deck):
             for item in items {
-                item.deck = deck
-                item.collection = nil
+                let copy = item.duplicate()
+                copy.deck = deck
+                modelContext.insert(copy)
             }
             deck.updatedAt = Date()
         }

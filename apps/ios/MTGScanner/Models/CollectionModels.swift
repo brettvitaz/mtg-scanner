@@ -22,6 +22,7 @@ final class CollectionItem {
     var setSymbolUrl: String?
     var cardKingdomUrl: String?
     var addedAt: Date
+    var quantity: Int
 
     @Relationship(inverse: \CardCollection.items)
     var collection: CardCollection?
@@ -48,6 +49,7 @@ final class CollectionItem {
         setSymbolUrl: String? = nil,
         cardKingdomUrl: String? = nil,
         addedAt: Date = Date(),
+        quantity: Int = 1,
         collection: CardCollection? = nil,
         deck: Deck? = nil
     ) {
@@ -70,6 +72,7 @@ final class CollectionItem {
         self.setSymbolUrl = setSymbolUrl
         self.cardKingdomUrl = cardKingdomUrl
         self.addedAt = addedAt
+        self.quantity = quantity
         self.collection = collection
         self.deck = deck
     }
@@ -141,7 +144,8 @@ final class CollectionItem {
             scryfallId: scryfallId,
             imageUrl: imageUrl,
             setSymbolUrl: setSymbolUrl,
-            cardKingdomUrl: cardKingdomUrl
+            cardKingdomUrl: cardKingdomUrl,
+            quantity: quantity
         )
     }
 }
@@ -179,5 +183,12 @@ final class Deck {
         self.items = []
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+}
+
+extension Array where Element == CollectionItem {
+    /// Sum of quantities across all items. Treats a stored quantity of 0 as 1 for migration safety.
+    var totalQuantity: Int {
+        reduce(0) { $0 + Swift.max(1, $1.quantity) }
     }
 }

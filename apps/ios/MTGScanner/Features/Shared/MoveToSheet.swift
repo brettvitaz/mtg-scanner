@@ -66,7 +66,7 @@ struct MoveToSheet: View {
                     HStack {
                         Label(collection.name, systemImage: "folder")
                         Spacer()
-                        Text("\(collection.items.count)")
+                        Text("\(collection.items.totalQuantity)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -91,7 +91,7 @@ struct MoveToSheet: View {
                     HStack {
                         Label(deck.name, systemImage: "rectangle.stack")
                         Spacer()
-                        Text("\(deck.items.count)")
+                        Text("\(deck.items.totalQuantity)")
                             .foregroundStyle(.secondary)
                     }
                 }

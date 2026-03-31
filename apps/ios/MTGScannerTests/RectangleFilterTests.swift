@@ -13,6 +13,13 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(RectangleFilter.targetAspectRatio, 63.0 / 88.0, accuracy: 0.001)
     }
 
+    func testPortraitInBufferRatioIsTargetScaledByBufferRatio() {
+        // The 1920×1080 buffer compresses normalized x by 9/16 relative to y.
+        // A card standing upright in landscape mode appears with ratio ≈ target × (1080/1920).
+        let expected = RectangleFilter.targetAspectRatio * (1080.0 / 1920.0)
+        XCTAssertEqual(RectangleFilter.portraitInBufferRatio, expected, accuracy: 0.001)
+    }
+
     // MARK: - IoU
 
     func testIouOfIdenticalRectanglesIsOne() {
@@ -41,30 +48,28 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(RectangleFilter.iou(a, b), 0.0, accuracy: 0.001)
     }
 
-    // MARK: - Aspect ratio acceptance
+    // MARK: - Aspect ratio — portrait device (isLandscape: false)
 
     func testFilterAcceptsExactCardAspectRatio() {
-        // Create an observation whose bounding box matches the card ratio exactly.
-        let ratio = RectangleFilter.targetAspectRatio  // short/long
-        // Make a portrait box: width = ratio, height = 1.0 (scaled to fit 0...1)
+        let ratio = RectangleFilter.targetAspectRatio
         let height: CGFloat = 0.4
         let width = height * ratio
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
     func testFilterRejectsTooNarrowAspectRatio() {
         // A very narrow rectangle (like a pencil) should be rejected.
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: 0.05, height: 0.4), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 0)
     }
 
     func testFilterRejectsTooSquareAspectRatio() {
         // A nearly-square rectangle should be rejected.
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.42), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 0)
     }
 
@@ -73,7 +78,7 @@ final class RectangleFilterTests: XCTestCase {
         let height: CGFloat = 0.4
         let width = height * ratio
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.1)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 0)
     }
 
@@ -85,31 +90,17 @@ final class RectangleFilterTests: XCTestCase {
             box: CGRect(x: 0.1, y: 0.1, width: width, height: height),
             confidence: RectangleFilter.minConfidence
         )
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
-    func testFilterAcceptsLandscapeCardAspectRatio() {
-        // A landscape card has width > height but the same short/long ratio.
+    func testFilterAcceptsLandscapeCardAspectRatioInPortraitMode() {
+        // Portrait device: card lying flat (landscape in buffer, short/long ≈ 0.716) — accepted.
         let ratio = RectangleFilter.targetAspectRatio
         let width: CGFloat = 0.4
         let height = width * ratio  // height < width → landscape bounding box
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
-        XCTAssertEqual(result.count, 1)
-    }
-
-    func testFilterAcceptsPortraitCardInLandscapeBuffer() {
-        // When the device is in landscape, a card standing upright appears portrait-shaped in the
-        // 1920×1080 sensor buffer. The normalized short/long ratio is NOT the physical card ratio;
-        // it equals targetAspectRatio × (1080/1920) ≈ 0.402 because Vision normalizes x over 1920
-        // pixels but y over only 1080 pixels — compressing x-distances by 9/16.
-        // The portrait-in-buffer acceptance band [portraitLower, portraitUpper] must cover this.
-        let portraitInBufferRatio = RectangleFilter.targetAspectRatio * (1080.0 / 1920.0)
-        let height: CGFloat = 0.4
-        let width = height * portraitInBufferRatio  // narrow: card's 63 mm squeezed by 1/1920
-        let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
@@ -119,7 +110,7 @@ final class RectangleFilterTests: XCTestCase {
         let height: CGFloat = 0.4
         let width = height * lower
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
@@ -128,7 +119,7 @@ final class RectangleFilterTests: XCTestCase {
         let height: CGFloat = 0.4
         let width = height * (lower - 0.01)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 0)
     }
 
@@ -137,7 +128,7 @@ final class RectangleFilterTests: XCTestCase {
         let height: CGFloat = 0.4
         let width = height * upper
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
@@ -146,9 +137,36 @@ final class RectangleFilterTests: XCTestCase {
         let height: CGFloat = 0.4
         let width = height * (upper + 0.01)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 0)
     }
+
+    // MARK: - Aspect ratio — landscape device (isLandscape: true)
+
+    func testFilterAcceptsPortraitCardInLandscapeBuffer() {
+        // Landscape device: card standing upright has its long axis vertical in the 1920×1080 buffer.
+        // The normalized short/long ratio = targetAspectRatio × (1080/1920) ≈ 0.402 because Vision
+        // normalizes x over 1920 pixels but y over 1080 pixels, compressing x-distances by 9/16.
+        // isLandscape: true activates the portrait-in-buffer band which accepts this ratio.
+        let height: CGFloat = 0.4
+        let width = height * RectangleFilter.portraitInBufferRatio
+        let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
+        let result = filter.filter([obs], isLandscape: true)
+        XCTAssertEqual(result.count, 1)
+    }
+
+    func testFilterRejectsHorizontalCardInLandscapeMode() {
+        // Landscape device: a card lying flat (landscape-in-buffer, ratio ≈ 0.716 normalized)
+        // must be rejected so only upright cards are detected when the device is landscape.
+        let ratio = RectangleFilter.targetAspectRatio
+        let height: CGFloat = 0.4
+        let width = height * ratio
+        let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
+        let result = filter.filter([obs], isLandscape: true)
+        XCTAssertEqual(result.count, 0)
+    }
+
+    // MARK: - Rotated card
 
     func testFilterAcceptsRotatedCardWithDistortedBoundingBox() {
         // A card rotated ~45° has an AABB that doesn't reflect the true card ratio,
@@ -159,8 +177,6 @@ final class RectangleFilterTests: XCTestCase {
         let angle: CGFloat = .pi / 6  // 30 degrees
         let cx: CGFloat = 0.5, cy: CGFloat = 0.5
 
-        // Card corners before rotation (centered at origin):
-        // topLeft=(-short/2, long/2), topRight=(short/2, long/2), etc.
         let hw = shortSide / 2, hh = longSide / 2
         let cosA = cos(angle), sinA = sin(angle)
         func rotate(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -189,7 +205,7 @@ final class RectangleFilterTests: XCTestCase {
         obs.setValue(br, forKey: "bottomRight")
         obs.setValue(bl, forKey: "bottomLeft")
 
-        let result = filter.filter([obs])
+        let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
@@ -220,7 +236,7 @@ final class RectangleFilterTests: XCTestCase {
         let high = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
         // Slightly shifted but IoU >> 0.45
         let low = makeObservation(box: CGRect(x: 0.102, y: 0.102, width: width, height: height), confidence: 0.6)
-        let result = filter.filter([low, high])
+        let result = filter.filter([low, high], isLandscape: false)
         XCTAssertEqual(result.count, 1)
         // swiftlint:disable:next force_unwrapping
         XCTAssertEqual(result.first!.confidence, 0.9, accuracy: 0.001)
@@ -233,12 +249,12 @@ final class RectangleFilterTests: XCTestCase {
         // Place two cards far apart (no IoU overlap).
         let left = makeObservation(box: CGRect(x: 0.0, y: 0.1, width: width, height: height), confidence: 0.8)
         let right = makeObservation(box: CGRect(x: 0.6, y: 0.1, width: width, height: height), confidence: 0.7)
-        let result = filter.filter([left, right])
+        let result = filter.filter([left, right], isLandscape: false)
         XCTAssertEqual(result.count, 2)
     }
 
     func testFilterReturnsEmptyForEmptyInput() {
-        XCTAssertEqual(filter.filter([]).count, 0)
+        XCTAssertEqual(filter.filter([], isLandscape: false).count, 0)
     }
 
     // MARK: - Spatial sort

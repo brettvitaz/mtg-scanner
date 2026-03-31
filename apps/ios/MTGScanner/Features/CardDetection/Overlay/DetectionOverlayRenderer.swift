@@ -27,11 +27,7 @@ final class DetectionOverlayRenderer {
     /// to `previewLayer` screen coordinates.
     ///
     /// Must be called on the main thread.
-    func update(
-        detections: [DetectedCard],
-        previewLayer: AVCaptureVideoPreviewLayer,
-        interfaceOrientation: UIInterfaceOrientation
-    ) {
+    func update(detections: [DetectedCard], previewLayer: AVCaptureVideoPreviewLayer) {
         lastDetectionCount = detections.count
 
         CATransaction.begin()
@@ -42,7 +38,7 @@ final class DetectionOverlayRenderer {
 
         for (index, card) in detections.enumerated() {
             let layer = layerPool[index]
-            let path = makeQuadPath(for: card, previewLayer: previewLayer, orientation: interfaceOrientation)
+            let path = makeQuadPath(for: card, previewLayer: previewLayer)
             layer.path = path.cgPath
             layer.isHidden = false
         }
@@ -65,55 +61,26 @@ final class DetectionOverlayRenderer {
 
     /// Converts a Vision normalized point to a point in the `previewLayer`'s coordinate space.
     ///
-    /// When an orientation hint is passed to `VNImageRequestHandler`, Vision returns corners in
-    /// the *oriented* image space (not native sensor space). This method un-rotates those
-    /// coordinates back to capture device space before calling `layerPointConverted`, which
-    /// expects native sensor coordinates (top-left origin, values 0–1).
+    /// Vision returns corners in normalized image coordinates: origin bottom-left, x right, y up,
+    /// values 0–1, relative to the native (landscape) pixel buffer passed to the handler.
     ///
-    /// Capture device space: origin top-left, x right, y down, values 0–1, native sensor frame.
-    /// Vision oriented space: origin bottom-left, values 0–1, relative to the displayed orientation.
+    /// `layerPointConverted(fromCaptureDevicePoint:)` expects capture device space:
+    /// origin top-left, x right, y down, values 0–1 in the native sensor frame.
     ///
-    /// Derivation (rotation of vision-coord `(vx, vy)` → capture device point):
-    ///   - `.landscapeRight` (`.up` hint, no rotation):   `(vx, 1-vy)`
-    ///   - `.landscapeLeft`  (`.down` hint, 180°):        `(1-vx, vy)`
-    ///   - `.portrait`       (`.right` hint, 90° CW):     `(1-vy, 1-vx)`
-    ///   - `.portraitUpsideDown` (`.left` hint, 90° CCW): `(vy, vx)`
-    static func visionPointToLayer(
-        _ point: CGPoint,
-        previewLayer: AVCaptureVideoPreviewLayer,
-        orientation: UIInterfaceOrientation
-    ) -> CGPoint {
-        let cdPoint = captureDevicePoint(point, orientation: orientation)
-        return previewLayer.layerPointConverted(fromCaptureDevicePoint: cdPoint)
-    }
-
-    /// Returns the capture device coordinate for a Vision normalized point in the given orientation.
-    ///
-    /// Exposed `internal` for unit testing. Production callers use `visionPointToLayer`.
-    static func captureDevicePoint(_ visionPoint: CGPoint, orientation: UIInterfaceOrientation) -> CGPoint {
-        switch orientation {
-        case .landscapeRight:
-            return CGPoint(x: visionPoint.x, y: 1.0 - visionPoint.y)
-        case .landscapeLeft:
-            return CGPoint(x: 1.0 - visionPoint.x, y: visionPoint.y)
-        case .portraitUpsideDown:
-            return CGPoint(x: visionPoint.y, y: visionPoint.x)
-        default: // .portrait (and unknown)
-            return CGPoint(x: 1.0 - visionPoint.y, y: 1.0 - visionPoint.x)
-        }
+    /// The only difference is Y-axis direction, so we flip Y before converting.
+    /// `layerPointConverted` then handles resizeAspectFill crop and videoRotationAngle
+    /// for all device orientations (portrait, landscape left/right, portrait upside-down).
+    static func visionPointToLayer(_ point: CGPoint, previewLayer: AVCaptureVideoPreviewLayer) -> CGPoint {
+        previewLayer.layerPointConverted(fromCaptureDevicePoint: CGPoint(x: point.x, y: 1.0 - point.y))
     }
 
     // MARK: - Private Helpers
 
-    private func makeQuadPath(
-        for card: DetectedCard,
-        previewLayer: AVCaptureVideoPreviewLayer,
-        orientation: UIInterfaceOrientation
-    ) -> UIBezierPath {
-        let tl = Self.visionPointToLayer(card.topLeft, previewLayer: previewLayer, orientation: orientation)
-        let tr = Self.visionPointToLayer(card.topRight, previewLayer: previewLayer, orientation: orientation)
-        let br = Self.visionPointToLayer(card.bottomRight, previewLayer: previewLayer, orientation: orientation)
-        let bl = Self.visionPointToLayer(card.bottomLeft, previewLayer: previewLayer, orientation: orientation)
+    private func makeQuadPath(for card: DetectedCard, previewLayer: AVCaptureVideoPreviewLayer) -> UIBezierPath {
+        let tl = Self.visionPointToLayer(card.topLeft, previewLayer: previewLayer)
+        let tr = Self.visionPointToLayer(card.topRight, previewLayer: previewLayer)
+        let br = Self.visionPointToLayer(card.bottomRight, previewLayer: previewLayer)
+        let bl = Self.visionPointToLayer(card.bottomLeft, previewLayer: previewLayer)
 
         let path = UIBezierPath()
         path.move(to: tl)

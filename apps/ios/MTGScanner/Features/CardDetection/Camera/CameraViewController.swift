@@ -60,7 +60,6 @@ final class CameraViewController: UIViewController {
         previewLayer?.frame = view.bounds
         detectionLayer.frame = view.bounds
         updatePreviewOrientation()
-        updateEngineOrientation()
     }
 
     // MARK: - Orientation
@@ -81,12 +80,6 @@ final class CameraViewController: UIViewController {
         default:                        angle = 90   // portrait
         }
         connection.videoRotationAngle = angle
-    }
-
-    /// Keeps the detection engine informed of the current interface orientation
-    /// so Vision applies the correct rotation when processing pixel buffers.
-    private func updateEngineOrientation() {
-        engine.interfaceOrientation = view.window?.windowScene?.interfaceOrientation ?? .portrait
     }
 
     // MARK: - Public API
@@ -174,8 +167,7 @@ final class CameraViewController: UIViewController {
 
         engine.onDetection = { [weak self] cards in
             guard let self, let previewLayer = self.previewLayer else { return }
-            let orientation = self.view.window?.windowScene?.interfaceOrientation ?? .portrait
-            self.renderer?.update(detections: cards, previewLayer: previewLayer, interfaceOrientation: orientation)
+            self.renderer?.update(detections: cards, previewLayer: previewLayer)
             self.onDetectedCardsChanged?(cards)
         }
     }

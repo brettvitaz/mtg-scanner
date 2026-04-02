@@ -58,6 +58,9 @@ struct ResultsView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: $filterState, items: inboxItems)
         }
+        .task(id: inboxItems.map(\.id)) {
+            await fetchMissingPrices(for: inboxItems)
+        }
     }
 
     // MARK: - Empty State
@@ -180,23 +183,36 @@ struct ResultsView: View {
         .background(.bar)
     }
 
-    // MARK: - Actions
+}
 
-    private func enterSelecting() {
+// MARK: - Actions
+
+private extension ResultsView {
+    func fetchMissingPrices(for items: [CollectionItem]) async {
+        for item in items where item.priceRetail == nil && item.priceBuy == nil {
+            guard let price = try? await appModel.fetchPrice(
+                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
+            ) else { continue }
+            item.priceRetail = price.priceRetail
+            item.priceBuy = price.priceBuy
+        }
+    }
+
+    func enterSelecting() {
         selectedItems = []
         isSelecting = true
     }
 
-    private func exitSelecting() {
+    func exitSelecting() {
         isSelecting = false
         selectedItems = []
     }
 
-    private func selectAll() {
+    func selectAll() {
         selectedItems = Set(inboxItems.map(\.id))
     }
 
-    private func copySelectedItems(to destination: MoveDestination) {
+    func copySelectedItems(to destination: MoveDestination) {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let collection):
@@ -219,7 +235,7 @@ struct ResultsView: View {
         exitSelecting()
     }
 
-    private func deleteSelectedItems() {
+    func deleteSelectedItems() {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
         for item in items {
             modelContext.delete(item)

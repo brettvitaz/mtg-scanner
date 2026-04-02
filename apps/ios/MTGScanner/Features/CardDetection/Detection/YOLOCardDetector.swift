@@ -161,6 +161,10 @@ final class YOLOCardDetector {
 }
 
 private extension YOLOCardDetector {
+    /// The model's fixed input resolution. Coordinates in the output tensor are in
+    /// absolute pixels relative to this size and must be divided to get [0,1] values.
+    static let modelInputSize: CGFloat = 640
+
     static func value(
         in pointer: UnsafePointer<Float32>,
         channel: Int,
@@ -171,6 +175,7 @@ private extension YOLOCardDetector {
         pointer[channel * channelStride + anchor * anchorStride]
     }
 
+    /// Returns a normalized [0,1] scalar by reading from the tensor and dividing by `modelInputSize`.
     static func scalar(
         from pointer: UnsafePointer<Float32>,
         channel: Int,
@@ -186,7 +191,7 @@ private extension YOLOCardDetector {
                 channelStride: channelStride,
                 anchorStride: anchorStride
             )
-        )
+        ) / modelInputSize
     }
 
     static func makeRect(
@@ -274,10 +279,10 @@ private extension YOLOCardDetector {
             let confidence = output[[0, 4, anchor] as [NSNumber]].floatValue
             guard confidence >= confidenceThreshold else { continue }
             let rect = makeRect(
-                centerX: CGFloat(output[[0, 0, anchor] as [NSNumber]].floatValue),
-                centerY: CGFloat(output[[0, 1, anchor] as [NSNumber]].floatValue),
-                width: CGFloat(output[[0, 2, anchor] as [NSNumber]].floatValue),
-                height: CGFloat(output[[0, 3, anchor] as [NSNumber]].floatValue)
+                centerX: CGFloat(output[[0, 0, anchor] as [NSNumber]].floatValue) / modelInputSize,
+                centerY: CGFloat(output[[0, 1, anchor] as [NSNumber]].floatValue) / modelInputSize,
+                width: CGFloat(output[[0, 2, anchor] as [NSNumber]].floatValue) / modelInputSize,
+                height: CGFloat(output[[0, 3, anchor] as [NSNumber]].floatValue) / modelInputSize
             )
             candidates.append((rect, confidence))
         }

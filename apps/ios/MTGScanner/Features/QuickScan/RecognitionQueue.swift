@@ -24,8 +24,11 @@ final class RecognitionQueue: ObservableObject {
     // MARK: - Private
 
     typealias RecognizeFunction = @Sendable (Data, String, String, String) async throws -> RecognitionResult
+    // swiftlint:disable:next line_length
+    typealias RecognizeBatchFunction = @Sendable ([(data: Data, filename: String)], String, String) async throws -> RecognitionResult
 
     private let recognize: RecognizeFunction
+    private let recognizeBatch: RecognizeBatchFunction
     private var activeCount = 0
     private var pendingJobs: [Job] = []
 
@@ -34,24 +37,34 @@ final class RecognitionQueue: ObservableObject {
         let filename: String
         let apiBaseURL: String
         let modelContext: ModelContext?
+        let isCropped: Bool
         var retryCount: Int = 0
     }
 
     // MARK: - Init
 
-    init(recognize: @escaping RecognizeFunction = { data, filename, contentType, baseURL in
-        try await APIClient().recognizeImage(
-            data: data, filename: filename, contentType: contentType, baseURL: baseURL
-        )
-    }) {
+    init(
+        recognize: @escaping RecognizeFunction = { data, filename, contentType, baseURL in
+            try await APIClient().recognizeImage(
+                data: data, filename: filename, contentType: contentType, baseURL: baseURL
+            )
+        },
+        recognizeBatch: @escaping RecognizeBatchFunction = { crops, contentType, baseURL in
+            try await APIClient().recognizeBatch(crops: crops, contentType: contentType, baseURL: baseURL)
+        }
+    ) {
         self.recognize = recognize
+        self.recognizeBatch = recognizeBatch
     }
 
     // MARK: - Public API
 
-    func enqueue(image: UIImage, apiBaseURL: String, modelContext: ModelContext?) {
+    func enqueue(image: UIImage, isCropped: Bool = false, apiBaseURL: String, modelContext: ModelContext?) {
         let filename = "quickscan-\(UUID().uuidString.prefix(8)).jpg"
-        pendingJobs.append(Job(image: image, filename: filename, apiBaseURL: apiBaseURL, modelContext: modelContext))
+        let job = Job(
+            image: image, filename: filename, apiBaseURL: apiBaseURL, modelContext: modelContext, isCropped: isCropped
+        )
+        pendingJobs.append(job)
         pendingCount += 1
         drainIfPossible()
     }
@@ -79,7 +92,7 @@ final class RecognitionQueue: ObservableObject {
         }
 
         do {
-            let result = try await recognize(jpeg, job.filename, "image/jpeg", job.apiBaseURL)
+            let result = try await callAPI(jpeg: jpeg, job: job)
             persist(result: result, modelContext: job.modelContext)
             pendingCount -= 1
             completedCount += 1
@@ -89,12 +102,22 @@ final class RecognitionQueue: ObservableObject {
                 retried.retryCount += 1
                 // Re-insert at front to retry before new work.
                 pendingJobs.insert(retried, at: 0)
-                return
             } else {
                 pendingCount -= 1
                 failedCount += 1
             }
         }
+    }
+
+    private func callAPI(jpeg: Data, job: Job) async throws -> RecognitionResult {
+        if job.isCropped {
+            return try await recognizeBatch(
+                [(data: jpeg, filename: job.filename)],
+                "image/jpeg",
+                job.apiBaseURL
+            )
+        }
+        return try await recognize(jpeg, job.filename, "image/jpeg", job.apiBaseURL)
     }
 
     private func persist(result: RecognitionResult, modelContext: ModelContext?) {

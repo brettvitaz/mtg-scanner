@@ -48,20 +48,32 @@ final class QuickScanViewModel: ObservableObject {
     // MARK: - Private
 
     private var settleTask: Task<Void, Never>?
+    private var lastDetectedBoundingBox: CGRect?
 
     // MARK: - Init
 
     init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         recognitionQueue = RecognitionQueue()
+        setupSignalHandler()
+    }
 
-        presenceTracker.onNewCardSignal = { [weak self] _ in
-            Task { @MainActor [weak self] in self?.handleNewCardSignal() }
-        }
+    /// Designated initialiser for testing — allows injecting a custom `RecognitionQueue`.
+    init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
+         recognitionQueue: RecognitionQueue) {
+        presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
+        self.recognitionQueue = recognitionQueue
+        setupSignalHandler()
     }
 
     convenience init(detector: YOLOCardDetector?) {
         self.init(detectorProvider: { detector })
+    }
+
+    private func setupSignalHandler() {
+        presenceTracker.onNewCardSignal = { [weak self] boundingBox in
+            Task { @MainActor [weak self] in self?.handleNewCardSignal(boundingBox: boundingBox) }
+        }
     }
 
     // MARK: - Controls
@@ -90,10 +102,11 @@ final class QuickScanViewModel: ObservableObject {
 
     // MARK: - State Machine
 
-    private func handleNewCardSignal() {
+    private func handleNewCardSignal(boundingBox: CGRect?) {
         guard isActive else { return }
         switch captureState {
         case .watching:
+            lastDetectedBoundingBox = boundingBox
             startSettleTimer()
         case .settling, .capturing:
             // Timer is already running (settling) or capture is in progress — don't interrupt.
@@ -123,8 +136,23 @@ final class QuickScanViewModel: ObservableObject {
             return
         }
 
+        let box = lastDetectedBoundingBox
+        lastDetectedBoundingBox = nil
+
+        let enqueueImage: UIImage
+        let isCropped: Bool
+        if let box, let cropped = YOLOCropHelper.cropImage(image, toNormalizedRect: box) {
+            enqueueImage = cropped
+            isCropped = true
+        } else {
+            enqueueImage = image
+            isCropped = false
+        }
+
         presenceTracker.markCaptured()
-        recognitionQueue.enqueue(image: image, apiBaseURL: apiBaseURL, modelContext: modelContext)
+        recognitionQueue.enqueue(
+            image: enqueueImage, isCropped: isCropped, apiBaseURL: apiBaseURL, modelContext: modelContext
+        )
         captureState = .watching
         statusMessage = "Captured! Watching for next card…"
     }

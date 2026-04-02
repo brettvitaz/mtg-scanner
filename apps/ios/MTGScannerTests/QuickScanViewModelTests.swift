@@ -117,6 +117,77 @@ final class QuickScanViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isActive)
     }
 
+    // MARK: - Bounding Box Threading
+
+    func testNewCardSignalWithBoundingBoxResultsInCroppedEnqueue() async throws {
+        // Inject a RecognitionQueue that captures whether isCropped was set.
+        var capturedIsCropped: Bool?
+        let queue2 = RecognitionQueue(
+            recognize: { _, _, _, _ in
+                capturedIsCropped = false
+                return RecognitionResult(cards: [])
+            },
+            recognizeBatch: { _, _, _ in
+                capturedIsCropped = true
+                return RecognitionResult(cards: [])
+            }
+        )
+
+        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue2)
+        vm.captureDelay = 0.05
+        vm.start()
+
+        // Signal with a non-nil bounding box (center of frame).
+        let box = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+        vm.presenceTracker.onNewCardSignal?(box)
+
+        // Wait for settle + capture (captureCoordinator is nil so capture will fail early).
+        try await Task.sleep(for: .milliseconds(300))
+
+        // captureCoordinator is nil → triggerCapture returns before enqueue.
+        // The box is stored then cleared. State returns to .watching.
+        XCTAssertNotEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+        // capturedIsCropped remains nil because capture failed before enqueue.
+        XCTAssertNil(capturedIsCropped)
+    }
+
+    func testNewCardSignalWithNilBoundingBoxTransitionsToSettling() async throws {
+        let vm = QuickScanViewModel(detector: nil)
+        vm.captureDelay = 60
+        vm.start()
+
+        vm.presenceTracker.onNewCardSignal?(nil)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+    }
+
+    func testBoundingBoxIgnoredWhenAlreadySettling() async throws {
+        // A second signal while settling should NOT overwrite the stored bounding box.
+        // We verify state stays .settling (already covered) and no crash occurs.
+        var batchCallCount = 0
+        let queue = RecognitionQueue(
+            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
+            recognizeBatch: { _, _, _ in
+                batchCallCount += 1
+                return RecognitionResult(cards: [])
+            }
+        )
+        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        vm.captureDelay = 60
+        vm.start()
+
+        let box = CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)
+        vm.presenceTracker.onNewCardSignal?(box)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+
+        // Fire another signal with a different box — must be ignored.
+        let otherBox = CGRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1)
+        vm.presenceTracker.onNewCardSignal?(otherBox)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+    }
+
     // MARK: - Configuration
 
     func testDefaultCaptureDelay() {

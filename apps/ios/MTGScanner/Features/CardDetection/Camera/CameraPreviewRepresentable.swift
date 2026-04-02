@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 /// Bridges `CameraViewController` into SwiftUI.
@@ -11,11 +12,16 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     var captureCoordinator: CameraCaptureCoordinator?
     var onZoomFactorChanged: ((CGFloat) -> Void)?
+    /// Receives raw `CMSampleBuffer` frames on the session queue when in Quick Scan mode.
+    var onQuickScanFrame: ((CMSampleBuffer) -> Void)?
+    /// Torch brightness: 0 = off, 0.1–1.0 = on at that brightness.
+    var torchLevel: Float = 0
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let vc = CameraViewController()
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
+        vc.onQuickScanFrame = onQuickScanFrame
         captureCoordinator?.controller = vc
         return vc
     }
@@ -24,7 +30,9 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
         vc.updateDetectionMode(detectionMode)
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
+        vc.onQuickScanFrame = onQuickScanFrame
         vc.setZoom(zoomFactor)
+        vc.setTorchLevel(torchLevel)
         captureCoordinator?.controller = vc
     }
 }

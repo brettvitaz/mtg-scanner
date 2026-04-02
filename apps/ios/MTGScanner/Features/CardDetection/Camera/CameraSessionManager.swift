@@ -81,6 +81,27 @@ final class CameraSessionManager: NSObject {
         }
     }
 
+    // MARK: - Torch
+
+    /// Sets the back-camera torch to `level` (0 = off, 0.1–1.0 = on at that brightness).
+    ///
+    /// Dispatches to the session queue and is safe to call from any thread.
+    func setTorchLevel(_ level: Float) {
+        guard let device = captureDevice, device.hasTorch, device.isTorchAvailable else { return }
+        sessionQueue.async {
+            do {
+                try device.lockForConfiguration()
+                if level <= 0 {
+                    device.torchMode = .off
+                } else {
+                    let clamped = min(level, AVCaptureDevice.maxAvailableTorchLevel)
+                    try? device.setTorchModeOn(level: clamped)
+                }
+                device.unlockForConfiguration()
+            } catch { return }
+        }
+    }
+
     // MARK: - Lifecycle
 
     func start() {

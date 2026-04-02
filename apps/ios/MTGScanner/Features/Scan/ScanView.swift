@@ -8,6 +8,7 @@ struct ScanView: View {
     @EnvironmentObject private var appModel: AppModel
     @StateObject private var detectionViewModel = CardDetectionViewModel()
     @StateObject private var captureCoordinator = CameraCaptureCoordinator()
+    @StateObject private var quickScanViewModel = QuickScanViewModel(detector: YOLOCardDetector())
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
@@ -17,17 +18,25 @@ struct ScanView: View {
             cameraPreview
                 .ignoresSafeArea()
 
-            VStack {
-                topBar
-                Spacer()
-                ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
-                    detectionViewModel.zoomFactor = preset
+            if appModel.quickScanEnabled {
+                QuickScanView(
+                    viewModel: quickScanViewModel,
+                    recognitionQueue: quickScanViewModel.recognitionQueue,
+                    torchLevel: $detectionViewModel.torchLevel
+                )
+            } else {
+                VStack {
+                    topBar
+                    Spacer()
+                    ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
+                        detectionViewModel.zoomFactor = preset
+                    }
+                    .padding(.bottom, 12)
+                    bottomBar
                 }
-                .padding(.bottom, 12)
-                bottomBar
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
 
             if shutterFlash {
                 Color.white.opacity(0.7)
@@ -42,9 +51,31 @@ struct ScanView: View {
         .onAppear {
             detectionViewModel.requestCameraPermissionIfNeeded()
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
+            configureQuickScan()
+            detectionViewModel.detectionMode = appModel.quickScanEnabled ? .quickScan : .table
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
+        }
+        .onChange(of: appModel.apiBaseURL) { _, url in
+            quickScanViewModel.apiBaseURL = url
+        }
+        .onChange(of: appModel.modelContext) { _, ctx in
+            quickScanViewModel.modelContext = ctx
+        }
+        .onChange(of: appModel.quickScanCaptureDelay) { _, delay in
+            quickScanViewModel.captureDelay = delay
+        }
+        .onChange(of: appModel.quickScanConfidenceThreshold) { _, conf in
+            quickScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
+        }
+        .onChange(of: appModel.quickScanEnabled) { _, enabled in
+            if enabled {
+                detectionViewModel.detectionMode = .quickScan
+            } else {
+                quickScanViewModel.stop()
+                detectionViewModel.detectionMode = .table
+            }
         }
         .alert("Camera Access Required", isPresented: $detectionViewModel.cameraPermissionDenied) {
             Button("OK", role: .cancel) {}
@@ -55,6 +86,16 @@ struct ScanView: View {
             guard let newValue else { return }
             Task { await loadPhoto(from: newValue) }
         }
+    }
+
+    // MARK: - Setup
+
+    private func configureQuickScan() {
+        quickScanViewModel.captureCoordinator = captureCoordinator
+        quickScanViewModel.modelContext = appModel.modelContext
+        quickScanViewModel.apiBaseURL = appModel.apiBaseURL
+        quickScanViewModel.captureDelay = appModel.quickScanCaptureDelay
+        quickScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.quickScanConfidenceThreshold)
     }
 
     // MARK: - Subviews
@@ -69,15 +110,20 @@ struct ScanView: View {
             captureCoordinator: captureCoordinator,
             onZoomFactorChanged: { factor in
                 detectionViewModel.zoomFactor = factor
-            }
+            },
+            onQuickScanFrame: appModel.quickScanEnabled
+                ? { [weak quickScanViewModel] buffer in quickScanViewModel?.processFrame(buffer) }
+                : nil,
+            torchLevel: detectionViewModel.torchLevel
         )
     }
 
     private var topBar: some View {
-        HStack {
+        HStack(alignment: .center) {
             cardCountBadge
+            TorchControl(level: $detectionViewModel.torchLevel)
             Spacer()
-            statusBadge
+            modeToggle
         }
     }
 
@@ -91,26 +137,13 @@ struct ScanView: View {
             .clipShape(Capsule())
     }
 
-    private var statusBadge: some View {
-        Text(appModel.statusMessage)
-            .font(.caption)
-            .foregroundStyle(.white)
-            .lineLimit(2)
-            .multilineTextAlignment(.trailing)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .frame(maxWidth: 180)
-    }
-
     private var bottomBar: some View {
         HStack(alignment: .center) {
             photoPickerButton
             Spacer()
             CaptureButton(action: captureCard, isDisabled: appModel.isRecognizing)
             Spacer()
-            modeToggle
+            Color.clear.frame(width: 54, height: 54)
         }
         .padding(.bottom, 8)
     }
@@ -129,8 +162,9 @@ struct ScanView: View {
 
     private var modeToggle: some View {
         Picker("Mode", selection: $detectionViewModel.detectionMode) {
-            Text("Table").tag(DetectionMode.table)
-            Text("Binder").tag(DetectionMode.binder)
+            ForEach([DetectionMode.table, .binder]) { mode in
+                Text(mode.displayName).tag(mode)
+            }
         }
         .pickerStyle(.segmented)
         .frame(width: 130)
@@ -164,8 +198,13 @@ struct ScanView: View {
             await handleCapturedImage(image)
         }
     }
+}
 
-    private func triggerShutterFeedback() {
+// MARK: - Helpers
+
+private extension ScanView {
+
+    func triggerShutterFeedback() {
         AudioServicesPlaySystemSound(1108)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(.easeOut(duration: 0.08)) { shutterFlash = true }
@@ -173,7 +212,7 @@ struct ScanView: View {
     }
 
     @MainActor
-    private func loadPhoto(from item: PhotosPickerItem) async {
+    func loadPhoto(from item: PhotosPickerItem) async {
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 appModel.statusMessage = "Could not read the selected image."
@@ -192,14 +231,12 @@ struct ScanView: View {
     }
 
     @MainActor
-    private func handleCapturedImage(_ image: UIImage) async {
+    func handleCapturedImage(_ image: UIImage) async {
         let filename = "camera-capture-\(UUID().uuidString.prefix(8)).jpg"
         await appModel.recognizeImage(image: image, filename: filename)
     }
 
-    // MARK: - Orientation
-
-    private func lockOrientation(_ mask: UIInterfaceOrientationMask) {
+    func lockOrientation(_ mask: UIInterfaceOrientationMask) {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
         let prefs = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
         scene.requestGeometryUpdate(prefs)

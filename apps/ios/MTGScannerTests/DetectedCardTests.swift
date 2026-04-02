@@ -88,7 +88,8 @@ final class DetectedCardTests: XCTestCase {
     func testDetectionModeAllCasesContainsBothModes() {
         XCTAssertTrue(DetectionMode.allCases.contains(.table))
         XCTAssertTrue(DetectionMode.allCases.contains(.binder))
-        XCTAssertEqual(DetectionMode.allCases.count, 2)
+        XCTAssertTrue(DetectionMode.allCases.contains(.quickScan))
+        XCTAssertEqual(DetectionMode.allCases.count, 3)
     }
 
     func testDetectionModeIdentifiableUsesRawValue() {

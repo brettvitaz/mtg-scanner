@@ -9,6 +9,7 @@ final class CardDetectionViewModel: ObservableObject {
     @Published var detectedCardCount: Int = 0
     @Published var cameraPermissionDenied = false
     @Published var zoomFactor: CGFloat = 1.0
+    @Published var torchLevel: Float = 0
 
     func handleDetectedCards(_ cards: [DetectedCard]) {
         detectedCardCount = cards.count

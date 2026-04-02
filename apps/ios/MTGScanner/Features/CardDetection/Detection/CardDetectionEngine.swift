@@ -25,6 +25,9 @@ final class CardDetectionEngine {
     /// pattern as `detectionMode`. The worst-case race during rotation is one stale frame.
     var isLandscape: Bool = false
 
+    // Loaded lazily so start-up time is not impacted if Quick Scan is not used.
+    private lazy var yoloDetector: YOLOCardDetector? = YOLOCardDetector()
+
     /// Called on the main queue with the latest detected cards after each processed frame.
     var onDetection: (([DetectedCard]) -> Void)?
 
@@ -68,6 +71,8 @@ final class CardDetectionEngine {
             return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp, isLandscape: isLandscape)
         case .binder:
             return detectBinderGrid(in: pixelBuffer, timestamp: timestamp)
+        case .quickScan:
+            return detectQuickScanCard(pixelBuffer: pixelBuffer, timestamp: timestamp)
         }
     }
 
@@ -171,6 +176,37 @@ final class CardDetectionEngine {
                 bottomRight: cell.bottomRight,
                 bottomLeft: cell.bottomLeft,
                 confidence: page.confidence,
+                timestamp: timestamp
+            )
+        }
+    }
+
+    // MARK: - Quick Scan YOLO Detection
+
+    /// Detects cards using the bundled YOLO model for Quick Scan mode.
+    ///
+    /// Converts YOLO top-left-origin boxes to Vision bottom-left-origin coordinates
+    /// so the existing overlay renderer can draw them without modification.
+    private func detectQuickScanCard(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval
+    ) -> [DetectedCard] {
+        guard let boxes = yoloDetector?.detect(in: pixelBuffer) else { return [] }
+        return boxes.map { box in
+            // Flip Y: Vision uses bottom-left origin; YOLO uses top-left origin.
+            let visionBox = CGRect(
+                x: box.rect.minX,
+                y: 1.0 - box.rect.maxY,
+                width: box.rect.width,
+                height: box.rect.height
+            )
+            return DetectedCard(
+                boundingBox: visionBox,
+                topLeft: CGPoint(x: visionBox.minX, y: visionBox.maxY),
+                topRight: CGPoint(x: visionBox.maxX, y: visionBox.maxY),
+                bottomRight: CGPoint(x: visionBox.maxX, y: visionBox.minY),
+                bottomLeft: CGPoint(x: visionBox.minX, y: visionBox.minY),
+                confidence: box.confidence,
                 timestamp: timestamp
             )
         }

@@ -29,6 +29,7 @@ final class QuickScanViewModel: ObservableObject {
     @Published private(set) var isActive = false
     @Published private(set) var captureState: CaptureState = .watching
     @Published private(set) var statusMessage = "Tap Start to begin."
+    @Published private(set) var lastCroppedImage: UIImage?
 
     // MARK: - Child Objects
 
@@ -54,14 +55,25 @@ final class QuickScanViewModel: ObservableObject {
     init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         recognitionQueue = RecognitionQueue()
+        setupSignalHandler()
+    }
 
-        presenceTracker.onNewCardSignal = { [weak self] _ in
-            Task { @MainActor [weak self] in self?.handleNewCardSignal() }
-        }
+    /// Designated initialiser for testing — allows injecting a custom `RecognitionQueue`.
+    init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
+         recognitionQueue: RecognitionQueue) {
+        presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
+        self.recognitionQueue = recognitionQueue
+        setupSignalHandler()
     }
 
     convenience init(detector: YOLOCardDetector?) {
         self.init(detectorProvider: { detector })
+    }
+
+    private func setupSignalHandler() {
+        presenceTracker.onNewCardSignal = { [weak self] boundingBox in
+            Task { @MainActor [weak self] in self?.handleNewCardSignal(boundingBox: boundingBox) }
+        }
     }
 
     // MARK: - Controls
@@ -77,6 +89,7 @@ final class QuickScanViewModel: ObservableObject {
         settleTask?.cancel()
         settleTask = nil
         captureState = .watching
+        lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
     }
 
@@ -90,7 +103,7 @@ final class QuickScanViewModel: ObservableObject {
 
     // MARK: - State Machine
 
-    private func handleNewCardSignal() {
+    private func handleNewCardSignal(boundingBox: CGRect?) {
         guard isActive else { return }
         switch captureState {
         case .watching:
@@ -123,8 +136,22 @@ final class QuickScanViewModel: ObservableObject {
             return
         }
 
+        let uprightImage = YOLOCropHelper.normalizedImage(image)
+        let cropped: UIImage?
+        if let cgImage = uprightImage.cgImage,
+           let box = await presenceTracker.detectBestBox(in: cgImage) {
+            cropped = YOLOCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+        } else {
+            cropped = nil
+        }
+        let enqueueImage = cropped ?? image
+        let isCropped = cropped != nil
+
+        lastCroppedImage = cropped
         presenceTracker.markCaptured()
-        recognitionQueue.enqueue(image: image, apiBaseURL: apiBaseURL, modelContext: modelContext)
+        recognitionQueue.enqueue(
+            image: enqueueImage, isCropped: isCropped, apiBaseURL: apiBaseURL, modelContext: modelContext
+        )
         captureState = .watching
         statusMessage = "Captured! Watching for next card…"
     }

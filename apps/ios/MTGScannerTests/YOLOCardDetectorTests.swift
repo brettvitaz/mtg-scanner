@@ -102,16 +102,19 @@ final class YOLOCardDetectorTests: XCTestCase {
             rawPointer.assumingMemoryBound(to: Float32.self).deallocate()
         }
 
-        pointer[0] = 0.4
-        pointer[7] = 0.5
-        pointer[14] = 0.2
-        pointer[21] = 0.3
-        pointer[28] = 0.75
-        pointer[3] = 0.7
-        pointer[10] = 0.2
-        pointer[17] = 0.1
-        pointer[24] = 0.15
-        pointer[31] = 0.8
+        // Raw tensor values are absolute pixel coordinates in the 640×640 model input space.
+        // cx=256, cy=320 → normalized center (0.4, 0.5); w=128, h=192 → (0.2, 0.3)
+        pointer[0] = 256    // cx anchor0
+        pointer[7] = 320    // cy anchor0
+        pointer[14] = 128   // w anchor0
+        pointer[21] = 192   // h anchor0
+        pointer[28] = 0.75  // confidence anchor0 (not a coordinate — not divided by 640)
+        // cx=448, cy=128 → normalized center (0.7, 0.2); w=64, h=96 → (0.1, 0.15)
+        pointer[3] = 448    // cx anchor1
+        pointer[10] = 128   // cy anchor1
+        pointer[17] = 64    // w anchor1
+        pointer[24] = 96    // h anchor1
+        pointer[31] = 0.8   // confidence anchor1
 
         return output
     }

@@ -26,6 +26,7 @@ struct QuickScanView: View {
 
     private var topBar: some View {
         HStack(alignment: .top) {
+            cropPreview
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 if recognitionQueue.pendingCount > 0 {
@@ -35,6 +36,19 @@ struct QuickScanView: View {
                     failedBadge
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var cropPreview: some View {
+        if let image = viewModel.lastCroppedImage {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 84)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.6), lineWidth: 1))
+                .shadow(radius: 4)
         }
     }
 

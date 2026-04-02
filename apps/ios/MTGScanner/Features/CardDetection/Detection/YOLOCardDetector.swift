@@ -49,6 +49,17 @@ final class YOLOCardDetector {
     /// Returns boxes in normalized top-left-origin image coordinates after NMS.
     /// Returns an empty array if the model fails or finds no cards above the threshold.
     func detect(in pixelBuffer: CVPixelBuffer) -> [CardBoundingBox] {
+        runDetection(handler: VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]))
+    }
+
+    /// Detect cards in a CGImage (e.g., from a captured still photo).
+    ///
+    /// The image is passed in its natural orientation. Vision handles scaling internally.
+    func detect(in cgImage: CGImage) -> [CardBoundingBox] {
+        runDetection(handler: VNImageRequestHandler(cgImage: cgImage, options: [:]))
+    }
+
+    private func runDetection(handler: VNImageRequestHandler) -> [CardBoundingBox] {
         var result: [CardBoundingBox] = []
 
         let request = VNCoreMLRequest(model: visionModel) { [weak self] req, _ in
@@ -63,7 +74,6 @@ final class YOLOCardDetector {
         // scaleFill avoids letterboxing, keeping output coords in [0,1] for both axes.
         request.imageCropAndScaleOption = .scaleFill
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
         return result
     }
@@ -151,6 +161,10 @@ final class YOLOCardDetector {
 }
 
 private extension YOLOCardDetector {
+    /// The model's fixed input resolution. Coordinates in the output tensor are in
+    /// absolute pixels relative to this size and must be divided to get [0,1] values.
+    static let modelInputSize: CGFloat = 640
+
     static func value(
         in pointer: UnsafePointer<Float32>,
         channel: Int,
@@ -161,6 +175,7 @@ private extension YOLOCardDetector {
         pointer[channel * channelStride + anchor * anchorStride]
     }
 
+    /// Returns a normalized [0,1] scalar by reading from the tensor and dividing by `modelInputSize`.
     static func scalar(
         from pointer: UnsafePointer<Float32>,
         channel: Int,
@@ -176,7 +191,7 @@ private extension YOLOCardDetector {
                 channelStride: channelStride,
                 anchorStride: anchorStride
             )
-        )
+        ) / modelInputSize
     }
 
     static func makeRect(
@@ -264,10 +279,10 @@ private extension YOLOCardDetector {
             let confidence = output[[0, 4, anchor] as [NSNumber]].floatValue
             guard confidence >= confidenceThreshold else { continue }
             let rect = makeRect(
-                centerX: CGFloat(output[[0, 0, anchor] as [NSNumber]].floatValue),
-                centerY: CGFloat(output[[0, 1, anchor] as [NSNumber]].floatValue),
-                width: CGFloat(output[[0, 2, anchor] as [NSNumber]].floatValue),
-                height: CGFloat(output[[0, 3, anchor] as [NSNumber]].floatValue)
+                centerX: CGFloat(output[[0, 0, anchor] as [NSNumber]].floatValue) / modelInputSize,
+                centerY: CGFloat(output[[0, 1, anchor] as [NSNumber]].floatValue) / modelInputSize,
+                width: CGFloat(output[[0, 2, anchor] as [NSNumber]].floatValue) / modelInputSize,
+                height: CGFloat(output[[0, 3, anchor] as [NSNumber]].floatValue) / modelInputSize
             )
             candidates.append((rect, confidence))
         }

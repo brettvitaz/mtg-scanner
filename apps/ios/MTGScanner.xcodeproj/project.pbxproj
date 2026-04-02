@@ -65,6 +65,7 @@
 		C000000000000000000001A4 /* QuickScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A4 /* QuickScanView.swift */; };
 		C000000000000000000001A5 /* QuickScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A5 /* QuickScanViewModel.swift */; };
 		C000000000000000000001A6 /* RecognitionQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A6 /* RecognitionQueue.swift */; };
+		C000000000000000000001A7 /* YOLOCropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A7 /* YOLOCropHelper.swift */; };
 		C000000000000000000001A8 /* ScanMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A8 /* ScanMenuButton.swift */; };
 		C000000000000000000001B0 /* YOLOCardDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B0 /* YOLOCardDetectorTests.swift */; };
 		C000000000000000000001B1 /* FrameDifferenceAnalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */; };
@@ -72,6 +73,7 @@
 		C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B3 /* QuickScanViewModelTests.swift */; };
 		C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B4 /* RecognitionQueueTests.swift */; };
 		C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* ScanMenuButtonTests.swift */; };
+		C000000000000000000001B6 /* YOLOCropHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B6 /* YOLOCropHelperTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -146,6 +148,7 @@
 		C000000000000000000002A4 /* QuickScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanView.swift; sourceTree = "<group>"; };
 		C000000000000000000002A5 /* QuickScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModel.swift; sourceTree = "<group>"; };
 		C000000000000000000002A6 /* RecognitionQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueue.swift; sourceTree = "<group>"; };
+		C000000000000000000002A7 /* YOLOCropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCropHelper.swift; sourceTree = "<group>"; };
 		C000000000000000000002A8 /* ScanMenuButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMenuButton.swift; sourceTree = "<group>"; };
 		C000000000000000000002B0 /* YOLOCardDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCardDetectorTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDifferenceAnalyzerTests.swift; sourceTree = "<group>"; };
@@ -153,6 +156,7 @@
 		C000000000000000000002B3 /* QuickScanViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModelTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B4 /* RecognitionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueueTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B5 /* ScanMenuButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMenuButtonTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B6 /* YOLOCropHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCropHelperTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -416,6 +420,7 @@
 				C000000000000000000002B3 /* QuickScanViewModelTests.swift */,
 				C000000000000000000002B4 /* RecognitionQueueTests.swift */,
 				C000000000000000000002B5 /* ScanMenuButtonTests.swift */,
+				C000000000000000000002B6 /* YOLOCropHelperTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
@@ -426,6 +431,7 @@
 				C000000000000000000002A4 /* QuickScanView.swift */,
 				C000000000000000000002A5 /* QuickScanViewModel.swift */,
 				C000000000000000000002A6 /* RecognitionQueue.swift */,
+				C000000000000000000002A7 /* YOLOCropHelper.swift */,
 			);
 			path = QuickScan;
 			sourceTree = "<group>";
@@ -569,6 +575,7 @@
 				C000000000000000000001A4 /* QuickScanView.swift in Sources */,
 				C000000000000000000001A5 /* QuickScanViewModel.swift in Sources */,
 				C000000000000000000001A6 /* RecognitionQueue.swift in Sources */,
+				C000000000000000000001A7 /* YOLOCropHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -592,6 +599,7 @@
 				C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */,
 				C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */,
 				C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */,
+				C000000000000000000001B6 /* YOLOCropHelperTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

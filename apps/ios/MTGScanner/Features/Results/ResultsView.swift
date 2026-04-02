@@ -209,7 +209,7 @@ private extension ResultsView {
     }
 
     func selectAll() {
-        selectedItems = Set(inboxItems.map(\.id))
+        selectedItems = Set(displayedItems.map(\.id))
     }
 
     func copySelectedItems(to destination: MoveDestination) {

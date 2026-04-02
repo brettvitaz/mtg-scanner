@@ -185,7 +185,7 @@ struct CollectionDetailView: View {
     }
 
     private func selectAll() {
-        selectedItems = Set(collection.items.map(\.id))
+        selectedItems = Set(displayedItems.map(\.id))
     }
 
     private func copySelectedItems(to destination: MoveDestination) {

@@ -191,7 +191,7 @@ extension DeckDetailView {
     }
 
     func selectAll() {
-        selectedItems = Set(deck.items.map(\.id))
+        selectedItems = Set(displayedItems.map(\.id))
     }
 
     func moveSelectedItems(to destination: MoveDestination) {

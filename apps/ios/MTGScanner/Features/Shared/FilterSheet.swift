@@ -23,7 +23,6 @@ struct FilterSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                searchSection
                 setSection
                 raritySection
                 foilSection
@@ -50,13 +49,6 @@ struct FilterSheet: View {
     }
 
     // MARK: - Sections
-
-    private var searchSection: some View {
-        Section("Search") {
-            TextField("Title or set name…", text: $filterState.searchText)
-                .autocorrectionDisabled()
-        }
-    }
 
     private var setSection: some View {
         Section("Set") {

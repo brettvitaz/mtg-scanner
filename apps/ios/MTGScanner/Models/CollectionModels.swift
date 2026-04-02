@@ -172,6 +172,8 @@ final class CollectionItem {
             setSymbolUrl: setSymbolUrl,
             cardKingdomUrl: cardKingdomUrl,
             colorIdentity: colorIdentity,
+            priceRetail: priceRetail,
+            priceBuy: priceBuy,
             quantity: quantity
         )
     }

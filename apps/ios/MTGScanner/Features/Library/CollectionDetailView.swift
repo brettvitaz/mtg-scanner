@@ -89,8 +89,13 @@ struct CollectionDetailView: View {
                     HStack {
                         Text("Cards")
                         Spacer()
-                        Text("\(items.totalQuantity) card(s)")
-                            .foregroundStyle(.secondary)
+                        if filterState.isActive {
+                            Text("\(items.totalQuantity) of \(collection.items.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(items.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

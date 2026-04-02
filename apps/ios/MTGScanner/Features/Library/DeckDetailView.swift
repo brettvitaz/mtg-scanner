@@ -95,8 +95,13 @@ struct DeckDetailView: View {
                     HStack {
                         Text("Cards")
                         Spacer()
-                        Text("\(items.totalQuantity) card(s)")
-                            .foregroundStyle(.secondary)
+                        if filterState.isActive {
+                            Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(items.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

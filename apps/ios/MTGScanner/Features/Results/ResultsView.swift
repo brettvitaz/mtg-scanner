@@ -97,8 +97,13 @@ struct ResultsView: View {
                     HStack {
                         Text("Scanned Cards")
                         Spacer()
-                        Text("\(displayedItems.totalQuantity) card(s)")
-                            .foregroundStyle(.secondary)
+                        if filterState.isActive {
+                            Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(displayedItems.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

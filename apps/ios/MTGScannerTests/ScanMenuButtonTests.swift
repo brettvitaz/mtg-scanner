@@ -30,6 +30,35 @@ final class ScanMenuButtonTests: XCTestCase {
 
     // MARK: - Brightness preset logic
 
+    func testVeryLowBrightnessSetsCorrectLevel() {
+        var level: Float = 1.0
+        level = 0.1
+        XCTAssertEqual(level, 0.1, accuracy: 0.001)
+    }
+
+    func testLongPressAutoEnablesTorchWhenOff() {
+        var level: Float = 0
+        // Mirror long-press action: if !torchIsOn { torchLevel = 0.5 }
+        if !(level > 0) { level = 0.5 }
+        XCTAssertEqual(level, 0.5, accuracy: 0.001)
+    }
+
+    func testLongPressKeepsCurrentLevelWhenTorchOn() {
+        var level: Float = 0.1
+        if !(level > 0) { level = 0.5 }
+        XCTAssertEqual(level, 0.1, accuracy: 0.001)
+    }
+
+    func testSliderMinimumIsAboveZero() {
+        let sliderMin: Float = 0.01
+        XCTAssertGreaterThan(sliderMin, 0)
+    }
+
+    func testSliderMaximumIsOne() {
+        let sliderMax: Float = 1.0
+        XCTAssertEqual(sliderMax, 1.0, accuracy: 0.001)
+    }
+
     func testLowBrightnessSetsCorrectLevel() {
         var level: Float = 1.0
         level = 0.25

@@ -12,6 +12,7 @@ struct ScanView: View {
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
+    @State private var photoLoadError: String?
 
     var body: some View {
         ZStack {
@@ -58,6 +59,14 @@ struct ScanView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Enable camera access in Settings to use real-time card detection.")
+        }
+        .alert("Photo Load Error", isPresented: Binding(
+            get: { photoLoadError != nil },
+            set: { if !$0 { photoLoadError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(photoLoadError ?? "")
         }
         .onChange(of: selectedPhoto) { _, newValue in
             guard let newValue else { return }
@@ -185,16 +194,16 @@ private extension ScanView {
     func loadPhoto(from item: PhotosPickerItem) async {
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                appModel.statusMessage = "Could not read the selected image."
+                photoLoadError = "Could not read the selected image."
                 return
             }
             guard let uiImage = UIImage(data: data) else {
-                appModel.statusMessage = "The selected file is not a supported image."
+                photoLoadError = "The selected file is not a supported image."
                 return
             }
             await enqueueForRecognition(uiImage)
         } catch {
-            appModel.statusMessage = "Failed to load the selected photo: \(error.localizedDescription)"
+            photoLoadError = "Failed to load the selected photo: \(error.localizedDescription)"
         }
     }
 

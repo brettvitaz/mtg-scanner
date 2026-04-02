@@ -99,6 +99,7 @@ final class QuickScanViewModel: ObservableObject {
     ///
     /// Called by table and binder scan modes after a manual capture. Runs Vision detection
     /// on a detached background task to avoid blocking the main actor.
+    @MainActor
     func enqueueCapturedImage(
         _ image: UIImage,
         cropEnabled: Bool,

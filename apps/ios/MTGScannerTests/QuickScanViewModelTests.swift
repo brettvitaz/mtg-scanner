@@ -202,35 +202,36 @@ final class QuickScanViewModelTests: XCTestCase {
     // MARK: - enqueueCapturedImage
 
     func testEnqueueCapturedImageCropDisabledEnqueuesOneFullImage() async {
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
-        )
+        let queue = makeStubQueue()
         let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
-        let image = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
-        }
 
-        await vm.enqueueCapturedImage(image, cropEnabled: false)
+        await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: false)
 
         XCTAssertEqual(queue.pendingCount, 1)
     }
 
     func testEnqueueCapturedImageCropEnabledNoCropsEnqueuesFullImage() async {
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
-        )
+        let queue = makeStubQueue()
         let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
-        // A small blank image produces zero card crops from Vision — fallback enqueues full image.
-        let image = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
+        // A small blank image produces zero card crops from Vision — fallback enqueues the full image.
+        await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)
+
+        XCTAssertEqual(queue.pendingCount, 1)
+    }
+
+    // MARK: - Helpers
+
+    private func makeBlankImage() -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
             UIColor.white.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
         }
+    }
 
-        await vm.enqueueCapturedImage(image, cropEnabled: true)
-
-        XCTAssertEqual(queue.pendingCount, 1)
+    private func makeStubQueue() -> RecognitionQueue {
+        RecognitionQueue(
+            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
+            recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
+        )
     }
 }

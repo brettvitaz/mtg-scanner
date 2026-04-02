@@ -93,6 +93,34 @@ final class QuickScanViewModel: ObservableObject {
         statusMessage = "Tap Start to begin."
     }
 
+    // MARK: - Standard Scan Enqueue
+
+    /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.
+    ///
+    /// Called by table and binder scan modes after a manual capture. Runs Vision detection
+    /// on a detached background task to avoid blocking the main actor.
+    func enqueueCapturedImage(
+        _ image: UIImage,
+        cropEnabled: Bool,
+        cropService: CardCropService = CardCropService()
+    ) async {
+        if cropEnabled {
+            let crops = await Task.detached(priority: .userInitiated) {
+                await cropService.detectAndCrop(image: image)
+            }.value
+            let pairs = crops.crops.isEmpty ? [(image, false)] : crops.crops.map { ($0, true) }
+            for (img, cropped) in pairs {
+                recognitionQueue.enqueue(
+                    image: img, isCropped: cropped, apiBaseURL: apiBaseURL, modelContext: modelContext
+                )
+            }
+        } else {
+            recognitionQueue.enqueue(
+                image: image, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+            )
+        }
+    }
+
     // MARK: - Frame Forwarding
 
     /// Forward camera frames to the presence tracker while active.

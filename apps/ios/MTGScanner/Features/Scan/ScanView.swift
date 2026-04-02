@@ -200,33 +200,7 @@ private extension ScanView {
 
     @MainActor
     func enqueueForRecognition(_ image: UIImage) async {
-        do {
-            try await APIClient().checkHealth(baseURL: appModel.apiBaseURL)
-        } catch {
-            appModel.connectionAlertMessage =
-                "Cannot reach the server at \(appModel.apiBaseURL). Check your connection and API settings."
-            appModel.showConnectionAlert = true
-            return
-        }
-
-        if appModel.onDeviceCropEnabled {
-            let cropResult = await CardCropService().detectAndCrop(image: image)
-            let images = cropResult.crops.isEmpty ? [(image, false)] : cropResult.crops.map { ($0, true) }
-            for (img, cropped) in images {
-                enqueue(img, isCropped: cropped)
-            }
-        } else {
-            enqueue(image, isCropped: false)
-        }
-    }
-
-    func enqueue(_ image: UIImage, isCropped: Bool) {
-        quickScanViewModel.recognitionQueue.enqueue(
-            image: image,
-            isCropped: isCropped,
-            apiBaseURL: appModel.apiBaseURL,
-            modelContext: appModel.modelContext
-        )
+        await quickScanViewModel.enqueueCapturedImage(image, cropEnabled: appModel.onDeviceCropEnabled)
     }
 
     func lockOrientation(_ mask: UIInterfaceOrientationMask) {

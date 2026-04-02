@@ -28,14 +28,7 @@ struct QuickScanView: View {
         HStack(alignment: .top) {
             cropPreview
             Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                if recognitionQueue.pendingCount > 0 {
-                    pendingBadge
-                }
-                if recognitionQueue.failedCount > 0 {
-                    failedBadge
-                }
-            }
+            RecognitionBadgeView(recognitionQueue: recognitionQueue)
         }
     }
 
@@ -50,32 +43,6 @@ struct QuickScanView: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.6), lineWidth: 1))
                 .shadow(radius: 4)
         }
-    }
-
-    private var pendingBadge: some View {
-        HStack(spacing: 6) {
-            ProgressView()
-                .progressViewStyle(.circular)
-                .tint(.white)
-                .scaleEffect(0.75)
-            Text("\(recognitionQueue.pendingCount) recognizing")
-                .font(.caption.bold())
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-    }
-
-    private var failedBadge: some View {
-        Text("\(recognitionQueue.failedCount) failed")
-            .font(.caption.bold())
-            .foregroundStyle(.red)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
     }
 
     private var statusStrip: some View {

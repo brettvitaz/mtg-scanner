@@ -198,4 +198,55 @@ final class QuickScanViewModelTests: XCTestCase {
         vm.captureDelay = 3.5
         XCTAssertEqual(vm.captureDelay, 3.5, accuracy: 0.001)
     }
+
+    // MARK: - enqueueCapturedImage
+
+    func testEnqueueCapturedImageCropDisabledEnqueuesOneFullImage() async {
+        let queue = makeStubQueue()
+        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+
+        await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: false)
+
+        XCTAssertEqual(queue.pendingCount, 1)
+    }
+
+    func testEnqueueCapturedImageCropEnabledNoCropsEnqueuesFullImage() async {
+        let queue = makeStubQueue()
+        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        // A small blank image produces zero card crops from Vision — fallback enqueues the full image.
+        await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)
+
+        XCTAssertEqual(queue.pendingCount, 1)
+    }
+
+    func testEnqueueCapturedImageCropEnabledWithCropsEnqueuesEachCrop() async {
+        let queue = makeStubQueue()
+        let fakeCrops = [makeBlankImage(), makeBlankImage()]
+        let vm = QuickScanViewModel(
+            detectorProvider: { nil },
+            recognitionQueue: queue,
+            cropImage: { _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }
+        )
+
+        await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)
+
+        // Two crops returned → two separate enqueue calls, each marked isCropped.
+        XCTAssertEqual(queue.pendingCount, 2)
+    }
+
+    // MARK: - Helpers
+
+    private func makeBlankImage() -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+    }
+
+    private func makeStubQueue() -> RecognitionQueue {
+        RecognitionQueue(
+            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
+            recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
+        )
+    }
 }

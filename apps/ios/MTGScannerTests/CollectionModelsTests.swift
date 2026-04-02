@@ -280,3 +280,75 @@ extension CollectionModelsTests {
         XCTAssertLessThanOrEqual(deck.updatedAt, after)
     }
 }
+
+// MARK: - Rename tests
+
+extension CollectionModelsTests {
+    @MainActor
+    func testRenameCollectionUpdatesNameAndTimestamp() {
+        let collection = CardCollection(name: "Old Name")
+        let originalUpdatedAt = collection.updatedAt
+        let vm = LibraryViewModel()
+
+        vm.renameCollection(collection, to: "New Name")
+
+        XCTAssertEqual(collection.name, "New Name")
+        XCTAssertGreaterThan(collection.updatedAt, originalUpdatedAt)
+    }
+
+    @MainActor
+    func testRenameDeckUpdatesNameAndTimestamp() {
+        let deck = Deck(name: "Old Deck")
+        let originalUpdatedAt = deck.updatedAt
+        let vm = LibraryViewModel()
+
+        vm.renameDeck(deck, to: "New Deck")
+
+        XCTAssertEqual(deck.name, "New Deck")
+        XCTAssertGreaterThan(deck.updatedAt, originalUpdatedAt)
+    }
+
+    @MainActor
+    func testRenameCollectionEmptyNameIsNoOp() {
+        let collection = CardCollection(name: "Keep This")
+        let vm = LibraryViewModel()
+
+        vm.renameCollection(collection, to: "")
+        XCTAssertEqual(collection.name, "Keep This")
+
+        vm.renameCollection(collection, to: "   ")
+        XCTAssertEqual(collection.name, "Keep This")
+    }
+
+    @MainActor
+    func testRenameDeckEmptyNameIsNoOp() {
+        let deck = Deck(name: "Keep This")
+        let vm = LibraryViewModel()
+
+        vm.renameDeck(deck, to: "")
+        XCTAssertEqual(deck.name, "Keep This")
+
+        vm.renameDeck(deck, to: "   ")
+        XCTAssertEqual(deck.name, "Keep This")
+    }
+
+    @MainActor
+    func testRenameCollectionTrimsWhitespace() {
+        let collection = CardCollection(name: "Original")
+        let vm = LibraryViewModel()
+
+        vm.renameCollection(collection, to: "  Trimmed Name  ")
+
+        XCTAssertEqual(collection.name, "Trimmed Name")
+    }
+
+    @MainActor
+    func testRenameDeckTrimsWhitespace() {
+        let deck = Deck(name: "Original")
+        let vm = LibraryViewModel()
+
+        vm.renameDeck(deck, to: "  Trimmed Name  ")
+
+        XCTAssertEqual(deck.name, "Trimmed Name")
+    }
+}

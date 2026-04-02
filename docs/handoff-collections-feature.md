@@ -173,10 +173,6 @@ The existing `CardCorrection` system (UserDefaults-based, keyed by `RecognizedCa
 
 Collection, deck, and results lists have no search bar or filter mechanism.
 
-### No rename for collections/decks
-
-Collections and decks can be created and deleted but not renamed after creation.
-
 ### Duplicate detection
 
 Adding the same card to a collection multiple times creates separate `CollectionItem` instances. There is no deduplication or quantity tracking.

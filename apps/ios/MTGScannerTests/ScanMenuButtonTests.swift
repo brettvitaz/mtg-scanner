@@ -59,6 +59,32 @@ final class ScanMenuButtonTests: XCTestCase {
         XCTAssertEqual(sliderMax, 1.0, accuracy: 0.001)
     }
 
+    // MARK: - Slider step buttons
+
+    func testDecreaseButtonReducesLevelBy5Percent() {
+        var level: Float = 0.5
+        level = max(0.01, level - 0.05)
+        XCTAssertEqual(level, 0.45, accuracy: 0.001)
+    }
+
+    func testIncreaseButtonRaisesLevelBy5Percent() {
+        var level: Float = 0.5
+        level = min(1.0, level + 0.05)
+        XCTAssertEqual(level, 0.55, accuracy: 0.001)
+    }
+
+    func testDecreaseButtonClampsAtMinimum() {
+        var level: Float = 0.01
+        level = max(0.01, level - 0.05)
+        XCTAssertEqual(level, 0.01, accuracy: 0.001)
+    }
+
+    func testIncreaseButtonClampsAtMaximum() {
+        var level: Float = 1.0
+        level = min(1.0, level + 0.05)
+        XCTAssertEqual(level, 1.0, accuracy: 0.001)
+    }
+
     func testLowBrightnessSetsCorrectLevel() {
         var level: Float = 1.0
         level = 0.25

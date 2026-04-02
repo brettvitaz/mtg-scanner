@@ -67,9 +67,13 @@ private struct BrightnessPopover: View {
             Text("Brightness")
                 .font(.headline)
             HStack {
-                Image(systemName: "sun.min")
+                Button { torchLevel = max(0.01, torchLevel - 0.05) } label: {
+                    Image(systemName: "sun.min")
+                }
                 Slider(value: $torchLevel, in: 0.01...1.0)
-                Image(systemName: "sun.max.fill")
+                Button { torchLevel = min(1.0, torchLevel + 0.05) } label: {
+                    Image(systemName: "sun.max.fill")
+                }
             }
             Text("\(Int(torchLevel * 100))%")
                 .font(.caption)

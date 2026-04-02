@@ -15,7 +15,7 @@ struct FrameDifferenceAnalyzer {
     let sampleStride: Int
 
     init(sampleStride: Int = 16) {
-        self.sampleStride = sampleStride
+        self.sampleStride = max(sampleStride, 1)
     }
 
     // MARK: - Sampling
@@ -24,7 +24,9 @@ struct FrameDifferenceAnalyzer {
     ///
     /// Returns an empty array if the buffer cannot be locked.
     func sample(_ pixelBuffer: CVPixelBuffer) -> [UInt8] {
-        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        guard CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly) == kCVReturnSuccess else {
+            return []
+        }
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
 
         guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return [] }

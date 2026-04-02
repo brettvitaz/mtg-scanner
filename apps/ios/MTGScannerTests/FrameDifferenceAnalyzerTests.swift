@@ -5,6 +5,11 @@ final class FrameDifferenceAnalyzerTests: XCTestCase {
 
     private let analyzer = FrameDifferenceAnalyzer(sampleStride: 1)
 
+    func testInitClampsSampleStrideToMinimumOfOne() {
+        let analyzer = FrameDifferenceAnalyzer(sampleStride: 0)
+        XCTAssertEqual(analyzer.sampleStride, 1)
+    }
+
     // MARK: - difference(from:to:)
 
     func testIdenticalSamplesReturnZero() {

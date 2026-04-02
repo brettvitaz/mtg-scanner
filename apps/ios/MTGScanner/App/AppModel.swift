@@ -53,10 +53,20 @@ final class AppModel: ObservableObject {
         self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
         self.quickScanEnabled = UserDefaults.standard.bool(forKey: quickScanEnabledKey)
         let storedDelay = UserDefaults.standard.double(forKey: quickScanCaptureDelayKey)
-        self.quickScanCaptureDelay = storedDelay > 0 ? storedDelay : 2.0
+        self.quickScanCaptureDelay = Self.clampQuickScanCaptureDelay(storedDelay)
         let storedConf = UserDefaults.standard.double(forKey: quickScanConfidenceKey)
-        self.quickScanConfidenceThreshold = storedConf > 0 ? storedConf : 0.5
+        self.quickScanConfidenceThreshold = Self.clampQuickScanConfidence(storedConf)
         loadCorrections()
+    }
+
+    private static func clampQuickScanCaptureDelay(_ value: Double) -> Double {
+        guard value > 0 else { return 2.0 }
+        return min(max(value, 0.5), 5.0)
+    }
+
+    private static func clampQuickScanConfidence(_ value: Double) -> Double {
+        guard value > 0 else { return 0.5 }
+        return min(max(value, 0.3), 0.9)
     }
 
     // MARK: - Recognition entry points

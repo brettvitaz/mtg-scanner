@@ -35,21 +35,26 @@ final class CardPresenceTracker {
 
     // MARK: - Private
 
-    private let detector: YOLOCardDetector?
+    private let detectorProvider: () -> YOLOCardDetector?
     private let analyzer = FrameDifferenceAnalyzer()
     private let presenceQueue = DispatchQueue(
         label: "com.mtgscanner.cardpresence",
         qos: .userInitiated
     )
-    private var isProcessing = false
+    private let processingSemaphore = DispatchSemaphore(value: 1)
+    private var detector: YOLOCardDetector?
+    private var hasLoadedDetector = false
     private var referenceSamples: [UInt8] = []
     private var lastSamples: [UInt8] = []
 
     // MARK: - Init
 
-    init(detector: YOLOCardDetector?) {
-        self.detector = detector
-        self.detector?.confidenceThreshold = confidenceThreshold
+    init(detectorProvider: @escaping () -> YOLOCardDetector? = { nil }) {
+        self.detectorProvider = detectorProvider
+    }
+
+    convenience init(detector: YOLOCardDetector?) {
+        self.init(detectorProvider: { detector })
     }
 
     // MARK: - Reference Management
@@ -70,11 +75,11 @@ final class CardPresenceTracker {
     /// Process a camera frame. Drops the frame if a previous frame is still being processed.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard processingSemaphore.wait(timeout: .now()) == .success else { return }
         presenceQueue.async { [weak self] in
-            guard let self, !self.isProcessing else { return }
-            self.isProcessing = true
+            guard let self else { return }
+            defer { self.processingSemaphore.signal() }
             self.process(pixelBuffer: pixelBuffer)
-            self.isProcessing = false
         }
     }
 
@@ -88,7 +93,7 @@ final class CardPresenceTracker {
 
         guard diff >= sceneChangeThreshold else { return }
 
-        let boxes = detector?.detect(in: pixelBuffer) ?? []
+        let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
         guard !boxes.isEmpty else { return }
 
         let bestBox = boxes.max(by: { $0.confidence < $1.confidence })?.rect
@@ -96,5 +101,14 @@ final class CardPresenceTracker {
         DispatchQueue.main.async { [weak self] in
             self?.onNewCardSignal?(bestBox)
         }
+    }
+
+    private func loadDetector() -> YOLOCardDetector? {
+        if !hasLoadedDetector {
+            detector = detectorProvider()
+            hasLoadedDetector = true
+        }
+        detector?.confidenceThreshold = confidenceThreshold
+        return detector
     }
 }

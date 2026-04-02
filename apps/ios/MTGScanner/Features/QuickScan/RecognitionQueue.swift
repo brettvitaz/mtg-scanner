@@ -89,9 +89,7 @@ final class RecognitionQueue: ObservableObject {
                 retried.retryCount += 1
                 // Re-insert at front to retry before new work.
                 pendingJobs.insert(retried, at: 0)
-                activeCount -= 1
-                drainIfPossible()
-                activeCount += 1
+                return
             } else {
                 pendingCount -= 1
                 failedCount += 1

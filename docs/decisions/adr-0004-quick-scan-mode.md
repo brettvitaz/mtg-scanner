@@ -39,7 +39,7 @@ A "new card" event fires only when both YOLO and frame differencing agree.  This
 ```
 watching  ─── (new card signal) ──► settling
 settling  ─── (settle timer fires) ──► capturing ──► watching
-settling  ─── (new signal during settle) ──► settling (timer restarted)
+settling  ─── (new signal during settle) ──► settling (timer continues)
 ```
 
 The settle timer (configurable 0.5 – 5.0 s, default 2.0 s) gives the card time to stop moving after being dropped.  Capturing while the card is still in motion would produce blurry or partially occluded images.

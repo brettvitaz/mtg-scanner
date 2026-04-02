@@ -25,10 +25,6 @@ struct ScanView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
             }
-
-            if appModel.isRecognizing {
-                loadingOverlay
-            }
         }
         .onAppear {
             detectionViewModel.requestCameraPermissionIfNeeded()
@@ -101,6 +97,10 @@ struct ScanView: View {
 
     private var standardOverlay: some View {
         VStack {
+            HStack {
+                Spacer()
+                RecognitionBadgeView(recognitionQueue: quickScanViewModel.recognitionQueue)
+            }
             Spacer()
             ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
                 detectionViewModel.zoomFactor = preset
@@ -138,7 +138,7 @@ struct ScanView: View {
         HStack(alignment: .center) {
             photoPickerButton
             Spacer()
-            CaptureButton(action: captureCard, isDisabled: appModel.isRecognizing)
+            CaptureButton(action: captureCard, isDisabled: false)
             Spacer()
             ScanMenuButton(
                 detectionMode: $detectionViewModel.detectionMode,
@@ -157,25 +157,6 @@ struct ScanView: View {
                 .background(.ultraThinMaterial)
                 .clipShape(Circle())
         }
-        .disabled(appModel.isRecognizing)
-    }
-
-    private var loadingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.35).ignoresSafeArea()
-            VStack(spacing: 16) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(.white)
-                    .scaleEffect(1.4)
-                Text(appModel.statusMessage)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(32)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        }
     }
 
     // MARK: - Actions
@@ -184,7 +165,7 @@ struct ScanView: View {
         triggerShutterFeedback()
         Task {
             guard let image = await captureCoordinator.capturePhoto() else { return }
-            await handleCapturedImage(image)
+            await enqueueForRecognition(image)
         }
     }
 }
@@ -207,22 +188,45 @@ private extension ScanView {
                 appModel.statusMessage = "Could not read the selected image."
                 return
             }
-            guard UIImage(data: data) != nil else {
+            guard let uiImage = UIImage(data: data) else {
                 appModel.statusMessage = "The selected file is not a supported image."
                 return
             }
-            let filename = item.itemIdentifier.map { "photo-\($0).jpg" } ?? "selected-image.jpg"
-            let contentType = UTType.jpeg.preferredMIMEType ?? "image/jpeg"
-            await appModel.recognizeImage(data: data, filename: filename, contentType: contentType)
+            await enqueueForRecognition(uiImage)
         } catch {
             appModel.statusMessage = "Failed to load the selected photo: \(error.localizedDescription)"
         }
     }
 
     @MainActor
-    func handleCapturedImage(_ image: UIImage) async {
-        let filename = "camera-capture-\(UUID().uuidString.prefix(8)).jpg"
-        await appModel.recognizeImage(image: image, filename: filename)
+    func enqueueForRecognition(_ image: UIImage) async {
+        do {
+            try await APIClient().checkHealth(baseURL: appModel.apiBaseURL)
+        } catch {
+            appModel.connectionAlertMessage =
+                "Cannot reach the server at \(appModel.apiBaseURL). Check your connection and API settings."
+            appModel.showConnectionAlert = true
+            return
+        }
+
+        if appModel.onDeviceCropEnabled {
+            let cropResult = await CardCropService().detectAndCrop(image: image)
+            let images = cropResult.crops.isEmpty ? [(image, false)] : cropResult.crops.map { ($0, true) }
+            for (img, cropped) in images {
+                enqueue(img, isCropped: cropped)
+            }
+        } else {
+            enqueue(image, isCropped: false)
+        }
+    }
+
+    func enqueue(_ image: UIImage, isCropped: Bool) {
+        quickScanViewModel.recognitionQueue.enqueue(
+            image: image,
+            isCropped: isCropped,
+            apiBaseURL: appModel.apiBaseURL,
+            modelContext: appModel.modelContext
+        )
     }
 
     func lockOrientation(_ mask: UIInterfaceOrientationMask) {

@@ -60,7 +60,7 @@ final class RecognitionQueue: ObservableObject {
     // MARK: - Public API
 
     func enqueue(image: UIImage, isCropped: Bool = false, apiBaseURL: String, modelContext: ModelContext?) {
-        let filename = "quickscan-\(UUID().uuidString.prefix(8)).jpg"
+        let filename = "scan-\(UUID().uuidString.prefix(8)).jpg"
         let job = Job(
             image: image, filename: filename, apiBaseURL: apiBaseURL, modelContext: modelContext, isCropped: isCropped
         )

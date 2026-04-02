@@ -56,6 +56,7 @@ final class CameraViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        sessionManager.setTorchLevel(0)
         sessionManager.stop()
         renderer?.clear()
     }

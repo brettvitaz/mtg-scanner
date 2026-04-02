@@ -234,6 +234,21 @@ final class CardSortAndStateTests: XCTestCase {
 
     // MARK: - Sort
 
+    func testSortByCollectorNumberHandlesTokenSlashFormat() {
+        // "1/20" should sort as 1, not 120 — leading integer only
+        let items = [
+            makeItem(collectorNumber: "1/20"),
+            makeItem(collectorNumber: "2/20"),
+            makeItem(collectorNumber: "119")
+        ]
+        let filter = CardFilterState()
+        filter.sort = CardSortOption(field: .collectorNumber, direction: .ascending)
+        let result = filter.apply(to: items)
+        XCTAssertEqual(result[0].collectorNumber, "1/20")
+        XCTAssertEqual(result[1].collectorNumber, "2/20")
+        XCTAssertEqual(result[2].collectorNumber, "119")
+    }
+
     func testSortByTitleAscending() {
         let items = [makeItem(title: "Z Card"), makeItem(title: "A Card")]
         let filter = CardFilterState()
@@ -302,6 +317,19 @@ final class CardSortAndStateTests: XCTestCase {
         let filter = CardFilterState()
         filter.sort = CardSortOption(field: .title, direction: .ascending)
         XCTAssertTrue(filter.isActive)
+        XCTAssertFalse(filter.isFilterActive)
+    }
+
+    func testIsFilterActiveIsFalseOnSortOnly() {
+        let filter = CardFilterState()
+        filter.sort = CardSortOption(field: .rarity, direction: .descending)
+        XCTAssertFalse(filter.isFilterActive)
+    }
+
+    func testIsFilterActiveIsTrueOnSearchText() {
+        let filter = CardFilterState()
+        filter.searchText = "bolt"
+        XCTAssertTrue(filter.isFilterActive)
     }
 
     func testResetClearsAll() {

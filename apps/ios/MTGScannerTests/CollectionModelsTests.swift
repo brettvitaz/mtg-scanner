@@ -196,6 +196,8 @@ final class CollectionModelsTests: XCTestCase {
             collectorNumber: "263",
             foil: true,
             rarity: "uncommon",
+            priceRetail: "$5.00",
+            priceBuy: "$3.00",
             quantity: 2
         )
 
@@ -208,6 +210,8 @@ final class CollectionModelsTests: XCTestCase {
         XCTAssertEqual(copy.collectorNumber, original.collectorNumber)
         XCTAssertEqual(copy.foil, original.foil)
         XCTAssertEqual(copy.rarity, original.rarity)
+        XCTAssertEqual(copy.priceRetail, "$5.00")
+        XCTAssertEqual(copy.priceBuy, "$3.00")
         XCTAssertEqual(copy.quantity, 2)
         XCTAssertNil(copy.collection)
         XCTAssertNil(copy.deck)

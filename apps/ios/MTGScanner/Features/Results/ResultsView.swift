@@ -56,7 +56,7 @@ struct ResultsView: View {
             ShareSheet(activityItem: item)
         }
         .sheet(isPresented: $showFilterSheet) {
-            FilterSheet(filterState: $filterState, items: inboxItems)
+            FilterSheet(filterState: filterState, items: inboxItems)
         }
         .task(id: inboxItems.map(\.id)) {
             await fetchMissingPrices(for: inboxItems)
@@ -100,7 +100,7 @@ struct ResultsView: View {
                     HStack {
                         Text("Scanned Cards")
                         Spacer()
-                        if filterState.isActive {
+                        if filterState.isFilterActive {
                             Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
                                 .foregroundStyle(.secondary)
                         } else {
@@ -145,7 +145,7 @@ struct ResultsView: View {
                     Image(systemName: "ellipsis.circle")
                 }
                 Button("Select") { enterSelecting() }
-                FilterSortToolbar(filterState: $filterState, showFilterSheet: $showFilterSheet)
+                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }
         }
     }
@@ -192,7 +192,10 @@ private extension ResultsView {
         for item in items where item.priceRetail == nil && item.priceBuy == nil {
             guard let price = try? await appModel.fetchPrice(
                 name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
-            ) else { continue }
+            ) else {
+                print("[ResultsView] fetchPrice failed for \(item.title)")
+                continue
+            }
             item.priceRetail = price.priceRetail
             item.priceBuy = price.priceBuy
         }

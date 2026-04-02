@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Sheet for configuring card filters across set, rarity, foil, color identity, type, and price.
 struct FilterSheet: View {
-    @Binding var filterState: CardFilterState
+    @Bindable var filterState: CardFilterState
     let items: [CollectionItem]
 
     @Environment(\.dismiss) private var dismiss

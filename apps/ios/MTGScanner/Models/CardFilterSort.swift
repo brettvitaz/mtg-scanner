@@ -104,7 +104,7 @@ final class CardFilterState {
     var priceBuyMax: Double?
     var sort: CardSortOption = .default
 
-    var isActive: Bool {
+    var isFilterActive: Bool {
         !searchText.isEmpty
             || !selectedSets.isEmpty
             || !selectedRarities.isEmpty
@@ -113,7 +113,10 @@ final class CardFilterState {
             || !selectedCardTypes.isEmpty
             || priceRetailMin != nil || priceRetailMax != nil
             || priceBuyMin != nil || priceBuyMax != nil
-            || sort != .default
+    }
+
+    var isActive: Bool {
+        isFilterActive || sort != .default
     }
 
     func reset() {
@@ -224,8 +227,14 @@ private func parsePrice(_ value: String?) -> Double {
 }
 
 private func compareCollectorNumbers(_ a: String?, _ b: String?) -> Bool {
-    let numA = Int(a?.components(separatedBy: CharacterSet.decimalDigits.inverted).joined() ?? "") ?? Int.max
-    let numB = Int(b?.components(separatedBy: CharacterSet.decimalDigits.inverted).joined() ?? "") ?? Int.max
+    // Extract only the leading numeric component (before any '/' or non-digit)
+    func leadingInt(_ s: String?) -> Int {
+        guard let s else { return Int.max }
+        let digits = s.prefix(while: { $0.isNumber })
+        return Int(digits) ?? Int.max
+    }
+    let numA = leadingInt(a)
+    let numB = leadingInt(b)
     if numA != numB { return numA < numB }
     return (a ?? "").localizedCompare(b ?? "") == .orderedAscending
 }

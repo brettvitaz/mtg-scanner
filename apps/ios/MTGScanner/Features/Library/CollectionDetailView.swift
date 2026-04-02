@@ -47,7 +47,7 @@ struct CollectionDetailView: View {
             ShareSheet(activityItem: item)
         }
         .sheet(isPresented: $showFilterSheet) {
-            FilterSheet(filterState: $filterState, items: collection.items)
+            FilterSheet(filterState: filterState, items: collection.items)
         }
     }
 
@@ -89,7 +89,7 @@ struct CollectionDetailView: View {
                     HStack {
                         Text("Cards")
                         Spacer()
-                        if filterState.isActive {
+                        if filterState.isFilterActive {
                             Text("\(items.totalQuantity) of \(collection.items.totalQuantity) card(s)")
                                 .foregroundStyle(.secondary)
                         } else {
@@ -134,7 +134,7 @@ struct CollectionDetailView: View {
                     Image(systemName: "ellipsis.circle")
                 }
                 Button("Select") { enterSelecting() }
-                FilterSortToolbar(filterState: $filterState, showFilterSheet: $showFilterSheet)
+                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }
         }
     }

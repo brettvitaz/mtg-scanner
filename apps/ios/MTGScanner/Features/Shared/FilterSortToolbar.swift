@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Sort menu and filter button for embedding inside a ToolbarItemGroup.
 struct FilterSortToolbar: View {
-    @Binding var filterState: CardFilterState
+    @Bindable var filterState: CardFilterState
     @Binding var showFilterSheet: Bool
 
     var body: some View {
@@ -31,7 +31,7 @@ struct FilterSortToolbar: View {
     }
 
     private var filterButton: some View {
-        let icon = filterState.isActive
+        let icon = filterState.isFilterActive
             ? "line.3.horizontal.decrease.circle.fill"
             : "line.3.horizontal.decrease.circle"
         return Button { showFilterSheet = true } label: { Image(systemName: icon) }

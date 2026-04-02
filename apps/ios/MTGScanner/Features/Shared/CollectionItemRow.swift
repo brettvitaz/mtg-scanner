@@ -44,14 +44,15 @@ struct CollectionItemRow: View {
 
     private var cardInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
+            HStack(alignment: .top, spacing: 4) {
                 Text(item.title)
                     .font(.headline)
                     .lineLimit(2)
                 if item.foil {
                     Image(systemName: "sparkles")
                         .font(.caption)
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(Color(.systemYellow))
+                        .accessibilityLabel("Foil")
                 }
             }
             Text(item.edition)

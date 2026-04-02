@@ -119,8 +119,9 @@ final class QuickScanViewModelTests: XCTestCase {
 
     // MARK: - Bounding Box Threading
 
-    func testNewCardSignalWithBoundingBoxResultsInCroppedEnqueue() async throws {
-        // Inject a RecognitionQueue that captures whether isCropped was set.
+    func testCaptureFailsGracefullyWhenCoordinatorIsNil() async throws {
+        // Verify that triggerCapture returns cleanly when captureCoordinator is nil,
+        // without calling enqueue and without leaving the state machine stuck.
         var capturedIsCropped: Bool?
         let queue2 = RecognitionQueue(
             recognize: { _, _, _, _ in
@@ -137,17 +138,14 @@ final class QuickScanViewModelTests: XCTestCase {
         vm.captureDelay = 0.05
         vm.start()
 
-        // Signal with a non-nil bounding box (center of frame).
         let box = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
         vm.presenceTracker.onNewCardSignal?(box)
 
-        // Wait for settle + capture (captureCoordinator is nil so capture will fail early).
+        // Wait for settle + capture attempt.
         try await Task.sleep(for: .milliseconds(300))
 
         // captureCoordinator is nil → triggerCapture returns before enqueue.
-        // The box is stored then cleared. State returns to .watching.
-        XCTAssertNotEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
-        // capturedIsCropped remains nil because capture failed before enqueue.
+        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.watching)
         XCTAssertNil(capturedIsCropped)
     }
 

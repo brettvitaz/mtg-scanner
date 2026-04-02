@@ -89,6 +89,7 @@ final class QuickScanViewModel: ObservableObject {
         settleTask?.cancel()
         settleTask = nil
         captureState = .watching
+        lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
     }
 
@@ -146,7 +147,7 @@ final class QuickScanViewModel: ObservableObject {
         let enqueueImage = cropped ?? image
         let isCropped = cropped != nil
 
-        if isCropped { lastCroppedImage = enqueueImage }
+        lastCroppedImage = cropped
         presenceTracker.markCaptured()
         recognitionQueue.enqueue(
             image: enqueueImage, isCropped: isCropped, apiBaseURL: apiBaseURL, modelContext: modelContext

@@ -23,6 +23,8 @@ Monorepo for an iPhone-first Magic: The Gathering card scanning system.
 ### API
 ```bash
 make api-bootstrap
+make api-import-ck-prices
+make api-update-mtgjson
 make api-run
 ```
 
@@ -43,8 +45,7 @@ make api-run       # run FastAPI dev server
 make api-test      # run backend tests
 make tree          # print a compact repo tree
 make api-import-ck-prices  # fetch and import Card Kingdom prices
-PYTHONPATH=services/api ./services/api/.venv/bin/python scripts/import_mtgjson.py tmp/AllPrintings.json
-xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build
+make api-update-mtgjson    # fetch and import MTG json card data
 ```
 
 ## Current status

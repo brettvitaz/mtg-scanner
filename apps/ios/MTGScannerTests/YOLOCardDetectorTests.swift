@@ -1,3 +1,4 @@
+import CoreML
 import XCTest
 @testable import MTGScanner
 
@@ -68,5 +69,50 @@ final class YOLOCardDetectorTests: XCTestCase {
         let result = YOLOCardDetector.nonMaxSuppression(boxes)
         XCTAssertEqual(result.count, 2)
         XCTAssertEqual(result[0].confidence, 0.9, accuracy: 0.001)
+    }
+
+    func testDecodeUsesMultiArrayStrides() throws {
+        let output = try makeStridedOutput()
+
+        let result = YOLOCardDetector.decode(output: output, confidenceThreshold: 0.5)
+
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].rect.origin.x, 0.65, accuracy: 0.001)
+        XCTAssertEqual(result[0].rect.origin.y, 0.125, accuracy: 0.001)
+        XCTAssertEqual(result[0].rect.width, 0.1, accuracy: 0.001)
+        XCTAssertEqual(result[0].rect.height, 0.15, accuracy: 0.001)
+        XCTAssertEqual(result[1].rect.origin.x, 0.3, accuracy: 0.001)
+        XCTAssertEqual(result[1].rect.origin.y, 0.35, accuracy: 0.001)
+        XCTAssertEqual(result[1].rect.width, 0.2, accuracy: 0.001)
+        XCTAssertEqual(result[1].rect.height, 0.3, accuracy: 0.001)
+    }
+
+    private func makeStridedOutput() throws -> MLMultiArray {
+        let shape = [1, 5, 2].map(NSNumber.init(value:))
+        let strides = [40, 7, 3].map(NSNumber.init(value:))
+        let pointer = UnsafeMutablePointer<Float32>.allocate(capacity: 32)
+        pointer.initialize(repeating: 0, count: 32)
+
+        let output = try MLMultiArray(
+            dataPointer: pointer,
+            shape: shape,
+            dataType: .float32,
+            strides: strides
+        ) { rawPointer in
+            rawPointer.assumingMemoryBound(to: Float32.self).deallocate()
+        }
+
+        pointer[0] = 0.4
+        pointer[7] = 0.5
+        pointer[14] = 0.2
+        pointer[21] = 0.3
+        pointer[28] = 0.75
+        pointer[3] = 0.7
+        pointer[10] = 0.2
+        pointer[17] = 0.1
+        pointer[24] = 0.15
+        pointer[31] = 0.8
+
+        return output
     }
 }

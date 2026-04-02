@@ -75,38 +75,44 @@ final class YOLOCardDetector {
     /// The 5 channels are [cx, cy, w, h, class_confidence] for the single 'card' class.
     /// Coordinates are normalized to [0,1] relative to the model input size.
     func decode(output: MLMultiArray) -> [CardBoundingBox] {
-        guard output.shape.count == 3 else { return [] }
+        Self.decode(output: output, confidenceThreshold: confidenceThreshold)
+    }
+
+    static func decode(output: MLMultiArray, confidenceThreshold: Float) -> [CardBoundingBox] {
+        guard
+            output.shape.count == 3,
+            output.shape[0].intValue == 1,
+            output.shape[1].intValue == 5
+        else { return [] }
+
         let numAnchors = output.shape[2].intValue
-        guard numAnchors > 0 else { return [] }
+        guard numAnchors > 0, output.strides.count == 3 else { return [] }
+
+        let channelStride = output.strides[1].intValue
+        let anchorStride = output.strides[2].intValue
 
         var candidates: [(rect: CGRect, confidence: Float)] = []
         candidates.reserveCapacity(64)
 
         if output.dataType == .float32 {
-            let ptr = output.dataPointer.assumingMemoryBound(to: Float32.self)
-            for i in 0..<numAnchors {
-                let conf = ptr[4 * numAnchors + i]
-                guard conf >= confidenceThreshold else { continue }
-                let cx = CGFloat(ptr[0 * numAnchors + i])
-                let cy = CGFloat(ptr[1 * numAnchors + i])
-                let w  = CGFloat(ptr[2 * numAnchors + i])
-                let h  = CGFloat(ptr[3 * numAnchors + i])
-                candidates.append((CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h), conf))
-            }
+            decodeFloat32Candidates(
+                into: &candidates,
+                output: output,
+                anchorCount: numAnchors,
+                confidenceThreshold: confidenceThreshold,
+                channelStride: channelStride,
+                anchorStride: anchorStride
+            )
         } else {
-            // Fallback path handles Float16 and other types via NSNumber coercion.
-            for i in 0..<numAnchors {
-                let conf = output[[0, 4, i] as [NSNumber]].floatValue
-                guard conf >= confidenceThreshold else { continue }
-                let cx = CGFloat(output[[0, 0, i] as [NSNumber]].floatValue)
-                let cy = CGFloat(output[[0, 1, i] as [NSNumber]].floatValue)
-                let w  = CGFloat(output[[0, 2, i] as [NSNumber]].floatValue)
-                let h  = CGFloat(output[[0, 3, i] as [NSNumber]].floatValue)
-                candidates.append((CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h), conf))
-            }
+            decodeNSNumberCandidates(
+                into: &candidates,
+                output: output,
+                anchorCount: numAnchors,
+                confidenceThreshold: confidenceThreshold
+            )
         }
 
-        return Self.nonMaxSuppression(candidates)
+        return nonMaxSuppression(candidates)
     }
 
     // MARK: - NMS
@@ -115,7 +121,7 @@ final class YOLOCardDetector {
     /// any lower-confidence box whose IoU with it exceeds `iouThreshold`.
     static func nonMaxSuppression(
         _ boxes: [(rect: CGRect, confidence: Float)],
-        iouThreshold: Float = 0.45
+        iouThreshold: Float = YOLOCardDetector.iouThreshold
     ) -> [CardBoundingBox] {
         let sorted = boxes.sorted { $0.confidence > $1.confidence }
         var kept: [CardBoundingBox] = []
@@ -140,5 +146,130 @@ final class YOLOCardDetector {
         let unionArea = Float(a.width * a.height + b.width * b.height) - intersectionArea
         guard unionArea > 0 else { return 0 }
         return intersectionArea / unionArea
+    }
+
+}
+
+private extension YOLOCardDetector {
+    static func value(
+        in pointer: UnsafePointer<Float32>,
+        channel: Int,
+        anchor: Int,
+        channelStride: Int,
+        anchorStride: Int
+    ) -> Float32 {
+        pointer[channel * channelStride + anchor * anchorStride]
+    }
+
+    static func scalar(
+        from pointer: UnsafePointer<Float32>,
+        channel: Int,
+        anchor: Int,
+        channelStride: Int,
+        anchorStride: Int
+    ) -> CGFloat {
+        CGFloat(
+            value(
+                in: pointer,
+                channel: channel,
+                anchor: anchor,
+                channelStride: channelStride,
+                anchorStride: anchorStride
+            )
+        )
+    }
+
+    static func makeRect(
+        centerX: CGFloat,
+        centerY: CGFloat,
+        width: CGFloat,
+        height: CGFloat
+    ) -> CGRect {
+        CGRect(x: centerX - width / 2, y: centerY - height / 2, width: width, height: height)
+    }
+
+    static func rect(
+        from pointer: UnsafePointer<Float32>,
+        anchor: Int,
+        channelStride: Int,
+        anchorStride: Int
+    ) -> CGRect {
+        let centerX = scalar(
+            from: pointer,
+            channel: 0,
+            anchor: anchor,
+            channelStride: channelStride,
+            anchorStride: anchorStride
+        )
+        let centerY = scalar(
+            from: pointer,
+            channel: 1,
+            anchor: anchor,
+            channelStride: channelStride,
+            anchorStride: anchorStride
+        )
+        let width = scalar(
+            from: pointer,
+            channel: 2,
+            anchor: anchor,
+            channelStride: channelStride,
+            anchorStride: anchorStride
+        )
+        let height = scalar(
+            from: pointer,
+            channel: 3,
+            anchor: anchor,
+            channelStride: channelStride,
+            anchorStride: anchorStride
+        )
+        return makeRect(centerX: centerX, centerY: centerY, width: width, height: height)
+    }
+
+    static func decodeFloat32Candidates(
+        into candidates: inout [(rect: CGRect, confidence: Float)],
+        output: MLMultiArray,
+        anchorCount: Int,
+        confidenceThreshold: Float,
+        channelStride: Int,
+        anchorStride: Int
+    ) {
+        let pointer = output.dataPointer.assumingMemoryBound(to: Float32.self)
+
+        for anchor in 0..<anchorCount {
+            let confidence = value(
+                in: pointer,
+                channel: 4,
+                anchor: anchor,
+                channelStride: channelStride,
+                anchorStride: anchorStride
+            )
+            guard confidence >= confidenceThreshold else { continue }
+            let rect = rect(
+                from: pointer,
+                anchor: anchor,
+                channelStride: channelStride,
+                anchorStride: anchorStride
+            )
+            candidates.append((rect, confidence))
+        }
+    }
+
+    static func decodeNSNumberCandidates(
+        into candidates: inout [(rect: CGRect, confidence: Float)],
+        output: MLMultiArray,
+        anchorCount: Int,
+        confidenceThreshold: Float
+    ) {
+        for anchor in 0..<anchorCount {
+            let confidence = output[[0, 4, anchor] as [NSNumber]].floatValue
+            guard confidence >= confidenceThreshold else { continue }
+            let rect = makeRect(
+                centerX: CGFloat(output[[0, 0, anchor] as [NSNumber]].floatValue),
+                centerY: CGFloat(output[[0, 1, anchor] as [NSNumber]].floatValue),
+                width: CGFloat(output[[0, 2, anchor] as [NSNumber]].floatValue),
+                height: CGFloat(output[[0, 3, anchor] as [NSNumber]].floatValue)
+            )
+            candidates.append((rect, confidence))
+        }
     }
 }

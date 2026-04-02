@@ -9,6 +9,8 @@ struct QuickScanView: View {
     @ObservedObject var viewModel: QuickScanViewModel
     @ObservedObject var recognitionQueue: RecognitionQueue
     @Binding var torchLevel: Float
+    @Binding var detectionMode: DetectionMode
+    let availableModes: [DetectionMode]
 
     var body: some View {
         VStack {
@@ -29,6 +31,7 @@ struct QuickScanView: View {
             TorchControl(level: $torchLevel)
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
+                modeToggle
                 if recognitionQueue.pendingCount > 0 {
                     pendingBadge
                 }
@@ -63,6 +66,17 @@ struct QuickScanView: View {
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
+    }
+
+    private var modeToggle: some View {
+        Picker("Mode", selection: $detectionMode) {
+            ForEach(availableModes) { mode in
+                Text(mode.displayName).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 220)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var failedBadge: some View {

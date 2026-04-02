@@ -51,13 +51,17 @@ final class QuickScanViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(detector: YOLOCardDetector?) {
-        presenceTracker = CardPresenceTracker(detector: detector)
+    init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
+        presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         recognitionQueue = RecognitionQueue()
 
         presenceTracker.onNewCardSignal = { [weak self] _ in
             Task { @MainActor [weak self] in self?.handleNewCardSignal() }
         }
+    }
+
+    convenience init(detector: YOLOCardDetector?) {
+        self.init(detectorProvider: { detector })
     }
 
     // MARK: - Controls

@@ -87,8 +87,13 @@ final class CameraSessionManager: NSObject {
     ///
     /// Dispatches to the session queue and is safe to call from any thread.
     func setTorchLevel(_ level: Float) {
-        guard let device = captureDevice, device.hasTorch, device.isTorchAvailable else { return }
-        sessionQueue.async {
+        sessionQueue.async { [weak self] in
+            guard
+                let self,
+                let device = self.captureDevice,
+                device.hasTorch,
+                device.isTorchAvailable
+            else { return }
             do {
                 try device.lockForConfiguration()
                 if level <= 0 {

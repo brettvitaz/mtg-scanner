@@ -8,7 +8,7 @@ struct ScanView: View {
     @EnvironmentObject private var appModel: AppModel
     @StateObject private var detectionViewModel = CardDetectionViewModel()
     @StateObject private var captureCoordinator = CameraCaptureCoordinator()
-    @StateObject private var quickScanViewModel = QuickScanViewModel(detector: YOLOCardDetector())
+    @StateObject private var quickScanViewModel = QuickScanViewModel()
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
@@ -18,25 +18,7 @@ struct ScanView: View {
             cameraPreview
                 .ignoresSafeArea()
 
-            if appModel.quickScanEnabled {
-                QuickScanView(
-                    viewModel: quickScanViewModel,
-                    recognitionQueue: quickScanViewModel.recognitionQueue,
-                    torchLevel: $detectionViewModel.torchLevel
-                )
-            } else {
-                VStack {
-                    topBar
-                    Spacer()
-                    ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
-                        detectionViewModel.zoomFactor = preset
-                    }
-                    .padding(.bottom, 12)
-                    bottomBar
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-            }
+            cameraOverlay
 
             if shutterFlash {
                 Color.white.opacity(0.7)
@@ -52,7 +34,9 @@ struct ScanView: View {
             detectionViewModel.requestCameraPermissionIfNeeded()
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             configureQuickScan()
-            detectionViewModel.detectionMode = appModel.quickScanEnabled ? .quickScan : .table
+            if !appModel.quickScanEnabled, detectionViewModel.detectionMode == .quickScan {
+                detectionViewModel.detectionMode = .table
+            }
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
@@ -70,11 +54,14 @@ struct ScanView: View {
             quickScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
         }
         .onChange(of: appModel.quickScanEnabled) { _, enabled in
-            if enabled {
-                detectionViewModel.detectionMode = .quickScan
-            } else {
+            if !enabled, detectionViewModel.detectionMode == .quickScan {
                 quickScanViewModel.stop()
                 detectionViewModel.detectionMode = .table
+            }
+        }
+        .onChange(of: detectionViewModel.detectionMode) { _, mode in
+            if mode != .quickScan {
+                quickScanViewModel.stop()
             }
         }
         .alert("Camera Access Required", isPresented: $detectionViewModel.cameraPermissionDenied) {
@@ -98,7 +85,44 @@ struct ScanView: View {
         quickScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.quickScanConfidenceThreshold)
     }
 
+    private var availableModes: [DetectionMode] {
+        appModel.quickScanEnabled ? DetectionMode.allCases : [.table, .binder]
+    }
+
+    private var isQuickScanMode: Bool {
+        appModel.quickScanEnabled && detectionViewModel.detectionMode == .quickScan
+    }
+
     // MARK: - Subviews
+
+    @ViewBuilder
+    private var cameraOverlay: some View {
+        if isQuickScanMode {
+            QuickScanView(
+                viewModel: quickScanViewModel,
+                recognitionQueue: quickScanViewModel.recognitionQueue,
+                torchLevel: $detectionViewModel.torchLevel,
+                detectionMode: $detectionViewModel.detectionMode,
+                availableModes: availableModes
+            )
+        } else {
+            standardOverlay
+        }
+    }
+
+    private var standardOverlay: some View {
+        VStack {
+            topBar
+            Spacer()
+            ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
+                detectionViewModel.zoomFactor = preset
+            }
+            .padding(.bottom, 12)
+            bottomBar
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
 
     private var cameraPreview: some View {
         CameraPreviewRepresentable(
@@ -111,8 +135,12 @@ struct ScanView: View {
             onZoomFactorChanged: { factor in
                 detectionViewModel.zoomFactor = factor
             },
-            onQuickScanFrame: appModel.quickScanEnabled
-                ? { [weak quickScanViewModel] buffer in quickScanViewModel?.processFrame(buffer) }
+            onQuickScanFrame: isQuickScanMode
+                ? { [weak quickScanViewModel] buffer in
+                    Task { @MainActor in
+                        quickScanViewModel?.processFrame(buffer)
+                    }
+                }
                 : nil,
             torchLevel: detectionViewModel.torchLevel
         )
@@ -162,12 +190,12 @@ struct ScanView: View {
 
     private var modeToggle: some View {
         Picker("Mode", selection: $detectionViewModel.detectionMode) {
-            ForEach([DetectionMode.table, .binder]) { mode in
+            ForEach(availableModes) { mode in
                 Text(mode.displayName).tag(mode)
             }
         }
         .pickerStyle(.segmented)
-        .frame(width: 130)
+        .frame(width: appModel.quickScanEnabled ? 220 : 130)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 

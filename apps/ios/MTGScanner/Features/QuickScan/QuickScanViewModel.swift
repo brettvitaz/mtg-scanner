@@ -49,20 +49,29 @@ final class QuickScanViewModel: ObservableObject {
     // MARK: - Private
 
     private var settleTask: Task<Void, Never>?
+    private let cropImage: @Sendable (UIImage) async -> CardCropResult
 
     // MARK: - Init
 
     init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         recognitionQueue = RecognitionQueue()
+        let service = CardCropService()
+        cropImage = { image in await service.detectAndCrop(image: image) }
         setupSignalHandler()
     }
 
-    /// Designated initialiser for testing — allows injecting a custom `RecognitionQueue`.
-    init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
-         recognitionQueue: RecognitionQueue) {
+    /// Designated initialiser for testing — allows injecting a custom `RecognitionQueue` and crop function.
+    init(
+        detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
+        recognitionQueue: RecognitionQueue,
+        cropImage: @escaping @Sendable (UIImage) async -> CardCropResult = {
+            await CardCropService().detectAndCrop(image: $0)
+        }
+    ) {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         self.recognitionQueue = recognitionQueue
+        self.cropImage = cropImage
         setupSignalHandler()
     }
 
@@ -100,14 +109,11 @@ final class QuickScanViewModel: ObservableObject {
     /// Called by table and binder scan modes after a manual capture. Runs Vision detection
     /// on a detached background task to avoid blocking the main actor.
     @MainActor
-    func enqueueCapturedImage(
-        _ image: UIImage,
-        cropEnabled: Bool,
-        cropService: CardCropService = CardCropService()
-    ) async {
+    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
         if cropEnabled {
+            let detectCrops = cropImage
             let crops = await Task.detached(priority: .userInitiated) {
-                await cropService.detectAndCrop(image: image)
+                await detectCrops(image)
             }.value
             let pairs = crops.crops.isEmpty ? [(image, false)] : crops.crops.map { ($0, true) }
             for (img, cropped) in pairs {

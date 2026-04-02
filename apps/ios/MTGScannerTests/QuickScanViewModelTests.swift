@@ -219,6 +219,21 @@ final class QuickScanViewModelTests: XCTestCase {
         XCTAssertEqual(queue.pendingCount, 1)
     }
 
+    func testEnqueueCapturedImageCropEnabledWithCropsEnqueuesEachCrop() async {
+        let queue = makeStubQueue()
+        let fakeCrops = [makeBlankImage(), makeBlankImage()]
+        let vm = QuickScanViewModel(
+            detectorProvider: { nil },
+            recognitionQueue: queue,
+            cropImage: { _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }
+        )
+
+        await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)
+
+        // Two crops returned → two separate enqueue calls, each marked isCropped.
+        XCTAssertEqual(queue.pendingCount, 2)
+    }
+
     // MARK: - Helpers
 
     private func makeBlankImage() -> UIImage {

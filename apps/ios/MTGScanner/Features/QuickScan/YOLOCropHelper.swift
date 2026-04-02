@@ -8,6 +8,28 @@ enum YOLOCropHelper {
 
     private static let defaultPadding: CGFloat = 0.03
 
+    /// Detect the highest-confidence card in `image` using `detector` and return a cropped UIImage.
+    ///
+    /// Runs YOLO on the image's own pixels, so the bounding box is always in the same
+    /// coordinate space as the image regardless of capture resolution or orientation.
+    ///
+    /// - Parameters:
+    ///   - image: Source UIImage. Orientation is normalized before detection and cropping.
+    ///   - detector: YOLO detector instance to use.
+    ///   - padding: Fractional padding applied uniformly around the detected box (default 3%).
+    /// - Returns: Cropped UIImage of the best-confidence card, or `nil` if no card detected.
+    static func detectAndCrop(
+        _ image: UIImage,
+        using detector: YOLOCardDetector,
+        padding: CGFloat = defaultPadding
+    ) -> UIImage? {
+        let upright = normalizedImage(image)
+        guard let cgImage = upright.cgImage else { return nil }
+        let boxes = detector.detect(in: cgImage)
+        guard let best = boxes.max(by: { $0.confidence < $1.confidence }) else { return nil }
+        return cropImage(cgImage: cgImage, toNormalizedRect: best.rect, padding: padding)
+    }
+
     /// Crop `image` to `normalizedRect` (YOLO top-left-origin, [0,1] coords).
     ///
     /// - Parameters:
@@ -21,10 +43,18 @@ enum YOLOCropHelper {
         padding: CGFloat = defaultPadding
     ) -> UIImage? {
         guard normalizedRect.width > 0, normalizedRect.height > 0 else { return nil }
-
         let upright = normalizedImage(image)
         guard let cgImage = upright.cgImage else { return nil }
+        return cropImage(cgImage: cgImage, toNormalizedRect: normalizedRect, padding: padding)
+    }
 
+    // MARK: - Private
+
+    private static func cropImage(
+        cgImage: CGImage,
+        toNormalizedRect normalizedRect: CGRect,
+        padding: CGFloat
+    ) -> UIImage? {
         let imageWidth = CGFloat(cgImage.width)
         let imageHeight = CGFloat(cgImage.height)
 
@@ -52,7 +82,7 @@ enum YOLOCropHelper {
     // MARK: - Orientation Normalization
 
     /// Redraws the image so cgImage pixels are upright (.up orientation).
-    private static func normalizedImage(_ image: UIImage) -> UIImage {
+    static func normalizedImage(_ image: UIImage) -> UIImage {
         guard image.imageOrientation != .up else { return image }
         let format = UIGraphicsImageRendererFormat()
         format.scale = image.scale

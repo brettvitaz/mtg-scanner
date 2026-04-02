@@ -44,9 +44,16 @@ struct CollectionItemRow: View {
 
     private var cardInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(item.title)
-                .font(.headline)
-                .lineLimit(2)
+            HStack(spacing: 4) {
+                Text(item.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                if item.foil {
+                    Image(systemName: "sparkles")
+                        .font(.caption)
+                        .foregroundStyle(.yellow)
+                }
+            }
             Text(item.edition)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

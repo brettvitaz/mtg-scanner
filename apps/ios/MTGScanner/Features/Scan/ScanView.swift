@@ -39,6 +39,7 @@ struct ScanView: View {
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             UIApplication.shared.isIdleTimerDisabled = false
+            detectionViewModel.torchLevel = 0
         }
         .onChange(of: appModel.apiBaseURL) { _, url in
             quickScanViewModel.apiBaseURL = url

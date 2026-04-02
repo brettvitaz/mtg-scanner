@@ -61,11 +61,19 @@ struct ScanMenuButton: View {
 
 private struct BrightnessPopover: View {
     @Binding var torchLevel: Float
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Brightness")
-                .font(.headline)
+            HStack {
+                Text("Brightness")
+                    .font(.headline)
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
             HStack {
                 Button { torchLevel = max(0.01, torchLevel - 0.05) } label: {
                     Image(systemName: "sun.min")
@@ -75,7 +83,7 @@ private struct BrightnessPopover: View {
                     Image(systemName: "sun.max.fill")
                 }
             }
-            Text("\(Int(torchLevel * 100))%")
+            Text("\(Int(torchLevel * 100 + 0.5))%")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

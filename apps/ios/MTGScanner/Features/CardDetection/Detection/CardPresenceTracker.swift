@@ -57,6 +57,23 @@ final class CardPresenceTracker {
         self.init(detectorProvider: { detector })
     }
 
+    // MARK: - Still-Image Detection
+
+    /// Detects the highest-confidence card bounding box in `cgImage` using the shared detector.
+    ///
+    /// Runs on the presence queue (background) and returns the result asynchronously.
+    /// Returns `nil` if no card is detected or the detector is unavailable.
+    func detectBestBox(in cgImage: CGImage) async -> CGRect? {
+        await withCheckedContinuation { continuation in
+            presenceQueue.async { [weak self] in
+                guard let self else { continuation.resume(returning: nil); return }
+                let boxes = self.loadDetector()?.detect(in: cgImage) ?? []
+                let best = boxes.max(by: { $0.confidence < $1.confidence })?.rect
+                continuation.resume(returning: best)
+            }
+        }
+    }
+
     // MARK: - Reference Management
 
     /// Updates the reference frame to the most recently processed frame.

@@ -49,13 +49,10 @@ final class QuickScanViewModel: ObservableObject {
     // MARK: - Private
 
     private var settleTask: Task<Void, Never>?
-    private let detectorProvider: () -> YOLOCardDetector?
-    private lazy var cropDetector: YOLOCardDetector? = detectorProvider()
 
     // MARK: - Init
 
     init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
-        self.detectorProvider = detectorProvider
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         recognitionQueue = RecognitionQueue()
         setupSignalHandler()
@@ -64,7 +61,6 @@ final class QuickScanViewModel: ObservableObject {
     /// Designated initialiser for testing — allows injecting a custom `RecognitionQueue`.
     init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
          recognitionQueue: RecognitionQueue) {
-        self.detectorProvider = detectorProvider
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         self.recognitionQueue = recognitionQueue
         setupSignalHandler()
@@ -139,7 +135,14 @@ final class QuickScanViewModel: ObservableObject {
             return
         }
 
-        let cropped = cropDetector.flatMap { YOLOCropHelper.detectAndCrop(image, using: $0) }
+        let uprightImage = YOLOCropHelper.normalizedImage(image)
+        let cropped: UIImage?
+        if let cgImage = uprightImage.cgImage,
+           let box = await presenceTracker.detectBestBox(in: cgImage) {
+            cropped = YOLOCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+        } else {
+            cropped = nil
+        }
         let enqueueImage = cropped ?? image
         let isCropped = cropped != nil
 

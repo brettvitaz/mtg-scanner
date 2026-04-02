@@ -10,7 +10,6 @@ struct QuickScanView: View {
     @ObservedObject var recognitionQueue: RecognitionQueue
     @Binding var torchLevel: Float
     @Binding var detectionMode: DetectionMode
-    let availableModes: [DetectionMode]
 
     var body: some View {
         VStack {
@@ -27,11 +26,8 @@ struct QuickScanView: View {
 
     private var topBar: some View {
         HStack(alignment: .top) {
-            scannedCountBadge
-            TorchControl(level: $torchLevel)
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
-                modeToggle
                 if recognitionQueue.pendingCount > 0 {
                     pendingBadge
                 }
@@ -40,16 +36,6 @@ struct QuickScanView: View {
                 }
             }
         }
-    }
-
-    private var scannedCountBadge: some View {
-        Text("\(recognitionQueue.completedCount) scanned")
-            .font(.headline)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
     }
 
     private var pendingBadge: some View {
@@ -66,17 +52,6 @@ struct QuickScanView: View {
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
-    }
-
-    private var modeToggle: some View {
-        Picker("Mode", selection: $detectionMode) {
-            ForEach(availableModes) { mode in
-                Text(mode.displayName).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 220)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var failedBadge: some View {
@@ -118,10 +93,12 @@ struct QuickScanView: View {
     }
 
     private var bottomBar: some View {
-        HStack {
+        HStack(alignment: .center) {
+            Color.clear.frame(width: 54, height: 54)
             Spacer()
             startStopButton
             Spacer()
+            ScanMenuButton(detectionMode: $detectionMode, torchLevel: $torchLevel)
         }
         .padding(.bottom, 8)
     }

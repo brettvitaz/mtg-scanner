@@ -72,14 +72,10 @@ struct SettingsView: View {
 
     private var quickScanSection: some View {
         Section("Quick Scan") {
-            Toggle("Enable Quick Scan Mode", isOn: $appModel.quickScanEnabled)
-            if appModel.quickScanEnabled {
-                quickScanCaptureDelayRow
-                quickScanConfidenceRow
-            }
+            quickScanCaptureDelayRow
+            quickScanConfidenceRow
             Text(
-                "When enabled, Quick Scan mode appears in the Scan tab. "
-                + "Place your phone above a scanning station and drop cards in — "
+                "Place your phone above a scanning station and drop cards in — "
                 + "each card is automatically captured and recognized."
             )
             .font(.footnote)

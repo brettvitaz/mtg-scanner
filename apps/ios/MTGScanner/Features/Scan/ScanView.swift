@@ -34,12 +34,11 @@ struct ScanView: View {
             detectionViewModel.requestCameraPermissionIfNeeded()
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             configureQuickScan()
-            if !appModel.quickScanEnabled, detectionViewModel.detectionMode == .quickScan {
-                detectionViewModel.detectionMode = .table
-            }
+            UIApplication.shared.isIdleTimerDisabled = true
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
+            UIApplication.shared.isIdleTimerDisabled = false
         }
         .onChange(of: appModel.apiBaseURL) { _, url in
             quickScanViewModel.apiBaseURL = url
@@ -52,12 +51,6 @@ struct ScanView: View {
         }
         .onChange(of: appModel.quickScanConfidenceThreshold) { _, conf in
             quickScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
-        }
-        .onChange(of: appModel.quickScanEnabled) { _, enabled in
-            if !enabled, detectionViewModel.detectionMode == .quickScan {
-                quickScanViewModel.stop()
-                detectionViewModel.detectionMode = .table
-            }
         }
         .onChange(of: detectionViewModel.detectionMode) { _, mode in
             if mode != .quickScan {
@@ -85,12 +78,8 @@ struct ScanView: View {
         quickScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.quickScanConfidenceThreshold)
     }
 
-    private var availableModes: [DetectionMode] {
-        appModel.quickScanEnabled ? DetectionMode.allCases : [.table, .binder]
-    }
-
     private var isQuickScanMode: Bool {
-        appModel.quickScanEnabled && detectionViewModel.detectionMode == .quickScan
+        detectionViewModel.detectionMode == .quickScan
     }
 
     // MARK: - Subviews
@@ -102,8 +91,7 @@ struct ScanView: View {
                 viewModel: quickScanViewModel,
                 recognitionQueue: quickScanViewModel.recognitionQueue,
                 torchLevel: $detectionViewModel.torchLevel,
-                detectionMode: $detectionViewModel.detectionMode,
-                availableModes: availableModes
+                detectionMode: $detectionViewModel.detectionMode
             )
         } else {
             standardOverlay
@@ -112,7 +100,6 @@ struct ScanView: View {
 
     private var standardOverlay: some View {
         VStack {
-            topBar
             Spacer()
             ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in
                 detectionViewModel.zoomFactor = preset
@@ -146,32 +133,16 @@ struct ScanView: View {
         )
     }
 
-    private var topBar: some View {
-        HStack(alignment: .center) {
-            cardCountBadge
-            TorchControl(level: $detectionViewModel.torchLevel)
-            Spacer()
-            modeToggle
-        }
-    }
-
-    private var cardCountBadge: some View {
-        Text("\(detectionViewModel.detectedCardCount) card\(detectionViewModel.detectedCardCount == 1 ? "" : "s")")
-            .font(.headline)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-    }
-
     private var bottomBar: some View {
         HStack(alignment: .center) {
             photoPickerButton
             Spacer()
             CaptureButton(action: captureCard, isDisabled: appModel.isRecognizing)
             Spacer()
-            Color.clear.frame(width: 54, height: 54)
+            ScanMenuButton(
+                detectionMode: $detectionViewModel.detectionMode,
+                torchLevel: $detectionViewModel.torchLevel
+            )
         }
         .padding(.bottom, 8)
     }
@@ -186,17 +157,6 @@ struct ScanView: View {
                 .clipShape(Circle())
         }
         .disabled(appModel.isRecognizing)
-    }
-
-    private var modeToggle: some View {
-        Picker("Mode", selection: $detectionViewModel.detectionMode) {
-            ForEach(availableModes) { mode in
-                Text(mode.displayName).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .frame(width: appModel.quickScanEnabled ? 220 : 130)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var loadingOverlay: some View {

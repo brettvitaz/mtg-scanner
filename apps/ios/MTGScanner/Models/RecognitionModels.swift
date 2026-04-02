@@ -44,6 +44,7 @@ struct RecognizedCard: Codable, Identifiable {
     let setSymbolUrl: String?
     let cardKingdomUrl: String?
     let cardKingdomFoilUrl: String?
+    let colorIdentity: String?
     let cropImageData: String?
 
     init(
@@ -68,6 +69,7 @@ struct RecognizedCard: Codable, Identifiable {
         setSymbolUrl: String? = nil,
         cardKingdomUrl: String? = nil,
         cardKingdomFoilUrl: String? = nil,
+        colorIdentity: String? = nil,
         cropImageData: String? = nil
     ) {
         self.id = id
@@ -91,6 +93,7 @@ struct RecognizedCard: Codable, Identifiable {
         self.setSymbolUrl = setSymbolUrl
         self.cardKingdomUrl = cardKingdomUrl
         self.cardKingdomFoilUrl = cardKingdomFoilUrl
+        self.colorIdentity = colorIdentity
         self.cropImageData = cropImageData
     }
 
@@ -117,6 +120,7 @@ struct RecognizedCard: Codable, Identifiable {
         self.setSymbolUrl = try container.decodeIfPresent(String.self, forKey: .setSymbolUrl)
         self.cardKingdomUrl = try container.decodeIfPresent(String.self, forKey: .cardKingdomUrl)
         self.cardKingdomFoilUrl = try container.decodeIfPresent(String.self, forKey: .cardKingdomFoilUrl)
+        self.colorIdentity = try container.decodeIfPresent(String.self, forKey: .colorIdentity)
         self.cropImageData = try container.decodeIfPresent(String.self, forKey: .cropImageData)
     }
 
@@ -143,6 +147,7 @@ struct RecognizedCard: Codable, Identifiable {
         try container.encodeIfPresent(setSymbolUrl, forKey: .setSymbolUrl)
         try container.encodeIfPresent(cardKingdomUrl, forKey: .cardKingdomUrl)
         try container.encodeIfPresent(cardKingdomFoilUrl, forKey: .cardKingdomFoilUrl)
+        try container.encodeIfPresent(colorIdentity, forKey: .colorIdentity)
         try container.encodeIfPresent(cropImageData, forKey: .cropImageData)
     }
 
@@ -168,6 +173,7 @@ struct RecognizedCard: Codable, Identifiable {
         case setSymbolUrl = "set_symbol_url"
         case cardKingdomUrl = "card_kingdom_url"
         case cardKingdomFoilUrl = "card_kingdom_foil_url"
+        case colorIdentity = "color_identity"
         case cropImageData = "crop_image_data"
     }
 }
@@ -211,6 +217,7 @@ struct CardPrinting: Codable, Identifiable, Equatable {
     let setSymbolUrl: String?
     let cardKingdomUrl: String?
     let cardKingdomFoilUrl: String?
+    let colorIdentity: String?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -230,6 +237,7 @@ struct CardPrinting: Codable, Identifiable, Equatable {
         case setSymbolUrl = "set_symbol_url"
         case cardKingdomUrl = "card_kingdom_url"
         case cardKingdomFoilUrl = "card_kingdom_foil_url"
+        case colorIdentity = "color_identity"
     }
 }
 
@@ -239,7 +247,7 @@ struct CardPrintingsResponse: Codable {
 }
 
 /// Card Kingdom price data from the price endpoint.
-struct CardPrice: Codable {
+struct CardPrice: Codable, Equatable {
     let priceRetail: String?
     let qtyRetail: Int?
     let priceBuy: String?

@@ -101,6 +101,8 @@ This writes:
 - `services/api/data/mtgjson/mtgjson.sqlite`
 - `services/api/data/mtgjson/manifest.json`
 
+> **Note:** If you have an existing `mtgjson.sqlite` built before a schema change (e.g. the addition of the `color_identity` column), you must re-run the import script. The API will raise a `SQLite OperationalError` at startup if the database schema is stale.
+
 ## Provider configuration
 The route contract stays the same. Provider selection is environment-driven:
 

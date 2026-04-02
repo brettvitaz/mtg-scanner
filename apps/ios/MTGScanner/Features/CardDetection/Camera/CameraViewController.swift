@@ -32,6 +32,7 @@ final class CameraViewController: UIViewController {
     private let sessionManager = CameraSessionManager()
     private let engine = CardDetectionEngine()
     private var renderer: DetectionOverlayRenderer?
+    private var isVisible = false
 
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
@@ -51,11 +52,14 @@ final class CameraViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        isVisible = true
         sessionManager.start()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        isVisible = false
+        sessionManager.setTorchLevel(0)
         sessionManager.stop()
         renderer?.clear()
     }
@@ -108,6 +112,7 @@ final class CameraViewController: UIViewController {
 
     /// Sets the torch brightness. Level 0 turns the torch off; 0.1–1.0 turns it on at that brightness.
     func setTorchLevel(_ level: Float) {
+        guard isVisible else { return }
         sessionManager.setTorchLevel(level)
     }
 

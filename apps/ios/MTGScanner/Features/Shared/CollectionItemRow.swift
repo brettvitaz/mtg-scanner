@@ -55,10 +55,23 @@ struct CollectionItemRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            if item.priceRetail != nil || item.priceBuy != nil {
+                priceLabel
+            }
             if showQuantityStepper {
                 quantityStepper
             }
         }
+    }
+
+    private var priceLabel: some View {
+        let parts = [
+            item.priceRetail.map { "Sell \($0)" },
+            item.priceBuy.map { "Buy \($0)" }
+        ].compactMap { $0 }
+        return Text(parts.joined(separator: " · "))
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 
     private var quantityStepper: some View {

@@ -11,6 +11,12 @@ struct DeckDetailView: View {
     @State private var showCopySheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
+    @State private var filterState = CardFilterState()
+    @State private var showFilterSheet = false
+
+    private var displayedItems: [CollectionItem] {
+        filterState.apply(to: deck.items)
+    }
 
     var body: some View {
         Group {
@@ -25,6 +31,7 @@ struct DeckDetailView: View {
             CardDetailView(card: card)
         }
         .toolbar { topToolbar }
+        .searchable(text: $filterState.searchText, prompt: "Search by title or set")
         .sheet(isPresented: $showMoveSheet) {
             MoveToSheet(title: "Move To Collection") { destination in
                 moveSelectedItems(to: destination)
@@ -44,6 +51,9 @@ struct DeckDetailView: View {
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
+        }
+        .sheet(isPresented: $showFilterSheet) {
+            FilterSheet(filterState: filterState, items: deck.items)
         }
     }
 
@@ -68,11 +78,11 @@ struct DeckDetailView: View {
     // MARK: - Card List
 
     private var cardListWithToolbar: some View {
-        let sortedItems = deck.items.sorted { $0.addedAt > $1.addedAt }
+        let items = displayedItems
         return VStack(spacing: 0) {
             List(selection: $selectedItems) {
                 Section {
-                    ForEach(sortedItems) { item in
+                    ForEach(items) { item in
                         if isSelecting {
                             CollectionItemRow(item: item)
                         } else {
@@ -85,8 +95,13 @@ struct DeckDetailView: View {
                     HStack {
                         Text("Cards")
                         Spacer()
-                        Text("\(deck.items.totalQuantity) card(s)")
-                            .foregroundStyle(.secondary)
+                        if filterState.isFilterActive {
+                            Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(items.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -125,6 +140,7 @@ struct DeckDetailView: View {
                     Image(systemName: "ellipsis.circle")
                 }
                 Button("Select") { enterSelecting() }
+                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }
         }
     }
@@ -175,7 +191,7 @@ extension DeckDetailView {
     }
 
     func selectAll() {
-        selectedItems = Set(deck.items.map(\.id))
+        selectedItems = Set(displayedItems.map(\.id))
     }
 
     func moveSelectedItems(to destination: MoveDestination) {

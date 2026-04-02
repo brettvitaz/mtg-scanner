@@ -39,6 +39,7 @@ struct CardDetailView: View {
             Task { await viewModel.loadPrice(using: appModel) }
         }
         .onChange(of: viewModel.selectedPrinting) { _, _ in autoSave() }
+        .onChange(of: viewModel.cardPrice) { _, _ in updateCollectionItem() }
         .fullScreenCover(isPresented: $showFullscreenImage) {
             FullscreenImageView(
                 imageUrl: viewModel.showingCropImage ? nil : viewModel.displayImageUrl,
@@ -232,8 +233,10 @@ extension CardDetailView {
         }
         item.imageUrl = viewModel.displayImageUrl?.absoluteString
         item.setSymbolUrl = viewModel.displaySetSymbolUrl?.absoluteString
-        if let ckUrl = viewModel.displayCardKingdomUrl?.absoluteString {
-            item.cardKingdomUrl = ckUrl
+        item.cardKingdomUrl = viewModel.displayCardKingdomUrl?.absoluteString ?? item.cardKingdomUrl
+        if let price = viewModel.cardPrice {
+            item.priceRetail = price.priceRetail
+            item.priceBuy = price.priceBuy
         }
     }
 

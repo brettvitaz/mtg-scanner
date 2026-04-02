@@ -16,6 +16,12 @@ struct ResultsView: View {
     @State private var showMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
+    @State private var filterState = CardFilterState()
+    @State private var showFilterSheet = false
+
+    private var displayedItems: [CollectionItem] {
+        filterState.apply(to: inboxItems)
+    }
 
     var body: some View {
         NavigationStack(path: $appModel.resultsNavigationPath) {
@@ -28,6 +34,7 @@ struct ResultsView: View {
             }
             .navigationTitle("Results")
             .toolbar { topToolbar }
+            .searchable(text: $filterState.searchText, prompt: "Search by title or set")
             .navigationDestination(for: RecognizedCard.self) { card in
                 CardDetailView(card: card)
                     .environmentObject(appModel)
@@ -47,6 +54,12 @@ struct ResultsView: View {
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
+        }
+        .sheet(isPresented: $showFilterSheet) {
+            FilterSheet(filterState: filterState, items: inboxItems)
+        }
+        .task(id: inboxItems.map(\.id)) {
+            await fetchMissingPrices(for: inboxItems)
         }
     }
 
@@ -74,7 +87,7 @@ struct ResultsView: View {
         VStack(spacing: 0) {
             List(selection: $selectedItems) {
                 Section {
-                    ForEach(inboxItems) { item in
+                    ForEach(displayedItems) { item in
                         if isSelecting {
                             CollectionItemRow(item: item)
                         } else {
@@ -87,8 +100,13 @@ struct ResultsView: View {
                     HStack {
                         Text("Scanned Cards")
                         Spacer()
-                        Text("\(inboxItems.totalQuantity) card(s)")
-                            .foregroundStyle(.secondary)
+                        if filterState.isFilterActive {
+                            Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(displayedItems.totalQuantity) card(s)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -127,6 +145,7 @@ struct ResultsView: View {
                     Image(systemName: "ellipsis.circle")
                 }
                 Button("Select") { enterSelecting() }
+                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }
         }
     }
@@ -164,23 +183,39 @@ struct ResultsView: View {
         .background(.bar)
     }
 
-    // MARK: - Actions
+}
 
-    private func enterSelecting() {
+// MARK: - Actions
+
+private extension ResultsView {
+    func fetchMissingPrices(for items: [CollectionItem]) async {
+        for item in items where item.priceRetail == nil && item.priceBuy == nil {
+            guard let price = try? await appModel.fetchPrice(
+                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
+            ) else {
+                print("[ResultsView] fetchPrice failed for \(item.title)")
+                continue
+            }
+            item.priceRetail = price.priceRetail
+            item.priceBuy = price.priceBuy
+        }
+    }
+
+    func enterSelecting() {
         selectedItems = []
         isSelecting = true
     }
 
-    private func exitSelecting() {
+    func exitSelecting() {
         isSelecting = false
         selectedItems = []
     }
 
-    private func selectAll() {
-        selectedItems = Set(inboxItems.map(\.id))
+    func selectAll() {
+        selectedItems = Set(displayedItems.map(\.id))
     }
 
-    private func copySelectedItems(to destination: MoveDestination) {
+    func copySelectedItems(to destination: MoveDestination) {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
         switch destination {
         case .collection(let collection):
@@ -203,7 +238,7 @@ struct ResultsView: View {
         exitSelecting()
     }
 
-    private func deleteSelectedItems() {
+    func deleteSelectedItems() {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
         for item in items {
             modelContext.delete(item)

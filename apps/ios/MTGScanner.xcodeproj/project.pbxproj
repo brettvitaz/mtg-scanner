@@ -71,6 +71,7 @@
 		C000000000000000000001B2 /* CardPresenceTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B2 /* CardPresenceTrackerTests.swift */; };
 		C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B3 /* QuickScanViewModelTests.swift */; };
 		C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B4 /* RecognitionQueueTests.swift */; };
+		C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* ScanMenuButtonTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -151,6 +152,7 @@
 		C000000000000000000002B2 /* CardPresenceTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPresenceTrackerTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B3 /* QuickScanViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModelTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B4 /* RecognitionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueueTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B5 /* ScanMenuButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMenuButtonTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -413,6 +415,7 @@
 				C000000000000000000002B2 /* CardPresenceTrackerTests.swift */,
 				C000000000000000000002B3 /* QuickScanViewModelTests.swift */,
 				C000000000000000000002B4 /* RecognitionQueueTests.swift */,
+				C000000000000000000002B5 /* ScanMenuButtonTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
@@ -588,6 +591,7 @@
 				C000000000000000000001B2 /* CardPresenceTrackerTests.swift in Sources */,
 				C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */,
 				C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */,
+				C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

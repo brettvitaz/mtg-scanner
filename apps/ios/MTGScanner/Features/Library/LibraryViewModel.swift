@@ -18,6 +18,20 @@ final class LibraryViewModel: ObservableObject {
         modelContext.insert(deck)
     }
 
+    func renameCollection(_ collection: CardCollection, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        collection.name = trimmed
+        collection.updatedAt = Date()
+    }
+
+    func renameDeck(_ deck: Deck, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        deck.name = trimmed
+        deck.updatedAt = Date()
+    }
+
     func deleteCollection(_ collection: CardCollection) {
         guard let modelContext else { return }
         modelContext.delete(collection)

@@ -10,6 +10,12 @@ struct LibraryView: View {
     @State private var showNewDeck = false
     @State private var newName = ""
 
+    @State private var showRenameCollection = false
+    @State private var showRenameDeck = false
+    @State private var renamingCollection: CardCollection?
+    @State private var renamingDeck: Deck?
+    @State private var editingName = ""
+
     var body: some View {
         NavigationStack {
             libraryList
@@ -31,6 +37,16 @@ struct LibraryView: View {
         .alert("New Deck", isPresented: $showNewDeck) {
             TextField("Name", text: $newName)
             Button("Create") { createDeck() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Rename Collection", isPresented: $showRenameCollection) {
+            TextField("Name", text: $editingName)
+            Button("Save") { renameCollection() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Rename Deck", isPresented: $showRenameDeck) {
+            TextField("Name", text: $editingName)
+            Button("Save") { renameDeck() }
             Button("Cancel", role: .cancel) {}
         }
         .navigationDestination(for: CardCollection.self) { collection in
@@ -70,6 +86,15 @@ struct LibraryView: View {
                 NavigationLink(value: collection) {
                     CollectionRow(name: collection.name, count: collection.items.totalQuantity)
                 }
+                .contextMenu {
+                    Button {
+                        renamingCollection = collection
+                        editingName = collection.name
+                        showRenameCollection = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+                }
             }
             .onDelete { offsets in
                 for index in offsets {
@@ -88,6 +113,15 @@ struct LibraryView: View {
             ForEach(decks) { deck in
                 NavigationLink(value: deck) {
                     CollectionRow(name: deck.name, count: deck.items.totalQuantity)
+                }
+                .contextMenu {
+                    Button {
+                        renamingDeck = deck
+                        editingName = deck.name
+                        showRenameDeck = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
                 }
             }
             .onDelete { offsets in
@@ -110,6 +144,18 @@ struct LibraryView: View {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         libraryViewModel.createDeck(name: trimmed)
+    }
+
+    private func renameCollection() {
+        guard let collection = renamingCollection else { return }
+        libraryViewModel.renameCollection(collection, to: editingName)
+        renamingCollection = nil
+    }
+
+    private func renameDeck() {
+        guard let deck = renamingDeck else { return }
+        libraryViewModel.renameDeck(deck, to: editingName)
+        renamingDeck = nil
     }
 }
 

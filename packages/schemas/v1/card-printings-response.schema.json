@@ -27,7 +27,8 @@
           "image_url": { "type": ["string", "null"] },
           "set_symbol_url": { "type": ["string", "null"] },
           "card_kingdom_url": { "type": ["string", "null"] },
-          "card_kingdom_foil_url": { "type": ["string", "null"] }
+          "card_kingdom_foil_url": { "type": ["string", "null"] },
+          "color_identity": { "type": ["string", "null"] }
         },
         "additionalProperties": false
       }

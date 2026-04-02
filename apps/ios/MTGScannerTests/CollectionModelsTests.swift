@@ -7,7 +7,26 @@ final class CollectionModelsTests: XCTestCase {
     // MARK: - CollectionItem init
 
     func testCollectionItemInitSetsAllFields() {
-        let item = CollectionItem(
+        let item = makeFullItem()
+        XCTAssertEqual(item.title, "Lightning Bolt")
+        XCTAssertEqual(item.edition, "Magic 2010")
+        XCTAssertEqual(item.setCode, "M10")
+        XCTAssertEqual(item.collectorNumber, "146")
+        XCTAssertFalse(item.foil)
+        XCTAssertEqual(item.rarity, "common")
+        XCTAssertEqual(item.typeLine, "Instant")
+        XCTAssertEqual(item.oracleText, "Lightning Bolt deals 3 damage to any target.")
+        XCTAssertEqual(item.manaCost, "{R}")
+        XCTAssertEqual(item.colorIdentity, "R")
+        XCTAssertEqual(item.priceRetail, "$1.49")
+        XCTAssertEqual(item.priceBuy, "$0.85")
+        XCTAssertEqual(item.quantity, 3)
+        XCTAssertNil(item.collection)
+        XCTAssertNil(item.deck)
+    }
+
+    private func makeFullItem() -> CollectionItem {
+        CollectionItem(
             title: "Lightning Bolt",
             edition: "Magic 2010",
             setCode: "M10",
@@ -21,26 +40,44 @@ final class CollectionModelsTests: XCTestCase {
             imageUrl: "https://example.com/image.png",
             setSymbolUrl: "https://example.com/symbol.svg",
             cardKingdomUrl: "https://example.com/ck",
+            colorIdentity: "R",
+            priceRetail: "$1.49",
+            priceBuy: "$0.85",
             quantity: 3
         )
-
-        XCTAssertEqual(item.title, "Lightning Bolt")
-        XCTAssertEqual(item.edition, "Magic 2010")
-        XCTAssertEqual(item.setCode, "M10")
-        XCTAssertEqual(item.collectorNumber, "146")
-        XCTAssertFalse(item.foil)
-        XCTAssertEqual(item.rarity, "common")
-        XCTAssertEqual(item.typeLine, "Instant")
-        XCTAssertEqual(item.oracleText, "Lightning Bolt deals 3 damage to any target.")
-        XCTAssertEqual(item.manaCost, "{R}")
-        XCTAssertEqual(item.quantity, 3)
-        XCTAssertNil(item.collection)
-        XCTAssertNil(item.deck)
     }
 
     func testCollectionItemDefaultQuantityIsOne() {
         let item = CollectionItem(title: "Test", edition: "Test Set")
         XCTAssertEqual(item.quantity, 1)
+    }
+
+    func testCollectionItemFromRecognizedCardMapsColorIdentity() {
+        let card = RecognizedCard(
+            title: "Lightning Bolt",
+            edition: "Magic 2010",
+            confidence: 0.9,
+            colorIdentity: "R"
+        )
+        let item = CollectionItem(from: card)
+        XCTAssertEqual(item.colorIdentity, "R")
+    }
+
+    func testToRecognizedCardIncludesColorIdentity() {
+        let item = CollectionItem(
+            title: "Counterspell",
+            edition: "DMR",
+            colorIdentity: "U"
+        )
+        let card = item.toRecognizedCard()
+        XCTAssertEqual(card.colorIdentity, "U")
+    }
+
+    func testNewFieldsDefaultToNil() {
+        let item = CollectionItem(title: "Test", edition: "Test Set")
+        XCTAssertNil(item.colorIdentity)
+        XCTAssertNil(item.priceRetail)
+        XCTAssertNil(item.priceBuy)
     }
 
     func testCollectionItemInitDefaultsToCurrentDate() {

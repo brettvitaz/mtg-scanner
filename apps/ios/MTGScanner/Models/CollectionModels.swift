@@ -21,6 +21,9 @@ final class CollectionItem {
     var imageUrl: String?
     var setSymbolUrl: String?
     var cardKingdomUrl: String?
+    var colorIdentity: String?
+    var priceRetail: String?
+    var priceBuy: String?
     var addedAt: Date
     var quantity: Int
 
@@ -48,6 +51,9 @@ final class CollectionItem {
         imageUrl: String? = nil,
         setSymbolUrl: String? = nil,
         cardKingdomUrl: String? = nil,
+        colorIdentity: String? = nil,
+        priceRetail: String? = nil,
+        priceBuy: String? = nil,
         addedAt: Date = Date(),
         quantity: Int = 1,
         collection: CardCollection? = nil,
@@ -71,6 +77,9 @@ final class CollectionItem {
         self.imageUrl = imageUrl
         self.setSymbolUrl = setSymbolUrl
         self.cardKingdomUrl = cardKingdomUrl
+        self.colorIdentity = colorIdentity
+        self.priceRetail = priceRetail
+        self.priceBuy = priceBuy
         self.addedAt = addedAt
         self.quantity = quantity
         self.collection = collection
@@ -99,7 +108,8 @@ final class CollectionItem {
             scryfallId: printing?.scryfallId ?? card.scryfallId,
             imageUrl: printing?.imageUrl ?? card.imageUrl,
             setSymbolUrl: printing?.setSymbolUrl ?? card.setSymbolUrl,
-            cardKingdomUrl: printing?.cardKingdomUrl ?? card.cardKingdomUrl
+            cardKingdomUrl: printing?.cardKingdomUrl ?? card.cardKingdomUrl,
+            colorIdentity: printing?.colorIdentity ?? card.colorIdentity
         )
     }
 
@@ -124,7 +134,8 @@ final class CollectionItem {
             scryfallId: scryfallId,
             imageUrl: imageUrl,
             setSymbolUrl: setSymbolUrl,
-            cardKingdomUrl: cardKingdomUrl
+            cardKingdomUrl: cardKingdomUrl,
+            colorIdentity: colorIdentity
         )
     }
 
@@ -160,6 +171,7 @@ final class CollectionItem {
             imageUrl: imageUrl,
             setSymbolUrl: setSymbolUrl,
             cardKingdomUrl: cardKingdomUrl,
+            colorIdentity: colorIdentity,
             quantity: quantity
         )
     }

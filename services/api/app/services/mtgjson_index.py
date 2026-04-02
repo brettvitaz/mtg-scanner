@@ -39,7 +39,7 @@ _CARD_COLUMNS = (
     "uuid, name, normalized_name, set_code, set_name, collector_number,"
     " normalized_collector_number, language, layout, release_date, is_promo,"
     " rarity, type_line, oracle_text, mana_cost, power, toughness, loyalty, defense,"
-    " scryfall_id, card_kingdom_url, card_kingdom_foil_url, finishes"
+    " scryfall_id, card_kingdom_url, card_kingdom_foil_url, finishes, color_identity"
 )
 
 
@@ -68,6 +68,7 @@ class CardRecord:
     card_kingdom_url: str | None = None
     card_kingdom_foil_url: str | None = None
     finishes: str | None = None
+    color_identity: str | None = None
 
     @property
     def has_foil(self) -> bool:
@@ -256,6 +257,7 @@ class MTGJSONIndex:
                 card_kingdom_url=row[20],
                 card_kingdom_foil_url=row[21],
                 finishes=row[22] if len(row) > 22 else None,
+                color_identity=row[23] if len(row) > 23 else None,
             )
             for row in rows
         ]
@@ -357,7 +359,8 @@ def create_schema(db_path: Path) -> None:
                 scryfall_id TEXT NULL,
                 card_kingdom_url TEXT NULL,
                 card_kingdom_foil_url TEXT NULL,
-                finishes TEXT NULL
+                finishes TEXT NULL,
+                color_identity TEXT NULL
             );
 
             CREATE INDEX idx_cards_name ON cards(normalized_name);
@@ -420,6 +423,8 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                 purchase_urls = card.get("purchaseUrls") or {}
                 finishes_list: list[str] = card.get("finishes") or []
                 finishes_str = ",".join(finishes_list) if finishes_list else None
+                color_identity_list: list[str] = card.get("colorIdentity") or []
+                color_identity_str = ",".join(color_identity_list) if color_identity_list else None
                 conn.execute(
                     """
                     INSERT INTO cards (
@@ -427,8 +432,8 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                         collector_number, normalized_collector_number, language, layout,
                         release_date, is_promo, rarity, type_line, oracle_text,
                         mana_cost, power, toughness, loyalty, defense, scryfall_id,
-                        card_kingdom_url, card_kingdom_foil_url, finishes
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        card_kingdom_url, card_kingdom_foil_url, finishes, color_identity
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         uuid,
@@ -455,6 +460,7 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                         purchase_urls.get("cardKingdom"),
                         purchase_urls.get("cardKingdomFoil"),
                         finishes_str,
+                        color_identity_str,
                     ),
                 )
                 card_count += 1

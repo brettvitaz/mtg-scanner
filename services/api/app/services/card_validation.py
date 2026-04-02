@@ -217,6 +217,7 @@ class CardValidationService:
                 "set_symbol_url": set_symbol_url,
                 "card_kingdom_url": match.card_kingdom_url,
                 "card_kingdom_foil_url": match.card_kingdom_foil_url,
+                "color_identity": match.color_identity,
             }
         )
         return ValidatedCardResult(

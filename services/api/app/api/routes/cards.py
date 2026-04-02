@@ -28,6 +28,7 @@ class CardPrinting(BaseModel):
     set_symbol_url: str | None = None
     card_kingdom_url: str | None = None
     card_kingdom_foil_url: str | None = None
+    color_identity: str | None = None
 
 
 class CardPrintingsResponse(BaseModel):
@@ -80,6 +81,7 @@ async def get_card_printings(
             set_symbol_url=_build_set_symbol_url(r.set_code),
             card_kingdom_url=r.card_kingdom_url,
             card_kingdom_foil_url=r.card_kingdom_foil_url,
+            color_identity=r.color_identity,
         )
         for r in records
     ]

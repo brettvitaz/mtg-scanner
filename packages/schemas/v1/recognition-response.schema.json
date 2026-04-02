@@ -31,6 +31,7 @@
           "set_symbol_url": { "type": ["string", "null"] },
           "card_kingdom_url": { "type": ["string", "null"] },
           "card_kingdom_foil_url": { "type": ["string", "null"] },
+          "color_identity": { "type": ["string", "null"] },
           "crop_image_data": { "type": ["string", "null"] }
         },
         "additionalProperties": false

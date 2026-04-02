@@ -17,7 +17,8 @@
       "image_url": "https://api.scryfall.com/cards/e3285e6b-3e79-4d7c-bf96-d920f973b122?format=image&version=normal",
       "set_symbol_url": "https://svgs.scryfall.io/sets/m10.svg",
       "card_kingdom_url": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt",
-      "card_kingdom_foil_url": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil"
+      "card_kingdom_foil_url": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil",
+      "color_identity": "R"
     },
     {
       "name": "Lightning Bolt",
@@ -36,7 +37,8 @@
       "image_url": "https://api.scryfall.com/cards/f29ba16f-c8fb-42fe-aabf-87089cb214a7?format=image&version=normal",
       "set_symbol_url": "https://svgs.scryfall.io/sets/2xm.svg",
       "card_kingdom_url": "https://www.cardkingdom.com/mtg/double-masters/lightning-bolt",
-      "card_kingdom_foil_url": null
+      "card_kingdom_foil_url": null,
+      "color_identity": "R"
     }
   ]
 }

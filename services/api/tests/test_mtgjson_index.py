@@ -41,6 +41,7 @@ def mtgjson_fixture(tmp_path: Path) -> Path:
                             "cardKingdom": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt",
                             "cardKingdomFoil": "https://www.cardkingdom.com/mtg/magic-2010/lightning-bolt-foil",
                         },
+                        "colorIdentity": ["R"],
                     },
                     {
                         "uuid": "forest-m10-247",
@@ -180,11 +181,13 @@ def test_index_lookup_paths(tmp_path: Path, mtgjson_fixture: Path) -> None:
     assert exact.mana_cost == "{R}"
     assert exact.power is None
     assert exact.toughness is None
+    assert exact.color_identity == "R"
 
-    # Verify land has no mana cost
+    # Verify land has no mana cost or color identity
     forest = index.lookup_exact(title="Forest", set_code="M10", collector_number="247")
     assert forest is not None
     assert forest.mana_cost is None
+    assert forest.color_identity is None
 
 
 def test_lookup_all_printings_by_name(tmp_path: Path, mtgjson_fixture: Path) -> None:

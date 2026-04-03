@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.post("/recognitions", response_model=RecognitionResponse)
-async def create_recognition(
+def create_recognition(
     image: UploadFile = File(...),
     prompt_version: str = Form(default="card-recognition.md"),
 ) -> RecognitionResponse:
@@ -23,7 +23,7 @@ async def create_recognition(
             detail="Uploaded file must be an image.",
         )
 
-    image_bytes = await image.read()
+    image_bytes = image.file.read()
 
     metadata = RecognitionUploadMetadata(
         filename=image.filename or "upload",
@@ -31,9 +31,11 @@ async def create_recognition(
         prompt_version=prompt_version,
     )
     try:
-        response, enriched_metadata, detection_result, validation_result = get_recognition_service().recognize(
-            image_bytes=image_bytes,
-            metadata=metadata,
+        response, enriched_metadata, detection_result, validation_result = (
+            get_recognition_service().recognize(
+                image_bytes=image_bytes,
+                metadata=metadata,
+            )
         )
     except RecognitionConfigurationError as exc:
         raise HTTPException(
@@ -57,7 +59,7 @@ async def create_recognition(
 
 
 @router.post("/recognitions/batch", response_model=RecognitionResponse)
-async def create_recognition_batch(
+def create_recognition_batch(
     images: list[UploadFile] = File(...),
     prompt_version: str = Form(default="card-recognition.md"),
 ) -> RecognitionResponse:
@@ -85,17 +87,19 @@ async def create_recognition_batch(
     all_cards: list[RecognizedCard] = []
 
     for i, img in enumerate(images):
-        image_bytes = await img.read()
+        image_bytes = img.file.read()
         metadata = RecognitionUploadMetadata(
             filename=img.filename or f"crop-{i}.jpg",
             content_type=img.content_type or "application/octet-stream",
             prompt_version=prompt_version,
         )
         try:
-            response, enriched_metadata, detection_result, validation_result = service.recognize(
-                image_bytes=image_bytes,
-                metadata=metadata,
-                skip_detection=True,
+            response, enriched_metadata, detection_result, validation_result = (
+                service.recognize(
+                    image_bytes=image_bytes,
+                    metadata=metadata,
+                    skip_detection=True,
+                )
             )
         except RecognitionConfigurationError as exc:
             raise HTTPException(

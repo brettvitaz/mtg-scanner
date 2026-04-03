@@ -108,7 +108,10 @@ struct ScanView: View {
         VStack {
             HStack {
                 Spacer()
-                RecognitionBadgeView(recognitionQueue: quickScanViewModel.recognitionQueue)
+                RecognitionBadgeView(
+                    recognitionQueue: quickScanViewModel.recognitionQueue,
+                    onCancel: quickScanViewModel.cancelRecognition
+                )
             }
             Spacer()
             ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor) { preset in

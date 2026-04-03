@@ -6,11 +6,17 @@ import SwiftUI
 /// async recognition job status in the upper-right corner of the scan screen.
 struct RecognitionBadgeView: View {
     @ObservedObject var recognitionQueue: RecognitionQueue
+    var onCancel: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
             if recognitionQueue.pendingCount > 0 {
-                pendingBadge
+                HStack(spacing: 6) {
+                    pendingBadge
+                    if let onCancel {
+                        cancelButton(action: onCancel)
+                    }
+                }
             }
             if recognitionQueue.failedCount > 0 {
                 failedBadge
@@ -32,6 +38,14 @@ struct RecognitionBadgeView: View {
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
+    }
+
+    private func cancelButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.white.opacity(0.8))
+        }
     }
 
     private var failedBadge: some View {

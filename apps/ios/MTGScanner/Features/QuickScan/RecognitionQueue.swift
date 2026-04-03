@@ -103,7 +103,7 @@ final class RecognitionQueue: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
-        guard let jpeg = job.image.jpegData(compressionQuality: 0.9) else {
+        guard let jpeg = await encodeJPEG(job.image) else {
             pendingCount -= 1
             failedCount += 1
             return
@@ -117,15 +117,25 @@ final class RecognitionQueue: ObservableObject {
             completedCount += 1
         } catch {
             guard !Task.isCancelled else { return }
-            if job.retryCount < 1 {
-                var retried = job
-                retried.retryCount += 1
-                // Re-insert at front to retry before new work.
-                pendingJobs.insert(retried, at: 0)
-            } else {
-                pendingCount -= 1
-                failedCount += 1
-            }
+            handleFailure(job: job)
+        }
+    }
+
+    private nonisolated func encodeJPEG(_ image: UIImage) async -> Data? {
+        await Task.detached(priority: .userInitiated) {
+            image.jpegData(compressionQuality: 0.9)
+        }.value
+    }
+
+    private func handleFailure(job: Job) {
+        if job.retryCount < 1 {
+            var retried = job
+            retried.retryCount += 1
+            // Re-insert at front to retry before new work.
+            pendingJobs.insert(retried, at: 0)
+        } else {
+            pendingCount -= 1
+            failedCount += 1
         }
     }
 

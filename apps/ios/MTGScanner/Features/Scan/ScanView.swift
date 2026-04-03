@@ -50,6 +50,9 @@ struct ScanView: View {
         .onChange(of: appModel.quickScanConfidenceThreshold) { _, conf in
             quickScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
         }
+        .onChange(of: appModel.maxConcurrentUploads) { _, count in
+            quickScanViewModel.recognitionQueue.maxConcurrent = count
+        }
         .onChange(of: detectionViewModel.detectionMode) { _, mode in
             if mode != .quickScan {
                 quickScanViewModel.stop()
@@ -82,6 +85,7 @@ struct ScanView: View {
         quickScanViewModel.apiBaseURL = appModel.apiBaseURL
         quickScanViewModel.captureDelay = appModel.quickScanCaptureDelay
         quickScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.quickScanConfidenceThreshold)
+        quickScanViewModel.recognitionQueue.maxConcurrent = appModel.maxConcurrentUploads
     }
 
     private var isQuickScanMode: Bool {

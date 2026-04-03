@@ -22,6 +22,9 @@ final class AppModel: ObservableObject {
     @Published var quickScanConfidenceThreshold: Double {
         didSet { UserDefaults.standard.set(quickScanConfidenceThreshold, forKey: quickScanConfidenceKey) }
     }
+    @Published var maxConcurrentUploads: Int {
+        didSet { UserDefaults.standard.set(maxConcurrentUploads, forKey: maxConcurrentUploadsKey) }
+    }
     @Published var isRecognizing = false
     @Published var statusMessage = "Point camera at cards to scan."
     @Published var lastUploadedFilename: String?
@@ -43,6 +46,7 @@ final class AppModel: ObservableObject {
     private let onDeviceCropStoreKey = "on_device_crop_enabled"
     private let quickScanCaptureDelayKey = "quick_scan_capture_delay"
     private let quickScanConfidenceKey = "quick_scan_confidence_threshold"
+    private let maxConcurrentUploadsKey = "max_concurrent_uploads"
 
     init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
@@ -51,6 +55,8 @@ final class AppModel: ObservableObject {
         self.quickScanCaptureDelay = Self.clampQuickScanCaptureDelay(storedDelay)
         let storedConf = UserDefaults.standard.double(forKey: quickScanConfidenceKey)
         self.quickScanConfidenceThreshold = Self.clampQuickScanConfidence(storedConf)
+        let storedConcurrent = UserDefaults.standard.integer(forKey: maxConcurrentUploadsKey)
+        self.maxConcurrentUploads = Self.clampMaxConcurrentUploads(storedConcurrent)
         loadCorrections()
     }
 
@@ -62,6 +68,11 @@ final class AppModel: ObservableObject {
     private static func clampQuickScanConfidence(_ value: Double) -> Double {
         guard value > 0 else { return 0.5 }
         return min(max(value, 0.3), 0.9)
+    }
+
+    private static func clampMaxConcurrentUploads(_ value: Int) -> Int {
+        guard value > 0 else { return 2 }
+        return min(max(value, 1), 6)
     }
 
     // MARK: - Recognition entry points

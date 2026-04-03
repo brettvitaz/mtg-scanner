@@ -74,6 +74,7 @@ struct SettingsView: View {
         Section("Quick Scan") {
             quickScanCaptureDelayRow
             quickScanConfidenceRow
+            maxConcurrentUploadsRow
             Text(
                 "Place your phone above a scanning station and drop cards in — "
                 + "each card is automatically captured and recognized."
@@ -104,6 +105,25 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Slider(value: $appModel.quickScanConfidenceThreshold, in: 0.3...0.9, step: 0.1)
+        }
+    }
+
+    private var maxConcurrentUploadsRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Concurrent Uploads")
+                Spacer()
+                Text("\(appModel.maxConcurrentUploads)")
+                    .foregroundStyle(.secondary)
+            }
+            Slider(
+                value: Binding(
+                    get: { Double(appModel.maxConcurrentUploads) },
+                    set: { appModel.maxConcurrentUploads = Int($0.rounded()) }
+                ),
+                in: 1...6,
+                step: 1
+            )
         }
     }
 

@@ -28,7 +28,7 @@ struct QuickScanView: View {
         HStack(alignment: .top) {
             cropPreview
             Spacer()
-            RecognitionBadgeView(recognitionQueue: recognitionQueue)
+            RecognitionBadgeView(recognitionQueue: recognitionQueue, onCancel: viewModel.cancelRecognition)
         }
     }
 

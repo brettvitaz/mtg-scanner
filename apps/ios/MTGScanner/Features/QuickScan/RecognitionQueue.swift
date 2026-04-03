@@ -31,13 +31,16 @@ final class RecognitionQueue: ObservableObject {
     private let recognizeBatch: RecognizeBatchFunction
     private var activeCount = 0
     private var pendingJobs: [Job] = []
+    private var activeTasks: [UUID: Task<Void, Never>] = [:]
 
     private struct Job {
+        let id: UUID = UUID()
         let image: UIImage
         let filename: String
         let apiBaseURL: String
         let modelContext: ModelContext?
         let isCropped: Bool
+        let capturedAt: Date
         var retryCount: Int = 0
     }
 
@@ -62,11 +65,20 @@ final class RecognitionQueue: ObservableObject {
     func enqueue(image: UIImage, isCropped: Bool = false, apiBaseURL: String, modelContext: ModelContext?) {
         let filename = "scan-\(UUID().uuidString.prefix(8)).jpg"
         let job = Job(
-            image: image, filename: filename, apiBaseURL: apiBaseURL, modelContext: modelContext, isCropped: isCropped
+            image: image, filename: filename, apiBaseURL: apiBaseURL,
+            modelContext: modelContext, isCropped: isCropped, capturedAt: Date()
         )
         pendingJobs.append(job)
         pendingCount += 1
         drainIfPossible()
+    }
+
+    func cancelAll() {
+        pendingJobs.removeAll()
+        for (_, task) in activeTasks { task.cancel() }
+        activeTasks.removeAll()
+        pendingCount = 0
+        activeCount = 0
     }
 
     // MARK: - Private Queue Management
@@ -75,15 +87,21 @@ final class RecognitionQueue: ObservableObject {
         while activeCount < maxConcurrent, !pendingJobs.isEmpty {
             let job = pendingJobs.removeFirst()
             activeCount += 1
-            Task { await process(job: job) }
+            let task = Task { await process(job: job) }
+            activeTasks[job.id] = task
         }
     }
 
     private func process(job: Job) async {
         defer {
-            activeCount -= 1
-            drainIfPossible()
+            activeTasks.removeValue(forKey: job.id)
+            if !Task.isCancelled {
+                activeCount -= 1
+                drainIfPossible()
+            }
         }
+
+        guard !Task.isCancelled else { return }
 
         guard let jpeg = job.image.jpegData(compressionQuality: 0.9) else {
             pendingCount -= 1
@@ -93,10 +111,12 @@ final class RecognitionQueue: ObservableObject {
 
         do {
             let result = try await callAPI(jpeg: jpeg, job: job)
-            persist(result: result, modelContext: job.modelContext)
+            guard !Task.isCancelled else { return }
+            persist(result: result, modelContext: job.modelContext, capturedAt: job.capturedAt)
             pendingCount -= 1
             completedCount += 1
         } catch {
+            guard !Task.isCancelled else { return }
             if job.retryCount < 1 {
                 var retried = job
                 retried.retryCount += 1
@@ -120,10 +140,12 @@ final class RecognitionQueue: ObservableObject {
         return try await recognize(jpeg, job.filename, "image/jpeg", job.apiBaseURL)
     }
 
-    private func persist(result: RecognitionResult, modelContext: ModelContext?) {
+    private func persist(result: RecognitionResult, modelContext: ModelContext?, capturedAt: Date) {
         guard let modelContext else { return }
         for card in result.cards {
-            modelContext.insert(CollectionItem(from: card, correction: nil))
+            let item = CollectionItem(from: card, correction: nil)
+            item.addedAt = capturedAt
+            modelContext.insert(item)
         }
     }
 }

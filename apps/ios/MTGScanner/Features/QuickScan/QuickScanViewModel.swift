@@ -102,6 +102,10 @@ final class QuickScanViewModel: ObservableObject {
         statusMessage = "Tap Start to begin."
     }
 
+    func cancelRecognition() {
+        recognitionQueue.cancelAll()
+    }
+
     // MARK: - Standard Scan Enqueue
 
     /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.

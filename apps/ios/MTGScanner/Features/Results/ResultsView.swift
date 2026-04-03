@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct ResultsView: View {
     @EnvironmentObject private var appModel: AppModel
@@ -18,6 +19,10 @@ struct ResultsView: View {
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
+    @State private var contextCopyItem: CollectionItem?
+    @State private var recentlyDeleted: [CollectionItem] = []
+    @State private var showFoilConflictAlert = false
+    @State private var foilConflictMessage = ""
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: inboxItems)
@@ -32,6 +37,9 @@ struct ResultsView: View {
                     cardListWithToolbar
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("shakeDetected"))) { _ in
+                undoDelete()
+            }
             .navigationTitle("Results")
             .toolbar { topToolbar }
             .searchable(text: $filterState.searchText, prompt: "Search by title or set")
@@ -45,12 +53,23 @@ struct ResultsView: View {
                 copySelectedItems(to: destination)
             }
         }
+        .sheet(item: $contextCopyItem) { item in
+            MoveToSheet(title: "Copy To") { destination in
+                copyItem(item, to: destination)
+                contextCopyItem = nil
+            }
+        }
         .confirmationDialog(
             "Delete \(selectedItems.count) card(s)?",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
+        }
+        .alert("Can't Toggle Is Foil", isPresented: $showFoilConflictAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(foilConflictMessage)
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -87,34 +106,44 @@ struct ResultsView: View {
         VStack(spacing: 0) {
             List(selection: $selectedItems) {
                 Section {
-                    ForEach(displayedItems) { item in
-                        if isSelecting {
-                            CollectionItemRow(item: item)
-                        } else {
-                            NavigationLink(value: item.toRecognizedCard()) {
-                                CollectionItemRow(item: item)
-                            }
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Scanned Cards")
-                        Spacer()
-                        if filterState.isFilterActive {
-                            Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("\(displayedItems.totalQuantity) card(s)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                    ForEach(displayedItems) { cardRowView(for: $0) }
+                } header: { cardListHeader }
             }
             .listStyle(.insetGrouped)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
                 bottomActionBar
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cardRowView(for item: CollectionItem) -> some View {
+        if isSelecting {
+            CollectionItemRow(item: item)
+        } else {
+            NavigationLink(value: item.toRecognizedCard()) {
+                CollectionItemRow(
+                    item: item,
+                    onCopy: { contextCopyItem = item },
+                    onDelete: { deleteItem(item) },
+                    onToggleFoil: { toggleFoil(item) }
+                )
+            }
+        }
+    }
+
+    private var cardListHeader: some View {
+        HStack {
+            Text("Scanned Cards")
+            Spacer()
+            if filterState.isFilterActive {
+                Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("\(displayedItems.totalQuantity) card(s)")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -244,6 +273,46 @@ private extension ResultsView {
             modelContext.delete(item)
         }
         exitSelecting()
+    }
+
+    func deleteItem(_ item: CollectionItem) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        recentlyDeleted = [item]
+        modelContext.delete(item)
+    }
+
+    func undoDelete() {
+        guard !recentlyDeleted.isEmpty else { return }
+        for deleted in recentlyDeleted {
+            modelContext.insert(deleted)
+        }
+        recentlyDeleted = []
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
+        let copy = item.duplicate()
+        switch destination {
+        case .collection(let collection):
+            mergeOrInsert(copy, into: collection.items, context: modelContext) {
+                $0.collection = collection
+            }
+            collection.updatedAt = Date()
+        case .deck(let deck):
+            mergeOrInsert(copy, into: deck.items, context: modelContext) {
+                $0.deck = deck
+            }
+            deck.updatedAt = Date()
+        }
+    }
+
+    func toggleFoil(_ item: CollectionItem) {
+        guard item.toggleFoilIfNoDuplicate(in: inboxItems) else {
+            foilConflictMessage = "\(item.title) already exists in Results with that foil setting."
+            showFoilConflictAlert = true
+            return
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 }
 

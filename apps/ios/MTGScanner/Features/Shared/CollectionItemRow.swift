@@ -5,6 +5,9 @@ import SwiftUI
 struct CollectionItemRow: View {
     @Bindable var item: CollectionItem
     var showQuantityStepper: Bool = false
+    var onCopy: (() -> Void)?
+    var onDelete: (() -> Void)?
+    var onToggleFoil: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -12,6 +15,43 @@ struct CollectionItemRow: View {
             cardInfo
         }
         .padding(.vertical, 4)
+        .modifier(ContextMenuModifier(row: self))
+    }
+
+    private var hasContextMenu: Bool {
+        onCopy != nil || onDelete != nil || onToggleFoil != nil
+    }
+
+    @ViewBuilder
+    private var contextMenu: some View {
+        if let onCopy {
+            Button(action: onCopy) {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+        }
+        if let onToggleFoil {
+            Button(action: onToggleFoil) {
+                Label(item.foil ? "Set as Non-Foil" : "Set as Foil", systemImage: "sparkles")
+            }
+        }
+        if let onDelete {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private struct ContextMenuModifier: ViewModifier {
+        let row: CollectionItemRow
+
+        @ViewBuilder
+        func body(content: Content) -> some View {
+            if row.hasContextMenu {
+                content.contextMenu { row.contextMenu }
+            } else {
+                content
+            }
+        }
     }
 
     private var cardThumbnail: some View {

@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct DeckDetailView: View {
     @Bindable var deck: Deck
@@ -13,6 +14,10 @@ struct DeckDetailView: View {
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
+    @State private var contextCopyItem: CollectionItem?
+    @State private var recentlyDeleted: [CollectionItem] = []
+    @State private var showFoilConflictAlert = false
+    @State private var foilConflictMessage = ""
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: deck.items)
@@ -25,6 +30,9 @@ struct DeckDetailView: View {
             } else {
                 cardListWithToolbar
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("shakeDetected"))) { _ in
+            undoDelete()
         }
         .navigationTitle(deck.name)
         .navigationDestination(for: RecognizedCard.self) { card in
@@ -42,12 +50,23 @@ struct DeckDetailView: View {
                 copySelectedItems(to: destination)
             }
         }
+        .sheet(item: $contextCopyItem) { item in
+            MoveToSheet(title: "Copy To") { destination in
+                copyItem(item, to: destination)
+                contextCopyItem = nil
+            }
+        }
         .confirmationDialog(
             "Delete \(selectedItems.count) card(s)?",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
+        }
+        .alert("Can't Toggle Is Foil", isPresented: $showFoilConflictAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(foilConflictMessage)
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -82,34 +101,45 @@ struct DeckDetailView: View {
         return VStack(spacing: 0) {
             List(selection: $selectedItems) {
                 Section {
-                    ForEach(items) { item in
-                        if isSelecting {
-                            CollectionItemRow(item: item)
-                        } else {
-                            NavigationLink(value: item.toRecognizedCard()) {
-                                CollectionItemRow(item: item, showQuantityStepper: true)
-                            }
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Cards")
-                        Spacer()
-                        if filterState.isFilterActive {
-                            Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("\(items.totalQuantity) card(s)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                    ForEach(items) { cardRowView(for: $0) }
+                } header: { cardListHeader(for: items) }
             }
             .listStyle(.insetGrouped)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
                 bottomActionBar
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cardRowView(for item: CollectionItem) -> some View {
+        if isSelecting {
+            CollectionItemRow(item: item)
+        } else {
+            NavigationLink(value: item.toRecognizedCard()) {
+                CollectionItemRow(
+                    item: item,
+                    showQuantityStepper: true,
+                    onCopy: { contextCopyItem = item },
+                    onDelete: { deleteItem(item) },
+                    onToggleFoil: { toggleFoil(item) }
+                )
+            }
+        }
+    }
+
+    private func cardListHeader(for items: [CollectionItem]) -> some View {
+        HStack {
+            Text("Cards")
+            Spacer()
+            if filterState.isFilterActive {
+                Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("\(items.totalQuantity) card(s)")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -243,5 +273,47 @@ extension DeckDetailView {
         }
         deck.updatedAt = Date()
         exitSelecting()
+    }
+
+    func deleteItem(_ item: CollectionItem) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        recentlyDeleted = [item]
+        modelContext.delete(item)
+        deck.updatedAt = Date()
+    }
+
+    func undoDelete() {
+        guard !recentlyDeleted.isEmpty else { return }
+        for deleted in recentlyDeleted {
+            modelContext.insert(deleted)
+        }
+        recentlyDeleted = []
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
+        let copy = item.duplicate()
+        switch destination {
+        case .collection(let collection):
+            mergeOrInsert(copy, into: collection.items, context: modelContext) {
+                $0.collection = collection
+            }
+            collection.updatedAt = Date()
+        case .deck(let targetDeck):
+            mergeOrInsert(copy, into: targetDeck.items, context: modelContext) {
+                $0.deck = targetDeck
+            }
+            targetDeck.updatedAt = Date()
+        }
+    }
+
+    func toggleFoil(_ item: CollectionItem) {
+        guard item.toggleFoilIfNoDuplicate(in: deck.items) else {
+            foilConflictMessage = "\(item.title) already exists in this deck with that foil setting."
+            showFoilConflictAlert = true
+            return
+        }
+        deck.updatedAt = Date()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 }

@@ -44,7 +44,7 @@ struct RootTabView: View {
         }
         .background {
             ShakeDetector {
-                NotificationCenter.default.post(name: .shakeDetected, object: nil)
+                appModel.undoLatestDelete()
             }
             .frame(width: 0, height: 0)
         }

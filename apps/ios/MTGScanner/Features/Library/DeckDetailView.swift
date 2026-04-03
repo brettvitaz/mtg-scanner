@@ -4,6 +4,7 @@ import UIKit
 
 struct DeckDetailView: View {
     @Bindable var deck: Deck
+    @EnvironmentObject private var appModel: AppModel
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false
@@ -15,7 +16,6 @@ struct DeckDetailView: View {
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
-    @State private var recentlyDeleted: [CollectionItem] = []
     @State private var showFoilConflictAlert = false
     @State private var foilConflictMessage = ""
 
@@ -30,9 +30,6 @@ struct DeckDetailView: View {
             } else {
                 cardListWithToolbar
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .shakeDetected)) { _ in
-            undoDelete()
         }
         .navigationTitle(deck.name)
         .navigationDestination(for: RecognizedCard.self) { card in
@@ -268,7 +265,7 @@ extension DeckDetailView {
 
     func deleteSelectedItems() {
         let items = deck.items.filter { selectedItems.contains($0.id) }
-        recentlyDeleted = items
+        registerUndo(for: items)
         for item in items {
             modelContext.delete(item)
         }
@@ -278,18 +275,9 @@ extension DeckDetailView {
 
     func deleteItem(_ item: CollectionItem) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        recentlyDeleted = [item]
+        registerUndo(for: [item])
         modelContext.delete(item)
         deck.updatedAt = Date()
-    }
-
-    func undoDelete() {
-        guard !recentlyDeleted.isEmpty else { return }
-        for deleted in recentlyDeleted {
-            modelContext.insert(deleted)
-        }
-        recentlyDeleted = []
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
@@ -316,5 +304,17 @@ extension DeckDetailView {
         }
         deck.updatedAt = Date()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    func registerUndo(for items: [CollectionItem]) {
+        let deletedItems = items
+        let deletedDeck = deck
+        appModel.registerUndoAction {
+            for item in deletedItems {
+                modelContext.insert(item)
+            }
+            deletedDeck.updatedAt = Date()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
     }
 }

@@ -4,6 +4,7 @@ import UIKit
 
 struct CollectionDetailView: View {
     @Bindable var collection: CardCollection
+    @EnvironmentObject private var appModel: AppModel
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false
@@ -14,7 +15,6 @@ struct CollectionDetailView: View {
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
-    @State private var recentlyDeleted: [CollectionItem] = []
     @State private var showFoilConflictAlert = false
     @State private var foilConflictMessage = ""
 
@@ -29,9 +29,6 @@ struct CollectionDetailView: View {
             } else {
                 cardListWithToolbar
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .shakeDetected)) { _ in
-            undoDelete()
         }
         .navigationTitle(collection.name)
         .navigationDestination(for: RecognizedCard.self) { card in
@@ -243,7 +240,7 @@ private extension CollectionDetailView {
 
     func deleteSelectedItems() {
         let items = collection.items.filter { selectedItems.contains($0.id) }
-        recentlyDeleted = items
+        registerUndo(for: items)
         for item in items {
             modelContext.delete(item)
         }
@@ -253,18 +250,9 @@ private extension CollectionDetailView {
 
     func deleteItem(_ item: CollectionItem) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        recentlyDeleted = [item]
+        registerUndo(for: [item])
         modelContext.delete(item)
         collection.updatedAt = Date()
-    }
-
-    func undoDelete() {
-        guard !recentlyDeleted.isEmpty else { return }
-        for deleted in recentlyDeleted {
-            modelContext.insert(deleted)
-        }
-        recentlyDeleted = []
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
@@ -291,5 +279,17 @@ private extension CollectionDetailView {
         }
         collection.updatedAt = Date()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    func registerUndo(for items: [CollectionItem]) {
+        let deletedItems = items
+        let deletedCollection = collection
+        appModel.registerUndoAction {
+            for item in deletedItems {
+                modelContext.insert(item)
+            }
+            deletedCollection.updatedAt = Date()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
     }
 }

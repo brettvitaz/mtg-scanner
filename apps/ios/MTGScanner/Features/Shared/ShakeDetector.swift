@@ -1,10 +1,6 @@
 import SwiftUI
 import UIKit
 
-extension Notification.Name {
-    static let shakeDetected = Notification.Name("shakeDetected")
-}
-
 struct ShakeDetector: UIViewControllerRepresentable {
     let onShake: () -> Void
 

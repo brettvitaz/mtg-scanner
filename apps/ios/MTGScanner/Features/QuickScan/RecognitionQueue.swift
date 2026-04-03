@@ -78,7 +78,7 @@ final class RecognitionQueue: ObservableObject {
         for (_, task) in activeTasks { task.cancel() }
         activeTasks.removeAll()
         pendingCount = 0
-        activeCount = 0
+        // activeCount decrements naturally as cancelled tasks run their defer blocks.
     }
 
     // MARK: - Private Queue Management
@@ -95,8 +95,8 @@ final class RecognitionQueue: ObservableObject {
     private func process(job: Job) async {
         defer {
             activeTasks.removeValue(forKey: job.id)
+            activeCount -= 1
             if !Task.isCancelled {
-                activeCount -= 1
                 drainIfPossible()
             }
         }

@@ -167,21 +167,27 @@ final class RecognitionQueueTests: XCTestCase {
     }
 
     func testCancelAllAllowsNewJobsAfterCancel() async throws {
-        // After cancelAll, new enqueues should work correctly (activeCount didn't go negative).
+        // After cancelAll, new enqueues on the same queue should complete normally,
+        // verifying that activeCount does not go negative and drainIfPossible works.
+        nonisolated(unsafe) var isCancelled = false
         let queue = RecognitionQueue(recognize: { _, _, _, _ in
-            try await Task.sleep(for: .seconds(10))
+            if !isCancelled {
+                try await Task.sleep(for: .seconds(10))
+            }
             return RecognitionResult(cards: [])
         })
+
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        isCancelled = true
         queue.cancelAll()
+        // Allow the cancelled task's defer block to run and decrement activeCount.
         try await Task.sleep(for: .milliseconds(100))
 
-        // After cancelling, enqueue a fast-completing job to verify the queue is usable.
-        let fastQueue = RecognitionQueue(recognize: { _, _, _, _ in RecognitionResult(cards: []) })
-        fastQueue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        // Re-enqueue on the same instance — should complete normally.
+        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
-        XCTAssertEqual(fastQueue.completedCount, 1)
-        XCTAssertEqual(fastQueue.pendingCount, 0)
+        XCTAssertEqual(queue.completedCount, 1)
+        XCTAssertEqual(queue.pendingCount, 0)
     }
 
     func testCancelAllPreservesCompletedCount() async throws {

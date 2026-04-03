@@ -33,6 +33,7 @@ scripts/           Bootstrap, run, and test helpers
 ### Worktree requirement
 All code changes MUST be made in a git worktree, never directly on main/master. Before writing any code:
 
+0. Make sure the main project branch is up to date before starting. If it is not, notify the user for resolution.
 1. Create a worktree with a descriptive name: `git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>`
 2. The name must be a short description of the work (e.g., `add-binder-detection`, `fix-crop-rotation`). No generic names like `feature-1` or `dev`.
 3. Bootstrap the worktree environment (see "Worktree setup reference" below).
@@ -41,8 +42,16 @@ All code changes MUST be made in a git worktree, never directly on main/master. 
 
 If you are already in a worktree, proceed. If you are on main/master, create a worktree first. No exceptions.
 
+After creating a worktree:
+
+1. Copy configuration files to the worktree: `cp services/api/.env <worktree-directory>/services/api/.env`
+2. Bootstrap the api in the worktree: `make api-bootstrap && make api-import-ck-prices && make api-update-mtgjson`
+3. Verify the worktree environment works: `make api-test && make api-lint`
+
 ### Pre-implementation baseline
+
 Before making any code changes, run the relevant test/build commands to establish a passing baseline:
+
 - Backend: `make api-test && make api-lint`
 - iOS: `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
 - Static analysis: `make lint` (runs mypy + SwiftLint)
@@ -50,7 +59,9 @@ Before making any code changes, run the relevant test/build commands to establis
 If the baseline is already failing, note the failures before proceeding so you do not introduce confusion about what you broke vs. what was already broken.
 
 ### Code review gate
+
 All code changes MUST pass a code review before the work is considered done. After implementation, review every changed file against `.claude/rules/code-review.md`. Explicitly state each criterion with pass/fail:
+
 1. **Complexity** — functions < 30 lines, nesting ≤ 3 levels, no unnecessary abstractions.
 2. **Correctness** — implementation matches the spec, edge cases handled.
 3. **Tests** — new/changed code has tests that exercise real code paths and would fail if the implementation were broken.
@@ -60,11 +71,13 @@ All code changes MUST pass a code review before the work is considered done. Aft
 Fix any failures before committing.
 
 ### Commit discipline
+
 - One logical change per commit. Do not bundle unrelated changes.
 - Commit messages must state what changed and why, not just "fix" or "update."
 - Run verification (tests/build) before committing. Do not commit code that fails its own tests.
 
 ### Scope guard
+
 Do not modify files or add features outside the stated task scope. If you discover something that should be fixed but is unrelated to the current task, note it in your report but do not fix it.
 
 ## Development commands
@@ -72,6 +85,8 @@ Do not modify files or add features outside the stated task scope. If you discov
 ```bash
 # Backend (requires uv: brew install uv)
 make api-bootstrap          # create venv and install deps via uv
+make api-import-ck-prices   # fetch and process product price list from card kingdom
+make api-update-mtgjson     # fetch and process mtgjson data for all printings
 make api-run                # start FastAPI dev server
 make api-test               # run pytest suite
 make api-lint               # run mypy type checking
@@ -87,10 +102,6 @@ make lint                   # run all static analysis (mypy + SwiftLint)
 
 # Evaluation
 PYTHONPATH=services/api python evals/run_eval.py
-
-# MTGJSON import
-PYTHONPATH=services/api .venv/bin/python scripts/import_mtgjson.py \
-  tmp/AllPrintings.json
 ```
 
 ## Coding standards
@@ -115,7 +126,7 @@ PYTHONPATH=services/api .venv/bin/python scripts/import_mtgjson.py \
 
 ### Swift (apps/ios)
 
-- Swift 5.9+, SwiftUI, minimum iOS 16.0.
+- Swift 5.9+, SwiftUI, minimum iOS 17.0.
 - MVVM architecture: Views, ViewModels (`@StateObject`/`@ObservedObject`), Services.
 - `final class` by default for view models and services.
 - `@MainActor` for UI-bound classes. Use `Task { @MainActor in }` to dispatch from background threads.

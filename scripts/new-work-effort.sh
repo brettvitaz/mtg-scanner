@@ -41,7 +41,7 @@ if [[ -d "$effort_dir" ]]; then
 fi
 
 # Also check for same slug with a different date
-existing=$(find "$EFFORTS_DIR" -maxdepth 1 -type d -name "*-${slug}" 2>/dev/null | head -1)
+existing=$(find "$EFFORTS_DIR" -maxdepth 1 -type d -name "????-??-??-${slug}" 2>/dev/null | head -1)
 if [[ -n "$existing" ]]; then
   echo "Error: a work effort with slug '${slug}' already exists: $existing" >&2
   exit 1

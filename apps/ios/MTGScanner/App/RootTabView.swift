@@ -42,5 +42,11 @@ struct RootTabView: View {
         } message: {
             Text(appModel.connectionAlertMessage)
         }
+        .background {
+            ShakeDetector {
+                NotificationCenter.default.post(name: .shakeDetected, object: nil)
+            }
+            .frame(width: 0, height: 0)
+        }
     }
 }

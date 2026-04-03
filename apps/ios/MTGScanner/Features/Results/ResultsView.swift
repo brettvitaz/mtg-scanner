@@ -37,7 +37,7 @@ struct ResultsView: View {
                     cardListWithToolbar
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("shakeDetected"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .shakeDetected)) { _ in
                 undoDelete()
             }
             .navigationTitle("Results")
@@ -269,6 +269,7 @@ private extension ResultsView {
 
     func deleteSelectedItems() {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
+        recentlyDeleted = items
         for item in items {
             modelContext.delete(item)
         }

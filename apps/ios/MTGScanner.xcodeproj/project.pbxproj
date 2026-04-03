@@ -55,6 +55,7 @@
 		A00000000000000000000199 /* CollectionItemFoilToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000299 /* CollectionItemFoilToggleTests.swift */; };
 		A00000000000000000000125 /* MoveToSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000225 /* MoveToSheet.swift */; };
 		A00000000000000000000126 /* CollectionItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000226 /* CollectionItemRow.swift */; };
+		A0000000000000000000012C /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000022C /* ShakeDetector.swift */; };
 		A00000000000000000000140 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000240 /* CachedAsyncImage.swift */; };
 		E00000000000000000000001 /* RecognitionBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00000000000000000000101 /* RecognitionBadgeView.swift */; };
 		A00000000000000000000127 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000227 /* LibraryView.swift */; };
@@ -144,6 +145,7 @@
 		A00000000000000000000299 /* CollectionItemFoilToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionItemFoilToggleTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000225 /* MoveToSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveToSheet.swift; sourceTree = "<group>"; };
 		A00000000000000000000226 /* CollectionItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionItemRow.swift; sourceTree = "<group>"; };
+		A0000000000000000000022C /* ShakeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeDetector.swift; sourceTree = "<group>"; };
 		A00000000000000000000240 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 		E00000000000000000000101 /* RecognitionBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionBadgeView.swift; sourceTree = "<group>"; };
 		A00000000000000000000227 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -251,6 +253,7 @@
 				B00000000000000000000002 /* ExportButton.swift */,
 				A00000000000000000000225 /* MoveToSheet.swift */,
 				A00000000000000000000226 /* CollectionItemRow.swift */,
+				A0000000000000000000022C /* ShakeDetector.swift */,
 				A00000000000000000000240 /* CachedAsyncImage.swift */,
 				D000000000000000000000102 /* FilterSortToolbar.swift */,
 				D000000000000000000000103 /* FilterSheet.swift */,
@@ -581,6 +584,7 @@
 				D000000000000000000000001 /* CardFilterSort.swift in Sources */,
 				A00000000000000000000125 /* MoveToSheet.swift in Sources */,
 				A00000000000000000000126 /* CollectionItemRow.swift in Sources */,
+				A0000000000000000000012C /* ShakeDetector.swift in Sources */,
 				A00000000000000000000140 /* CachedAsyncImage.swift in Sources */,
 				E00000000000000000000001 /* RecognitionBadgeView.swift in Sources */,
 				A00000000000000000000127 /* LibraryView.swift in Sources */,

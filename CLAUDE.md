@@ -198,37 +198,6 @@ When touching detection, recognition, or cropping:
 
 Do not add provider-specific integrations unless the OpenAI-compatible path proves insufficient.
 
-## Worktree setup reference
-
-Worktrees are mandatory for all code changes (see "Mandatory agent workflows" above). Reference commands:
-
-```bash
-# 1. Create worktree (name must describe the task)
-git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>
-cd ../mtg-scanner-worktrees/<task-description>
-
-# 2. Copy configuration files
-cp services/api/.env.example services/api/.env
-# Edit services/api/.env to set a non-conflicting port if running alongside main
-
-# 3. Bootstrap Python environment (creates venv, installs all deps including dev tools)
-bash scripts/bootstrap-api.sh
-source .venv/bin/activate
-
-# 4. Verify the environment works
-make api-test
-make api-lint
-
-# 5. Start development
-uvicorn services.api.app.main:app --reload
-
-# 6. Clean up when done
-cd -
-git worktree remove ../mtg-scanner-worktrees/<task-description>
-```
-
-The bootstrap script (`scripts/bootstrap-api.sh`) is the single source of truth for Python environment setup. It uses `uv` to create the virtualenv and install all dependencies including dev tools (pytest, mypy). Do not install packages manually — update `pyproject.toml` and re-run the bootstrap script. Install uv with `brew install uv`.
-
 ## Documentation
 
 - `README.md` — project overview, quick start, provider config.

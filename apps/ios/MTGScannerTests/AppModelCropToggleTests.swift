@@ -6,18 +6,21 @@ final class AppModelCropToggleTests: XCTestCase {
     private let storeKey = "on_device_crop_enabled"
     private let quickScanDelayKey = "quick_scan_capture_delay"
     private let quickScanConfidenceKey = "quick_scan_confidence_threshold"
+    private let maxConcurrentUploadsKey = "max_concurrent_uploads"
 
     override func setUp() {
         super.setUp()
         UserDefaults.standard.removeObject(forKey: storeKey)
         UserDefaults.standard.removeObject(forKey: quickScanDelayKey)
         UserDefaults.standard.removeObject(forKey: quickScanConfidenceKey)
+        UserDefaults.standard.removeObject(forKey: maxConcurrentUploadsKey)
     }
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: storeKey)
         UserDefaults.standard.removeObject(forKey: quickScanDelayKey)
         UserDefaults.standard.removeObject(forKey: quickScanConfidenceKey)
+        UserDefaults.standard.removeObject(forKey: maxConcurrentUploadsKey)
         super.tearDown()
     }
 
@@ -78,5 +81,44 @@ final class AppModelCropToggleTests: XCTestCase {
         UserDefaults.standard.set(0.1, forKey: quickScanConfidenceKey)
         let model = AppModel()
         XCTAssertEqual(model.quickScanConfidenceThreshold, 0.3, accuracy: 0.001)
+    }
+
+    // MARK: - maxConcurrentUploads
+
+    @MainActor
+    func testMaxConcurrentUploadsDefaultIsTwoWhenKeyAbsent() {
+        let model = AppModel()
+        XCTAssertEqual(model.maxConcurrentUploads, 2)
+    }
+
+    @MainActor
+    func testMaxConcurrentUploadsPersistsToUserDefaults() {
+        let model = AppModel()
+        model.maxConcurrentUploads = 4
+
+        let stored = UserDefaults.standard.integer(forKey: maxConcurrentUploadsKey)
+        XCTAssertEqual(stored, 4)
+    }
+
+    @MainActor
+    func testMaxConcurrentUploadsLoadsPersistedValue() {
+        UserDefaults.standard.set(5, forKey: maxConcurrentUploadsKey)
+        let model = AppModel()
+        XCTAssertEqual(model.maxConcurrentUploads, 5)
+    }
+
+    @MainActor
+    func testMaxConcurrentUploadsClampsAboveMaxToSix() {
+        UserDefaults.standard.set(10, forKey: maxConcurrentUploadsKey)
+        let model = AppModel()
+        XCTAssertEqual(model.maxConcurrentUploads, 6)
+    }
+
+    @MainActor
+    func testMaxConcurrentUploadsClampsZeroToDefault() {
+        // UserDefaults.integer(forKey:) returns 0 when key is absent; also tests explicit 0.
+        UserDefaults.standard.set(0, forKey: maxConcurrentUploadsKey)
+        let model = AppModel()
+        XCTAssertEqual(model.maxConcurrentUploads, 2)
     }
 }

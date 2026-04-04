@@ -128,7 +128,7 @@ struct DeckDetailView: View {
                 Menu {
                     ExportMenuContent(items: deck.items, name: deck.name, exportFile: $exportFile)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "square.and.arrow.up")
                 }
                 Button { exitSelecting() } label: {
                     Image(systemName: "xmark")
@@ -137,7 +137,7 @@ struct DeckDetailView: View {
                 Menu {
                     ExportMenuContent(items: deck.items, name: deck.name, exportFile: $exportFile)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "square.and.arrow.up")
                 }
                 Button("Select") { enterSelecting() }
                 FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)

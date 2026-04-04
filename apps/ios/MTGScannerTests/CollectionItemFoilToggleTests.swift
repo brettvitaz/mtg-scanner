@@ -93,4 +93,24 @@ final class CollectionItemFoilToggleTests: XCTestCase {
         XCTAssertFalse(item1.foil)
         XCTAssertFalse(item2.foil)
     }
+
+    // MARK: - Unconditional foil toggle
+
+    func testToggleFoilUnconditionallyTogglesFoil() {
+        let item = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "abc-123")
+        item.toggleFoilUnconditionally()
+        XCTAssertTrue(item.foil)
+        item.toggleFoilUnconditionally()
+        XCTAssertFalse(item.foil)
+    }
+
+    func testToggleFoilUnconditionallyIgnoresCollisions() {
+        let item = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "abc-123")
+        let sibling = CollectionItem(title: "Lightning Bolt", edition: "M11", foil: true, scryfallId: "abc-123")
+
+        item.toggleFoilUnconditionally()
+
+        XCTAssertTrue(item.foil)
+        XCTAssertTrue(sibling.foil)
+    }
 }

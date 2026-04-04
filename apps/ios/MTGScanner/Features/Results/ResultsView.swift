@@ -21,8 +21,6 @@ struct ResultsView: View {
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
-    @State private var showFoilConflictAlert = false
-    @State private var foilConflictMessage = ""
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: inboxItems)
@@ -75,11 +73,6 @@ struct ResultsView: View {
             Button("Cancel", role: .cancel) { contextDeleteItem = nil }
         } message: {
             Text("This card will be removed from Results.")
-        }
-        .alert("Can't Toggle Is Foil", isPresented: $showFoilConflictAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(foilConflictMessage)
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -308,25 +301,16 @@ private extension ResultsView {
     }
 
     func toggleFoil(_ item: CollectionItem) {
-        guard item.toggleFoilIfNoDuplicate(in: inboxItems) else {
-            foilConflictMessage = "\(item.title) already exists in Results with that foil setting."
-            showFoilConflictAlert = true
-            return
-        }
+        item.toggleFoilUnconditionally()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     func toggleSelectedFoil() {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
-        var skipped = 0
-        for item in items where !item.toggleFoilIfNoDuplicate(in: inboxItems) {
-            skipped += 1
+        for item in items {
+            item.toggleFoilUnconditionally()
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        if skipped > 0 {
-            foilConflictMessage = "\(skipped) card(s) already exist in Results with that foil setting and were skipped."
-            showFoilConflictAlert = true
-        }
     }
 
     func registerUndo(for items: [CollectionItem]) {

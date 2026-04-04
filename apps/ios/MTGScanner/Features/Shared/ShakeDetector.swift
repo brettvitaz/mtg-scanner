@@ -1,37 +1,33 @@
 import SwiftUI
 import UIKit
 
-struct ShakeDetector: UIViewControllerRepresentable {
-    let onShake: () -> Void
-
-    func makeUIViewController(context: Context) -> ShakeViewController {
-        let controller = ShakeViewController()
-        controller.onShake = onShake
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: ShakeViewController, context: Context) {
-        uiViewController.onShake = onShake
+extension UIWindow {
+    open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        super.motionEnded(motion, with: event)
+        if motion == .motionShake {
+            NotificationCenter.default.post(name: .deviceDidShake, object: nil)
+        }
     }
 }
 
-final class ShakeViewController: UIViewController {
-    var onShake: (() -> Void)?
+extension Notification.Name {
+    static let deviceDidShake = Notification.Name("deviceDidShake")
+}
 
-    override var canBecomeFirstResponder: Bool { true }
+struct ShakeDetector: ViewModifier {
+    let onShake: () -> Void
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        becomeFirstResponder()
+    func body(content: Content) -> some View {
+        content.onReceive(
+            NotificationCenter.default.publisher(for: .deviceDidShake)
+        ) { _ in
+            onShake()
+        }
     }
+}
 
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        resignFirstResponder()
-    }
-
-    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
-        guard motion == .motionShake else { return }
-        onShake?()
+extension View {
+    func onShake(perform action: @escaping () -> Void) -> some View {
+        modifier(ShakeDetector(onShake: action))
     }
 }

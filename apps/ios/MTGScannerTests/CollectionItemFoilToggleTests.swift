@@ -47,4 +47,50 @@ final class CollectionItemFoilToggleTests: XCTestCase {
         XCTAssertFalse(toggled)
         XCTAssertFalse(item.foil)
     }
+
+    // MARK: - Bulk foil toggle (toggleSelectedFoil logic)
+
+    func testBulkToggleAllSucceedWhenNoCollisions() {
+        let item1 = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "a1")
+        let item2 = CollectionItem(title: "Counterspell", edition: "DMR", foil: false, scryfallId: "b2")
+        let items = [item1, item2]
+        var skipped = 0
+        for item in items where !item.toggleFoilIfNoDuplicate(in: items) {
+            skipped += 1
+        }
+        XCTAssertEqual(skipped, 0)
+        XCTAssertTrue(item1.foil)
+        XCTAssertTrue(item2.foil)
+    }
+
+    func testBulkToggleSkipsItemsWithCollisions() {
+        let item = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: false, scryfallId: "a1")
+        let blocker = CollectionItem(title: "Lightning Bolt", edition: "M10", foil: true, scryfallId: "a1")
+        let other = CollectionItem(title: "Counterspell", edition: "DMR", foil: false, scryfallId: "b2")
+        let items = [item, other]
+        let siblings = [item, blocker, other]
+        var skipped = 0
+        for it in items where !it.toggleFoilIfNoDuplicate(in: siblings) {
+            skipped += 1
+        }
+        XCTAssertEqual(skipped, 1)
+        XCTAssertFalse(item.foil)
+        XCTAssertTrue(other.foil)
+    }
+
+    func testBulkToggleAllSkippedWhenAllCollide() {
+        let item1 = CollectionItem(title: "Sol Ring", edition: "C21", foil: false, scryfallId: "sr-1")
+        let blocker1 = CollectionItem(title: "Sol Ring", edition: "C21", foil: true, scryfallId: "sr-1")
+        let item2 = CollectionItem(title: "Forest", edition: "M10", foil: false, scryfallId: "fo-1")
+        let blocker2 = CollectionItem(title: "Forest", edition: "M10", foil: true, scryfallId: "fo-1")
+        let items = [item1, item2]
+        let siblings = [item1, blocker1, item2, blocker2]
+        var skipped = 0
+        for it in items where !it.toggleFoilIfNoDuplicate(in: siblings) {
+            skipped += 1
+        }
+        XCTAssertEqual(skipped, 2)
+        XCTAssertFalse(item1.foil)
+        XCTAssertFalse(item2.foil)
+    }
 }

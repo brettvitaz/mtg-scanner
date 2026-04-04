@@ -38,6 +38,7 @@ final class AppModel: ObservableObject {
     /// When true, shows a connection-unavailable alert.
     @Published var showConnectionAlert = false
     @Published var connectionAlertMessage = ""
+    @Published var showUndoAlert = false
     private var latestUndoAction: (@MainActor () -> Void)?
 
     private let apiClient = APIClient()
@@ -270,6 +271,11 @@ extension AppModel {
     }
 
     func undoLatestDelete() {
+        guard latestUndoAction != nil else { return }
+        showUndoAlert = true
+    }
+
+    func confirmUndo() {
         guard let latestUndoAction else { return }
         latestUndoAction()
         self.latestUndoAction = nil

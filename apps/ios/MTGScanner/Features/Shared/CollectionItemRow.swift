@@ -6,6 +6,7 @@ struct CollectionItemRow: View {
     @Bindable var item: CollectionItem
     var showQuantityStepper: Bool = false
     var onCopy: (() -> Void)?
+    var onMove: (() -> Void)?
     var onDelete: (() -> Void)?
     var onToggleFoil: (() -> Void)?
 
@@ -19,7 +20,7 @@ struct CollectionItemRow: View {
     }
 
     private var hasContextMenu: Bool {
-        onCopy != nil || onDelete != nil || onToggleFoil != nil
+        onCopy != nil || onMove != nil || onDelete != nil || onToggleFoil != nil
     }
 
     @ViewBuilder
@@ -27,6 +28,11 @@ struct CollectionItemRow: View {
         if let onCopy {
             Button(action: onCopy) {
                 Label("Copy", systemImage: "doc.on.doc")
+            }
+        }
+        if let onMove {
+            Button(action: onMove) {
+                Label("Move", systemImage: "folder")
             }
         }
         if let onToggleFoil {

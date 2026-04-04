@@ -54,6 +54,7 @@
 		A00000000000000000000198 /* CollectionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000298 /* CollectionModelsTests.swift */; };
 		A00000000000000000000199 /* CollectionItemFoilToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000299 /* CollectionItemFoilToggleTests.swift */; };
 		A0000000000000000000019A /* AppModelUndoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000029A /* AppModelUndoTests.swift */; };
+		A0000000000000000000019B /* CollectionItemMoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000029B /* CollectionItemMoveTests.swift */; };
 		A00000000000000000000125 /* MoveToSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000225 /* MoveToSheet.swift */; };
 		A00000000000000000000126 /* CollectionItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000226 /* CollectionItemRow.swift */; };
 		A0000000000000000000012C /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000022C /* ShakeDetector.swift */; };
@@ -145,6 +146,7 @@
 		A00000000000000000000298 /* CollectionModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionModelsTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000299 /* CollectionItemFoilToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionItemFoilToggleTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000029A /* AppModelUndoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelUndoTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000029B /* CollectionItemMoveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionItemMoveTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000225 /* MoveToSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveToSheet.swift; sourceTree = "<group>"; };
 		A00000000000000000000226 /* CollectionItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionItemRow.swift; sourceTree = "<group>"; };
 		A0000000000000000000022C /* ShakeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeDetector.swift; sourceTree = "<group>"; };
@@ -436,6 +438,7 @@
 				A00000000000000000000298 /* CollectionModelsTests.swift */,
 				A00000000000000000000299 /* CollectionItemFoilToggleTests.swift */,
 				A0000000000000000000029A /* AppModelUndoTests.swift */,
+				A0000000000000000000029B /* CollectionItemMoveTests.swift */,
 				D000000000000000000000104 /* CardFilterSortTests.swift */,
 				B00000000000000000000003 /* ExportServiceTests.swift */,
 				C000000000000000000002B0 /* YOLOCardDetectorTests.swift */,
@@ -623,6 +626,7 @@
 				A00000000000000000000198 /* CollectionModelsTests.swift in Sources */,
 				A00000000000000000000199 /* CollectionItemFoilToggleTests.swift in Sources */,
 				A0000000000000000000019A /* AppModelUndoTests.swift in Sources */,
+				A0000000000000000000019B /* CollectionItemMoveTests.swift in Sources */,
 				D000000000000000000000004 /* CardFilterSortTests.swift in Sources */,
 				B00000000000000000000013 /* ExportServiceTests.swift in Sources */,
 				C000000000000000000001B0 /* YOLOCardDetectorTests.swift in Sources */,

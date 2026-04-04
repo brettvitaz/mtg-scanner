@@ -15,8 +15,7 @@ struct CollectionDetailView: View {
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
-    @State private var showFoilConflictAlert = false
-    @State private var foilConflictMessage = ""
+    @State private var contextDeleteItem: CollectionItem?
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
@@ -47,17 +46,25 @@ struct CollectionDetailView: View {
                 contextCopyItem = nil
             }
         }
-        .confirmationDialog(
-            "Delete \(selectedItems.count) card(s)?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
-        }
-        .alert("Can't Toggle Is Foil", isPresented: $showFoilConflictAlert) {
-            Button("OK", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text(foilConflictMessage)
+            Text("These cards will be removed from the collection.")
+        }
+        .alert("Delete \"\(contextDeleteItem?.title ?? "")\"?", isPresented: Binding(
+            get: { contextDeleteItem != nil },
+            set: { if !$0 { contextDeleteItem = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let item = contextDeleteItem {
+                    deleteItem(item)
+                    contextDeleteItem = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { contextDeleteItem = nil }
+        } message: {
+            Text("This card will be removed from the collection.")
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -114,8 +121,7 @@ struct CollectionDetailView: View {
                     item: item,
                     showQuantityStepper: true,
                     onCopy: { contextCopyItem = item },
-                    onDelete: { deleteItem(item) },
-                    onToggleFoil: { toggleFoil(item) }
+                    onDelete: { contextDeleteItem = item }
                 )
             }
         }
@@ -269,16 +275,6 @@ private extension CollectionDetailView {
             }
             deck.updatedAt = Date()
         }
-    }
-
-    func toggleFoil(_ item: CollectionItem) {
-        guard item.toggleFoilIfNoDuplicate(in: collection.items) else {
-            foilConflictMessage = "\(item.title) already exists in this collection with that foil setting."
-            showFoilConflictAlert = true
-            return
-        }
-        collection.updatedAt = Date()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     func registerUndo(for items: [CollectionItem]) {

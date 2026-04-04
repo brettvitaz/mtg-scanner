@@ -20,6 +20,7 @@ struct ResultsView: View {
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
+    @State private var contextDeleteItem: CollectionItem?
     @State private var showFoilConflictAlert = false
     @State private var foilConflictMessage = ""
 
@@ -55,12 +56,25 @@ struct ResultsView: View {
                 contextCopyItem = nil
             }
         }
-        .confirmationDialog(
-            "Delete \(selectedItems.count) card(s)?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("These cards will be removed from Results.")
+        }
+        .alert("Delete \"\(contextDeleteItem?.title ?? "")\"?", isPresented: Binding(
+            get: { contextDeleteItem != nil },
+            set: { if !$0 { contextDeleteItem = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let item = contextDeleteItem {
+                    deleteItem(item)
+                    contextDeleteItem = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { contextDeleteItem = nil }
+        } message: {
+            Text("This card will be removed from Results.")
         }
         .alert("Can't Toggle Is Foil", isPresented: $showFoilConflictAlert) {
             Button("OK", role: .cancel) {}
@@ -123,7 +137,7 @@ struct ResultsView: View {
                 CollectionItemRow(
                     item: item,
                     onCopy: { contextCopyItem = item },
-                    onDelete: { deleteItem(item) },
+                    onDelete: { contextDeleteItem = item },
                     onToggleFoil: { toggleFoil(item) }
                 )
             }
@@ -175,39 +189,38 @@ struct ResultsView: View {
         }
     }
 
-    // MARK: - Bottom Action Bar
+}
 
-    private var bottomActionBar: some View {
+// MARK: - Bottom Action Bar
+
+private extension ResultsView {
+    var bottomActionBar: some View {
         HStack {
-            Button {
-                guard !selectedItems.isEmpty else { return }
-                showMoveSheet = true
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "doc.on.doc")
-                    Text("Copy").font(.caption2)
-                }
-            }
-            .disabled(selectedItems.isEmpty)
-
+            actionButton("doc.on.doc", "Copy") { showMoveSheet = true }
             Spacer()
-
-            Button(role: .destructive) {
-                guard !selectedItems.isEmpty else { return }
-                showDeleteConfirmation = true
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "trash")
-                    Text("Delete").font(.caption2)
-                }
-            }
-            .disabled(selectedItems.isEmpty)
+            actionButton("sparkles", "Toggle Foil") { toggleSelectedFoil() }
+            Spacer()
+            actionButton("trash", "Delete", role: .destructive) { showDeleteConfirmation = true }
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 30)
         .padding(.vertical, 12)
         .background(.bar)
     }
 
+    func actionButton(
+        _ icon: String, _ label: String, role: ButtonRole? = nil, action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role) {
+            guard !selectedItems.isEmpty else { return }
+            action()
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: icon)
+                Text(label).font(.caption2)
+            }
+        }
+        .disabled(selectedItems.isEmpty)
+    }
 }
 
 // MARK: - Actions
@@ -301,6 +314,19 @@ private extension ResultsView {
             return
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    func toggleSelectedFoil() {
+        let items = inboxItems.filter { selectedItems.contains($0.id) }
+        var skipped = 0
+        for item in items where !item.toggleFoilIfNoDuplicate(in: inboxItems) {
+            skipped += 1
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if skipped > 0 {
+            foilConflictMessage = "\(skipped) card(s) already exist in Results with that foil setting and were skipped."
+            showFoilConflictAlert = true
+        }
     }
 
     func registerUndo(for items: [CollectionItem]) {

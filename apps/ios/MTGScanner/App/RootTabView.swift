@@ -42,11 +42,14 @@ struct RootTabView: View {
         } message: {
             Text(appModel.connectionAlertMessage)
         }
-        .background {
-            ShakeDetector {
-                appModel.undoLatestDelete()
-            }
-            .frame(width: 0, height: 0)
+        .alert("Undo Delete?", isPresented: $appModel.showUndoAlert) {
+            Button("Undo") { appModel.confirmUndo() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Restore the last deleted card.")
+        }
+        .onShake {
+            appModel.undoLatestDelete()
         }
     }
 }

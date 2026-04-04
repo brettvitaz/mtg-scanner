@@ -191,7 +191,7 @@ struct ScanView: View {
 private extension ScanView {
 
     func triggerShutterFeedback() {
-        AudioServicesPlaySystemSound(1108)
+        AudioServicesPlaySystemSound(1306)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(.easeOut(duration: 0.08)) { shutterFlash = true }
         withAnimation(.easeIn(duration: 0.18).delay(0.08)) { shutterFlash = false }

@@ -168,6 +168,7 @@ final class QuickScanViewModel: ObservableObject {
     private func triggerCapture() async {
         captureState = .capturing
         statusMessage = "Capturing…"
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         guard let image = await captureCoordinator?.capturePhoto() else {
             captureState = .watching

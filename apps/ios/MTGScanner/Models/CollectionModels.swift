@@ -151,6 +151,32 @@ final class CollectionItem {
             && foil == other.foil
     }
 
+    /// Returns true if this item represents the same printing as another, ignoring foil state.
+    func matchesIgnoringFoil(_ other: CollectionItem) -> Bool {
+        if let a = scryfallId, let b = other.scryfallId, !a.isEmpty, !b.isEmpty {
+            return a == b
+        }
+        return title == other.title
+            && edition == other.edition
+            && collectorNumber == other.collectorNumber
+    }
+
+    /// Returns true when toggling foil would create a duplicate row among sibling items.
+    func hasFoilCollision(in siblings: [CollectionItem]) -> Bool {
+        let toggledFoil = !foil
+        return siblings.contains { sibling in
+            sibling.id != id && sibling.foil == toggledFoil && matchesIgnoringFoil(sibling)
+        }
+    }
+
+    /// Toggles foil only when the target identity remains unique among sibling items.
+    @discardableResult
+    func toggleFoilIfNoDuplicate(in siblings: [CollectionItem]) -> Bool {
+        guard !hasFoilCollision(in: siblings) else { return false }
+        foil.toggle()
+        return true
+    }
+
     /// Create a copy of this item (for operations that need a standalone duplicate).
     func duplicate() -> CollectionItem {
         CollectionItem(

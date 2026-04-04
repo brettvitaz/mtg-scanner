@@ -42,5 +42,14 @@ struct RootTabView: View {
         } message: {
             Text(appModel.connectionAlertMessage)
         }
+        .alert("Undo Delete?", isPresented: $appModel.showUndoAlert) {
+            Button("Undo") { appModel.confirmUndo() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Restore the last deleted card.")
+        }
+        .onShake {
+            appModel.undoLatestDelete()
+        }
     }
 }

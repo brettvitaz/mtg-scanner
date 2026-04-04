@@ -392,4 +392,5 @@ extension CollectionModelsTests {
 
         XCTAssertEqual(deck.name, "Trimmed Name")
     }
+
 }

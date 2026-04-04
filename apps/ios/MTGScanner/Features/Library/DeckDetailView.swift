@@ -1,8 +1,10 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct DeckDetailView: View {
     @Bindable var deck: Deck
+    @EnvironmentObject private var appModel: AppModel
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false
@@ -13,6 +15,9 @@ struct DeckDetailView: View {
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
+    @State private var contextCopyItem: CollectionItem?
+    @State private var contextMoveItem: CollectionItem?
+    @State private var contextDeleteItem: CollectionItem?
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: deck.items)
@@ -42,12 +47,37 @@ struct DeckDetailView: View {
                 copySelectedItems(to: destination)
             }
         }
-        .confirmationDialog(
-            "Delete \(selectedItems.count) card(s)?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
+        .sheet(item: $contextCopyItem) { item in
+            MoveToSheet(title: "Copy To") { destination in
+                copyItem(item, to: destination)
+                contextCopyItem = nil
+            }
+        }
+        .sheet(item: $contextMoveItem) { item in
+            MoveToSheet(title: "Move To") { destination in
+                moveItem(item, to: destination)
+                contextMoveItem = nil
+            }
+        }
+        .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("These cards will be removed from the deck.")
+        }
+        .alert("Delete \"\(contextDeleteItem?.title ?? "")\"?", isPresented: Binding(
+            get: { contextDeleteItem != nil },
+            set: { if !$0 { contextDeleteItem = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let item = contextDeleteItem {
+                    deleteItem(item)
+                    contextDeleteItem = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { contextDeleteItem = nil }
+        } message: {
+            Text("This card will be removed from the deck.")
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -82,34 +112,45 @@ struct DeckDetailView: View {
         return VStack(spacing: 0) {
             List(selection: $selectedItems) {
                 Section {
-                    ForEach(items) { item in
-                        if isSelecting {
-                            CollectionItemRow(item: item)
-                        } else {
-                            NavigationLink(value: item.toRecognizedCard()) {
-                                CollectionItemRow(item: item, showQuantityStepper: true)
-                            }
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Cards")
-                        Spacer()
-                        if filterState.isFilterActive {
-                            Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("\(items.totalQuantity) card(s)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                    ForEach(items) { cardRowView(for: $0) }
+                } header: { cardListHeader(for: items) }
             }
             .listStyle(.insetGrouped)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
                 bottomActionBar
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cardRowView(for item: CollectionItem) -> some View {
+        if isSelecting {
+            CollectionItemRow(item: item)
+        } else {
+            NavigationLink(value: item.toRecognizedCard()) {
+                CollectionItemRow(
+                    item: item,
+                    showQuantityStepper: true,
+                    onCopy: { contextCopyItem = item },
+                    onMove: { contextMoveItem = item },
+                    onDelete: { contextDeleteItem = item }
+                )
+            }
+        }
+    }
+
+    private func cardListHeader(for items: [CollectionItem]) -> some View {
+        HStack {
+            Text("Cards")
+            Spacer()
+            if filterState.isFilterActive {
+                Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("\(items.totalQuantity) card(s)")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -205,6 +246,7 @@ extension DeckDetailView {
             collection.updatedAt = Date()
         case .deck(let targetDeck):
             for item in items {
+                item.collection = nil
                 item.deck = targetDeck
             }
             targetDeck.updatedAt = Date()
@@ -238,10 +280,60 @@ extension DeckDetailView {
 
     func deleteSelectedItems() {
         let items = deck.items.filter { selectedItems.contains($0.id) }
+        registerUndo(for: items)
         for item in items {
             modelContext.delete(item)
         }
         deck.updatedAt = Date()
         exitSelecting()
+    }
+
+    func deleteItem(_ item: CollectionItem) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        registerUndo(for: [item])
+        modelContext.delete(item)
+        deck.updatedAt = Date()
+    }
+
+    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
+        let copy = item.duplicate()
+        switch destination {
+        case .collection(let collection):
+            mergeOrInsert(copy, into: collection.items, context: modelContext) {
+                $0.collection = collection
+            }
+            collection.updatedAt = Date()
+        case .deck(let targetDeck):
+            mergeOrInsert(copy, into: targetDeck.items, context: modelContext) {
+                $0.deck = targetDeck
+            }
+            targetDeck.updatedAt = Date()
+        }
+    }
+
+    func moveItem(_ item: CollectionItem, to destination: MoveDestination) {
+        switch destination {
+        case .collection(let collection):
+            item.deck = nil
+            item.collection = collection
+            collection.updatedAt = Date()
+        case .deck(let targetDeck):
+            item.collection = nil
+            item.deck = targetDeck
+            targetDeck.updatedAt = Date()
+        }
+        deck.updatedAt = Date()
+    }
+
+    func registerUndo(for items: [CollectionItem]) {
+        let deletedItems = items
+        let deletedDeck = deck
+        appModel.registerUndoAction {
+            for item in deletedItems {
+                modelContext.insert(item)
+            }
+            deletedDeck.updatedAt = Date()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
     }
 }

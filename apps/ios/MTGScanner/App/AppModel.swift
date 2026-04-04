@@ -38,6 +38,8 @@ final class AppModel: ObservableObject {
     /// When true, shows a connection-unavailable alert.
     @Published var showConnectionAlert = false
     @Published var connectionAlertMessage = ""
+    @Published var showUndoAlert = false
+    private var latestUndoAction: (@MainActor () -> Void)?
 
     private let apiClient = APIClient()
     private let cropService = CardCropService()
@@ -257,5 +259,25 @@ final class AppModel: ObservableObject {
             let stored = try? JSONDecoder().decode([UUID: CardCorrection].self, from: data)
         else { return }
         corrections = stored
+    }
+
+}
+
+// MARK: - Undo
+
+extension AppModel {
+    func registerUndoAction(_ action: @escaping @MainActor () -> Void) {
+        latestUndoAction = action
+    }
+
+    func undoLatestDelete() {
+        guard latestUndoAction != nil else { return }
+        showUndoAlert = true
+    }
+
+    func confirmUndo() {
+        guard let latestUndoAction else { return }
+        latestUndoAction()
+        self.latestUndoAction = nil
     }
 }

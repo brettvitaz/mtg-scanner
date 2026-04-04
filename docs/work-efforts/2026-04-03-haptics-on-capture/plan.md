@@ -1,30 +1,34 @@
-# Plan: [FILL: same title as request.md]
+# Plan: Add haptic feedback to capture interface
 
-**Planned by:** [FILL: agent name or model]
-**Date:** [FILL: YYYY-MM-DD]
+**Planned by:** kimi-k2.5
+**Date:** 2026-04-03
 
 ## Approach
 
-[FILL: two to five sentences summarizing how you will satisfy the request]
+Make two minimal changes to provide haptic feedback on both manual and auto-capture paths: (1) change the shutter sound ID in ScanView from 1108 to 1306 for a softer click, keeping the existing medium haptic; (2) add a light haptic call to QuickScanViewModel.triggerCapture() for auto-capture feedback. This satisfies all requirements with minimal code changes and no new abstractions.
 
 ## Implementation Steps
 
-1. [FILL: first step — what changes, which files]
-2. [FILL: second step]
-3. [FILL: add more as needed]
+1. Update ScanView.swift line 194: change AudioServicesPlaySystemSound(1108) to 1306
+2. Update QuickScanViewModel.swift: add UIImpactFeedbackGenerator(style: .light).impactOccurred() in triggerCapture() method
+3. Verify build passes with xcodebuild
+4. Verify SwiftLint passes
 
-Note any dependencies between steps (e.g., "step 3 depends on step 1") or steps that can run in parallel.
+Steps 1 and 2 are independent and can be done in any order.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| [FILL: path] | [FILL: what changes] |
+| apps/ios/MTGScanner/Features/Scan/ScanView.swift | Change AudioServicesPlaySystemSound(1108) to 1306 (softer click sound) |
+| apps/ios/MTGScanner/Features/QuickScan/QuickScanViewModel.swift | Add UIImpactFeedbackGenerator(style: .light).impactOccurred() in triggerCapture() |
 
 ## Risks and Open Questions
 
-- [FILL: anything uncertain, any assumptions you are making, any decisions that need human input]
+- None identified. Changes are minimal and use well-established iOS APIs.
 
 ## Verification Plan
 
-[FILL: specific commands or checks you will run to prove the work is correct, drawn from the request's verification section]
+1. Run: `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
+2. Run: `make ios-lint`
+3. Both should complete successfully with no errors

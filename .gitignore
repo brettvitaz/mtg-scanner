@@ -21,7 +21,7 @@ DerivedData/
 **/*.xcworkspace/xcuserdata/
 **/*.xcodeproj/project.xcworkspace/xcuserdata/
 **/*.xcodeproj/xcuserdata/
-buildServer.json
+#buildServer.json
 
 # Logs
 *.log

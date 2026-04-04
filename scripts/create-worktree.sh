@@ -89,4 +89,17 @@ post_create() {
 	echo "Worktree ready: $wt_dir"
 }
 
-post_create "$(cd "$WORKTREE_PATH" && pwd)" "$name"
+wt_dir="$(cd "$WORKTREE_PATH" && pwd)"
+post_create "$wt_dir" "$name"
+
+# Store worktree path in temp file for sourcing
+tmp_file="/tmp/mtg-scanner-worktree"
+echo "$wt_dir" >"$tmp_file"
+echo "Worktree path saved to: $tmp_file"
+
+# Copy worktree path to clipboard
+echo -n "$wt_dir" | pbcopy
+echo "Worktree path copied to clipboard"
+
+echo ""
+echo "To cd into the worktree, run: cd \"\$(cat $tmp_file)\""

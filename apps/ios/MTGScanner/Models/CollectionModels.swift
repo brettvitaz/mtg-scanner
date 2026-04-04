@@ -177,6 +177,13 @@ final class CollectionItem {
         return true
     }
 
+    /// Toggles foil without any collision check.
+    /// Used on the results page where users may legitimately hold both
+    /// foil and non-foil copies of the same card in their inbox.
+    func toggleFoilUnconditionally() {
+        foil.toggle()
+    }
+
     /// Create a copy of this item (for operations that need a standalone duplicate).
     func duplicate() -> CollectionItem {
         CollectionItem(

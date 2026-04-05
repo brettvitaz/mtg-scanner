@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.settings import get_settings
-from app.services.recognizer import OpenAIRecognitionProvider, get_recognition_service
+from app.services.recognizer import get_recognition_service
+from app.services.llm import OpenAIProvider
 
 client = TestClient(app)
 
@@ -45,9 +46,9 @@ def mtgjson_db(tmp_path: Path) -> Path:
                                 "setCode": "DFT",
                                 "number": "166",
                                 "layout": "normal",
-                                "language": "English"
+                                "language": "English",
                             }
-                        ]
+                        ],
                     },
                     "OTJ": {
                         "code": "OTJ",
@@ -60,10 +61,10 @@ def mtgjson_db(tmp_path: Path) -> Path:
                                 "setCode": "OTJ",
                                 "number": "215",
                                 "layout": "normal",
-                                "language": "English"
+                                "language": "English",
                             }
-                        ]
-                    }
+                        ],
+                    },
                 },
             }
         )
@@ -71,12 +72,16 @@ def mtgjson_db(tmp_path: Path) -> Path:
     from app.services.mtgjson_index import import_all_printings
 
     db_path = tmp_path / "mtgjson.sqlite"
-    import_all_printings(source_path=source_path, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+    import_all_printings(
+        source_path=source_path,
+        db_path=db_path,
+        manifest_path=tmp_path / "manifest.json",
+    )
     return db_path
 
 
 def test_recognition_upload_response(mtgjson_db: Path, monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
     response = client.post(
         "/api/v1/recognitions",
@@ -104,14 +109,14 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
     tmp_path, monkeypatch, mtgjson_db: Path
 ) -> None:
     """Autarch Mammoth only exists in DFT. When the LLM says OTJ, validation auto-corrects it."""
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "openai")
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
     monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_LLM_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
 
     from app.models.recognition import RecognitionResponse
-    from app.services import recognizer as recognizer_module
+    from app.services.llm import OpenAIProvider
 
     def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
         del self, image_bytes, metadata, prompt_text
@@ -129,7 +134,7 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
         )
 
     monkeypatch.setattr(
-        recognizer_module.OpenAIRecognitionProvider,
+        OpenAIProvider,
         "recognize",
         fake_recognize,
     )
@@ -152,11 +157,16 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
     recognition_dirs = list((tmp_path / "recognitions").iterdir())
     saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
     assert saved_metadata["validation"]["cards"][0]["status"] == "corrected_match"
-    assert saved_metadata["validation"]["cards"][0]["matched_uuid"] == "autarch-mammoth-dft-166"
+    assert (
+        saved_metadata["validation"]["cards"][0]["matched_uuid"]
+        == "autarch-mammoth-dft-166"
+    )
 
 
-def test_recognition_upload_saves_artifacts(tmp_path, monkeypatch, mtgjson_db: Path) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+def test_recognition_upload_saves_artifacts(
+    tmp_path, monkeypatch, mtgjson_db: Path
+) -> None:
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
     monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 
@@ -192,13 +202,13 @@ def test_recognition_can_use_openai_provider_without_live_access(
     tmp_path, monkeypatch
 ) -> None:
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("MTG_SCANNER_LLM_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
 
     from app.models.recognition import RecognitionResponse
-    from app.services import recognizer as recognizer_module
+    from app.services.llm import OpenAIProvider
 
     def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
         assert self.model_name == "gpt-4.1-mini"
@@ -221,7 +231,7 @@ def test_recognition_can_use_openai_provider_without_live_access(
         )
 
     monkeypatch.setattr(
-        recognizer_module.OpenAIRecognitionProvider,
+        OpenAIProvider,
         "recognize",
         fake_recognize,
     )
@@ -245,10 +255,12 @@ def test_recognition_can_use_openai_provider_without_live_access(
 
 
 def test_openai_provider_requires_env_when_selected(monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "openai")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
+    monkeypatch.setenv("MTG_SCANNER_LLM_API_KEY", "")
     monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "")
+    monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "")
+    monkeypatch.setenv("OPENAI_MODEL", "")
 
     response = client.post(
         "/api/v1/recognitions",
@@ -257,39 +269,39 @@ def test_openai_provider_requires_env_when_selected(monkeypatch) -> None:
     )
 
     assert response.status_code == 500
-    assert "OPENAI_API_KEY must be set" in response.json()["detail"]
+    assert "OPENAI_API_KEY" in response.json()["detail"]
 
 
 def test_openai_provider_timeout_defaults_to_thirty_seconds(monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("MTG_SCANNER_LLM_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
-    monkeypatch.delenv("MTG_SCANNER_OPENAI_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("MTG_SCANNER_LLM_TIMEOUT_SECONDS", raising=False)
 
     service = get_recognition_service()
 
-    assert isinstance(service._provider, OpenAIRecognitionProvider)
-    assert service._provider._timeout_seconds == 30.0
+    assert isinstance(service._provider, OpenAIProvider)
+    assert service._provider._timeout == 30.0
 
 
 def test_openai_provider_timeout_can_be_configured(monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "openai")
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("MTG_SCANNER_OPENAI_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("MTG_SCANNER_LLM_API_KEY", "test-key")
+    monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
-    monkeypatch.setenv("MTG_SCANNER_OPENAI_TIMEOUT_SECONDS", "12.5")
+    monkeypatch.setenv("MTG_SCANNER_LLM_TIMEOUT_SECONDS", "12.5")
 
     service = get_recognition_service()
 
-    assert isinstance(service._provider, OpenAIRecognitionProvider)
-    assert service._provider._timeout_seconds == 12.5
+    assert isinstance(service._provider, OpenAIProvider)
+    assert service._provider._timeout == 12.5
 
 
 def test_max_concurrent_recognitions_defaults_to_four(monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
     monkeypatch.delenv("MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS", raising=False)
 
@@ -301,7 +313,7 @@ def test_max_concurrent_recognitions_defaults_to_four(monkeypatch) -> None:
 
 
 def test_max_concurrent_recognitions_uses_configured_value(monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
     monkeypatch.setenv("MTG_SCANNER_MAX_CONCURRENT_RECOGNITIONS", "7")
 
@@ -312,8 +324,10 @@ def test_max_concurrent_recognitions_uses_configured_value(monkeypatch) -> None:
     assert service._max_concurrent_recognitions == 7
 
 
-def test_recognition_gracefully_skips_validation_when_db_missing(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+def test_recognition_gracefully_skips_validation_when_db_missing(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
     monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(tmp_path / "missing.sqlite"))
 
@@ -330,14 +344,18 @@ def test_recognition_gracefully_skips_validation_when_db_missing(tmp_path, monke
     recognition_dirs = list((tmp_path / "recognitions").iterdir())
     saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
     assert saved_metadata["validation"]["available"] is False
-    assert saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"
+    assert (
+        saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"
+    )
 
 
-def test_recognition_gracefully_skips_validation_when_db_corrupt(tmp_path, monkeypatch) -> None:
+def test_recognition_gracefully_skips_validation_when_db_corrupt(
+    tmp_path, monkeypatch
+) -> None:
     corrupt_db = tmp_path / "corrupt.sqlite"
     corrupt_db.write_text("not a sqlite database")
 
-    monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+    monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
     monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
     monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(corrupt_db))
 
@@ -354,5 +372,7 @@ def test_recognition_gracefully_skips_validation_when_db_corrupt(tmp_path, monke
     recognition_dirs = list((tmp_path / "recognitions").iterdir())
     saved_metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
     assert saved_metadata["validation"]["available"] is False
-    assert saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"
+    assert (
+        saved_metadata["validation"]["cards"][0]["status"] == "validation_unavailable"
+    )
     assert "unreadable" in saved_metadata["validation"]["cards"][0]["reason"].lower()

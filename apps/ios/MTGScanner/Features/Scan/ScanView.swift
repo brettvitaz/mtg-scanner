@@ -252,50 +252,84 @@ private extension ScanView {
 struct IdentifiedCardToastView: View {
     let card: IdentifiedCard
     let onDismiss: () -> Void
+    @State private var shimmerOffset: CGFloat = -1.0
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(card.title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .lineLimit(1)
+        HStack(spacing: 8) {
+            Text(card.title)
+                .font(.system(size: 16, weight: .bold))
+                .lineLimit(1)
 
-                    if card.isFoil {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.yellow)
-                    }
-                }
+            if card.isFoil {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.yellow)
+            }
 
-                HStack(spacing: 8) {
-                    Text(card.setCode.uppercased())
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+            Text(card.setCode.uppercased())
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
 
-                    if !card.collectorNumber.isEmpty {
-                        Text("#\(card.collectorNumber)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            if !card.collectorNumber.isEmpty {
+                Text("#\(card.collectorNumber)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 24, height: 24)
+                    .background(Color.white.opacity(0.3))
+                    .clipShape(Circle())
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.ultraThinMaterial)
+                .opacity(0.85)
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        )
+        .overlay(
+            Group {
+                if card.isFoil {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.red.opacity(0.3),
+                                    Color.orange.opacity(0.3),
+                                    Color.yellow.opacity(0.3),
+                                    Color.green.opacity(0.3),
+                                    Color.blue.opacity(0.3),
+                                    Color.purple.opacity(0.3),
+                                    Color.red.opacity(0.3)
+                                ],
+                                startPoint: UnitPoint(x: shimmerOffset, y: 0),
+                                endPoint: UnitPoint(x: shimmerOffset + 1, y: 1)
+                            )
+                        )
+                        .blendMode(.overlay)
+                        .onAppear {
+                            withAnimation(
+                                .linear(duration: 2.0)
+                                .repeatForever(autoreverses: false)
+                            ) {
+                                shimmerOffset = 1.0
+                            }
+                        }
+                }
+            }
         )
     }
 }

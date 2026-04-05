@@ -32,11 +32,14 @@ struct ScanView: View {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             configureQuickScan()
             UIApplication.shared.isIdleTimerDisabled = true
+            restoreTorchLevel()
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             UIApplication.shared.isIdleTimerDisabled = false
+            appModel.lastTorchLevel = detectionViewModel.torchLevel
             detectionViewModel.torchLevel = 0
+            quickScanViewModel.stop()
         }
         .onChange(of: appModel.apiBaseURL) { _, url in
             quickScanViewModel.apiBaseURL = url
@@ -96,15 +99,23 @@ struct ScanView: View {
 
     @ViewBuilder
     private var cameraOverlay: some View {
-        if isQuickScanMode {
-            QuickScanView(
-                viewModel: quickScanViewModel,
-                recognitionQueue: quickScanViewModel.recognitionQueue,
-                torchLevel: $detectionViewModel.torchLevel,
-                detectionMode: $detectionViewModel.detectionMode
-            )
-        } else {
-            standardOverlay
+        ZStack {
+            if isQuickScanMode {
+                QuickScanView(
+                    viewModel: quickScanViewModel,
+                    recognitionQueue: quickScanViewModel.recognitionQueue,
+                    torchLevel: $detectionViewModel.torchLevel,
+                    detectionMode: $detectionViewModel.detectionMode
+                )
+            } else {
+                standardOverlay
+            }
+
+            VStack {
+                IdentifiedCardToastContainer(viewModel: quickScanViewModel.identifiedCardsViewModel)
+                    .padding(.top, 60)
+                Spacer()
+            }
         }
     }
 
@@ -223,5 +234,89 @@ private extension ScanView {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
         let prefs = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
         scene.requestGeometryUpdate(prefs)
+    }
+
+    private func restoreTorchLevel() {
+        let savedLevel = appModel.lastTorchLevel
+        guard savedLevel > 0 else { return }
+        detectionViewModel.torchLevel = savedLevel
+    }
+}
+
+// MARK: - Identified Card Toast Views
+
+/// Displays a single identified card toast notification.
+///
+/// Slides in from the trailing edge with a semi-transparent background.
+/// Shows the card title, foil indicator, set code, and collector number.
+struct IdentifiedCardToastView: View {
+    let card: IdentifiedCard
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(card.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(1)
+
+                    if card.isFoil {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.yellow)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Text(card.setCode.uppercased())
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    if !card.collectorNumber.isEmpty {
+                        Text("#\(card.collectorNumber)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
+    }
+}
+
+/// Container view that displays multiple card toasts stacked vertically.
+struct IdentifiedCardToastContainer: View {
+    @ObservedObject var viewModel: IdentifiedCardsViewModel
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(viewModel.recentCards) { card in
+                IdentifiedCardToastView(card: card) {
+                    viewModel.removeCard(id: card.id)
+                }
+                .transition(
+                    .move(edge: .trailing)
+                    .combined(with: .opacity)
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: viewModel.recentCards.count)
     }
 }

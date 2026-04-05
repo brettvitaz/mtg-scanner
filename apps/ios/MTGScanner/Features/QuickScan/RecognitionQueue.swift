@@ -17,6 +17,11 @@ final class RecognitionQueue: ObservableObject {
     @Published private(set) var completedCount = 0
     @Published private(set) var failedCount = 0
 
+    // MARK: - Callbacks
+
+    /// Called when a card is successfully identified. The callback receives each recognized card.
+    var onCardIdentified: ((RecognizedCard) -> Void)?
+
     // MARK: - Configuration
 
     var maxConcurrent: Int = 2
@@ -156,6 +161,7 @@ final class RecognitionQueue: ObservableObject {
             let item = CollectionItem(from: card, correction: nil)
             item.addedAt = capturedAt
             modelContext.insert(item)
+            onCardIdentified?(card)
         }
     }
 }

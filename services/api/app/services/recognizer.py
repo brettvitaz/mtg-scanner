@@ -124,11 +124,7 @@ class OpenAIRecognitionProvider:
                 )
                 http_response.raise_for_status()
             except httpx.HTTPStatusError as exc:
-                body_snippet = ""
-                try:
-                    body_snippet = exc.response.text[:500]
-                except Exception:
-                    pass
+                body_snippet = getattr(exc.response, "text", "")[:500]
                 logger.error(
                     "Recognition provider HTTP error: status=%d url=%s model=%s body=%s",
                     exc.response.status_code,

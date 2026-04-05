@@ -25,6 +25,7 @@ DerivedData/
 
 # Logs
 *.log
+services/api/logs/
 
 # Local sample artifacts
 .artifacts/

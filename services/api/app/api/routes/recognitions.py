@@ -1,5 +1,6 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
+from app.logging_config import get_logger
 from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
 from app.services.artifact_store import get_artifact_store
 from app.services.recognizer import (
@@ -8,6 +9,8 @@ from app.services.recognizer import (
     _encode_crop_image,
     get_recognition_service,
 )
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -38,11 +41,23 @@ def create_recognition(
             )
         )
     except RecognitionConfigurationError as exc:
+        logger.error(
+            "Recognition configuration error: filename=%s content_type=%s error=%s",
+            metadata.filename,
+            metadata.content_type,
+            exc,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
     except RecognitionProviderError as exc:
+        logger.error(
+            "Recognition provider error: filename=%s content_type=%s error=%s",
+            metadata.filename,
+            metadata.content_type,
+            exc,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
@@ -102,11 +117,23 @@ def create_recognition_batch(
                 )
             )
         except RecognitionConfigurationError as exc:
+            logger.error(
+                "Batch recognition configuration error: filename=%s content_type=%s error=%s",
+                metadata.filename,
+                metadata.content_type,
+                exc,
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=str(exc),
             ) from exc
         except RecognitionProviderError as exc:
+            logger.error(
+                "Batch recognition provider error: filename=%s content_type=%s error=%s",
+                metadata.filename,
+                metadata.content_type,
+                exc,
+            )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(exc),

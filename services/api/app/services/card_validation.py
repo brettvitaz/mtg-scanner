@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 import sqlite3
 from typing import cast
 
@@ -13,6 +14,8 @@ from app.services.mtgjson_index import (
     normalize_set_name,
     normalize_title,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,8 +65,14 @@ class CardValidationService:
 
         try:
             results = [self.validate_card(card) for card in response.cards]
-        except sqlite3.Error:
-            traces = [self._unavailable_trace(card, reason="MTGJSON database unreadable; validation skipped.") for card in response.cards]
+        except sqlite3.Error as exc:
+            logger.warning("MTGJSON database error during validation: %s", exc)
+            traces = [
+                self._unavailable_trace(
+                    card, reason="MTGJSON database unreadable; validation skipped."
+                )
+                for card in response.cards
+            ]
             return ValidationBatchResult(
                 response=response,
                 traces=traces,
@@ -98,7 +107,9 @@ class CardValidationService:
         }
 
         if not normalized_title:
-            return self._result(card, trace_base, "no_match", None, "Missing title; validation skipped.")
+            return self._result(
+                card, trace_base, "no_match", None, "Missing title; validation skipped."
+            )
 
         resolved_set_code = self._index.resolve_set(card.edition or "")
         # Track if the LLM's set claim was wrong: either the set doesn't exist, or the
@@ -112,27 +123,65 @@ class CardValidationService:
                 collector_number=card.collector_number or "",
             )
             if match is not None:
-                return self._matched(card, trace_base, match, "exact_match", "Exact title/set/collector match.")
+                return self._matched(
+                    card,
+                    trace_base,
+                    match,
+                    "exact_match",
+                    "Exact title/set/collector match.",
+                )
 
         if resolved_set_code:
-            candidates = self._index.lookup_by_name_and_set(title=card.title or "", set_code=resolved_set_code)
+            candidates = self._index.lookup_by_name_and_set(
+                title=card.title or "", set_code=resolved_set_code
+            )
             if not candidates:
                 wrong_set = True
             if normalized_number:
-                narrowed = [c for c in candidates if c.normalized_collector_number == normalized_number]
+                narrowed = [
+                    c
+                    for c in candidates
+                    if c.normalized_collector_number == normalized_number
+                ]
                 if len(narrowed) == 1:
-                    return self._matched(card, trace_base, narrowed[0], "normalized_match", "Resolved set and collector number after title match.")
+                    return self._matched(
+                        card,
+                        trace_base,
+                        narrowed[0],
+                        "normalized_match",
+                        "Resolved set and collector number after title match.",
+                    )
                 if len(narrowed) > 1:
-                    return self._result(card, trace_base, "ambiguous_match", None, "Multiple printings share the same title and collector number in the resolved set.")
+                    return self._result(
+                        card,
+                        trace_base,
+                        "ambiguous_match",
+                        None,
+                        "Multiple printings share the same title and collector number in the resolved set.",
+                    )
                 # Collector not in set — fall through to cross-set lookup
             elif len(candidates) == 1:
-                return self._matched(card, trace_base, candidates[0], "normalized_match", "Resolved set and title to a single printing.")
+                return self._matched(
+                    card,
+                    trace_base,
+                    candidates[0],
+                    "normalized_match",
+                    "Resolved set and title to a single printing.",
+                )
             elif len(candidates) > 1:
-                return self._result(card, trace_base, "ambiguous_match", None, "Multiple printings share the same title in the resolved set.")
+                return self._result(
+                    card,
+                    trace_base,
+                    "ambiguous_match",
+                    None,
+                    "Multiple printings share the same title in the resolved set.",
+                )
             # Title not in the resolved set — fall through to cross-set lookup
 
         if normalized_number:
-            candidates = self._index.lookup_by_name_and_number(title=card.title or "", collector_number=card.collector_number or "")
+            candidates = self._index.lookup_by_name_and_number(
+                title=card.title or "", collector_number=card.collector_number or ""
+            )
             if len(candidates) == 1:
                 status = "corrected_match" if wrong_set else "normalized_match"
                 reason = (
@@ -143,8 +192,19 @@ class CardValidationService:
                 return self._matched(card, trace_base, candidates[0], status, reason)
             if len(candidates) > 1:
                 if wrong_set:
-                    return self._needs_correction(card, trace_base, candidates, "Title and collector number matched multiple printings; original set was invalid.")
-                return self._result(card, trace_base, "ambiguous_match", None, "Title and collector number matched multiple printings across sets.")
+                    return self._needs_correction(
+                        card,
+                        trace_base,
+                        candidates,
+                        "Title and collector number matched multiple printings; original set was invalid.",
+                    )
+                return self._result(
+                    card,
+                    trace_base,
+                    "ambiguous_match",
+                    None,
+                    "Title and collector number matched multiple printings across sets.",
+                )
 
         candidates = self._index.search_candidates(
             title=card.title or "",
@@ -162,17 +222,45 @@ class CardValidationService:
             return self._matched(card, trace_base, candidates[0], status, reason)
         if len(candidates) > 1:
             if wrong_set:
-                return self._needs_correction(card, trace_base, candidates, "Multiple normalized candidates; original set was invalid.")
-            return self._result(card, trace_base, "ambiguous_match", None, "Multiple normalized candidates remain; keeping recognizer output.")
+                return self._needs_correction(
+                    card,
+                    trace_base,
+                    candidates,
+                    "Multiple normalized candidates; original set was invalid.",
+                )
+            return self._result(
+                card,
+                trace_base,
+                "ambiguous_match",
+                None,
+                "Multiple normalized candidates remain; keeping recognizer output.",
+            )
 
         # Final fallback: look up all printings by title to enable auto-correction
         all_printings = self._index.lookup_all_printings_by_name(title=card.title or "")
         if len(all_printings) == 1:
-            return self._matched(card, trace_base, all_printings[0], "corrected_match", "Auto-corrected: title found in exactly one set; original set/collector ignored.")
+            return self._matched(
+                card,
+                trace_base,
+                all_printings[0],
+                "corrected_match",
+                "Auto-corrected: title found in exactly one set; original set/collector ignored.",
+            )
         if len(all_printings) > 1:
-            return self._needs_correction(card, trace_base, all_printings, "Title found in multiple sets; cannot auto-correct without LLM retry.")
+            return self._needs_correction(
+                card,
+                trace_base,
+                all_printings,
+                "Title found in multiple sets; cannot auto-correct without LLM retry.",
+            )
 
-        return self._result(card, trace_base, "no_match", None, "No MTGJSON match found; keeping recognizer output.")
+        return self._result(
+            card,
+            trace_base,
+            "no_match",
+            None,
+            "No MTGJSON match found; keeping recognizer output.",
+        )
 
     def _matched(
         self,
@@ -195,7 +283,11 @@ class CardValidationService:
             if match.scryfall_id
             else None
         )
-        set_symbol_url = f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg" if match.set_code else None
+        set_symbol_url = (
+            f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg"
+            if match.set_code
+            else None
+        )
         validated_card = card.model_copy(
             update={
                 "title": match.name,
@@ -224,7 +316,9 @@ class CardValidationService:
             card=validated_card,
             trace=ValidationTrace(
                 original=cast(dict[str, object], trace_base["original"]),
-                normalized_inputs=cast(dict[str, object], trace_base["normalized_inputs"]),
+                normalized_inputs=cast(
+                    dict[str, object], trace_base["normalized_inputs"]
+                ),
                 status=status,
                 matched_uuid=match.uuid,
                 matched_set_code=match.set_code,
@@ -252,7 +346,9 @@ class CardValidationService:
             card=validated_card,
             trace=ValidationTrace(
                 original=cast(dict[str, object], trace_base["original"]),
-                normalized_inputs=cast(dict[str, object], trace_base["normalized_inputs"]),
+                normalized_inputs=cast(
+                    dict[str, object], trace_base["normalized_inputs"]
+                ),
                 status=status,
                 matched_uuid=match.uuid if match else None,
                 matched_set_code=match.set_code if match else None,
@@ -271,15 +367,19 @@ class CardValidationService:
         reason: str,
     ) -> ValidatedCardResult:
         confidence_after = _adjust_confidence(card.confidence, "needs_correction")
-        validated_card = card.model_copy(update={
-            "confidence": confidence_after,
-            "notes": _merge_notes(card.notes, reason),
-        })
+        validated_card = card.model_copy(
+            update={
+                "confidence": confidence_after,
+                "notes": _merge_notes(card.notes, reason),
+            }
+        )
         return ValidatedCardResult(
             card=validated_card,
             trace=ValidationTrace(
                 original=cast(dict[str, object], trace_base["original"]),
-                normalized_inputs=cast(dict[str, object], trace_base["normalized_inputs"]),
+                normalized_inputs=cast(
+                    dict[str, object], trace_base["normalized_inputs"]
+                ),
                 status="needs_correction",
                 matched_uuid=None,
                 matched_set_code=None,
@@ -315,7 +415,9 @@ class CardValidationService:
         )
 
 
-def _check_foil_mismatch(foil: bool | None, match: CardRecord) -> tuple[str | None, float]:
+def _check_foil_mismatch(
+    foil: bool | None, match: CardRecord
+) -> tuple[str | None, float]:
     """Return (note_text, confidence_penalty) if the foil claim conflicts with known finishes."""
     if foil is None or not match.finishes:
         return None, 0.0

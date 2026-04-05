@@ -6,6 +6,7 @@ from typing import Protocol
 
 import httpx
 
+from app.logging_config import get_logger
 from app.models.recognition import (
     RecognizedCard,
     RecognitionResponse,
@@ -20,6 +21,8 @@ from app.services.openai_compat import (
     extract_recognition_response,
 )
 from app.settings import get_settings
+
+logger = get_logger(__name__)
 
 
 class RecognitionProvider(Protocol):
@@ -101,10 +104,18 @@ class OpenAIRecognitionProvider:
             response_mode=self._response_mode,
         )
 
+        url = f"{self._base_url}/chat/completions"
+        logger.info(
+            "Calling recognition provider: url=%s model=%s timeout=%.1fs",
+            url,
+            self.model_name,
+            self._timeout_seconds,
+        )
+
         with httpx.Client(timeout=self._timeout_seconds) as client:
             try:
                 http_response = client.post(
-                    f"{self._base_url}/chat/completions",
+                    url,
                     headers={
                         "Authorization": f"Bearer {self._api_key}",
                         "Content-Type": "application/json",
@@ -112,12 +123,42 @@ class OpenAIRecognitionProvider:
                     json=request_body,
                 )
                 http_response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                body_snippet = getattr(exc.response, "text", "")[:500]
+                logger.error(
+                    "Recognition provider HTTP error: status=%d url=%s model=%s body=%s",
+                    exc.response.status_code,
+                    url,
+                    self.model_name,
+                    body_snippet,
+                )
+                raise RecognitionProviderError(
+                    f"OpenAI recognition request failed: {exc}"
+                ) from exc
             except httpx.HTTPError as exc:
+                logger.error(
+                    "Recognition provider connection error: url=%s model=%s error=%s",
+                    url,
+                    self.model_name,
+                    exc,
+                )
                 raise RecognitionProviderError(
                     f"OpenAI recognition request failed: {exc}"
                 ) from exc
 
-        payload = http_response.json()
+        try:
+            payload = http_response.json()
+        except Exception as exc:
+            logger.error(
+                "Recognition provider returned non-JSON: status=%d content_type=%s body=%s",
+                http_response.status_code,
+                http_response.headers.get("content-type", "unknown"),
+                http_response.text[:500],
+            )
+            raise RecognitionProviderError(
+                f"Recognition provider returned invalid JSON: {exc}"
+            ) from exc
+
         return extract_recognition_response(payload, self._response_mode)
 
 
@@ -161,7 +202,8 @@ class RecognitionService:
             return validation_result
 
         needs_correction_indices = [
-            i for i, trace in enumerate(validation_result.traces)
+            i
+            for i, trace in enumerate(validation_result.traces)
             if trace.status == "needs_correction"
         ]
         if not needs_correction_indices:
@@ -186,10 +228,19 @@ class RecognitionService:
                     metadata=metadata,
                     prompt_text=filled_prompt,
                 )
-            except RecognitionProviderError:
+            except RecognitionProviderError as exc:
+                logger.warning(
+                    "LLM correction failed for card '%s': %s",
+                    card.title or "<unknown>",
+                    exc,
+                )
                 continue
 
             if not corrected_response.cards:
+                logger.warning(
+                    "LLM correction returned no cards for '%s'",
+                    card.title or "<unknown>",
+                )
                 continue
 
             corrected_card = corrected_response.cards[0]
@@ -214,6 +265,11 @@ class RecognitionService:
         crops: list[tuple[bytes, RecognitionUploadMetadata]],
         prompt_text: str,
     ) -> list[RecognitionResponse]:
+        logger.info(
+            "Recognizing %d card crops concurrently (max_workers=%d)",
+            len(crops),
+            self._max_concurrent_recognitions,
+        )
         executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=self._max_concurrent_recognitions
         )
@@ -251,6 +307,12 @@ class RecognitionService:
                     try:
                         responses[index] = future.result()
                     except Exception:
+                        pending_count = len(futures)
+                        logger.error(
+                            "Crop %d recognition failed, cancelling %d pending crops",
+                            index,
+                            pending_count,
+                        )
                         for pending_future in futures:
                             pending_future.cancel()
                         executor.shutdown(wait=False, cancel_futures=True)
@@ -331,8 +393,17 @@ class RecognitionService:
                     validation_result = self._apply_llm_correction(
                         validation_result, image_bytes, enriched_metadata
                     )
-                final_response = validation_result.response if validation_result else combined_response
+                final_response = (
+                    validation_result.response
+                    if validation_result
+                    else combined_response
+                )
                 final_response = _attach_crop_images(final_response, crop_bytes_list)
+                logger.info(
+                    "Multi-card recognition complete: %d cards detected and recognized from '%s'",
+                    len(final_response.cards),
+                    metadata.filename,
+                )
                 return (
                     final_response,
                     enriched_metadata,
@@ -351,8 +422,15 @@ class RecognitionService:
             validation_result = self._apply_llm_correction(
                 validation_result, image_bytes, enriched_metadata
             )
+        final_response = validation_result.response if validation_result else response
+        logger.info(
+            "Recognition complete: %d cards from '%s' via %s",
+            len(final_response.cards),
+            metadata.filename,
+            self._provider.provider_name,
+        )
         return (
-            validation_result.response if validation_result else response,
+            final_response,
             enriched_metadata,
             detection_result,
             validation_result,
@@ -366,6 +444,7 @@ def get_recognition_service() -> RecognitionService:
     detector: CardDetector | None = None
     if settings.mtg_scanner_enable_multi_card:
         from app.services.card_detector import get_card_detector
+
         detector = get_card_detector()
 
     validator: CardValidationService | None = None
@@ -376,6 +455,7 @@ def get_recognition_service() -> RecognitionService:
         )
 
     if provider_name == "mock":
+        logger.info("Using mock recognition provider")
         return RecognitionService(
             MockRecognitionProvider(),
             detector,
@@ -388,16 +468,25 @@ def get_recognition_service() -> RecognitionService:
     if provider_name == "openai":
         api_key = settings.openai_api_key
         if not api_key:
+            logger.error("OPENAI_API_KEY not set for openai provider")
             raise RecognitionConfigurationError(
                 "OPENAI_API_KEY must be set when MTG_SCANNER_RECOGNIZER_PROVIDER=openai."
             )
 
         model_name = settings.mtg_scanner_openai_model
         if not model_name:
+            logger.error("MTG_SCANNER_OPENAI_MODEL not set for openai provider")
             raise RecognitionConfigurationError(
                 "MTG_SCANNER_OPENAI_MODEL must be set when MTG_SCANNER_RECOGNIZER_PROVIDER=openai."
             )
 
+        logger.info(
+            "Using openai recognition provider: model=%s base_url=%s timeout=%.1fs response_mode=%s",
+            model_name,
+            settings.openai_base_url,
+            settings.mtg_scanner_openai_timeout_seconds,
+            settings.mtg_scanner_openai_response_mode,
+        )
         return RecognitionService(
             OpenAIRecognitionProvider(
                 api_key=api_key,
@@ -413,6 +502,7 @@ def get_recognition_service() -> RecognitionService:
             correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
         )
 
+    logger.error("Unknown recognition provider: '%s'", provider_name)
     raise RecognitionConfigurationError(
         "MTG_SCANNER_RECOGNIZER_PROVIDER must be one of: mock, openai."
     )
@@ -421,9 +511,11 @@ def get_recognition_service() -> RecognitionService:
 def _load_prompt(prompt_version: str) -> str:
     prompt_path = Path(__file__).resolve().parents[4] / "prompts" / prompt_version
     if not prompt_path.is_file():
+        logger.error("Prompt file not found: %s", prompt_path)
         raise RecognitionConfigurationError(
             f"Prompt file not found for prompt_version '{prompt_version}'."
         )
+    logger.debug("Loaded prompt '%s' from %s", prompt_version, prompt_path)
     return prompt_path.read_text()
 
 
@@ -478,7 +570,10 @@ def _build_correction_prompt(
     reason: str,
 ) -> str:
     """Fill the correction prompt template with card data and candidate table."""
-    rows = ["| Set Name | Set Code | Collector # | Rarity | Finishes |", "| --- | --- | --- | --- | --- |"]
+    rows = [
+        "| Set Name | Set Code | Collector # | Rarity | Finishes |",
+        "| --- | --- | --- | --- | --- |",
+    ]
     for c in candidates:
         finishes_display = c.finishes or "unknown"
         rows.append(
@@ -490,7 +585,9 @@ def _build_correction_prompt(
     filled = filled.replace("{{title}}", card.title or "")
     filled = filled.replace("{{edition}}", card.edition or "")
     filled = filled.replace("{{collector_number}}", card.collector_number or "")
-    filled = filled.replace("{{foil}}", str(card.foil) if card.foil is not None else "unknown")
+    filled = filled.replace(
+        "{{foil}}", str(card.foil) if card.foil is not None else "unknown"
+    )
     filled = filled.replace("{{reason}}", reason)
     filled = filled.replace("{{candidates_table}}", candidates_table)
     return filled

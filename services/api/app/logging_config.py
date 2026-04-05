@@ -6,7 +6,7 @@ from pathlib import Path
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
 
-_LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 _LOG_FILE = _LOG_DIR / "app.log"
 _MAX_BYTES = 10 * 1024 * 1024
 _BACKUP_COUNT = 5

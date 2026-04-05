@@ -11,4 +11,5 @@ if __name__ == "__main__":
         reload=True,
         host=settings.mtg_scanner_api_host,
         port=settings.mtg_scanner_api_port,
+        log_config=None,
     )

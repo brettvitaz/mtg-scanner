@@ -1,12 +1,22 @@
 import json
+import logging
 import re
 from typing import Any
 
 from app.models.recognition import RecognitionResponse
 from app.services.errors import RecognitionProviderError
 
+logger = logging.getLogger(__name__)
 
-def build_openai_request_body(*, model_name: str, prompt_text: str, data_url: str, schema: dict, response_mode: str) -> dict[str, Any]:
+
+def build_openai_request_body(
+    *,
+    model_name: str,
+    prompt_text: str,
+    data_url: str,
+    schema: dict,
+    response_mode: str,
+) -> dict[str, Any]:
     body: dict[str, Any] = {
         "model": model_name,
         "messages": [
@@ -50,7 +60,9 @@ def build_openai_request_body(*, model_name: str, prompt_text: str, data_url: st
     return body
 
 
-def extract_recognition_response(payload: dict, response_mode: str) -> RecognitionResponse:
+def extract_recognition_response(
+    payload: dict, response_mode: str
+) -> RecognitionResponse:
     content = _extract_openai_content(payload)
 
     if response_mode in {"json_schema", "json_mode"}:
@@ -76,6 +88,10 @@ def _parse_recognition_json(content: str) -> RecognitionResponse:
     try:
         return RecognitionResponse.model_validate_json(content)
     except Exception as exc:
+        logger.error(
+            "Failed to parse recognition JSON: content_snippet=%s",
+            content[:500],
+        )
         raise RecognitionProviderError(
             "Recognition response did not match RecognitionResponse."
         ) from exc
@@ -97,7 +113,9 @@ def _extract_json_object(content: str) -> str:
         except json.JSONDecodeError:
             continue
 
-    raise RecognitionProviderError("Recognition response did not contain a JSON object.")
+    raise RecognitionProviderError(
+        "Recognition response did not contain a JSON object."
+    )
 
 
 def _extract_openai_content(payload: dict) -> str:
@@ -105,6 +123,13 @@ def _extract_openai_content(payload: dict) -> str:
         choice = payload["choices"][0]
         message = choice["message"]
     except (KeyError, IndexError, TypeError) as exc:
+        available_keys = (
+            list(payload.keys()) if isinstance(payload, dict) else str(type(payload))
+        )
+        logger.error(
+            "Malformed OpenAI response: missing choices[0].message, keys=%s",
+            available_keys,
+        )
         raise RecognitionProviderError(
             "Recognition response was missing choices[0].message."
         ) from exc
@@ -127,4 +152,9 @@ def _extract_openai_content(payload: dict) -> str:
         if text_parts:
             return "".join(text_parts)
 
+    logger.error(
+        "Recognition response did not contain JSON content: content_type=%s content_preview=%s",
+        type(content).__name__,
+        str(content)[:200] if content else "<empty>",
+    )
     raise RecognitionProviderError("Recognition response did not contain JSON content.")

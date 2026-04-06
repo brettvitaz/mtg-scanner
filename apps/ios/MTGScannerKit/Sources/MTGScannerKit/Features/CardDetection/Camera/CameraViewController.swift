@@ -21,11 +21,11 @@ final class CameraViewController: UIViewController {
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     /// Called on the main thread whenever the zoom factor changes.
     var onZoomFactorChanged: ((CGFloat) -> Void)?
-    /// Called on the session queue for every camera frame when in Quick Scan mode.
+    /// Called on the session queue for every camera frame when in Auto Scan mode.
     ///
-    /// Used by `QuickScanViewModel` to feed frames into `CardPresenceTracker`.
-    /// Set to `nil` when not in Quick Scan mode to avoid unnecessary overhead.
-    var onQuickScanFrame: ((CMSampleBuffer) -> Void)?
+    /// Used by `AutoScanViewModel` to feed frames into `CardPresenceTracker`.
+    /// Set to `nil` when not in Auto Scan mode to avoid unnecessary overhead.
+    var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
 
     // MARK: - Private
 
@@ -33,6 +33,7 @@ final class CameraViewController: UIViewController {
     private let engine = CardDetectionEngine()
     private var renderer: DetectionOverlayRenderer?
     private var isVisible = false
+    private var desiredTorchLevel: Float = 0
 
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
@@ -54,6 +55,7 @@ final class CameraViewController: UIViewController {
         super.viewDidAppear(animated)
         isVisible = true
         sessionManager.start()
+        applyTorchLevel(desiredTorchLevel)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -112,7 +114,12 @@ final class CameraViewController: UIViewController {
 
     /// Sets the torch brightness. Level 0 turns the torch off; 0.1–1.0 turns it on at that brightness.
     func setTorchLevel(_ level: Float) {
+        desiredTorchLevel = level
         guard isVisible else { return }
+        applyTorchLevel(level)
+    }
+
+    private func applyTorchLevel(_ level: Float) {
         sessionManager.setTorchLevel(level)
     }
 
@@ -181,7 +188,7 @@ final class CameraViewController: UIViewController {
     private func wireComponents() {
         sessionManager.onFrame = { [weak self] sampleBuffer in
             self?.engine.processFrame(sampleBuffer)
-            self?.onQuickScanFrame?(sampleBuffer)
+            self?.onAutoScanFrame?(sampleBuffer)
         }
 
         engine.onDetection = { [weak self] cards in

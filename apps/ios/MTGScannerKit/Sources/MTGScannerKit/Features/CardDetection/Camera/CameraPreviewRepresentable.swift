@@ -12,8 +12,8 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     var captureCoordinator: CameraCaptureCoordinator?
     var onZoomFactorChanged: ((CGFloat) -> Void)?
-    /// Receives raw `CMSampleBuffer` frames on the session queue when in Quick Scan mode.
-    var onQuickScanFrame: ((CMSampleBuffer) -> Void)?
+    /// Receives raw `CMSampleBuffer` frames on the session queue when in Auto Scan mode.
+    var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
     /// Torch brightness: 0 = off, 0.1–1.0 = on at that brightness.
     var torchLevel: Float = 0
 
@@ -21,7 +21,7 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
         let vc = CameraViewController()
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
-        vc.onQuickScanFrame = onQuickScanFrame
+        vc.onAutoScanFrame = onAutoScanFrame
         captureCoordinator?.controller = vc
         return vc
     }
@@ -30,7 +30,7 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
         vc.updateDetectionMode(detectionMode)
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
-        vc.onQuickScanFrame = onQuickScanFrame
+        vc.onAutoScanFrame = onAutoScanFrame
         vc.setZoom(zoomFactor)
         vc.setTorchLevel(torchLevel)
         captureCoordinator?.controller = vc

@@ -17,11 +17,11 @@ public final class AppModel {
     var onDeviceCropEnabled: Bool {
         didSet { persistOnDeviceCrop() }
     }
-    var quickScanCaptureDelay: Double {
-        didSet { UserDefaults.standard.set(quickScanCaptureDelay, forKey: quickScanCaptureDelayKey) }
+    var autoScanCaptureDelay: Double {
+        didSet { UserDefaults.standard.set(autoScanCaptureDelay, forKey: autoScanCaptureDelayKey) }
     }
-    var quickScanConfidenceThreshold: Double {
-        didSet { UserDefaults.standard.set(quickScanConfidenceThreshold, forKey: quickScanConfidenceKey) }
+    var autoScanConfidenceThreshold: Double {
+        didSet { UserDefaults.standard.set(autoScanConfidenceThreshold, forKey: autoScanConfidenceKey) }
     }
     var maxConcurrentUploads: Int {
         didSet { UserDefaults.standard.set(maxConcurrentUploads, forKey: maxConcurrentUploadsKey) }
@@ -50,28 +50,28 @@ public final class AppModel {
     private let correctionsStoreKey = "card_corrections"
     private let apiBaseURLStoreKey = "api_base_url"
     private let onDeviceCropStoreKey = "on_device_crop_enabled"
-    private let quickScanCaptureDelayKey = "quick_scan_capture_delay"
-    private let quickScanConfidenceKey = "quick_scan_confidence_threshold"
+    private let autoScanCaptureDelayKey = "auto_scan_capture_delay"
+    private let autoScanConfidenceKey = "auto_scan_confidence_threshold"
     private let maxConcurrentUploadsKey = "max_concurrent_uploads"
 
     public init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
-        let storedDelay = UserDefaults.standard.double(forKey: quickScanCaptureDelayKey)
-        self.quickScanCaptureDelay = Self.clampQuickScanCaptureDelay(storedDelay)
-        let storedConf = UserDefaults.standard.double(forKey: quickScanConfidenceKey)
-        self.quickScanConfidenceThreshold = Self.clampQuickScanConfidence(storedConf)
+        let storedDelay = UserDefaults.standard.double(forKey: autoScanCaptureDelayKey)
+        self.autoScanCaptureDelay = Self.clampAutoScanCaptureDelay(storedDelay)
+        let storedConf = UserDefaults.standard.double(forKey: autoScanConfidenceKey)
+        self.autoScanConfidenceThreshold = Self.clampAutoScanConfidence(storedConf)
         let storedConcurrent = UserDefaults.standard.integer(forKey: maxConcurrentUploadsKey)
         self.maxConcurrentUploads = Self.clampMaxConcurrentUploads(storedConcurrent)
         loadCorrections()
     }
 
-    private static func clampQuickScanCaptureDelay(_ value: Double) -> Double {
+    private static func clampAutoScanCaptureDelay(_ value: Double) -> Double {
         guard value > 0 else { return 2.0 }
         return min(max(value, 0.5), 5.0)
     }
 
-    private static func clampQuickScanConfidence(_ value: Double) -> Double {
+    private static func clampAutoScanConfidence(_ value: Double) -> Double {
         guard value > 0 else { return 0.5 }
         return min(max(value, 0.3), 0.9)
     }

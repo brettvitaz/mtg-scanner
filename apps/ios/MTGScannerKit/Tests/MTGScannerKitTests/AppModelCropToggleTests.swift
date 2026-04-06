@@ -4,22 +4,28 @@ import XCTest
 final class AppModelCropToggleTests: XCTestCase {
 
     private let storeKey = "on_device_crop_enabled"
-    private let quickScanDelayKey = "quick_scan_capture_delay"
-    private let quickScanConfidenceKey = "quick_scan_confidence_threshold"
+    private let autoScanDelayKey = "auto_scan_capture_delay"
+    private let autoScanConfidenceKey = "auto_scan_confidence_threshold"
+    private let oldQuickScanDelayKey = "quick_scan_capture_delay"
+    private let oldQuickScanConfidenceKey = "quick_scan_confidence_threshold"
     private let maxConcurrentUploadsKey = "max_concurrent_uploads"
 
     override func setUp() {
         super.setUp()
         UserDefaults.standard.removeObject(forKey: storeKey)
-        UserDefaults.standard.removeObject(forKey: quickScanDelayKey)
-        UserDefaults.standard.removeObject(forKey: quickScanConfidenceKey)
+        UserDefaults.standard.removeObject(forKey: autoScanDelayKey)
+        UserDefaults.standard.removeObject(forKey: autoScanConfidenceKey)
+        UserDefaults.standard.removeObject(forKey: oldQuickScanDelayKey)
+        UserDefaults.standard.removeObject(forKey: oldQuickScanConfidenceKey)
         UserDefaults.standard.removeObject(forKey: maxConcurrentUploadsKey)
     }
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: storeKey)
-        UserDefaults.standard.removeObject(forKey: quickScanDelayKey)
-        UserDefaults.standard.removeObject(forKey: quickScanConfidenceKey)
+        UserDefaults.standard.removeObject(forKey: autoScanDelayKey)
+        UserDefaults.standard.removeObject(forKey: autoScanConfidenceKey)
+        UserDefaults.standard.removeObject(forKey: oldQuickScanDelayKey)
+        UserDefaults.standard.removeObject(forKey: oldQuickScanConfidenceKey)
         UserDefaults.standard.removeObject(forKey: maxConcurrentUploadsKey)
         super.tearDown()
     }
@@ -70,17 +76,26 @@ final class AppModelCropToggleTests: XCTestCase {
     }
 
     @MainActor
-    func testQuickScanCaptureDelayClampsStoredValueIntoSupportedRange() {
-        UserDefaults.standard.set(8.0, forKey: quickScanDelayKey)
+    func testAutoScanCaptureDelayClampsStoredValueIntoSupportedRange() {
+        UserDefaults.standard.set(8.0, forKey: autoScanDelayKey)
         let model = AppModel()
-        XCTAssertEqual(model.quickScanCaptureDelay, 5.0, accuracy: 0.001)
+        XCTAssertEqual(model.autoScanCaptureDelay, 5.0, accuracy: 0.001)
     }
 
     @MainActor
-    func testQuickScanConfidenceClampsStoredValueIntoSupportedRange() {
-        UserDefaults.standard.set(0.1, forKey: quickScanConfidenceKey)
+    func testAutoScanConfidenceClampsStoredValueIntoSupportedRange() {
+        UserDefaults.standard.set(0.1, forKey: autoScanConfidenceKey)
         let model = AppModel()
-        XCTAssertEqual(model.quickScanConfidenceThreshold, 0.3, accuracy: 0.001)
+        XCTAssertEqual(model.autoScanConfidenceThreshold, 0.3, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testOldQuickScanKeysAreIgnored() {
+        UserDefaults.standard.set(5.0, forKey: oldQuickScanDelayKey)
+        UserDefaults.standard.set(0.9, forKey: oldQuickScanConfidenceKey)
+        let model = AppModel()
+        XCTAssertEqual(model.autoScanCaptureDelay, 2.0, accuracy: 0.001)
+        XCTAssertEqual(model.autoScanConfidenceThreshold, 0.5, accuracy: 0.001)
     }
 
     // MARK: - maxConcurrentUploads

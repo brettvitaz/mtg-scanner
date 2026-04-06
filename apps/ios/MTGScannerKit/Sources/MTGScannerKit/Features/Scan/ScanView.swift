@@ -6,9 +6,12 @@ import UniformTypeIdentifiers
 
 struct ScanView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.scenePhase) private var scenePhase
+    @Binding var detectionMode: DetectionMode
+    let isActive: Bool
     @State private var detectionViewModel = CardDetectionViewModel()
     @State private var captureCoordinator = CameraCaptureCoordinator()
-    @State private var quickScanViewModel = QuickScanViewModel()
+    @State private var autoScanViewModel = AutoScanViewModel()
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
@@ -30,36 +33,40 @@ struct ScanView: View {
         .onAppear {
             detectionViewModel.requestCameraPermissionIfNeeded()
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
-            configureQuickScan()
+            configureAutoScan()
             UIApplication.shared.isIdleTimerDisabled = true
-            restoreTorchLevel()
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             UIApplication.shared.isIdleTimerDisabled = false
-            appModel.lastTorchLevel = detectionViewModel.torchLevel
-            detectionViewModel.torchLevel = 0
-            quickScanViewModel.stop()
+            storeAndTurnOffTorch()
+            autoScanViewModel.stop()
         }
         .onChange(of: appModel.apiBaseURL) { _, url in
-            quickScanViewModel.apiBaseURL = url
+            autoScanViewModel.apiBaseURL = url
         }
         .onChange(of: appModel.modelContext) { _, ctx in
-            quickScanViewModel.modelContext = ctx
+            autoScanViewModel.modelContext = ctx
         }
-        .onChange(of: appModel.quickScanCaptureDelay) { _, delay in
-            quickScanViewModel.captureDelay = delay
+        .onChange(of: appModel.autoScanCaptureDelay) { _, delay in
+            autoScanViewModel.captureDelay = delay
         }
-        .onChange(of: appModel.quickScanConfidenceThreshold) { _, conf in
-            quickScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
+        .onChange(of: appModel.autoScanConfidenceThreshold) { _, conf in
+            autoScanViewModel.presenceTracker.confidenceThreshold = Float(conf)
         }
         .onChange(of: appModel.maxConcurrentUploads) { _, count in
-            quickScanViewModel.recognitionQueue.maxConcurrent = count
+            autoScanViewModel.recognitionQueue.maxConcurrent = count
         }
-        .onChange(of: detectionViewModel.detectionMode) { _, mode in
-            if mode != .quickScan {
-                quickScanViewModel.stop()
+        .onChange(of: detectionMode) { _, mode in
+            if mode != .auto {
+                autoScanViewModel.stop()
             }
+        }
+        .onChange(of: isActive) { _, active in
+            handleScanActivityChange(active)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            handleScenePhaseChange(phase)
         }
         .alert("Camera Access Required", isPresented: $detectionViewModel.cameraPermissionDenied) {
             Button("OK", role: .cancel) {}
@@ -82,17 +89,17 @@ struct ScanView: View {
 
     // MARK: - Setup
 
-    private func configureQuickScan() {
-        quickScanViewModel.captureCoordinator = captureCoordinator
-        quickScanViewModel.modelContext = appModel.modelContext
-        quickScanViewModel.apiBaseURL = appModel.apiBaseURL
-        quickScanViewModel.captureDelay = appModel.quickScanCaptureDelay
-        quickScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.quickScanConfidenceThreshold)
-        quickScanViewModel.recognitionQueue.maxConcurrent = appModel.maxConcurrentUploads
+    private func configureAutoScan() {
+        autoScanViewModel.captureCoordinator = captureCoordinator
+        autoScanViewModel.modelContext = appModel.modelContext
+        autoScanViewModel.apiBaseURL = appModel.apiBaseURL
+        autoScanViewModel.captureDelay = appModel.autoScanCaptureDelay
+        autoScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.autoScanConfidenceThreshold)
+        autoScanViewModel.recognitionQueue.maxConcurrent = appModel.maxConcurrentUploads
     }
 
-    private var isQuickScanMode: Bool {
-        detectionViewModel.detectionMode == .quickScan
+    private var isAutoScanMode: Bool {
+        detectionMode == .auto
     }
 
     // MARK: - Subviews
@@ -100,19 +107,19 @@ struct ScanView: View {
     @ViewBuilder
     private var cameraOverlay: some View {
         ZStack {
-            if isQuickScanMode {
-                QuickScanView(
-                    viewModel: quickScanViewModel,
-                    recognitionQueue: quickScanViewModel.recognitionQueue,
+            if isAutoScanMode {
+                AutoScanView(
+                    viewModel: autoScanViewModel,
+                    recognitionQueue: autoScanViewModel.recognitionQueue,
                     torchLevel: $detectionViewModel.torchLevel,
-                    detectionMode: $detectionViewModel.detectionMode
+                    lastTorchLevel: lastTorchLevelBinding
                 )
             } else {
                 standardOverlay
             }
 
             VStack {
-                IdentifiedCardToastContainer(viewModel: quickScanViewModel.identifiedCardsViewModel)
+                IdentifiedCardToastContainer(viewModel: autoScanViewModel.identifiedCardsViewModel)
                     .padding(.top, 60)
                 Spacer()
             }
@@ -124,8 +131,8 @@ struct ScanView: View {
             HStack {
                 Spacer()
                 RecognitionBadgeView(
-                    recognitionQueue: quickScanViewModel.recognitionQueue,
-                    onCancel: quickScanViewModel.cancelRecognition
+                    recognitionQueue: autoScanViewModel.recognitionQueue,
+                    onCancel: autoScanViewModel.cancelRecognition
                 )
             }
             Spacer()
@@ -141,7 +148,7 @@ struct ScanView: View {
 
     private var cameraPreview: some View {
         CameraPreviewRepresentable(
-            detectionMode: $detectionViewModel.detectionMode,
+            detectionMode: $detectionMode,
             zoomFactor: detectionViewModel.zoomFactor,
             onDetectedCardsChanged: { cards in
                 detectionViewModel.handleDetectedCards(cards)
@@ -150,10 +157,10 @@ struct ScanView: View {
             onZoomFactorChanged: { factor in
                 detectionViewModel.zoomFactor = factor
             },
-            onQuickScanFrame: isQuickScanMode
-                ? { [weak quickScanViewModel] buffer in
+            onAutoScanFrame: isAutoScanMode
+                ? { [weak autoScanViewModel] buffer in
                     Task { @MainActor in
-                        quickScanViewModel?.processFrame(buffer)
+                        autoScanViewModel?.processFrame(buffer)
                     }
                 }
                 : nil,
@@ -167,12 +174,19 @@ struct ScanView: View {
             Spacer()
             CaptureButton(action: captureCard, isDisabled: false)
             Spacer()
-            ScanMenuButton(
-                detectionMode: $detectionViewModel.detectionMode,
-                torchLevel: $detectionViewModel.torchLevel
+            FlashlightButton(
+                torchLevel: $detectionViewModel.torchLevel,
+                lastTorchLevel: lastTorchLevelBinding
             )
         }
         .padding(.bottom, 8)
+    }
+
+    private var lastTorchLevelBinding: Binding<Float> {
+        Binding(
+            get: { appModel.lastTorchLevel },
+            set: { appModel.lastTorchLevel = $0 }
+        )
     }
 
     private var photoPickerButton: some View {
@@ -227,7 +241,7 @@ private extension ScanView {
 
     @MainActor
     func enqueueForRecognition(_ image: UIImage) async {
-        await quickScanViewModel.enqueueCapturedImage(image, cropEnabled: appModel.onDeviceCropEnabled)
+        await autoScanViewModel.enqueueCapturedImage(image, cropEnabled: appModel.onDeviceCropEnabled)
     }
 
     func lockOrientation(_ mask: UIInterfaceOrientationMask) {
@@ -236,10 +250,23 @@ private extension ScanView {
         scene.requestGeometryUpdate(prefs)
     }
 
-    private func restoreTorchLevel() {
-        let savedLevel = appModel.lastTorchLevel
-        guard savedLevel > 0 else { return }
-        detectionViewModel.torchLevel = savedLevel
+    private func storeAndTurnOffTorch() {
+        if detectionViewModel.torchLevel > 0 {
+            appModel.lastTorchLevel = detectionViewModel.torchLevel
+        }
+        detectionViewModel.torchLevel = 0
+    }
+
+    private func handleScanActivityChange(_ active: Bool) {
+        if !active {
+            storeAndTurnOffTorch()
+            autoScanViewModel.stop()
+        }
+    }
+
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        guard phase == .background else { return }
+        storeAndTurnOffTorch()
     }
 }
 

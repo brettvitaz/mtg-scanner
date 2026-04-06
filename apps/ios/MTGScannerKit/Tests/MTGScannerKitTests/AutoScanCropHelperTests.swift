@@ -1,7 +1,7 @@
 import XCTest
 @testable import MTGScannerKit
 
-final class YOLOCropHelperTests: XCTestCase {
+final class AutoScanCropHelperTests: XCTestCase {
 
     // MARK: - Helpers
 
@@ -23,7 +23,7 @@ final class YOLOCropHelperTests: XCTestCase {
         // 100×100 image, crop center half (no padding).
         let image = makeImage(width: 100, height: 100)
         let rect = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
-        let result = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
+        let result = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
         XCTAssertEqual(result.size.width, 50, accuracy: 1)
         XCTAssertEqual(result.size.height, 50, accuracy: 1)
     }
@@ -31,8 +31,8 @@ final class YOLOCropHelperTests: XCTestCase {
     func testCropWithPaddingProducesLargerOutput() throws {
         let image = makeImage(width: 200, height: 200)
         let rect = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
-        let noPad = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
-        let padded = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0.1))
+        let noPad = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
+        let padded = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0.1))
         XCTAssertGreaterThan(padded.size.width, noPad.size.width)
         XCTAssertGreaterThan(padded.size.height, noPad.size.height)
     }
@@ -41,13 +41,19 @@ final class YOLOCropHelperTests: XCTestCase {
 
     func testCropWithZeroWidthRectReturnsNil() {
         let image = makeImage(width: 100, height: 100)
-        let result = YOLOCropHelper.cropImage(image, toNormalizedRect: CGRect(x: 0.5, y: 0.5, width: 0, height: 0.5))
+        let result = AutoScanCropHelper.cropImage(
+            image,
+            toNormalizedRect: CGRect(x: 0.5, y: 0.5, width: 0, height: 0.5)
+        )
         XCTAssertNil(result)
     }
 
     func testCropWithZeroHeightRectReturnsNil() {
         let image = makeImage(width: 100, height: 100)
-        let result = YOLOCropHelper.cropImage(image, toNormalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0))
+        let result = AutoScanCropHelper.cropImage(
+            image,
+            toNormalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0)
+        )
         XCTAssertNil(result)
     }
 
@@ -55,7 +61,7 @@ final class YOLOCropHelperTests: XCTestCase {
         // Rect extends beyond [0,1] in both axes — result must be non-nil and within image.
         let image = makeImage(width: 100, height: 100)
         let rect = CGRect(x: 0.8, y: 0.8, width: 0.5, height: 0.5)
-        let result = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
+        let result = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
         // Cropped region is clamped to image bounds, so output is smaller than 50×50.
         XCTAssertLessThanOrEqual(result.size.width, 50)
         XCTAssertLessThanOrEqual(result.size.height, 50)
@@ -64,7 +70,7 @@ final class YOLOCropHelperTests: XCTestCase {
     func testCropFullImageReturnsFullSizeOutput() throws {
         let image = makeImage(width: 80, height: 120)
         let rect = CGRect(x: 0, y: 0, width: 1, height: 1)
-        let result = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
+        let result = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
         XCTAssertEqual(result.size.width, 80, accuracy: 1)
         XCTAssertEqual(result.size.height, 120, accuracy: 1)
     }
@@ -73,8 +79,8 @@ final class YOLOCropHelperTests: XCTestCase {
         // Default padding (3%) should produce a crop larger than zero-padding.
         let image = makeImage(width: 200, height: 200)
         let rect = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
-        let noPad = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
-        let defaultPad = try XCTUnwrap(YOLOCropHelper.cropImage(image, toNormalizedRect: rect))
+        let noPad = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect, padding: 0))
+        let defaultPad = try XCTUnwrap(AutoScanCropHelper.cropImage(image, toNormalizedRect: rect))
         XCTAssertGreaterThan(defaultPad.size.width, noPad.size.width)
     }
 }

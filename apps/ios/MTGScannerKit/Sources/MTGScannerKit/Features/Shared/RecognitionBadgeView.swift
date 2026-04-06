@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Displays pending and failed recognition counts as overlay badges.
 ///
-/// Used by both Quick Scan and standard (table/binder) scan modes to show
+/// Used by both Auto Scan and standard scan modes to show
 /// async recognition job status in the upper-right corner of the scan screen.
 struct RecognitionBadgeView: View {
     @Bindable var recognitionQueue: RecognitionQueue

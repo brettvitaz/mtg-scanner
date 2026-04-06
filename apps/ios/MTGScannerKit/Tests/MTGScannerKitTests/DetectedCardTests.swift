@@ -77,29 +77,26 @@ final class DetectedCardTests: XCTestCase {
 
     // MARK: - DetectionMode
 
-    func testDetectionModeTableRawValue() {
-        XCTAssertEqual(DetectionMode.table.rawValue, "table")
+    func testDetectionModeScanRawValue() {
+        XCTAssertEqual(DetectionMode.scan.rawValue, "scan")
     }
 
-    func testDetectionModeBinderRawValue() {
-        XCTAssertEqual(DetectionMode.binder.rawValue, "binder")
+    func testDetectionModeAutoRawValue() {
+        XCTAssertEqual(DetectionMode.auto.rawValue, "auto")
     }
 
-    func testDetectionModeAllCasesContainsBothModes() {
-        XCTAssertTrue(DetectionMode.allCases.contains(.table))
-        XCTAssertTrue(DetectionMode.allCases.contains(.binder))
-        XCTAssertTrue(DetectionMode.allCases.contains(.quickScan))
-        XCTAssertEqual(DetectionMode.allCases.count, 3)
+    func testDetectionModeAllCasesContainsScanAndAuto() {
+        XCTAssertEqual(DetectionMode.allCases, [.scan, .auto])
     }
 
     func testDetectionModeIdentifiableUsesRawValue() {
-        XCTAssertEqual(DetectionMode.table.id, "table")
-        XCTAssertEqual(DetectionMode.binder.id, "binder")
+        XCTAssertEqual(DetectionMode.scan.id, "scan")
+        XCTAssertEqual(DetectionMode.auto.id, "auto")
     }
 
     func testDetectionModeRoundtripsViaRawValue() {
-        XCTAssertEqual(DetectionMode(rawValue: "table"), .table)
-        XCTAssertEqual(DetectionMode(rawValue: "binder"), .binder)
+        XCTAssertEqual(DetectionMode(rawValue: "scan"), .scan)
+        XCTAssertEqual(DetectionMode(rawValue: "auto"), .auto)
         XCTAssertNil(DetectionMode(rawValue: "unknown"))
     }
 }

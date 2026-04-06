@@ -150,7 +150,6 @@ PYTHONPATH=services/api python evals/run_eval.py
 
 ### iOS (XCTest)
 
-- Tests live in `apps/ios/MTGScannerTests/`.
 - `final class <Feature>Tests: XCTestCase` naming pattern.
 - Every public method or type should have at least one test.
 - Tests must exercise real code paths — no tests that only verify mocks or hardcoded values.

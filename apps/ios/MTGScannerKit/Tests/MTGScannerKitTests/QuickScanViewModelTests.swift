@@ -122,7 +122,7 @@ final class QuickScanViewModelTests: XCTestCase {
     func testCaptureFailsGracefullyWhenCoordinatorIsNil() async throws {
         // Verify that triggerCapture returns cleanly when captureCoordinator is nil,
         // without calling enqueue and without leaving the state machine stuck.
-        var capturedIsCropped: Bool?
+        nonisolated(unsafe) var capturedIsCropped: Bool?
         let queue2 = RecognitionQueue(
             recognize: { _, _, _, _ in
                 capturedIsCropped = false
@@ -162,7 +162,7 @@ final class QuickScanViewModelTests: XCTestCase {
     func testBoundingBoxIgnoredWhenAlreadySettling() async throws {
         // A second signal while settling should NOT overwrite the stored bounding box.
         // We verify state stays .settling (already covered) and no crash occurs.
-        var batchCallCount = 0
+        nonisolated(unsafe) var batchCallCount = 0
         let queue = RecognitionQueue(
             recognize: { _, _, _, _ in RecognitionResult(cards: []) },
             recognizeBatch: { _, _, _ in

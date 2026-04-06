@@ -22,7 +22,7 @@ ios-build:
 
 ios-test:
 	xcodebuild test \
-	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
+	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests \
 	  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' \
 	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
 

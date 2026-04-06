@@ -41,7 +41,7 @@ final class RecognitionQueueTests: XCTestCase {
     }
 
     func testRetryOnce() async throws {
-        var callCount = 0
+        nonisolated(unsafe) var callCount = 0
         let queue = RecognitionQueue(recognize: { _, _, _, _ in
             callCount += 1
             throw URLError(.networkConnectionLost)
@@ -67,7 +67,7 @@ final class RecognitionQueueTests: XCTestCase {
     // MARK: - Cropped vs Uncropped Routing
 
     func testUncroppedJobCallsSingleEndpoint() async throws {
-        var singleCalled = false
+        nonisolated(unsafe) var singleCalled = false
         let queue = RecognitionQueue(
             recognize: { _, _, _, _ in singleCalled = true; return RecognitionResult(cards: []) },
             recognizeBatch: { _, _, _ in XCTFail("batch should not be called"); return RecognitionResult(cards: []) }
@@ -78,7 +78,7 @@ final class RecognitionQueueTests: XCTestCase {
     }
 
     func testCroppedJobCallsBatchEndpoint() async throws {
-        var batchCalled = false
+        nonisolated(unsafe) var batchCalled = false
         let queue = RecognitionQueue(
             recognize: { _, _, _, _ in XCTFail("single should not be called"); return RecognitionResult(cards: []) },
             recognizeBatch: { crops, _, _ in
@@ -93,7 +93,7 @@ final class RecognitionQueueTests: XCTestCase {
     }
 
     func testRetryPreservesCroppedFlag() async throws {
-        var batchCallCount = 0
+        nonisolated(unsafe) var batchCallCount = 0
         let queue = RecognitionQueue(
             recognize: { _, _, _, _ in XCTFail("single should not be called"); return RecognitionResult(cards: []) },
             recognizeBatch: { _, _, _ in
@@ -109,7 +109,7 @@ final class RecognitionQueueTests: XCTestCase {
     }
 
     func testDefaultEnqueueIsUncropped() async throws {
-        var singleCalled = false
+        nonisolated(unsafe) var singleCalled = false
         let queue = RecognitionQueue(
             recognize: { _, _, _, _ in singleCalled = true; return RecognitionResult(cards: []) },
             recognizeBatch: { _, _, _ in XCTFail("batch should not be called"); return RecognitionResult(cards: []) }
@@ -229,7 +229,7 @@ final class RecognitionQueueTests: XCTestCase {
         // We test this indirectly: enqueue a job that fails once then succeeds,
         // verify it retried (callCount == 2) and completed. The retry uses the same
         // Job struct, so capturedAt is set at enqueue time, not retry time.
-        var callCount = 0
+        nonisolated(unsafe) var callCount = 0
         let queue = RecognitionQueue(recognize: { _, _, _, _ in
             callCount += 1
             if callCount == 1 {

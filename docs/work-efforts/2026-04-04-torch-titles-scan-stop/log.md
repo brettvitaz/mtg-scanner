@@ -113,3 +113,38 @@ Dispatched code-reviewer subagent for review. Assessment: "Ready for production 
 Deviations from plan: Applied code review feedback to simplify callback
 
 ---
+
+### Step 7: Post-Review Fixes (External Review)
+
+**Status:** done
+
+Received external code review findings on toast implementation. Addressed all issues:
+
+**Critical fix - Foil shimmer hit testing:**
+- Issue: Shimmer overlay at line 303 blocked taps on dismiss button
+- Fix: Added `.allowsHitTesting(false)` to shimmer overlay Group (line 331)
+
+**Important fix - Layout compression:**
+- Issue: Single-row HStack could truncate set code and collector number on narrow widths
+- Fix: Added `.layoutPriority(1)` to set code (line 274) and collector number (line 281)
+
+**Important fix - Accessibility:**
+- Issue: Dismiss button 24×24 below Apple's 44×44 minimum, missing accessibility label
+- Fix: Changed to `minWidth: 44, minHeight: 44` with `contentShape`, added `.accessibilityLabel("Dismiss")` (lines 290-298)
+
+**Minor fix - Reduce Motion:**
+- Issue: Shimmer animation ignored Reduce Motion preference
+- Fix: Added `@Environment(\.accessibilityReduceMotion)` and gated animation (lines 256, 333)
+
+Files modified:
+- `apps/ios/MTGScanner/Features/Scan/ScanView.swift` - All four fixes applied
+
+Build verification:
+```bash
+xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build
+```
+Result: BUILD SUCCEEDED
+
+Deviations from plan: None - all fixes applied as specified in review
+
+---

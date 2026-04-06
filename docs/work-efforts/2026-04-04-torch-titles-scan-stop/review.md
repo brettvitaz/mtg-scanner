@@ -133,9 +133,36 @@ Result: BUILD SUCCEEDED
 2. **Toasts:** Enable quick scan → scan cards → verify toasts slide in from side with correct data
 3. **Auto-stop:** Start quick scan → navigate away → return → verify scanning stopped
 
+## Post-Review Fixes (2026-04-05)
+
+Received external code review with four findings on toast implementation. All addressed:
+
+### Issues Fixed
+
+1. **Critical: Foil shimmer overlay blocks taps** - Fixed
+   - Added `.allowsHitTesting(false)` to shimmer overlay at line 331
+   - Dismiss button now tappable on foil cards
+
+2. **Important: Layout truncates metadata** - Fixed
+   - Added `.layoutPriority(1)` to set code and collector number text views
+   - Metadata now resists compression better than title
+
+3. **Important: Dismiss control too small** - Fixed
+   - Increased tappable area from 24×24 to 44×44 minimum (Apple HIG compliant)
+   - Added explicit `.accessibilityLabel("Dismiss")`
+
+4. **Minor: Shimmer ignores Reduce Motion** - Fixed
+   - Added `@Environment(\.accessibilityReduceMotion)` environment value
+   - Animation now gated on `!reduceMotion`
+
+### Re-verification
+
+Build: **BUILD SUCCEEDED**
+
 ## Notes
 
 - **Architecture decision:** Integrated toast code into existing files rather than creating new ones. This avoided complex Xcode project file modifications while maintaining clean separation of concerns within each file.
 - **Animation:** Uses SwiftUI's built-in `.transition(.move(edge: .trailing).combined(with: .opacity))` for smooth slide-in effect
 - **Memory:** IdentifiedCardsViewModel keeps max 10 cards, auto-dismisses after 3 seconds - minimal memory footprint
 - **Threading:** All UI updates happen on MainActor as required by SwiftUI
+- **Accessibility:** Toast system now respects Reduce Motion preference and provides proper accessibility labels

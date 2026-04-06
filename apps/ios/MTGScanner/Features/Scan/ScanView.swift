@@ -253,6 +253,7 @@ struct IdentifiedCardToastView: View {
     let card: IdentifiedCard
     let onDismiss: () -> Void
     @State private var shimmerOffset: CGFloat = -1.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 8) {
@@ -270,12 +271,14 @@ struct IdentifiedCardToastView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .layoutPriority(1)
 
             if !card.collectorNumber.isEmpty {
                 Text("#\(card.collectorNumber)")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .layoutPriority(1)
             }
 
             Spacer()
@@ -284,10 +287,15 @@ struct IdentifiedCardToastView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.primary)
-                    .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.3))
-                    .clipShape(Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 24, height: 24)
+                    )
             }
+            .accessibilityLabel("Dismiss")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -320,7 +328,9 @@ struct IdentifiedCardToastView: View {
                             )
                         )
                         .blendMode(.overlay)
+                        .allowsHitTesting(false)
                         .onAppear {
+                            guard !reduceMotion else { return }
                             withAnimation(
                                 .linear(duration: 2.0)
                                 .repeatForever(autoreverses: false)

@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Card Image Section
 
 struct CardImageSection: View {
-    @ObservedObject var viewModel: CardDetailViewModel
+    @Bindable var viewModel: CardDetailViewModel
     let appModel: AppModel
     @Binding var showFullscreen: Bool
 
@@ -54,7 +54,7 @@ struct CardImageSection: View {
 // MARK: - Edition Picker Sheet
 
 struct EditionPickerSheet: View {
-    @ObservedObject var viewModel: CardDetailViewModel
+    @Bindable var viewModel: CardDetailViewModel
     let appModel: AppModel
     @Binding var isPresented: Bool
 
@@ -195,7 +195,7 @@ struct RarityBadge: View {
 }
 
 struct CardStatsView: View {
-    @ObservedObject var viewModel: CardDetailViewModel
+    @Bindable var viewModel: CardDetailViewModel
 
     var body: some View {
         HStack(spacing: 12) {

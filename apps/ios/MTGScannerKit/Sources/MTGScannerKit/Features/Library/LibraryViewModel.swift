@@ -3,8 +3,11 @@ import SwiftData
 import SwiftUI
 
 @MainActor
-final class LibraryViewModel: ObservableObject {
-    var modelContext: ModelContext?
+@Observable
+public final class LibraryViewModel {
+    public var modelContext: ModelContext?
+
+    public init() {}
 
     func createCollection(name: String) {
         guard let modelContext else { return }

@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 final class DetectionOverlayRendererTests: XCTestCase {
 

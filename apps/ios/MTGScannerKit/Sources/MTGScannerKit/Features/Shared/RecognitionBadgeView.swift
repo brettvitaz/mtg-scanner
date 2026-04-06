@@ -5,7 +5,7 @@ import SwiftUI
 /// Used by both Quick Scan and standard (table/binder) scan modes to show
 /// async recognition job status in the upper-right corner of the scan screen.
 struct RecognitionBadgeView: View {
-    @ObservedObject var recognitionQueue: RecognitionQueue
+    @Bindable var recognitionQueue: RecognitionQueue
     var onCancel: (() -> Void)?
 
     var body: some View {

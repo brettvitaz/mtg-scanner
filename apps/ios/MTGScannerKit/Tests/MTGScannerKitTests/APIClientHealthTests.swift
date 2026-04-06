@@ -1,5 +1,5 @@
 import XCTest
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 final class APIClientHealthTests: XCTestCase {
     private let client = APIClient()

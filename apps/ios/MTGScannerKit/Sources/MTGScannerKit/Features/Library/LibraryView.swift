@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct LibraryView: View {
-    @EnvironmentObject private var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) private var libraryViewModel
     @Query(sort: \CardCollection.updatedAt, order: .reverse) private var collections: [CardCollection]
     @Query(sort: \Deck.updatedAt, order: .reverse) private var decks: [Deck]
 

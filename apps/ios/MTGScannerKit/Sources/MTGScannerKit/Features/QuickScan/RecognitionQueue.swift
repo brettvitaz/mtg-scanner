@@ -9,13 +9,14 @@ import UIKit
 ///
 /// Retries each job once on failure before marking it failed.
 @MainActor
-final class RecognitionQueue: ObservableObject {
+@Observable
+final class RecognitionQueue {
 
     // MARK: - Published State
 
-    @Published private(set) var pendingCount = 0
-    @Published private(set) var completedCount = 0
-    @Published private(set) var failedCount = 0
+    private(set) var pendingCount = 0
+    private(set) var completedCount = 0
+    private(set) var failedCount = 0
 
     // MARK: - Callbacks
 

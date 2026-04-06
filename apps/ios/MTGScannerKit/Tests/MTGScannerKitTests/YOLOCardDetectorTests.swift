@@ -1,6 +1,6 @@
 import CoreML
 import XCTest
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 final class YOLOCardDetectorTests: XCTestCase {
 

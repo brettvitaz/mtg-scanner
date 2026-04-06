@@ -14,7 +14,7 @@ import Vision
 /// - Table mode: VNDetectRectanglesRequest filtered by RectangleFilter.
 /// - Binder mode: VNDetectRectanglesRequest to find the page, then GridInterpolator
 ///   to subdivide into a 3×3 grid.
-final class CardDetectionEngine {
+final class CardDetectionEngine: @unchecked Sendable {
 
     // MARK: - Properties
 

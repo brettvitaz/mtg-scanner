@@ -4,45 +4,46 @@ import SwiftUI
 import UIKit
 
 @MainActor
-final class AppModel: ObservableObject {
-    @Published var latestResult: RecognitionResult = .sample
-    @Published var corrections: [UUID: CardCorrection] = [:]
+@Observable
+public final class AppModel {
+    var latestResult: RecognitionResult = .sample
+    var corrections: [UUID: CardCorrection] = [:]
 
     /// SwiftData model context, set after app launch.
-    var modelContext: ModelContext?
-    @Published var apiBaseURL: String {
+    public var modelContext: ModelContext?
+    var apiBaseURL: String {
         didSet { persistAPIBaseURL() }
     }
-    @Published var onDeviceCropEnabled: Bool {
+    var onDeviceCropEnabled: Bool {
         didSet { persistOnDeviceCrop() }
     }
-    @Published var quickScanCaptureDelay: Double {
+    var quickScanCaptureDelay: Double {
         didSet { UserDefaults.standard.set(quickScanCaptureDelay, forKey: quickScanCaptureDelayKey) }
     }
-    @Published var quickScanConfidenceThreshold: Double {
+    var quickScanConfidenceThreshold: Double {
         didSet { UserDefaults.standard.set(quickScanConfidenceThreshold, forKey: quickScanConfidenceKey) }
     }
-    @Published var maxConcurrentUploads: Int {
+    var maxConcurrentUploads: Int {
         didSet { UserDefaults.standard.set(maxConcurrentUploads, forKey: maxConcurrentUploadsKey) }
     }
-    @Published var isRecognizing = false
-    @Published var statusMessage = "Point camera at cards to scan."
-    @Published var lastUploadedFilename: String?
+    var isRecognizing = false
+    var statusMessage = "Point camera at cards to scan."
+    var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.
-    @Published var lastDetectedCrops: [UIImage] = []
+    var lastDetectedCrops: [UIImage] = []
     /// Crop images keyed by the corresponding RecognizedCard.id.
-    @Published var cardCropImages: [UUID: UIImage] = [:]
-    @Published var shouldShowResults = false
+    var cardCropImages: [UUID: UIImage] = [:]
+    var shouldShowResults = false
     /// Navigation path for the Results tab — reset to dismiss detail views.
-    @Published var resultsNavigationPath = NavigationPath()
+    var resultsNavigationPath = NavigationPath()
     /// When true, shows a connection-unavailable alert.
-    @Published var showConnectionAlert = false
-    @Published var connectionAlertMessage = ""
-    @Published var showUndoAlert = false
+    var showConnectionAlert = false
+    var connectionAlertMessage = ""
+    var showUndoAlert = false
     private var latestUndoAction: (@MainActor () -> Void)?
 
     /// Torch level to restore when returning to scan view (same session only, not persisted)
-    @Published var lastTorchLevel: Float = 0
+    var lastTorchLevel: Float = 0
 
     private let apiClient = APIClient()
     private let cropService = CardCropService()
@@ -53,7 +54,7 @@ final class AppModel: ObservableObject {
     private let quickScanConfidenceKey = "quick_scan_confidence_threshold"
     private let maxConcurrentUploadsKey = "max_concurrent_uploads"
 
-    init() {
+    public init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
         let storedDelay = UserDefaults.standard.double(forKey: quickScanCaptureDelayKey)

@@ -83,6 +83,7 @@
 		C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B4 /* RecognitionQueueTests.swift */; };
 		C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* ScanMenuButtonTests.swift */; };
 		C000000000000000000001B6 /* YOLOCropHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B6 /* YOLOCropHelperTests.swift */; };
+		SPM0000000000000000000004 /* MTGScannerKit in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000003 /* MTGScannerKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -175,6 +176,7 @@
 		C000000000000000000002B4 /* RecognitionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueueTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B5 /* ScanMenuButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMenuButtonTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B6 /* YOLOCropHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCropHelperTests.swift; sourceTree = "<group>"; };
+		SPM0000000000000000000001 /* MTGScannerKit */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; name = MTGScannerKit; path = MTGScannerKit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -182,6 +184,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				SPM0000000000000000000004 /* MTGScannerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -469,6 +472,9 @@
 		A00000000000000000000005 /* MTGScanner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A00000000000000000000009 /* Build configuration list for PBXNativeTarget "MTGScanner" */;
+			packageProductDependencies = (
+				SPM0000000000000000000003 /* MTGScannerKit */,
+			);
 			buildPhases = (
 				A00000000000000000000007 /* Sources */,
 				A00000000000000000000008 /* Frameworks */,
@@ -531,6 +537,9 @@
 			productRefGroup = A00000000000000000000004 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			localPackages = (
+				SPM0000000000000000000002 /* XCLocalSwiftPackageReference "MTGScannerKit" */,
+			);
 			targets = (
 				A00000000000000000000005 /* MTGScanner */,
 				A00000000000000000000031 /* MTGScannerTests */,
@@ -555,59 +564,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00000000000000000000101 /* AppModel.swift in Sources */,
 				A00000000000000000000102 /* MTGScannerApp.swift in Sources */,
-				A00000000000000000000103 /* RootTabView.swift in Sources */,
-				A00000000000000000000104 /* ResultsView.swift in Sources */,
-				A00000000000000000000105 /* ScanView.swift in Sources */,
-				A00000000000000000000123 /* ZoomPresetControl.swift in Sources */,
-				C000000000000000000001A8 /* ScanMenuButton.swift in Sources */,
-				A00000000000000000000106 /* SettingsView.swift in Sources */,
-				A00000000000000000000107 /* RecognitionModels.swift in Sources */,
-				A00000000000000000000108 /* APIClient.swift in Sources */,
-				A00000000000000000000109 /* AppConfig.swift in Sources */,
-				A00000000000000000000180 /* CorrectionView.swift in Sources */,
-				A0000000000000000000010C /* CardCropService.swift in Sources */,
-				A00000000000000000000110 /* DetectedCard.swift in Sources */,
-				A00000000000000000000111 /* DetectionMode.swift in Sources */,
-				A00000000000000000000112 /* RectangleFilter.swift in Sources */,
-				A00000000000000000000113 /* GridInterpolator.swift in Sources */,
-				A00000000000000000000114 /* CardDetectionEngine.swift in Sources */,
-				A0000000000000000000011B /* CardTracker.swift in Sources */,
-				A00000000000000000000115 /* CameraSessionManager.swift in Sources */,
-				A00000000000000000000116 /* DetectionOverlayRenderer.swift in Sources */,
-				A00000000000000000000117 /* CameraViewController.swift in Sources */,
-				A00000000000000000000118 /* CameraPreviewRepresentable.swift in Sources */,
-				A00000000000000000000119 /* CardDetectionViewModel.swift in Sources */,
-				A0000000000000000000011D /* CameraCaptureCoordinator.swift in Sources */,
-				A0000000000000000000011E /* CaptureButton.swift in Sources */,
-				A00000000000000000000120 /* CardDetailView.swift in Sources */,
-				A0000000000000000000012B /* CardDetailSubviews.swift in Sources */,
-				A00000000000000000000121 /* CardDetailViewModel.swift in Sources */,
-				A00000000000000000000122 /* FullscreenImageView.swift in Sources */,
-				A0000000000000000000012B /* CardDetailSubviews.swift in Sources */,
-				A00000000000000000000124 /* CollectionModels.swift in Sources */,
-				D000000000000000000000001 /* CardFilterSort.swift in Sources */,
-				A00000000000000000000125 /* MoveToSheet.swift in Sources */,
-				A00000000000000000000126 /* CollectionItemRow.swift in Sources */,
-				A0000000000000000000012C /* ShakeDetector.swift in Sources */,
-				A00000000000000000000140 /* CachedAsyncImage.swift in Sources */,
-				E00000000000000000000001 /* RecognitionBadgeView.swift in Sources */,
-				A00000000000000000000127 /* LibraryView.swift in Sources */,
-				A00000000000000000000128 /* LibraryViewModel.swift in Sources */,
-				A00000000000000000000129 /* CollectionDetailView.swift in Sources */,
-				A0000000000000000000012A /* DeckDetailView.swift in Sources */,
-				B00000000000000000000011 /* ExportService.swift in Sources */,
-				B00000000000000000000012 /* ExportButton.swift in Sources */,
-				D000000000000000000000002 /* FilterSortToolbar.swift in Sources */,
-				D000000000000000000000003 /* FilterSheet.swift in Sources */,
-				C000000000000000000001A1 /* YOLOCardDetector.swift in Sources */,
-				C000000000000000000001A2 /* FrameDifferenceAnalyzer.swift in Sources */,
-				C000000000000000000001A3 /* CardPresenceTracker.swift in Sources */,
-				C000000000000000000001A4 /* QuickScanView.swift in Sources */,
-				C000000000000000000001A5 /* QuickScanViewModel.swift in Sources */,
-				C000000000000000000001A6 /* RecognitionQueue.swift in Sources */,
-				C000000000000000000001A7 /* YOLOCropHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -615,27 +572,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00000000000000000000190 /* DetectedCardTests.swift in Sources */,
-				A00000000000000000000191 /* RectangleFilterTests.swift in Sources */,
-				A00000000000000000000192 /* GridInterpolatorTests.swift in Sources */,
-				A00000000000000000000193 /* DetectionOverlayRendererTests.swift in Sources */,
-				A00000000000000000000194 /* AppModelCropToggleTests.swift in Sources */,
-				A00000000000000000000195 /* APIClientHealthTests.swift in Sources */,
-				A00000000000000000000196 /* ZoomFactorTests.swift in Sources */,
-				A00000000000000000000197 /* ZoomPresetTests.swift in Sources */,
-				A00000000000000000000198 /* CollectionModelsTests.swift in Sources */,
-				A00000000000000000000199 /* CollectionItemFoilToggleTests.swift in Sources */,
-				A0000000000000000000019A /* AppModelUndoTests.swift in Sources */,
-				A0000000000000000000019B /* CollectionItemMoveTests.swift in Sources */,
-				D000000000000000000000004 /* CardFilterSortTests.swift in Sources */,
-				B00000000000000000000013 /* ExportServiceTests.swift in Sources */,
-				C000000000000000000001B0 /* YOLOCardDetectorTests.swift in Sources */,
-				C000000000000000000001B1 /* FrameDifferenceAnalyzerTests.swift in Sources */,
-				C000000000000000000001B2 /* CardPresenceTrackerTests.swift in Sources */,
-				C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */,
-				C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */,
-				C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */,
-				C000000000000000000001B6 /* YOLOCropHelperTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -649,6 +585,19 @@
 		};
 /* End PBXTargetDependency section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		SPM0000000000000000000002 /* XCLocalSwiftPackageReference "MTGScannerKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = MTGScannerKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+		SPM0000000000000000000003 /* MTGScannerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = SPM0000000000000000000002 /* XCLocalSwiftPackageReference "MTGScannerKit" */;
+			productName = MTGScannerKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 /* Begin XCBuildConfiguration section */
 		A00000000000000000000021 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -669,7 +618,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -690,7 +639,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
@@ -714,7 +663,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -737,7 +686,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -750,7 +699,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XH38UHTNGY;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -762,7 +711,7 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MTGScanner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MTGScanner";
 			};
@@ -776,7 +725,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XH38UHTNGY;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -788,7 +737,7 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MTGScanner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MTGScanner";
 			};

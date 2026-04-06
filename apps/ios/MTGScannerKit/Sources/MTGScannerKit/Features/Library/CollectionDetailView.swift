@@ -4,7 +4,7 @@ import UIKit
 
 struct CollectionDetailView: View {
     @Bindable var collection: CardCollection
-    @EnvironmentObject private var appModel: AppModel
+    @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false

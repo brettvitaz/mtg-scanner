@@ -2,12 +2,20 @@
 
 SwiftUI app for iPhone-first MTG card scanning with on-device detection and cropping.
 
+## Structure
+
+The iOS code is split into two parts:
+
+- **`MTGScanner/`** — Xcode app shell: `@main` entry point, `Info.plist`, `Assets.xcassets`, `MTGCardDetector.mlpackage`. This is the Xcode target that produces the `.app`.
+- **`MTGScannerKit/`** — Swift Package containing all production source and tests. SourceKit-LSP indexes this package for IDE tooling (autocomplete, go-to-definition).
+- **`MTGScanner.xcworkspace`** — Workspace that references both. **Always open the workspace, not the xcodeproj.**
+
 ## Architecture
 
 ```
-MTGScanner/
+MTGScannerKit/Sources/MTGScannerKit/
   App/
-    MTGScannerApp.swift              @main entry point
+    MTGScannerApp (entry point — stays in MTGScanner/ app target)
     AppModel.swift                   Root @MainActor ObservableObject — app-wide state
     RootTabView.swift                Tab navigation
   Features/
@@ -29,21 +37,14 @@ MTGScanner/
         DetectionMode.swift          Enum: .table, .binder
       ViewModels/
         CardDetectionViewModel.swift ObservableObject bridging detection → SwiftUI
-      Views/
-        CardDetectionView.swift      SwiftUI host view
     Scan/                            Camera capture and upload flow
-      Services/
-        CardCropService.swift        On-device perspective-corrected cropping
-      ScanView.swift, ScanViewModel.swift
     Results/                         Recognition results list with card thumbnails
     CardDetail/                      Card detail view with metadata, edition picker, purchase links
-      CardDetailView.swift           Scrollable detail: image, identity, oracle text, stats, actions
-      CardDetailViewModel.swift      State management, printings loading, edition selection
-      FullscreenImageView.swift      Tap-to-dismiss fullscreen card/crop image overlay
-    Correction/                      Legacy manual correction UI (ConfidenceBadge still used)
+    Correction/                      Legacy manual correction UI
     Settings/                        App configuration
   Services/
     APIClient.swift                  Network client for backend communication
+    CardCropService.swift            On-device perspective-corrected cropping
 ```
 
 ## Detection pipeline
@@ -66,6 +67,7 @@ These were established through debugging. Do not deviate:
 
 ## Coding rules
 
+- Swift 6.0, minimum iOS 18.0 (supports iOS 18 and iOS 26).
 - `final class` for view models and services (prevent unintended subclassing).
 - `@MainActor` on all UI-bound classes. Bridge from background with `Task { @MainActor in }`.
 - No force unwraps (`!`) in production code. `guard let` / `if let` only.
@@ -73,18 +75,21 @@ These were established through debugging. Do not deviate:
 - Camera and Vision work on dedicated serial `DispatchQueue`s, never on main thread.
 - `CATransaction.setDisableActions(true)` when updating overlay layer paths to prevent implicit animations.
 - Session preset: `.hd1920x1080`. Do not use `.photo` or `.hd4K` — too slow for real-time Vision.
+- Classes that use GCD-based concurrency (camera/detection layer) are marked `@unchecked Sendable` — do not remove this without auditing the threading model.
 
 ## Testing
 
 ```bash
 xcodebuild test \
-  -project apps/ios/MTGScanner.xcodeproj \
+  -workspace apps/ios/MTGScanner.xcworkspace \
   -scheme MTGScanner \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
   2>&1 | xcpretty
 ```
 
-- Tests in `MTGScannerTests/`.
+Or via Makefile: `make ios-test`
+
+- Tests in `MTGScannerKit/Tests/MTGScannerKitTests/`.
 - `final class <Feature>Tests: XCTestCase` naming.
 - Force unwraps acceptable in test code for brevity.
 - Use `XCTAssertEqual(_:_:accuracy:)` for CGFloat/Double comparisons.
@@ -95,6 +100,8 @@ xcodebuild test \
 Minimum check that the app compiles:
 
 ```bash
-xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner \
+xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
   -sdk iphonesimulator -configuration Debug build
 ```
+
+Or: `make ios-build`

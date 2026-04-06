@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-lint lint security tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-build ios-test ios-xcode-build ios-lint lint security tree
 
 bootstrap: api-bootstrap
 
@@ -15,6 +15,16 @@ api-test:
 
 api-lint:
 	./scripts/lint-api.sh
+
+ios-build:
+	xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
+	  -sdk iphonesimulator -configuration Debug build
+
+ios-test:
+	xcodebuild test \
+	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
+	  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' \
+	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
 
 ios-lint:
 	./scripts/lint-ios.sh

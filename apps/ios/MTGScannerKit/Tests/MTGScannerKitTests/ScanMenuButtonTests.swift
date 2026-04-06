@@ -1,5 +1,5 @@
 import XCTest
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 // Note: ScanMenuButton is a SwiftUI view; button tap behavior and gesture state cannot be
 // unit-tested without a SwiftUI testing library (e.g. ViewInspector). Tests here cover the

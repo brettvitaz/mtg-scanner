@@ -1,5 +1,5 @@
 import XCTest
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 @MainActor
 final class QuickScanViewModelTests: XCTestCase {

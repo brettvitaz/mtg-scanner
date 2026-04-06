@@ -257,45 +257,9 @@ struct IdentifiedCardToastView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(card.title)
-                .font(.system(size: 16, weight: .bold))
-                .lineLimit(1)
-
-            if card.isFoil {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.yellow)
-            }
-
-            Text(card.setCode.uppercased())
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .layoutPriority(1)
-
-            if !card.collectorNumber.isEmpty {
-                Text("#\(card.collectorNumber)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .layoutPriority(1)
-            }
-
+            cardLabels
             Spacer()
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(width: 24, height: 24)
-                    )
-            }
-            .accessibilityLabel("Dismiss")
+            dismissButton
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -308,39 +272,73 @@ struct IdentifiedCardToastView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
-        .overlay(
-            Group {
-                if card.isFoil {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.red.opacity(0.3),
-                                    Color.orange.opacity(0.3),
-                                    Color.yellow.opacity(0.3),
-                                    Color.green.opacity(0.3),
-                                    Color.blue.opacity(0.3),
-                                    Color.purple.opacity(0.3),
-                                    Color.red.opacity(0.3)
-                                ],
-                                startPoint: UnitPoint(x: shimmerOffset, y: 0),
-                                endPoint: UnitPoint(x: shimmerOffset + 1, y: 1)
-                            )
-                        )
-                        .blendMode(.overlay)
-                        .allowsHitTesting(false)
-                        .onAppear {
-                            guard !reduceMotion else { return }
-                            withAnimation(
-                                .linear(duration: 2.0)
-                                .repeatForever(autoreverses: false)
-                            ) {
-                                shimmerOffset = 1.0
-                            }
-                        }
+        .overlay(shimmerOverlay)
+    }
+
+    @ViewBuilder
+    private var cardLabels: some View {
+        Text(card.title)
+            .font(.system(size: 16, weight: .bold))
+            .lineLimit(1)
+        if card.isFoil {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14))
+                .foregroundStyle(.yellow)
+        }
+        Text(card.setCode.uppercased())
+            .font(.system(size: 13))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .layoutPriority(1)
+        if !card.collectorNumber.isEmpty {
+            Text("#\(card.collectorNumber)")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .layoutPriority(1)
+        }
+    }
+
+    private var dismissButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+                .background(Circle().fill(Color.white.opacity(0.3)).frame(width: 24, height: 24))
+        }
+        .accessibilityLabel("Dismiss")
+    }
+
+    @ViewBuilder
+    private var shimmerOverlay: some View {
+        if card.isFoil {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.red.opacity(0.3),
+                            Color.orange.opacity(0.3),
+                            Color.yellow.opacity(0.3),
+                            Color.green.opacity(0.3),
+                            Color.blue.opacity(0.3),
+                            Color.purple.opacity(0.3),
+                            Color.red.opacity(0.3)
+                        ],
+                        startPoint: UnitPoint(x: shimmerOffset, y: 0),
+                        endPoint: UnitPoint(x: shimmerOffset + 1, y: 1)
+                    )
+                )
+                .blendMode(.overlay)
+                .allowsHitTesting(false)
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                        shimmerOffset = 1.0
+                    }
                 }
-            }
-        )
+        }
     }
 }
 

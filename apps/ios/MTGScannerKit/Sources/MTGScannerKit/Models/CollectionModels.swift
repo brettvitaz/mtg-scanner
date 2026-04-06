@@ -2,38 +2,38 @@ import Foundation
 import SwiftData
 
 @Model
-final class CollectionItem {
-    var id: UUID
-    var title: String
-    var edition: String
-    var setCode: String?
-    var collectorNumber: String?
-    var foil: Bool
-    var rarity: String?
-    var typeLine: String?
-    var oracleText: String?
-    var manaCost: String?
-    var power: String?
-    var toughness: String?
-    var loyalty: String?
-    var defense: String?
-    var scryfallId: String?
-    var imageUrl: String?
-    var setSymbolUrl: String?
-    var cardKingdomUrl: String?
-    var colorIdentity: String?
-    var priceRetail: String?
-    var priceBuy: String?
-    var addedAt: Date
-    var quantity: Int
+public final class CollectionItem {
+    public var id: UUID
+    public var title: String
+    public var edition: String
+    public var setCode: String?
+    public var collectorNumber: String?
+    public var foil: Bool
+    public var rarity: String?
+    public var typeLine: String?
+    public var oracleText: String?
+    public var manaCost: String?
+    public var power: String?
+    public var toughness: String?
+    public var loyalty: String?
+    public var defense: String?
+    public var scryfallId: String?
+    public var imageUrl: String?
+    public var setSymbolUrl: String?
+    public var cardKingdomUrl: String?
+    public var colorIdentity: String?
+    public var priceRetail: String?
+    public var priceBuy: String?
+    public var addedAt: Date
+    public var quantity: Int
 
     @Relationship(inverse: \CardCollection.items)
-    var collection: CardCollection?
+    public var collection: CardCollection?
 
     @Relationship(inverse: \Deck.items)
-    var deck: Deck?
+    public var deck: Deck?
 
-    init(
+    public init(
         title: String,
         edition: String,
         setCode: String? = nil,
@@ -213,15 +213,15 @@ final class CollectionItem {
 }
 
 @Model
-final class CardCollection {
-    var id: UUID
-    var name: String
+public final class CardCollection {
+    public var id: UUID
+    public var name: String
     @Relationship(deleteRule: .cascade)
-    var items: [CollectionItem]
-    var createdAt: Date
-    var updatedAt: Date
+    public var items: [CollectionItem]
+    public var createdAt: Date
+    public var updatedAt: Date
 
-    init(name: String) {
+    public init(name: String) {
         self.id = UUID()
         self.name = name
         self.items = []
@@ -231,15 +231,15 @@ final class CardCollection {
 }
 
 @Model
-final class Deck {
-    var id: UUID
-    var name: String
+public final class Deck {
+    public var id: UUID
+    public var name: String
     @Relationship(deleteRule: .cascade)
-    var items: [CollectionItem]
-    var createdAt: Date
-    var updatedAt: Date
+    public var items: [CollectionItem]
+    public var createdAt: Date
+    public var updatedAt: Date
 
-    init(name: String) {
+    public init(name: String) {
         self.id = UUID()
         self.name = name
         self.items = []

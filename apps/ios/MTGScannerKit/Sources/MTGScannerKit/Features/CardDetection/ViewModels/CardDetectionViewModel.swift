@@ -3,13 +3,14 @@ import SwiftUI
 
 /// Observable state for the real-time card detection feature.
 @MainActor
-final class CardDetectionViewModel: ObservableObject {
+@Observable
+final class CardDetectionViewModel {
 
-    @Published var detectionMode: DetectionMode = .table
-    @Published var detectedCardCount: Int = 0
-    @Published var cameraPermissionDenied = false
-    @Published var zoomFactor: CGFloat = 1.0
-    @Published var torchLevel: Float = 0
+    var detectionMode: DetectionMode = .table
+    var detectedCardCount: Int = 0
+    var cameraPermissionDenied = false
+    var zoomFactor: CGFloat = 1.0
+    var torchLevel: Float = 0
 
     func handleDetectedCards(_ cards: [DetectedCard]) {
         detectedCardCount = cards.count

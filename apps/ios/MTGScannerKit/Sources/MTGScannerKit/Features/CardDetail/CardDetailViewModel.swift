@@ -7,22 +7,23 @@ extension String {
 }
 
 @MainActor
-final class CardDetailViewModel: ObservableObject {
+@Observable
+final class CardDetailViewModel {
     let card: RecognizedCard
     let cropImage: UIImage?
 
-    @Published var showingCropImage = false
-    @Published var printings: [CardPrinting] = []
-    @Published var isLoadingPrintings = false
-    @Published var selectedPrinting: CardPrinting?
-    @Published var cardPrice: CardPrice?
-    @Published var isLoadingPrice = false
+    var showingCropImage = false
+    var printings: [CardPrinting] = []
+    var isLoadingPrintings = false
+    var selectedPrinting: CardPrinting?
+    var cardPrice: CardPrice?
+    var isLoadingPrice = false
 
     // Editable correction fields
-    @Published var editTitle: String
-    @Published var editEdition: String
-    @Published var editCollectorNumber: String
-    @Published var editFoil: Bool
+    var editTitle: String
+    var editEdition: String
+    var editCollectorNumber: String
+    var editFoil: Bool
 
     init(card: RecognizedCard, cropImage: UIImage?) {
         self.card = card

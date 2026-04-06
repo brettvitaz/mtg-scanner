@@ -6,7 +6,7 @@ import AVFoundation
 /// - Configure the back wide-angle camera for 1080p video output.
 /// - Deliver `CMSampleBuffer` frames to `onFrame` on the session queue.
 /// - Start and stop the session from outside the session queue safely.
-final class CameraSessionManager: NSObject {
+final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     // MARK: - Public
 

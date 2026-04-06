@@ -18,7 +18,7 @@ struct CardCropResult {
 /// 2. Filtering by MTG-like aspect ratio (2.5:3.5 ≈ 0.714) with tolerance
 /// 3. Suppressing heavily overlapping duplicates (IoU-based)
 /// 4. Cropping each accepted region with perspective correction
-final class CardCropService {
+final class CardCropService: @unchecked Sendable {
 
     private static let cropPadding: CGFloat = 0.03
     private let rectangleFilter = RectangleFilter()
@@ -37,7 +37,7 @@ final class CardCropService {
         }
 
         // Step 2: Run Vision rectangle detection on upright pixels.
-        let observations = await detectRectangles(in: cgImage)
+        let observations = detectRectangles(in: cgImage)
         let filtered = rectangleFilter.filter(observations, isLandscape: false)
 
         // Step 3: Perspective-correct and crop each detected card.
@@ -62,25 +62,17 @@ final class CardCropService {
 
     // MARK: - Rectangle Detection
 
-    private func detectRectangles(in cgImage: CGImage) async -> [VNRectangleObservation] {
-        await withCheckedContinuation { continuation in
-            let request = VNDetectRectanglesRequest { request, _ in
-                let results = (request.results as? [VNRectangleObservation]) ?? []
-                continuation.resume(returning: results)
-            }
-            request.maximumObservations = 10
-            request.minimumConfidence = RectangleFilter.minConfidence
-            request.minimumAspectRatio = RectangleFilter.visionMinAspectRatio
-            request.maximumAspectRatio = RectangleFilter.visionMaxAspectRatio
+    private func detectRectangles(in cgImage: CGImage) -> [VNRectangleObservation] {
+        let request = VNDetectRectanglesRequest()
+        request.maximumObservations = 10
+        request.minimumConfidence = RectangleFilter.minConfidence
+        request.minimumAspectRatio = RectangleFilter.visionMinAspectRatio
+        request.maximumAspectRatio = RectangleFilter.visionMaxAspectRatio
 
-            // CGImage is already upright, so no orientation hint needed.
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            do {
-                try handler.perform([request])
-            } catch {
-                continuation.resume(returning: [])
-            }
-        }
+        // CGImage is already upright, so no orientation hint needed.
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try? handler.perform([request])
+        return (request.results as? [VNRectangleObservation]) ?? []
     }
 
     // MARK: - Perspective Crop

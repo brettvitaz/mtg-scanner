@@ -1,6 +1,6 @@
 import XCTest
 import Vision
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 // swiftlint:disable type_body_length
 final class RectangleFilterTests: XCTestCase {

@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 struct ResultsView: View {
-    @EnvironmentObject private var appModel: AppModel
+    @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @Query(
         filter: #Predicate<CollectionItem> { $0.collection == nil && $0.deck == nil },
@@ -27,6 +27,7 @@ struct ResultsView: View {
     }
 
     var body: some View {
+        @Bindable var appModel = appModel
         NavigationStack(path: $appModel.resultsNavigationPath) {
             Group {
                 if inboxItems.isEmpty {
@@ -40,7 +41,7 @@ struct ResultsView: View {
             .searchable(text: $filterState.searchText, prompt: "Search by title or set")
             .navigationDestination(for: RecognizedCard.self) { card in
                 CardDetailView(card: card)
-                    .environmentObject(appModel)
+                    .environment(appModel)
             }
         }
         .sheet(isPresented: $showMoveSheet) {

@@ -1,10 +1,13 @@
 import SwiftUI
 
-struct RootTabView: View {
-    @EnvironmentObject private var appModel: AppModel
+public struct RootTabView: View {
+    @Environment(AppModel.self) private var appModel
     @State private var selectedTab = 0
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
+        @Bindable var appModel = appModel
         TabView(selection: $selectedTab) {
             ScanView()
                 .tabItem {

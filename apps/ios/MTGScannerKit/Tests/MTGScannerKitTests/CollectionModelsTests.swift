@@ -1,6 +1,6 @@
 import SwiftData
 import XCTest
-@testable import MTGScanner
+@testable import MTGScannerKit
 
 final class CollectionModelsTests: XCTestCase {
 

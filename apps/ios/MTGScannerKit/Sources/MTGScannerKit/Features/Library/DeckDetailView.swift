@@ -4,7 +4,7 @@ import UIKit
 
 struct DeckDetailView: View {
     @Bindable var deck: Deck
-    @EnvironmentObject private var appModel: AppModel
+    @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
 
     @State private var isSelecting = false

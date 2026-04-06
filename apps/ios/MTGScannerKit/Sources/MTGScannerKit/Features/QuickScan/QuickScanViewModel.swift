@@ -16,7 +16,8 @@ import UIKit
 /// settling  ──(new signal)───────► (ignored — timer keeps running)
 /// ```
 @MainActor
-final class QuickScanViewModel: ObservableObject {
+@Observable
+final class QuickScanViewModel {
 
     // MARK: - State
 
@@ -26,10 +27,10 @@ final class QuickScanViewModel: ObservableObject {
         case capturing
     }
 
-    @Published private(set) var isActive = false
-    @Published private(set) var captureState: CaptureState = .watching
-    @Published private(set) var statusMessage = "Tap Start to begin."
-    @Published private(set) var lastCroppedImage: UIImage?
+    private(set) var isActive = false
+    private(set) var captureState: CaptureState = .watching
+    private(set) var statusMessage = "Tap Start to begin."
+    private(set) var lastCroppedImage: UIImage?
 
     // MARK: - Child Objects
 
@@ -216,11 +217,12 @@ final class QuickScanViewModel: ObservableObject {
 /// Maintains up to `maxCards` recent identifications, auto-dismissing
 /// each card after `displayDuration` seconds.
 @MainActor
-final class IdentifiedCardsViewModel: ObservableObject {
+@Observable
+final class IdentifiedCardsViewModel {
 
     // MARK: - Published State
 
-    @Published private(set) var recentCards: [IdentifiedCard] = []
+    private(set) var recentCards: [IdentifiedCard] = []
 
     // MARK: - Configuration
 

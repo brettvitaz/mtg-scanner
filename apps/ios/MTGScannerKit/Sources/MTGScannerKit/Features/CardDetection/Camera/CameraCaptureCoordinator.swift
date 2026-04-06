@@ -2,7 +2,8 @@ import UIKit
 
 /// Bridges SwiftUI's async/await world to CameraViewController's callback-based capture.
 @MainActor
-final class CameraCaptureCoordinator: ObservableObject {
+@Observable
+final class CameraCaptureCoordinator {
     weak var controller: CameraViewController?
 
     func capturePhoto() async -> UIImage? {

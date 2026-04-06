@@ -6,8 +6,8 @@ import SwiftUI
 /// the underlying `CameraPreviewRepresentable` in `ScanView`. This view adds the
 /// Quick Scan-specific controls: running counts, status strip, and Start/Stop button.
 struct QuickScanView: View {
-    @ObservedObject var viewModel: QuickScanViewModel
-    @ObservedObject var recognitionQueue: RecognitionQueue
+    @Bindable var viewModel: QuickScanViewModel
+    @Bindable var recognitionQueue: RecognitionQueue
     @Binding var torchLevel: Float
     @Binding var detectionMode: DetectionMode
 
@@ -85,7 +85,9 @@ struct QuickScanView: View {
     }
 
     private var startStopButton: some View {
-        Button(action: viewModel.isActive ? viewModel.stop : viewModel.start) {
+        Button {
+            if viewModel.isActive { viewModel.stop() } else { viewModel.start() }
+        } label: {
             Text(viewModel.isActive ? "Stop" : "Start")
                 .font(.title3.bold())
                 .foregroundStyle(.white)

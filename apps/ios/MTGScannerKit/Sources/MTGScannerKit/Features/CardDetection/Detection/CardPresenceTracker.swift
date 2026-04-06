@@ -13,7 +13,7 @@ import CoreVideo
 ///
 /// Threading: `processFrame(_:)` is safe to call from any queue.  Internal work runs
 /// on a dedicated serial queue.  `onNewCardSignal` is always called on the main queue.
-final class CardPresenceTracker {
+final class CardPresenceTracker: @unchecked Sendable {
 
     // MARK: - Configuration
 

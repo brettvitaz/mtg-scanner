@@ -2,9 +2,9 @@ import SwiftData
 import SwiftUI
 
 struct CardDetailView: View {
-    @EnvironmentObject private var appModel: AppModel
+    @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var viewModel: CardDetailViewModel
+    @State private var viewModel: CardDetailViewModel
     @State private var showFullscreenImage = false
     @State private var showEditionPicker = false
     @State private var showAddToSheet = false
@@ -13,10 +13,11 @@ struct CardDetailView: View {
     @State private var autoSaveTask: Task<Void, Never>?
 
     init(card: RecognizedCard) {
-        _viewModel = StateObject(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
+        _viewModel = State(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
     }
 
     var body: some View {
+        @Bindable var viewModel = viewModel
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 CardImageSection(viewModel: viewModel, appModel: appModel, showFullscreen: $showFullscreenImage)

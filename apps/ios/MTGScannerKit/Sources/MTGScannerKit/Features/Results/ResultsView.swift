@@ -233,6 +233,17 @@ private extension ResultsView {
         }
     }
 
+    func refetchPrice(for item: CollectionItem) async {
+        guard let price = try? await appModel.fetchPrice(
+            name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
+        ) else {
+            print("[ResultsView] refetchPrice failed for \(item.title)")
+            return
+        }
+        item.priceRetail = price.priceRetail
+        item.priceBuy = price.priceBuy
+    }
+
     func enterSelecting() {
         selectedItems = []
         isSelecting = true
@@ -304,6 +315,7 @@ private extension ResultsView {
     func toggleFoil(_ item: CollectionItem) {
         item.toggleFoilUnconditionally()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task { await refetchPrice(for: item) }
     }
 
     func toggleSelectedFoil() {
@@ -312,6 +324,29 @@ private extension ResultsView {
             item.toggleFoilUnconditionally()
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let fetchRequests = items.map { (id: $0.id, name: $0.title, scryfallId: $0.scryfallId, isFoil: $0.foil) }
+        Task {
+            let results = await withTaskGroup(of: (UUID, CardPrice?).self) { group in
+                for req in fetchRequests {
+                    group.addTask {
+                        let price = try? await self.appModel.fetchPrice(
+                            name: req.name, scryfallId: req.scryfallId, isFoil: req.isFoil
+                        )
+                        return (req.id, price)
+                    }
+                }
+                var collected: [(UUID, CardPrice?)] = []
+                for await result in group {
+                    collected.append(result)
+                }
+                return collected
+            }
+            for (id, price) in results {
+                guard let price, let item = items.first(where: { $0.id == id }) else { continue }
+                item.priceRetail = price.priceRetail
+                item.priceBuy = price.priceBuy
+            }
+        }
     }
 
     func registerUndo(for items: [CollectionItem]) {

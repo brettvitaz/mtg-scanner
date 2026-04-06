@@ -5,10 +5,10 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct ScanView: View {
-    @EnvironmentObject private var appModel: AppModel
-    @StateObject private var detectionViewModel = CardDetectionViewModel()
-    @StateObject private var captureCoordinator = CameraCaptureCoordinator()
-    @StateObject private var quickScanViewModel = QuickScanViewModel()
+    @Environment(AppModel.self) private var appModel
+    @State private var detectionViewModel = CardDetectionViewModel()
+    @State private var captureCoordinator = CameraCaptureCoordinator()
+    @State private var quickScanViewModel = QuickScanViewModel()
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
@@ -346,7 +346,7 @@ struct IdentifiedCardToastView: View {
 
 /// Container view that displays multiple card toasts stacked vertically.
 struct IdentifiedCardToastContainer: View {
-    @ObservedObject var viewModel: IdentifiedCardsViewModel
+    @Bindable var viewModel: IdentifiedCardsViewModel
 
     var body: some View {
         VStack(spacing: 8) {

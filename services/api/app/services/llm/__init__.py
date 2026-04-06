@@ -40,7 +40,7 @@ def get_llm_provider(settings: Settings) -> LLMProvider:
     Raises:
         RecognitionConfigurationError: If provider is unknown or misconfigured
     """
-    provider_name = settings.mtg_scanner_llm_provider.strip().lower()
+    provider_name = _resolve_provider_name(settings)
 
     if provider_name == "mock":
         logger.info("Using mock LLM provider")
@@ -63,11 +63,32 @@ def get_llm_provider(settings: Settings) -> LLMProvider:
     )
 
 
+def _resolve_provider_name(settings: Settings) -> str:
+    """Resolve the active provider from new settings first, then legacy config."""
+    llm_provider = (settings.mtg_scanner_llm_provider or "").strip().lower()
+    if llm_provider:
+        return llm_provider
+
+    legacy_provider = (settings.mtg_scanner_recognizer_provider or "").strip().lower()
+    if legacy_provider:
+        logger.warning(
+            "Using legacy MTG_SCANNER_RECOGNIZER_PROVIDER=%s; prefer MTG_SCANNER_LLM_PROVIDER.",
+            legacy_provider,
+        )
+        return legacy_provider
+
+    return "mock"
+
+
 def _create_openai_provider(settings: Settings) -> OpenAIProvider:
     """Create OpenAI provider with resolved settings."""
     api_key = settings.openai_api_key or settings.mtg_scanner_llm_api_key
-    model = settings.openai_model or settings.mtg_scanner_llm_model
-    base_url = settings.openai_base_url or settings.mtg_scanner_llm_base_url
+    model = settings.openai_model or settings.mtg_scanner_llm_model or "gpt-4.1-mini"
+    base_url = (
+        settings.openai_base_url
+        or settings.mtg_scanner_llm_base_url
+        or "https://api.openai.com/v1"
+    )
 
     if not api_key:
         raise RecognitionConfigurationError(
@@ -97,8 +118,12 @@ def _create_openai_provider(settings: Settings) -> OpenAIProvider:
 def _create_moonshot_provider(settings: Settings) -> MoonshotProvider:
     """Create Moonshot provider with resolved settings."""
     api_key = settings.moonshot_api_key or settings.mtg_scanner_llm_api_key
-    model = settings.moonshot_model or settings.mtg_scanner_llm_model
-    base_url = settings.moonshot_base_url or settings.mtg_scanner_llm_base_url
+    model = settings.moonshot_model or settings.mtg_scanner_llm_model or "kimi-k2.5"
+    base_url = (
+        settings.moonshot_base_url
+        or settings.mtg_scanner_llm_base_url
+        or "https://api.moonshot.ai/v1"
+    )
 
     if not api_key:
         raise RecognitionConfigurationError(
@@ -128,8 +153,16 @@ def _create_moonshot_provider(settings: Settings) -> MoonshotProvider:
 def _create_anthropic_provider(settings: Settings) -> AnthropicProvider:
     """Create Anthropic provider with resolved settings."""
     api_key = settings.anthropic_api_key or settings.mtg_scanner_llm_api_key
-    model = settings.anthropic_model or settings.mtg_scanner_llm_model
-    base_url = settings.anthropic_base_url or settings.mtg_scanner_llm_base_url
+    model = (
+        settings.anthropic_model
+        or settings.mtg_scanner_llm_model
+        or "claude-sonnet-4-0"
+    )
+    base_url = (
+        settings.anthropic_base_url
+        or settings.mtg_scanner_llm_base_url
+        or "https://api.anthropic.com/v1"
+    )
 
     if not api_key:
         raise RecognitionConfigurationError(

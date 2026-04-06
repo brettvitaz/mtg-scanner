@@ -442,6 +442,65 @@ class TestProviderFactory:
         provider = get_llm_provider(settings)
         assert provider.model_name == "gpt-4o"  # Provider-specific wins
 
+    def test_generic_model_applies_to_moonshot_when_no_override(self):
+        """Test generic model is used when provider-specific model is unset."""
+        settings = Settings(
+            mtg_scanner_llm_provider="moonshot",
+            mtg_scanner_llm_api_key="test-key",
+            mtg_scanner_llm_model="shared-model",
+            moonshot_model=None,
+        )
+        provider = get_llm_provider(settings)
+        assert isinstance(provider, MoonshotProvider)
+        assert provider.model_name == "shared-model"
+
+    def test_generic_base_url_applies_to_anthropic_when_no_override(self):
+        """Test generic base URL is used when provider-specific base URL is unset."""
+        settings = Settings(
+            mtg_scanner_llm_provider="anthropic",
+            mtg_scanner_llm_api_key="test-key",
+            mtg_scanner_llm_base_url="https://proxy.example/v1",
+            anthropic_base_url=None,
+        )
+        provider = get_llm_provider(settings)
+        assert isinstance(provider, AnthropicProvider)
+        assert provider._base_url == "https://proxy.example/v1"
+
+    def test_provider_uses_sensible_default_model(self):
+        """Test provider-specific defaults still apply when no model is configured."""
+        settings = Settings(
+            mtg_scanner_llm_provider="moonshot",
+            mtg_scanner_llm_api_key="test-key",
+        )
+        provider = get_llm_provider(settings)
+        assert isinstance(provider, MoonshotProvider)
+        assert provider.model_name == "kimi-k2.5"
+
+    def test_legacy_provider_setting_is_used_when_new_setting_unset(self):
+        """Test legacy provider selector is still honored as a fallback."""
+        settings = Settings(
+            mtg_scanner_llm_provider=None,
+            mtg_scanner_recognizer_provider="openai",
+            mtg_scanner_llm_api_key="test-key",
+        )
+        provider = get_llm_provider(settings)
+        assert isinstance(provider, OpenAIProvider)
+        assert provider.provider_name == "openai"
+
+    def test_new_provider_setting_wins_over_legacy_selector(self):
+        """Test the new provider selector takes precedence over the legacy setting."""
+        settings = Settings(
+            mtg_scanner_llm_provider="moonshot",
+            mtg_scanner_recognizer_provider="openai",
+            mtg_scanner_llm_api_key="test-key",
+            moonshot_model=None,
+            mtg_scanner_llm_model="shared-model",
+        )
+        provider = get_llm_provider(settings)
+        assert isinstance(provider, MoonshotProvider)
+        assert provider.provider_name == "moonshot"
+        assert provider.model_name == "shared-model"
+
     def test_get_moonshot_provider(self):
         """Test factory creates Moonshot provider."""
         settings = Settings(
@@ -469,23 +528,11 @@ class TestProviderFactory:
         settings = Settings(
             mtg_scanner_llm_provider="openai",
             mtg_scanner_llm_api_key=None,
-            openai_api_key=None,  # Override default
+            openai_api_key=None,
         )
         with pytest.raises(RecognitionConfigurationError) as exc_info:
             get_llm_provider(settings)
         assert "OPENAI_API_KEY" in str(exc_info.value)
-
-    def test_missing_model_raises_error(self):
-        """Test error when model is missing."""
-        settings = Settings(
-            mtg_scanner_llm_provider="openai",
-            mtg_scanner_llm_api_key="test-key",
-            mtg_scanner_llm_model=None,
-            openai_model=None,  # Override default
-        )
-        with pytest.raises(RecognitionConfigurationError) as exc_info:
-            get_llm_provider(settings)
-        assert "OPENAI_MODEL" in str(exc_info.value)
 
     def test_unknown_provider_raises_error(self):
         """Test error for unknown provider."""

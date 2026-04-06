@@ -58,7 +58,7 @@ class TestBatchRecognitionEndpoint:
 
     def test_batch_two_crops_returns_merged_cards(self, tmp_path, monkeypatch, mtgjson_db) -> None:
         """Two pre-cropped card images should produce two recognised cards."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 
@@ -79,7 +79,7 @@ class TestBatchRecognitionEndpoint:
         assert payload["cards"][1]["title"] == "Lightning Bolt"
 
     def test_batch_single_crop_returns_one_card(self, tmp_path, monkeypatch, mtgjson_db) -> None:
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 
@@ -97,7 +97,7 @@ class TestBatchRecognitionEndpoint:
 
     def test_batch_saves_artifact_per_crop(self, tmp_path, monkeypatch, mtgjson_db) -> None:
         """Each crop in a batch should produce its own artifact directory."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 
@@ -124,7 +124,7 @@ class TestBatchRecognitionEndpoint:
 
     def test_batch_rejects_non_image_content_type(self, monkeypatch) -> None:
         """Non-image files in the batch should return HTTP 400."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
 
         response = client.post(
@@ -140,7 +140,7 @@ class TestBatchRecognitionEndpoint:
 
     def test_batch_with_different_crop_notes(self, tmp_path, monkeypatch, mtgjson_db) -> None:
         """Verify that the notes for each crop reference their respective filename."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 
@@ -161,7 +161,7 @@ class TestBatchRecognitionEndpoint:
 
     def test_batch_uses_prompt_version(self, tmp_path, monkeypatch, mtgjson_db) -> None:
         """The prompt_version form field should be forwarded to each crop recognition."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
 

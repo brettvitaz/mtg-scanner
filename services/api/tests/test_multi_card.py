@@ -338,7 +338,7 @@ class TestMultiCardRecognitionAPI:
         import cv2
         import numpy as np
 
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
 
         # Create image with one card-like rectangle
@@ -374,7 +374,7 @@ class TestMultiCardRecognitionAPI:
         import cv2
         import numpy as np
 
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
 
         # Create image with two distinct cards
@@ -415,7 +415,7 @@ class TestMultiCardRecognitionAPI:
 
     def test_backward_compatibility_single_card(self, tmp_path, monkeypatch):
         """Test that single-card images still work correctly."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
 
         # Use simple fake image (no card-like features, so detection may fail gracefully)
@@ -432,7 +432,7 @@ class TestMultiCardRecognitionAPI:
 
     def test_multi_card_detection_disabled(self, tmp_path, monkeypatch):
         """Test that multi-card detection can be disabled."""
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
 
@@ -470,7 +470,7 @@ class TestMultiCardRecognitionAPI:
         db_path = tmp_path / "mtgjson.sqlite"
         import_all_printings(source_path=mtgjson_source, db_path=db_path, manifest_path=tmp_path / "manifest.json")
 
-        monkeypatch.setenv("MTG_SCANNER_RECOGNIZER_PROVIDER", "mock")
+        monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(db_path))
         monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "true")

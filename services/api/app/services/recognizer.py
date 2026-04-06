@@ -353,8 +353,8 @@ def get_recognition_service() -> RecognitionService:
             max_fuzzy_candidates=settings.mtg_scanner_mtgjson_max_fuzzy_candidates,
         )
 
-    # Use new unified LLM provider system
-    # Falls back to legacy provider setting for backwards compatibility
+    # Use the unified LLM provider system, with a legacy provider fallback only
+    # when the new setting is not configured yet.
     provider = get_llm_provider(settings)
 
     return RecognitionService(

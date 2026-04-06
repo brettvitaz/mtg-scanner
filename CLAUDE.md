@@ -130,7 +130,7 @@ PYTHONPATH=services/api python evals/run_eval.py
 ### Swift (apps/ios)
 
 - Swift 6.0+, SwiftUI, minimum iOS 18.0 (supports iOS 18 and iOS 26).
-- MVVM architecture: Views, ViewModels (`@StateObject`/`@ObservedObject`), Services.
+- MVVM architecture: Views, ViewModels (`@Observable` classes held via `@State` or passed via `@Environment`), Services.
 - `final class` by default for view models and services.
 - `@MainActor` for UI-bound classes. Use `Task { @MainActor in }` to dispatch from background threads.
 - No force unwraps (`!`) in production code. Use `guard let` or `if let`. Force unwraps are acceptable in tests.

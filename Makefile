@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-build ios-test ios-xcode-build ios-lint lint security tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-build ios-test ios-lint lint security tree
 
 bootstrap: api-bootstrap
 

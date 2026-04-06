@@ -6,7 +6,6 @@ import SwiftUI
 @Observable
 final class CardDetectionViewModel {
 
-    var detectionMode: DetectionMode = .table
     var detectedCardCount: Int = 0
     var cameraPermissionDenied = false
     var zoomFactor: CGFloat = 1.0

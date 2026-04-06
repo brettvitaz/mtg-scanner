@@ -3,7 +3,7 @@ import Foundation
 
 /// Detects scene changes between camera frames by comparing sparse luminance samples.
 ///
-/// Used in Quick Scan mode to distinguish a new card drop (large scene change) from
+/// Used in Auto Scan mode to distinguish a new card drop (large scene change) from
 /// an unchanged bin (same card or empty).
 ///
 /// Sampling every `sampleStride` pixels in both axes gives a coarse-but-fast

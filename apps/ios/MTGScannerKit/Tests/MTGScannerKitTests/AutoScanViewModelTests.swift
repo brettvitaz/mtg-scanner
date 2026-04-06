@@ -2,32 +2,32 @@ import XCTest
 @testable import MTGScannerKit
 
 @MainActor
-final class QuickScanViewModelTests: XCTestCase {
+final class AutoScanViewModelTests: XCTestCase {
 
     // MARK: - Initial State
 
     func testInitialStateIsInactive() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         XCTAssertFalse(vm.isActive)
         XCTAssertEqual(vm.captureState, .watching)
     }
 
     func testInitialStatusMessageContainsStart() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         XCTAssertTrue(vm.statusMessage.lowercased().contains("start"))
     }
 
     // MARK: - Start / Stop
 
     func testStartActivatesViewModel() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.start()
         XCTAssertTrue(vm.isActive)
         XCTAssertEqual(vm.captureState, .watching)
     }
 
     func testStopDeactivatesViewModel() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.start()
         vm.stop()
         XCTAssertFalse(vm.isActive)
@@ -35,7 +35,7 @@ final class QuickScanViewModelTests: XCTestCase {
     }
 
     func testStopFromInactiveIsIdempotent() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.stop()
         XCTAssertFalse(vm.isActive)
     }
@@ -43,7 +43,7 @@ final class QuickScanViewModelTests: XCTestCase {
     // MARK: - Settle Timer
 
     func testSettleTimerTransitionsStateToSettling() async throws {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60  // very long so we don't reach capturing in this test
         vm.start()
 
@@ -57,7 +57,7 @@ final class QuickScanViewModelTests: XCTestCase {
     }
 
     func testStopCancelsSettleTimer() async throws {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
         vm.presenceTracker.onNewCardSignal?(nil)
@@ -72,7 +72,7 @@ final class QuickScanViewModelTests: XCTestCase {
     func testNewSignalWhileSettlingDoesNotRestartTimer() async throws {
         // After the first signal starts the settle timer, additional signals while in
         // .settling must be ignored so the timer can actually complete.
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
 
@@ -90,7 +90,7 @@ final class QuickScanViewModelTests: XCTestCase {
     func testSettleTimerCompletesWhenSignalsAreNotResent() async throws {
         // Verifies the core behaviour: settle timer must run to completion when
         // subsequent signals are ignored (the fix for the "always settling" bug).
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 0.1  // short timer for the test
         vm.start()
 
@@ -110,7 +110,7 @@ final class QuickScanViewModelTests: XCTestCase {
     }
 
     func testSignalIgnoredWhenInactive() async throws {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.presenceTracker.onNewCardSignal?(nil)
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(vm.captureState, .watching)
@@ -134,7 +134,7 @@ final class QuickScanViewModelTests: XCTestCase {
             }
         )
 
-        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue2)
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue2)
         vm.captureDelay = 0.05
         vm.start()
 
@@ -145,18 +145,18 @@ final class QuickScanViewModelTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(300))
 
         // captureCoordinator is nil → triggerCapture returns before enqueue.
-        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.watching)
+        XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.watching)
         XCTAssertNil(capturedIsCropped)
     }
 
     func testNewCardSignalWithNilBoundingBoxTransitionsToSettling() async throws {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
 
         vm.presenceTracker.onNewCardSignal?(nil)
         try await Task.sleep(for: .milliseconds(50))
-        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+        XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.settling)
     }
 
     func testBoundingBoxIgnoredWhenAlreadySettling() async throws {
@@ -170,31 +170,31 @@ final class QuickScanViewModelTests: XCTestCase {
                 return RecognitionResult(cards: [])
             }
         )
-        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
         vm.captureDelay = 60
         vm.start()
 
         let box = CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)
         vm.presenceTracker.onNewCardSignal?(box)
         try await Task.sleep(for: .milliseconds(30))
-        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+        XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.settling)
 
         // Fire another signal with a different box — must be ignored.
         let otherBox = CGRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1)
         vm.presenceTracker.onNewCardSignal?(otherBox)
         try await Task.sleep(for: .milliseconds(30))
-        XCTAssertEqual(vm.captureState, QuickScanViewModel.CaptureState.settling)
+        XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.settling)
     }
 
     // MARK: - Configuration
 
     func testDefaultCaptureDelay() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         XCTAssertEqual(vm.captureDelay, 2.0, accuracy: 0.001)
     }
 
     func testCaptureDelayIsSettable() {
-        let vm = QuickScanViewModel(detector: nil)
+        let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 3.5
         XCTAssertEqual(vm.captureDelay, 3.5, accuracy: 0.001)
     }
@@ -203,7 +203,7 @@ final class QuickScanViewModelTests: XCTestCase {
 
     func testEnqueueCapturedImageCropDisabledEnqueuesOneFullImage() async {
         let queue = makeStubQueue()
-        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
 
         await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: false)
 
@@ -212,7 +212,7 @@ final class QuickScanViewModelTests: XCTestCase {
 
     func testEnqueueCapturedImageCropEnabledNoCropsEnqueuesFullImage() async {
         let queue = makeStubQueue()
-        let vm = QuickScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
         // A small blank image produces zero card crops from Vision — fallback enqueues the full image.
         await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)
 
@@ -222,7 +222,7 @@ final class QuickScanViewModelTests: XCTestCase {
     func testEnqueueCapturedImageCropEnabledWithCropsEnqueuesEachCrop() async {
         let queue = makeStubQueue()
         let fakeCrops = [makeBlankImage(), makeBlankImage()]
-        let vm = QuickScanViewModel(
+        let vm = AutoScanViewModel(
             detectorProvider: { nil },
             recognitionQueue: queue,
             cropImage: { _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }

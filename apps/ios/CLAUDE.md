@@ -21,10 +21,10 @@ MTGScannerKit/Sources/MTGScannerKit/
   Features/
     CardDetection/                   Live camera card detection with overlays
       Detection/
-        CardDetectionEngine.swift    VNDetectRectanglesRequest dispatch (table + binder)
+        CardDetectionEngine.swift    Scan rectangle detection + Auto Scan YOLO dispatch
         CardTracker.swift            EMA smoothing + presence hysteresis
         RectangleFilter.swift        Edge-based aspect ratio validation + NMS
-        GridInterpolator.swift       Bilinear interpolation for binder grid
+        GridInterpolator.swift       Bilinear interpolation for quadrilateral grids
       Camera/
         CameraSessionManager.swift   AVCaptureSession lifecycle
         CameraViewController.swift   UIKit controller: session + preview + overlays
@@ -34,7 +34,7 @@ MTGScannerKit/Sources/MTGScannerKit/
         DetectionOverlayRenderer.swift  CAShapeLayer pool, coordinate transforms
       Models/
         DetectedCard.swift           Struct: corners, boundingBox, confidence
-        DetectionMode.swift          Enum: .table, .binder
+        DetectionMode.swift          Enum: .scan, .auto
       ViewModels/
         CardDetectionViewModel.swift ObservableObject bridging detection → SwiftUI
     Scan/                            Camera capture and upload flow

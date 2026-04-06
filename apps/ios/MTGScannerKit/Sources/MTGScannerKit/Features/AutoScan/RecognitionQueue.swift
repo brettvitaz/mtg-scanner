@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import UIKit
 
-/// Manages asynchronous card recognition jobs for Quick Scan mode.
+/// Manages asynchronous card recognition jobs for Auto Scan mode.
 ///
 /// Accepts captured images, dispatches them to the recognition API up to `maxConcurrent`
 /// at a time, persists each result to SwiftData, and publishes running counts for the UI.

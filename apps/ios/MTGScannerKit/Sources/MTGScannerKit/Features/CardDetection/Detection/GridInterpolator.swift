@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// Subdivides a detected quadrilateral (e.g., a binder page) into a grid of smaller quads.
+/// Subdivides a detected quadrilateral into a grid of smaller quads.
 ///
 /// Uses bilinear interpolation so that perspective-distorted quadrilaterals produce
 /// correctly proportioned sub-cells rather than simple rectangular divisions.

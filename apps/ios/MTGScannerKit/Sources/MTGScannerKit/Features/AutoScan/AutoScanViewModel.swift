@@ -3,7 +3,7 @@ import Foundation
 import SwiftData
 import UIKit
 
-/// State machine for the Quick Scan mode.
+/// State machine for the Auto Scan mode.
 ///
 /// Observes `CardPresenceTracker` for new-card signals, runs a configurable settle
 /// timer to wait for the card to stop moving, triggers a still-photo capture, then
@@ -17,7 +17,7 @@ import UIKit
 /// ```
 @MainActor
 @Observable
-final class QuickScanViewModel {
+final class AutoScanViewModel {
 
     // MARK: - State
 
@@ -125,7 +125,7 @@ final class QuickScanViewModel {
 
     /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.
     ///
-    /// Called by table and binder scan modes after a manual capture. Runs Vision detection
+    /// Called by scan mode after a manual capture. Runs Vision detection
     /// on a detached background task to avoid blocking the main actor.
     @MainActor
     func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
@@ -191,11 +191,11 @@ final class QuickScanViewModel {
             return
         }
 
-        let uprightImage = YOLOCropHelper.normalizedImage(image)
+        let uprightImage = AutoScanCropHelper.normalizedImage(image)
         let cropped: UIImage?
         if let cgImage = uprightImage.cgImage,
            let box = await presenceTracker.detectBestBox(in: cgImage) {
-            cropped = YOLOCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+            cropped = AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
         } else {
             cropped = nil
         }

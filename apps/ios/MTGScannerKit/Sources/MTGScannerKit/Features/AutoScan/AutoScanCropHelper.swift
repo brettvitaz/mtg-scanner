@@ -4,7 +4,7 @@ import UIKit
 ///
 /// YOLO boxes are normalized top-left-origin [0,1] and axis-aligned, so a simple
 /// `CGImage.cropping(to:)` is sufficient — no perspective correction needed.
-enum YOLOCropHelper {
+enum AutoScanCropHelper {
 
     private static let defaultPadding: CGFloat = 0.03
 

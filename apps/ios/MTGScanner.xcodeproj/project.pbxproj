@@ -71,18 +71,18 @@
 		C000000000000000000001A1 /* YOLOCardDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A1 /* YOLOCardDetector.swift */; };
 		C000000000000000000001A2 /* FrameDifferenceAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A2 /* FrameDifferenceAnalyzer.swift */; };
 		C000000000000000000001A3 /* CardPresenceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A3 /* CardPresenceTracker.swift */; };
-		C000000000000000000001A4 /* QuickScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A4 /* QuickScanView.swift */; };
-		C000000000000000000001A5 /* QuickScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A5 /* QuickScanViewModel.swift */; };
+		C000000000000000000001A4 /* AutoScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A4 /* AutoScanView.swift */; };
+		C000000000000000000001A5 /* AutoScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A5 /* AutoScanViewModel.swift */; };
 		C000000000000000000001A6 /* RecognitionQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A6 /* RecognitionQueue.swift */; };
-		C000000000000000000001A7 /* YOLOCropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A7 /* YOLOCropHelper.swift */; };
-		C000000000000000000001A8 /* ScanMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A8 /* ScanMenuButton.swift */; };
+		C000000000000000000001A7 /* AutoScanCropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A7 /* AutoScanCropHelper.swift */; };
+		C000000000000000000001A8 /* FlashlightButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002A8 /* FlashlightButton.swift */; };
 		C000000000000000000001B0 /* YOLOCardDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B0 /* YOLOCardDetectorTests.swift */; };
 		C000000000000000000001B1 /* FrameDifferenceAnalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */; };
 		C000000000000000000001B2 /* CardPresenceTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B2 /* CardPresenceTrackerTests.swift */; };
-		C000000000000000000001B3 /* QuickScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B3 /* QuickScanViewModelTests.swift */; };
+		C000000000000000000001B3 /* AutoScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B3 /* AutoScanViewModelTests.swift */; };
 		C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B4 /* RecognitionQueueTests.swift */; };
-		C000000000000000000001B5 /* ScanMenuButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* ScanMenuButtonTests.swift */; };
-		C000000000000000000001B6 /* YOLOCropHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B6 /* YOLOCropHelperTests.swift */; };
+		C000000000000000000001B5 /* FlashlightButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* FlashlightButtonTests.swift */; };
+		C000000000000000000001B6 /* AutoScanCropHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B6 /* AutoScanCropHelperTests.swift */; };
 		SPM0000000000000000000004 /* MTGScannerKit in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000003 /* MTGScannerKit */; };
 /* End PBXBuildFile section */
 
@@ -164,18 +164,18 @@
 		C000000000000000000002A1 /* YOLOCardDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCardDetector.swift; sourceTree = "<group>"; };
 		C000000000000000000002A2 /* FrameDifferenceAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDifferenceAnalyzer.swift; sourceTree = "<group>"; };
 		C000000000000000000002A3 /* CardPresenceTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPresenceTracker.swift; sourceTree = "<group>"; };
-		C000000000000000000002A4 /* QuickScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanView.swift; sourceTree = "<group>"; };
-		C000000000000000000002A5 /* QuickScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModel.swift; sourceTree = "<group>"; };
+		C000000000000000000002A4 /* AutoScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScanView.swift; sourceTree = "<group>"; };
+		C000000000000000000002A5 /* AutoScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScanViewModel.swift; sourceTree = "<group>"; };
 		C000000000000000000002A6 /* RecognitionQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueue.swift; sourceTree = "<group>"; };
-		C000000000000000000002A7 /* YOLOCropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCropHelper.swift; sourceTree = "<group>"; };
-		C000000000000000000002A8 /* ScanMenuButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMenuButton.swift; sourceTree = "<group>"; };
+		C000000000000000000002A7 /* AutoScanCropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScanCropHelper.swift; sourceTree = "<group>"; };
+		C000000000000000000002A8 /* FlashlightButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashlightButton.swift; sourceTree = "<group>"; };
 		C000000000000000000002B0 /* YOLOCardDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCardDetectorTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDifferenceAnalyzerTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B2 /* CardPresenceTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPresenceTrackerTests.swift; sourceTree = "<group>"; };
-		C000000000000000000002B3 /* QuickScanViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickScanViewModelTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B3 /* AutoScanViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScanViewModelTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B4 /* RecognitionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueueTests.swift; sourceTree = "<group>"; };
-		C000000000000000000002B5 /* ScanMenuButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMenuButtonTests.swift; sourceTree = "<group>"; };
-		C000000000000000000002B6 /* YOLOCropHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOCropHelperTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B5 /* FlashlightButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashlightButtonTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B6 /* AutoScanCropHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScanCropHelperTests.swift; sourceTree = "<group>"; };
 		SPM0000000000000000000001 /* MTGScannerKit */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; name = MTGScannerKit; path = MTGScannerKit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -249,7 +249,7 @@
 				A00000000000000000000018 /* Settings */,
 				A00000000000000000000027 /* Library */,
 				A00000000000000000000026 /* Shared */,
-				C00000000000000000000001 /* QuickScan */,
+				C00000000000000000000001 /* AutoScan */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -325,7 +325,7 @@
 				A00000000000000000000205 /* ScanView.swift */,
 				A0000000000000000000021E /* CaptureButton.swift */,
 				A00000000000000000000223 /* ZoomPresetControl.swift */,
-				C000000000000000000002A8 /* ScanMenuButton.swift */,
+				C000000000000000000002A8 /* FlashlightButton.swift */,
 			);
 			path = Scan;
 			sourceTree = "<group>";
@@ -447,23 +447,23 @@
 				C000000000000000000002B0 /* YOLOCardDetectorTests.swift */,
 				C000000000000000000002B1 /* FrameDifferenceAnalyzerTests.swift */,
 				C000000000000000000002B2 /* CardPresenceTrackerTests.swift */,
-				C000000000000000000002B3 /* QuickScanViewModelTests.swift */,
+				C000000000000000000002B3 /* AutoScanViewModelTests.swift */,
 				C000000000000000000002B4 /* RecognitionQueueTests.swift */,
-				C000000000000000000002B5 /* ScanMenuButtonTests.swift */,
-				C000000000000000000002B6 /* YOLOCropHelperTests.swift */,
+				C000000000000000000002B5 /* FlashlightButtonTests.swift */,
+				C000000000000000000002B6 /* AutoScanCropHelperTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";
 		};
-		C00000000000000000000001 /* QuickScan */ = {
+		C00000000000000000000001 /* AutoScan */ = {
 			isa = PBXGroup;
 			children = (
-				C000000000000000000002A4 /* QuickScanView.swift */,
-				C000000000000000000002A5 /* QuickScanViewModel.swift */,
+				C000000000000000000002A4 /* AutoScanView.swift */,
+				C000000000000000000002A5 /* AutoScanViewModel.swift */,
 				C000000000000000000002A6 /* RecognitionQueue.swift */,
-				C000000000000000000002A7 /* YOLOCropHelper.swift */,
+				C000000000000000000002A7 /* AutoScanCropHelper.swift */,
 			);
-			path = QuickScan;
+			path = AutoScan;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

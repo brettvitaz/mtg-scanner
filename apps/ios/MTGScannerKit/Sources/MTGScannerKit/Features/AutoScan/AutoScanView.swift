@@ -1,15 +1,15 @@
 import SwiftUI
 
-/// Overlay controls displayed over the camera preview during Quick Scan mode.
+/// Overlay controls displayed over the camera preview during Auto Scan mode.
 ///
 /// The camera preview and detection overlay (YOLO bounding boxes) are rendered by
 /// the underlying `CameraPreviewRepresentable` in `ScanView`. This view adds the
-/// Quick Scan-specific controls: running counts, status strip, and Start/Stop button.
-struct QuickScanView: View {
-    @Bindable var viewModel: QuickScanViewModel
+/// Auto Scan-specific controls: running counts, status strip, and Start/Stop button.
+struct AutoScanView: View {
+    @Bindable var viewModel: AutoScanViewModel
     @Bindable var recognitionQueue: RecognitionQueue
     @Binding var torchLevel: Float
-    @Binding var detectionMode: DetectionMode
+    @Binding var lastTorchLevel: Float
 
     var body: some View {
         VStack {
@@ -79,7 +79,7 @@ struct QuickScanView: View {
             Spacer()
             startStopButton
             Spacer()
-            ScanMenuButton(detectionMode: $detectionMode, torchLevel: $torchLevel)
+            FlashlightButton(torchLevel: $torchLevel, lastTorchLevel: $lastTorchLevel)
         }
         .padding(.bottom, 8)
     }

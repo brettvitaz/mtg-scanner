@@ -37,7 +37,7 @@ private struct SettingsForm: View {
         Form {
             apiSection
             recognitionSection
-            quickScanSection
+            autoScanSection
         }
     }
 
@@ -89,11 +89,11 @@ private struct SettingsForm: View {
         }
     }
 
-    // MARK: - Quick Scan Section
+    // MARK: - Auto Scan Section
 
     @ViewBuilder
-    private var quickScanSection: some View {
-        Section("Quick Scan") {
+    private var autoScanSection: some View {
+        Section("Auto Scan") {
             captureDelayRow
             confidenceRow
             concurrentUploadsRow
@@ -111,9 +111,9 @@ private struct SettingsForm: View {
             HStack {
                 Text("Capture Delay")
                 Spacer()
-                Text(String(format: "%.1f s", appModel.quickScanCaptureDelay)).foregroundStyle(.secondary)
+                Text(String(format: "%.1f s", appModel.autoScanCaptureDelay)).foregroundStyle(.secondary)
             }
-            Slider(value: $appModel.quickScanCaptureDelay, in: 0.5...5.0, step: 0.5)
+            Slider(value: $appModel.autoScanCaptureDelay, in: 0.5...5.0, step: 0.5)
         }
     }
 
@@ -122,9 +122,9 @@ private struct SettingsForm: View {
             HStack {
                 Text("Detection Confidence")
                 Spacer()
-                Text(String(format: "%.1f", appModel.quickScanConfidenceThreshold)).foregroundStyle(.secondary)
+                Text(String(format: "%.1f", appModel.autoScanConfidenceThreshold)).foregroundStyle(.secondary)
             }
-            Slider(value: $appModel.quickScanConfidenceThreshold, in: 0.3...0.9, step: 0.1)
+            Slider(value: $appModel.autoScanConfidenceThreshold, in: 0.3...0.9, step: 0.1)
         }
     }
 

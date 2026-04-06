@@ -11,21 +11,20 @@ import Vision
 /// - Results are dispatched to the main queue via `onDetection`.
 ///
 /// Detection paths:
-/// - Table mode: VNDetectRectanglesRequest filtered by RectangleFilter.
-/// - Binder mode: VNDetectRectanglesRequest to find the page, then GridInterpolator
-///   to subdivide into a 3×3 grid.
+/// - Scan mode: VNDetectRectanglesRequest filtered by RectangleFilter.
+/// - Auto mode: YOLO card detection for the scanning-station flow.
 final class CardDetectionEngine: @unchecked Sendable {
 
     // MARK: - Properties
 
-    var detectionMode: DetectionMode = .table
+    var detectionMode: DetectionMode = .scan
 
     /// Set to `true` when the device interface orientation is landscape.
     /// Written from the main thread; read on the camera queue in `processFrame` — same
     /// pattern as `detectionMode`. The worst-case race during rotation is one stale frame.
     var isLandscape: Bool = false
 
-    // Loaded lazily so start-up time is not impacted if Quick Scan is not used.
+    // Loaded lazily so start-up time is not impacted if Auto Scan is not used.
     private lazy var yoloDetector: YOLOCardDetector? = YOLOCardDetector()
 
     /// Called on the main queue with the latest detected cards after each processed frame.
@@ -67,23 +66,21 @@ final class CardDetectionEngine: @unchecked Sendable {
         isLandscape: Bool
     ) -> [DetectedCard] {
         switch mode {
-        case .table:
-            return detectTableCards(pixelBuffer: pixelBuffer, timestamp: timestamp, isLandscape: isLandscape)
-        case .binder:
-            return detectBinderGrid(in: pixelBuffer, timestamp: timestamp)
-        case .quickScan:
-            return detectQuickScanCard(pixelBuffer: pixelBuffer, timestamp: timestamp)
+        case .scan:
+            return detectScanCards(pixelBuffer: pixelBuffer, timestamp: timestamp, isLandscape: isLandscape)
+        case .auto:
+            return detectAutoScanCard(pixelBuffer: pixelBuffer, timestamp: timestamp)
         }
     }
 
-    // MARK: - Rectangle Table Detection
+    // MARK: - Rectangle Scan Detection
 
     #if DEBUG
-    private var _debugTableFrameCount = 0
+    private var _debugScanFrameCount = 0
     #endif
 
     // swiftlint:disable:next function_body_length
-    private func detectTableCards(
+    private func detectScanCards(
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval,
         isLandscape: Bool
@@ -97,8 +94,8 @@ final class CardDetectionEngine: @unchecked Sendable {
         let filtered = RectangleFilter().filter(observations, isLandscape: isLandscape)
 
         #if DEBUG
-        _debugTableFrameCount += 1
-        if _debugTableFrameCount % 30 == 1 {
+        _debugScanFrameCount += 1
+        if _debugScanFrameCount % 30 == 1 {
             let minAR = RectangleFilter.visionMinAspectRatio
             let maxAR = RectangleFilter.visionMaxAspectRatio
             print("[RectDetect] bounds=[\(minAR), \(maxAR)]"
@@ -140,54 +137,13 @@ final class CardDetectionEngine: @unchecked Sendable {
         return filtered.map { DetectedCard(from: $0, timestamp: timestamp) }
     }
 
-    // MARK: - Binder Grid Detection (VNDetectRectanglesRequest)
+    // MARK: - Auto Scan YOLO Detection
 
-    // swiftlint:disable:next function_body_length
-    private func detectBinderGrid(in pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> [DetectedCard] {
-        let pageObservations = runRectangleRequest(
-            pixelBuffer: pixelBuffer,
-            maxObservations: 1,
-            minAspectRatio: 0.60,
-            maxAspectRatio: 0.95
-        )
-
-        guard let page = pageObservations.first else { return [] }
-
-        let cells = GridInterpolator.subdivide(
-            topLeft: page.topLeft,
-            topRight: page.topRight,
-            bottomRight: page.bottomRight,
-            bottomLeft: page.bottomLeft,
-            rows: 3,
-            cols: 3
-        )
-
-        return cells.map { cell in
-            let box = CGRect(
-                x: min(cell.topLeft.x, cell.bottomLeft.x),
-                y: min(cell.bottomLeft.y, cell.bottomRight.y),
-                width: abs(cell.topRight.x - cell.topLeft.x),
-                height: abs(cell.topLeft.y - cell.bottomLeft.y)
-            )
-            return DetectedCard(
-                boundingBox: box,
-                topLeft: cell.topLeft,
-                topRight: cell.topRight,
-                bottomRight: cell.bottomRight,
-                bottomLeft: cell.bottomLeft,
-                confidence: page.confidence,
-                timestamp: timestamp
-            )
-        }
-    }
-
-    // MARK: - Quick Scan YOLO Detection
-
-    /// Detects cards using the bundled YOLO model for Quick Scan mode.
+    /// Detects cards using the bundled YOLO model for Auto Scan mode.
     ///
     /// Converts YOLO top-left-origin boxes to Vision bottom-left-origin coordinates
     /// so the existing overlay renderer can draw them without modification.
-    private func detectQuickScanCard(
+    private func detectAutoScanCard(
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval
     ) -> [DetectedCard] {

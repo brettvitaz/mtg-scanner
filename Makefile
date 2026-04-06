@@ -1,6 +1,12 @@
 SHELL := /bin/bash
+IOS_TEST_SIMULATOR_ID ?= $(shell xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $$2 ~ /^[0-9A-F-]+$$/ { print $$2; exit }')
+IOS_TEST_DESTINATION ?= id=$(IOS_TEST_SIMULATOR_ID)
+IOS_TEST_CURRENT_DEVICE ?= iPhone 17
+IOS_TEST_CURRENT_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_CURRENT_DEVICE)
+IOS_TEST_TABLET_DEVICE ?= iPad Air 11-inch (M4)
+IOS_TEST_TABLET_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_TABLET_DEVICE)
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-build ios-test ios-lint lint security tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint lint security tree
 
 bootstrap: api-bootstrap
 
@@ -22,9 +28,23 @@ ios-build:
 
 ios-test:
 	xcodebuild test \
-	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests \
-	  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' \
+	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
+	  -destination '$(IOS_TEST_DESTINATION)' \
 	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+
+ios-test-current:
+	xcodebuild test \
+	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
+	  -destination '$(IOS_TEST_CURRENT_DESTINATION)' \
+	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+
+ios-test-tablet:
+	xcodebuild test \
+	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
+	  -destination '$(IOS_TEST_TABLET_DESTINATION)' \
+	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+
+ios-test-matrix: ios-test ios-test-current ios-test-tablet
 
 ios-lint:
 	./scripts/lint-ios.sh

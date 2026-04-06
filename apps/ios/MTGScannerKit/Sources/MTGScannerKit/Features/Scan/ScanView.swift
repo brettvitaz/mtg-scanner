@@ -35,7 +35,6 @@ struct ScanView: View {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
             configureAutoScan()
             UIApplication.shared.isIdleTimerDisabled = true
-            restoreTorchLevel()
         }
         .onDisappear {
             lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
@@ -251,12 +250,6 @@ private extension ScanView {
         scene.requestGeometryUpdate(prefs)
     }
 
-    private func restoreTorchLevel() {
-        let savedLevel = appModel.lastTorchLevel
-        guard savedLevel > 0 else { return }
-        detectionViewModel.torchLevel = savedLevel
-    }
-
     private func storeAndTurnOffTorch() {
         if detectionViewModel.torchLevel > 0 {
             appModel.lastTorchLevel = detectionViewModel.torchLevel
@@ -265,9 +258,7 @@ private extension ScanView {
     }
 
     private func handleScanActivityChange(_ active: Bool) {
-        if active {
-            restoreTorchLevel()
-        } else {
+        if !active {
             storeAndTurnOffTorch()
             autoScanViewModel.stop()
         }

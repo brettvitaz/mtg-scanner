@@ -241,6 +241,42 @@ struct CardPrinting: Codable, Identifiable, Equatable {
     }
 }
 
+/// Data model for a card identification toast notification.
+struct IdentifiedCard: Identifiable {
+    let id: UUID
+    let title: String
+    let isFoil: Bool
+    let setCode: String
+    let collectorNumber: String
+    let createdAt: Date
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        isFoil: Bool,
+        setCode: String,
+        collectorNumber: String,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.title = title
+        self.isFoil = isFoil
+        self.setCode = setCode
+        self.collectorNumber = collectorNumber
+        self.createdAt = createdAt
+    }
+
+    /// Creates an IdentifiedCard from a RecognizedCard
+    init(from card: RecognizedCard) {
+        self.id = card.id
+        self.title = card.title ?? "Unknown Card"
+        self.isFoil = card.foil ?? false
+        self.setCode = card.setCode ?? ""
+        self.collectorNumber = card.collectorNumber ?? ""
+        self.createdAt = Date()
+    }
+}
+
 /// Response from the printings endpoint.
 struct CardPrintingsResponse: Codable {
     let printings: [CardPrinting]

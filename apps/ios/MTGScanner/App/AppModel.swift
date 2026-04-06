@@ -41,6 +41,9 @@ final class AppModel: ObservableObject {
     @Published var showUndoAlert = false
     private var latestUndoAction: (@MainActor () -> Void)?
 
+    /// Torch level to restore when returning to scan view (same session only, not persisted)
+    @Published var lastTorchLevel: Float = 0
+
     private let apiClient = APIClient()
     private let cropService = CardCropService()
     private let correctionsStoreKey = "card_corrections"

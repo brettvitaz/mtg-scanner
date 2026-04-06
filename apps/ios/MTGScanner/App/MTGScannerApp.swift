@@ -1,10 +1,11 @@
+import MTGScannerKit
 import SwiftData
 import SwiftUI
 
 @main
 struct MTGScannerApp: App {
-    @StateObject private var appModel = AppModel()
-    @StateObject private var libraryViewModel = LibraryViewModel()
+    @State private var appModel = AppModel()
+    @State private var libraryViewModel = LibraryViewModel()
 
     init() {
         let cacheDir = URL.cachesDirectory.appending(path: "card-images")
@@ -28,8 +29,8 @@ struct MTGScannerApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView()
-                .environmentObject(appModel)
-                .environmentObject(libraryViewModel)
+                .environment(appModel)
+                .environment(libraryViewModel)
                 .modelContainer(modelContainer)
                 .onAppear {
                     appModel.modelContext = modelContainer.mainContext

@@ -1,10 +1,12 @@
 included:
-  - apps/ios/MTGScanner
-  - apps/ios/MTGScannerTests
+  - apps/ios/MTGScannerKit/Sources
+  - apps/ios/MTGScannerKit/Tests
+  - apps/ios/MTGScanner/App
 
 excluded:
   - .build
   - DerivedData
+  - apps/ios/MTGScannerKit/.build
 
 opt_in_rules:
   - closure_body_length

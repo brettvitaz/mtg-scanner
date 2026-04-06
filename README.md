@@ -30,7 +30,7 @@ make api-run
 
 ### iOS
 ```bash
-open apps/ios/MTGScanner.xcodeproj
+open apps/ios/MTGScanner.xcworkspace
 ```
 Run the `MTGScanner` scheme in Xcode. The app flow is:
 1. Capture an image with the camera (live detection overlays) or pick from the photo library

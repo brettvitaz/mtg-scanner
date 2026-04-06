@@ -19,7 +19,7 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 - Override artifact output with `MTG_SCANNER_ARTIFACTS_DIR=/tmp/mtg-scanner-artifacts` when you want a custom local debug/eval directory.
 
 ### iOS
-- Start by editing the Swift files under `apps/ios/MTGScanner/`.
+- Start by editing the Swift files under `apps/ios/MTGScannerKit/Sources/MTGScannerKit/`.
 - Keep UI state and network logic simple and obvious.
 - Avoid introducing package managers or generated project complexity until the app shape stabilizes.
 

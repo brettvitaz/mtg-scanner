@@ -1,3 +1,5 @@
 {
-    "sweetpad.build.xcodeWorkspacePath": "apps/ios/MTGScanner.xcodeproj/project.xcworkspace"
+    "sweetpad.build.xcodeWorkspacePath": "apps/ios/MTGScanner.xcworkspace",
+    "swift.path": "/usr/bin",
+    "sourcekit-lsp.serverPath": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/sourcekit-lsp"
 }

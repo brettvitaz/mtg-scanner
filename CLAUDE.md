@@ -9,14 +9,17 @@ mtg-scanner is an iPhone-first Magic: The Gathering card scanning system. SwiftU
 ## Repo layout
 
 ```
-apps/ios/          SwiftUI app with camera, card detection, cropping, upload
-services/api/      FastAPI backend: recognition, detection, validation, artifacts
-packages/schemas/  Versioned JSON schemas and example payloads
-docs/              Plans, workflows, architecture decision records
-prompts/           AI extraction prompt templates
-samples/           Test images and ground-truth fixtures
-evals/             Evaluation harness and results
-scripts/           Bootstrap, run, and test helpers
+apps/ios/                    SwiftUI app with camera, card detection, cropping, upload
+  MTGScanner/                Xcode app shell: entry point, Info.plist, assets, ML model
+  MTGScannerKit/             Swift Package: all production source + tests (indexed by SourceKit-LSP)
+  MTGScanner.xcworkspace     Workspace referencing both the app and the local package
+services/api/                FastAPI backend: recognition, detection, validation, artifacts
+packages/schemas/            Versioned JSON schemas and example payloads
+docs/                        Plans, workflows, architecture decision records
+prompts/                     AI extraction prompt templates
+samples/                     Test images and ground-truth fixtures
+evals/                       Evaluation harness and results
+scripts/                     Bootstrap, run, and test helpers
 ```
 
 ## Principles
@@ -53,7 +56,7 @@ After creating a worktree:
 Before making any code changes, run the relevant test/build commands to establish a passing baseline:
 
 - Backend: `make api-test && make api-lint`
-- iOS: `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
+- iOS: `make ios-build` (or `xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`)
 - Static analysis: `make lint` (runs mypy + SwiftLint)
 
 If the baseline is already failing, note the failures before proceeding so you do not introduce confusion about what you broke vs. what was already broken.
@@ -91,10 +94,10 @@ make api-run                # start FastAPI dev server
 make api-test               # run pytest suite
 make api-lint               # run mypy type checking
 
-# iOS
-open apps/ios/MTGScanner.xcodeproj
-xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner \
-  -sdk iphonesimulator -configuration Debug build
+# iOS (open workspace, not xcodeproj, to include the local package)
+open apps/ios/MTGScanner.xcworkspace
+make ios-build              # build the app via xcodebuild (uses workspace)
+make ios-test               # run tests via xcodebuild
 make ios-lint               # run SwiftLint
 
 # Static analysis
@@ -126,8 +129,8 @@ PYTHONPATH=services/api python evals/run_eval.py
 
 ### Swift (apps/ios)
 
-- Swift 5.9+, SwiftUI, minimum iOS 17.0.
-- MVVM architecture: Views, ViewModels (`@StateObject`/`@ObservedObject`), Services.
+- Swift 6.0+, SwiftUI, minimum iOS 18.0 (supports iOS 18 and iOS 26).
+- MVVM architecture: Views, ViewModels (`@Observable` classes held via `@State` or passed via `@Environment`), Services.
 - `final class` by default for view models and services.
 - `@MainActor` for UI-bound classes. Use `Task { @MainActor in }` to dispatch from background threads.
 - No force unwraps (`!`) in production code. Use `guard let` or `if let`. Force unwraps are acceptable in tests.
@@ -147,7 +150,6 @@ PYTHONPATH=services/api python evals/run_eval.py
 
 ### iOS (XCTest)
 
-- Tests live in `apps/ios/MTGScannerTests/`.
 - `final class <Feature>Tests: XCTestCase` naming pattern.
 - Every public method or type should have at least one test.
 - Tests must exercise real code paths — no tests that only verify mocks or hardcoded values.

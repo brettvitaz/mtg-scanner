@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Protocol
 
-import httpx
-
 from app.logging_config import get_logger
 from app.models.recognition import (
     RecognizedCard,
@@ -16,10 +14,7 @@ from app.services.card_detector import CardDetector, DetectionResult
 from app.services.card_validation import CardValidationService, ValidationBatchResult
 from app.services.errors import RecognitionConfigurationError, RecognitionProviderError
 from app.services.mtgjson_index import CardRecord, MTGJSONIndex
-from app.services.openai_compat import (
-    build_openai_request_body,
-    extract_recognition_response,
-)
+from app.services.llm import get_llm_provider, LLMProvider
 from app.settings import get_settings
 
 logger = get_logger(__name__)
@@ -65,101 +60,6 @@ class MockRecognitionProvider:
                 f"Mocked recognition result for upload '{metadata.filename}' ({metadata.content_type})."
             )
         return RecognitionResponse(**payload)
-
-
-class OpenAIRecognitionProvider:
-    provider_name: str = "openai"
-
-    def __init__(
-        self,
-        *,
-        api_key: str,
-        model_name: str,
-        base_url: str,
-        timeout_seconds: float = 30.0,
-        response_mode: str = "json_schema",
-    ) -> None:
-        self.model_name: str | None = model_name
-        self._api_key = api_key
-        self._base_url = base_url.rstrip("/")
-        self._timeout_seconds = timeout_seconds
-        self._response_mode = response_mode
-        self._response_schema = _load_response_schema()
-
-    def recognize(
-        self,
-        image_bytes: bytes,
-        metadata: RecognitionUploadMetadata,
-        prompt_text: str,
-    ) -> RecognitionResponse:
-        assert self.model_name is not None
-        request_body = build_openai_request_body(
-            model_name=self.model_name,
-            prompt_text=prompt_text,
-            data_url=_make_data_url(
-                content_type=metadata.content_type,
-                image_bytes=image_bytes,
-            ),
-            schema=self._response_schema,
-            response_mode=self._response_mode,
-        )
-
-        url = f"{self._base_url}/chat/completions"
-        logger.info(
-            "Calling recognition provider: url=%s model=%s timeout=%.1fs",
-            url,
-            self.model_name,
-            self._timeout_seconds,
-        )
-
-        with httpx.Client(timeout=self._timeout_seconds) as client:
-            try:
-                http_response = client.post(
-                    url,
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=request_body,
-                )
-                http_response.raise_for_status()
-            except httpx.HTTPStatusError as exc:
-                body_snippet = getattr(exc.response, "text", "")[:500]
-                logger.error(
-                    "Recognition provider HTTP error: status=%d url=%s model=%s body=%s",
-                    exc.response.status_code,
-                    url,
-                    self.model_name,
-                    body_snippet,
-                )
-                raise RecognitionProviderError(
-                    f"OpenAI recognition request failed: {exc}"
-                ) from exc
-            except httpx.HTTPError as exc:
-                logger.error(
-                    "Recognition provider connection error: url=%s model=%s error=%s",
-                    url,
-                    self.model_name,
-                    exc,
-                )
-                raise RecognitionProviderError(
-                    f"OpenAI recognition request failed: {exc}"
-                ) from exc
-
-        try:
-            payload = http_response.json()
-        except Exception as exc:
-            logger.error(
-                "Recognition provider returned non-JSON: status=%d content_type=%s body=%s",
-                http_response.status_code,
-                http_response.headers.get("content-type", "unknown"),
-                http_response.text[:500],
-            )
-            raise RecognitionProviderError(
-                f"Recognition provider returned invalid JSON: {exc}"
-            ) from exc
-
-        return extract_recognition_response(payload, self._response_mode)
 
 
 class RecognitionService:
@@ -439,7 +339,6 @@ class RecognitionService:
 
 def get_recognition_service() -> RecognitionService:
     settings = get_settings()
-    provider_name = settings.mtg_scanner_recognizer_provider.strip().lower()
 
     detector: CardDetector | None = None
     if settings.mtg_scanner_enable_multi_card:
@@ -454,57 +353,17 @@ def get_recognition_service() -> RecognitionService:
             max_fuzzy_candidates=settings.mtg_scanner_mtgjson_max_fuzzy_candidates,
         )
 
-    if provider_name == "mock":
-        logger.info("Using mock recognition provider")
-        return RecognitionService(
-            MockRecognitionProvider(),
-            detector,
-            validator,
-            max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
-            enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
-            correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
-        )
+    # Use the unified LLM provider system, with a legacy provider fallback only
+    # when the new setting is not configured yet.
+    provider = get_llm_provider(settings)
 
-    if provider_name == "openai":
-        api_key = settings.openai_api_key
-        if not api_key:
-            logger.error("OPENAI_API_KEY not set for openai provider")
-            raise RecognitionConfigurationError(
-                "OPENAI_API_KEY must be set when MTG_SCANNER_RECOGNIZER_PROVIDER=openai."
-            )
-
-        model_name = settings.mtg_scanner_openai_model
-        if not model_name:
-            logger.error("MTG_SCANNER_OPENAI_MODEL not set for openai provider")
-            raise RecognitionConfigurationError(
-                "MTG_SCANNER_OPENAI_MODEL must be set when MTG_SCANNER_RECOGNIZER_PROVIDER=openai."
-            )
-
-        logger.info(
-            "Using openai recognition provider: model=%s base_url=%s timeout=%.1fs response_mode=%s",
-            model_name,
-            settings.openai_base_url,
-            settings.mtg_scanner_openai_timeout_seconds,
-            settings.mtg_scanner_openai_response_mode,
-        )
-        return RecognitionService(
-            OpenAIRecognitionProvider(
-                api_key=api_key,
-                model_name=model_name,
-                base_url=settings.openai_base_url,
-                timeout_seconds=settings.mtg_scanner_openai_timeout_seconds,
-                response_mode=settings.mtg_scanner_openai_response_mode.strip().lower(),
-            ),
-            detector,
-            validator,
-            max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
-            enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
-            correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
-        )
-
-    logger.error("Unknown recognition provider: '%s'", provider_name)
-    raise RecognitionConfigurationError(
-        "MTG_SCANNER_RECOGNIZER_PROVIDER must be one of: mock, openai."
+    return RecognitionService(
+        provider,
+        detector,
+        validator,
+        max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
+        enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
+        correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
     )
 
 

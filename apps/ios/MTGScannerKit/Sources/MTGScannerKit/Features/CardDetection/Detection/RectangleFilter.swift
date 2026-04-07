@@ -6,6 +6,7 @@ import Vision
 /// Responsibilities:
 /// - Accept observations whose aspect ratio matches a standard MTG card (63mm × 88mm ≈ 0.716).
 /// - Suppress overlapping detections using IoU-based Non-Maximum Suppression (NMS).
+/// - Suppress smaller rectangles substantially contained inside a larger accepted rectangle.
 /// - Re-sort accepted observations in reading order (top-left to bottom-right).
 struct RectangleFilter {
 
@@ -50,6 +51,13 @@ struct RectangleFilter {
     /// IoU threshold above which two observations are treated as duplicates.
     static let iouThreshold: CGFloat = 0.45
 
+    /// Minimum fraction of the smaller box that must be covered by the larger box to count as
+    /// a contained false positive.
+    static let containmentThreshold: CGFloat = 0.90
+
+    /// Minimum larger/smaller area ratio required before containment suppression fires.
+    static let containmentAreaRatioThreshold: CGFloat = 1.20
+
     // MARK: - Public API
 
     /// Returns filtered, deduplicated, and sorted observations from the given array.
@@ -64,20 +72,28 @@ struct RectangleFilter {
     /// 1. Drops observations below `minConfidence`.
     /// 2. Drops observations whose aspect ratio falls outside the active band.
     /// 3. Applies IoU-based NMS (higher-confidence observation wins ties).
-    /// 4. Re-sorts in top-left → bottom-right reading order.
+    /// 4. Suppresses nested inner boxes.
+    /// 5. Re-sorts in top-left → bottom-right reading order.
     func filter(_ observations: [VNRectangleObservation], isLandscape: Bool) -> [VNRectangleObservation] {
+        filterResult(observations, isLandscape: isLandscape).observations
+    }
+
+    func filterResult(_ observations: [VNRectangleObservation], isLandscape: Bool) -> FilterResult {
         let candidates = observations
             .filter { $0.confidence >= Self.minConfidence }
             .filter { isCardAspectRatio($0, isLandscape: isLandscape) }
             .sorted { $0.confidence > $1.confidence }
 
-        var accepted: [VNRectangleObservation] = []
+        var nmsAccepted: [VNRectangleObservation] = []
         for obs in candidates {
-            let isDuplicate = accepted.contains { Self.iou(obs.boundingBox, $0.boundingBox) > Self.iouThreshold }
+            let isDuplicate = nmsAccepted.contains { Self.iou(obs.boundingBox, $0.boundingBox) > Self.iouThreshold }
             if !isDuplicate {
-                accepted.append(obs)
+                nmsAccepted.append(obs)
             }
         }
+
+        let containedSuppression = suppressContainedObservations(nmsAccepted)
+        var accepted = containedSuppression.observations
 
         accepted.sort { a, b in
             let ay = a.boundingBox.minY
@@ -86,7 +102,10 @@ struct RectangleFilter {
             return a.boundingBox.minX < b.boundingBox.minX
         }
 
-        return accepted
+        return FilterResult(
+            observations: accepted,
+            containmentSuppressionCount: containedSuppression.suppressionCount
+        )
     }
 
     // MARK: - Helpers
@@ -121,6 +140,41 @@ struct RectangleFilter {
         hypot(a.x - b.x, a.y - b.y)
     }
 
+    private func suppressContainedObservations(
+        _ observations: [VNRectangleObservation]
+    ) -> ContainmentSuppressionResult {
+        let sorted = observations.sorted { lhs, rhs in
+            let lhsArea = Self.area(of: lhs.boundingBox)
+            let rhsArea = Self.area(of: rhs.boundingBox)
+            if abs(lhsArea - rhsArea) > 0.0001 {
+                return lhsArea > rhsArea
+            }
+            return lhs.confidence > rhs.confidence
+        }
+
+        var kept: [VNRectangleObservation] = []
+        var suppressionCount = 0
+
+        for observation in sorted {
+            let isContained = kept.contains { accepted in
+                let acceptedArea = Self.area(of: accepted.boundingBox)
+                let candidateArea = Self.area(of: observation.boundingBox)
+                guard candidateArea > 0 else { return false }
+                guard acceptedArea / candidateArea >= Self.containmentAreaRatioThreshold else { return false }
+                return Self.containmentRatio(of: observation.boundingBox, in: accepted.boundingBox) >=
+                    Self.containmentThreshold
+            }
+
+            if isContained {
+                suppressionCount += 1
+            } else {
+                kept.append(observation)
+            }
+        }
+
+        return ContainmentSuppressionResult(observations: kept, suppressionCount: suppressionCount)
+    }
+
     /// Intersection-over-union of two axis-aligned rectangles in normalized coordinates.
     static func iou(_ a: CGRect, _ b: CGRect) -> CGFloat {
         let ix = max(0, min(a.maxX, b.maxX) - max(a.minX, b.minX))
@@ -128,5 +182,31 @@ struct RectangleFilter {
         let intersection = ix * iy
         let union = a.width * a.height + b.width * b.height - intersection
         return union > 0 ? intersection / union : 0
+    }
+
+    static func containmentRatio(of inner: CGRect, in outer: CGRect) -> CGFloat {
+        let intersection = inner.intersection(outer)
+        guard !intersection.isNull else { return 0 }
+        let innerArea = area(of: inner)
+        guard innerArea > 0 else { return 0 }
+        return area(of: intersection) / innerArea
+    }
+
+    static func area(of rect: CGRect) -> CGFloat {
+        rect.width * rect.height
+    }
+}
+
+extension RectangleFilter {
+    struct FilterResult {
+        let observations: [VNRectangleObservation]
+        let containmentSuppressionCount: Int
+    }
+}
+
+private extension RectangleFilter {
+    struct ContainmentSuppressionResult {
+        let observations: [VNRectangleObservation]
+        let suppressionCount: Int
     }
 }

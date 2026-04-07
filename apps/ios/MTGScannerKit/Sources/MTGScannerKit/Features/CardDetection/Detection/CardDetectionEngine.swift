@@ -11,7 +11,7 @@ import Vision
 /// - Results are dispatched to the main queue via `onDetection`.
 ///
 /// Detection paths:
-/// - Scan mode: VNDetectRectanglesRequest filtered by RectangleFilter.
+/// - Scan mode: VNDetectRectanglesRequest filtered by RectangleFilter and validated by YOLO.
 /// - Auto mode: YOLO card detection for the scanning-station flow.
 final class CardDetectionEngine: @unchecked Sendable {
 
@@ -35,6 +35,8 @@ final class CardDetectionEngine: @unchecked Sendable {
     private var isProcessing = false
     /// Guarded by visionQueue — stabilizes detections with EMA smoothing + hysteresis.
     private let tracker = CardTracker()
+    /// Guarded by visionQueue — caches throttled YOLO validation for scan mode.
+    private var scanYOLOValidationState = ScanYOLOValidationState()
 
     // MARK: - Frame Processing
 
@@ -91,7 +93,13 @@ final class CardDetectionEngine: @unchecked Sendable {
             minAspectRatio: RectangleFilter.visionMinAspectRatio,
             maxAspectRatio: RectangleFilter.visionMaxAspectRatio
         )
-        let filtered = RectangleFilter().filter(observations, isLandscape: isLandscape)
+        let filterResult = RectangleFilter().filterResult(observations, isLandscape: isLandscape)
+        let filtered = filterResult.observations
+        let validationResult = validateScanObservations(
+            filtered,
+            pixelBuffer: pixelBuffer,
+            timestamp: timestamp
+        )
 
         #if DEBUG
         _debugScanFrameCount += 1
@@ -100,7 +108,18 @@ final class CardDetectionEngine: @unchecked Sendable {
             let maxAR = RectangleFilter.visionMaxAspectRatio
             print("[RectDetect] bounds=[\(minAR), \(maxAR)]"
                   + " raw=\(observations.count)"
-                  + " filtered=\(filtered.count)")
+                  + " filtered=\(filtered.count)"
+                  + " final=\(validationResult.observations.count)")
+            if filterResult.containmentSuppressionCount > 0 {
+                print("[RectDetect]   suppressed nested=\(filterResult.containmentSuppressionCount)")
+            }
+            if validationResult.usedFallback {
+                print("[RectDetect]   YOLO validation unavailable; using rectangle-only fallback")
+            } else if validationResult.yoloRejectedCount > 0 || validationResult.yoloAcceptedCount > 0 {
+                print("[RectDetect]   YOLO accepted=\(validationResult.yoloAcceptedCount)"
+                      + " rejected=\(validationResult.yoloRejectedCount)"
+                      + " boxes=\(validationResult.yoloBoxes.count)")
+            }
             for (i, obs) in observations.enumerated() {
                 let box = obs.boundingBox
                 let topEdge = hypot(obs.topRight.x - obs.topLeft.x, obs.topRight.y - obs.topLeft.y)
@@ -134,7 +153,7 @@ final class CardDetectionEngine: @unchecked Sendable {
         }
         #endif
 
-        return filtered.map { DetectedCard(from: $0, timestamp: timestamp) }
+        return validationResult.observations.map { DetectedCard(from: $0, timestamp: timestamp) }
     }
 
     // MARK: - Auto Scan YOLO Detection
@@ -196,6 +215,78 @@ final class CardDetectionEngine: @unchecked Sendable {
         try? handler.perform([request])
         return results
     }
+
+    private func validateScanObservations(
+        _ observations: [VNRectangleObservation],
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval
+    ) -> ScanYOLOValidationResult {
+        guard !observations.isEmpty else {
+            return ScanYOLOValidationResult(
+                observations: [],
+                yoloBoxes: [],
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: 0,
+                usedFallback: false
+            )
+        }
+
+        guard let yoloBoxes = scanYOLOBoxes(pixelBuffer: pixelBuffer, timestamp: timestamp) else {
+            return ScanYOLOValidationResult(
+                observations: observations,
+                yoloBoxes: [],
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: 0,
+                usedFallback: true
+            )
+        }
+
+        var accepted: [VNRectangleObservation] = []
+        accepted.reserveCapacity(observations.count)
+
+        for observation in observations {
+            if ScanYOLOSupport.supports(rectangle: observation.boundingBox, with: yoloBoxes) {
+                accepted.append(observation)
+            }
+        }
+
+        return ScanYOLOValidationResult(
+            observations: accepted,
+            yoloBoxes: yoloBoxes,
+            yoloAcceptedCount: accepted.count,
+            yoloRejectedCount: observations.count - accepted.count,
+            usedFallback: false
+        )
+    }
+
+    private func scanYOLOBoxes(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval
+    ) -> [CGRect]? {
+        scanYOLOValidationState.frameCounter += 1
+
+        let cacheIsFresh: Bool
+        if let lastTimestamp = scanYOLOValidationState.lastTimestamp {
+            cacheIsFresh = (timestamp - lastTimestamp) <= ScanYOLOValidationState.cacheTTL
+        } else {
+            cacheIsFresh = false
+        }
+
+        let shouldRefresh = !scanYOLOValidationState.hasCachedBoxes
+            || !cacheIsFresh
+            || scanYOLOValidationState.frameCounter % ScanYOLOValidationState.validationStride == 0
+
+        if !shouldRefresh {
+            return scanYOLOValidationState.boxes
+        }
+
+        guard let detector = yoloDetector else { return nil }
+        let boxes = detector.detect(in: pixelBuffer).map { ScanYOLOSupport.visionBox(from: $0.rect) }
+        scanYOLOValidationState.boxes = boxes
+        scanYOLOValidationState.lastTimestamp = timestamp
+        scanYOLOValidationState.hasCachedBoxes = true
+        return boxes
+    }
 }
 
 // MARK: - DetectedCard convenience init from VNRectangleObservation
@@ -211,5 +302,54 @@ private extension DetectedCard {
             confidence: obs.confidence,
             timestamp: timestamp
         )
+    }
+}
+
+private extension CardDetectionEngine {
+    struct ScanYOLOValidationState {
+        static let validationStride = 3
+        static let cacheTTL: TimeInterval = 0.25
+
+        var boxes: [CGRect] = []
+        var lastTimestamp: TimeInterval?
+        var frameCounter = 0
+        var hasCachedBoxes = false
+    }
+
+    struct ScanYOLOValidationResult {
+        let observations: [VNRectangleObservation]
+        let yoloBoxes: [CGRect]
+        let yoloAcceptedCount: Int
+        let yoloRejectedCount: Int
+        let usedFallback: Bool
+    }
+}
+
+enum ScanYOLOSupport {
+    static let iouThreshold: CGFloat = 0.35
+    static let coverageThreshold: CGFloat = 0.60
+
+    static func supports(rectangle: CGRect, with yoloBoxes: [CGRect]) -> Bool {
+        yoloBoxes.contains { yoloBox in
+            RectangleFilter.iou(rectangle, yoloBox) >= iouThreshold
+                || coverage(of: yoloBox, by: rectangle) >= coverageThreshold
+        }
+    }
+
+    static func visionBox(from yoloBox: CGRect) -> CGRect {
+        CGRect(
+            x: yoloBox.minX,
+            y: 1.0 - yoloBox.maxY,
+            width: yoloBox.width,
+            height: yoloBox.height
+        )
+    }
+
+    static func coverage(of rect: CGRect, by coveringRect: CGRect) -> CGFloat {
+        let intersection = rect.intersection(coveringRect)
+        guard !intersection.isNull else { return 0 }
+        let rectArea = RectangleFilter.area(of: rect)
+        guard rectArea > 0 else { return 0 }
+        return RectangleFilter.area(of: intersection) / rectArea
     }
 }

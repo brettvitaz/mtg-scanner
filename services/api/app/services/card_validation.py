@@ -81,6 +81,7 @@ class CardValidationService:
                 correction_candidates=[[] for _ in response.cards],
             )
 
+        results = _drop_face_name_redundancies(results, self._index)
         return ValidationBatchResult(
             response=RecognitionResponse(cards=[result.card for result in results]),
             traces=[result.trace for result in results],
@@ -488,31 +489,41 @@ def _narrow_face_matches(
     return face_matches
 
 
-def dedup_by_uuid(results: list[ValidatedCardResult]) -> list[ValidatedCardResult]:
-    """Remove duplicate validated results that resolved to the same card UUID.
+def _drop_face_name_redundancies(
+    results: list[ValidatedCardResult],
+    index: MTGJSONIndex,
+) -> list[ValidatedCardResult]:
+    """Drop entries whose title is a face of a split card that another entry already matched.
 
-    Keeps the highest-confidence result for each UUID. Unmatched cards (no UUID)
-    are always kept as-is.
+    When the LLM returns both face names of a split card, one may be corrected
+    (face-name match) and the other may fail (no_match or needs_correction).
+    The unmatched half is redundant and should be dropped.
+
+    Only entries matched via face-name correction trigger this — normal UUID
+    matches from identical physical cards are not touched.
     """
-    seen: dict[str, ValidatedCardResult] = {}
-    deduped: list[ValidatedCardResult] = []
-    for result in results:
-        uuid = result.trace.matched_uuid
-        if uuid is None:
-            deduped.append(result)
-            continue
-        if uuid not in seen or result.card.confidence > seen[uuid].card.confidence:
-            seen[uuid] = result
-    # Preserve original order for matched UUIDs
-    added_uuids: set[str] = set()
+    face_matched_uuids: set[str] = {
+        result.trace.matched_uuid
+        for result in results
+        if result.trace.matched_uuid is not None
+        and "face name of split card" in result.trace.reason
+    }
+    if not face_matched_uuids:
+        return results
+
+    emitted_face_uuids: set[str] = set()
     output: list[ValidatedCardResult] = []
     for result in results:
         uuid = result.trace.matched_uuid
-        if uuid is None:
-            output.append(result)
-        elif uuid not in added_uuids:
-            output.append(seen[uuid])
-            added_uuids.add(uuid)
+        if uuid in face_matched_uuids:
+            if uuid not in emitted_face_uuids:
+                output.append(result)
+                emitted_face_uuids.add(uuid)
+            continue
+        face_parents = {r.uuid for r in index.lookup_by_face_name(title=result.card.title or "")}
+        if face_parents & face_matched_uuids:
+            continue  # this title is a face of an already-matched split card — drop it
+        output.append(result)
     return output
 
 

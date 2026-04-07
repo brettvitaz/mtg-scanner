@@ -408,10 +408,8 @@ def test_validate_split_card_full_name_still_works(validation_service: CardValid
     assert result.card.set_code == "WAR"
 
 
-def test_dedup_by_uuid_collapses_same_uuid(validation_service: CardValidationService) -> None:
-    # Both face names resolve to the same UUID — dedup_by_uuid should keep highest confidence
-    from app.services.card_validation import ValidatedCardResult, dedup_by_uuid
-
+def test_validate_response_collapses_split_card_faces(validation_service: CardValidationService) -> None:
+    # Both face names corrected to same card — redundant second entry dropped
     response = RecognitionResponse(
         cards=[
             RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
@@ -419,19 +417,38 @@ def test_dedup_by_uuid_collapses_same_uuid(validation_service: CardValidationSer
         ]
     )
     batch = validation_service.validate_response(response)
-    assert len(batch.response.cards) == 2  # validate_response does NOT dedup
 
-    results = [
-        ValidatedCardResult(card=card, trace=trace, correction_candidates=candidates)
-        for card, trace, candidates in zip(
-            batch.response.cards, batch.traces, batch.correction_candidates
-        )
-    ]
-    deduped = dedup_by_uuid(results)
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
 
-    assert len(deduped) == 1
-    assert deduped[0].card.title == "Warrant // Warden"
-    assert deduped[0].card.confidence == pytest.approx(0.81)
+
+def test_validate_response_drops_unmatched_face_when_other_half_matched(validation_service: CardValidationService) -> None:
+    # One face matched, the other failed — the failed half is dropped as redundant
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Xarden", edition=None, collector_number=None, foil=False, confidence=0.5, notes=None),  # misspelling, no_match
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    # "Xarden" doesn't match any face — both cards kept
+    assert len(batch.response.cards) == 2
+
+
+def test_validate_response_drops_valid_face_when_sibling_matched(validation_service: CardValidationService) -> None:
+    # "Warden" corrected to full card; "Warrant" (valid face name) is redundant — drop it
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition=None, collector_number=None, foil=False, confidence=0.84, notes=None),
+            RecognizedCard(title="Warden", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    # Both faces resolve to the same card; the redundant entry is dropped
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
 
 
 def test_validate_response_preserves_duplicate_physical_cards(validation_service: CardValidationService) -> None:

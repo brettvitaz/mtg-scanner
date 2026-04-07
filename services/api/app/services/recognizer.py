@@ -11,7 +11,7 @@ from app.models.recognition import (
     RecognitionUploadMetadata,
 )
 from app.services.card_detector import CardDetector, DetectionResult
-from app.services.card_validation import CardValidationService, ValidatedCardResult, ValidationBatchResult, dedup_by_uuid
+from app.services.card_validation import CardValidationService, ValidationBatchResult
 from app.services.errors import RecognitionConfigurationError, RecognitionProviderError
 from app.services.mtgjson_index import CardRecord, MTGJSONIndex
 from app.services.llm import get_llm_provider, LLMProvider
@@ -322,7 +322,6 @@ class RecognitionService:
             validation_result = self._apply_llm_correction(
                 validation_result, image_bytes, enriched_metadata
             )
-            validation_result = _apply_dedup(validation_result)
         final_response = validation_result.response if validation_result else response
         logger.info(
             "Recognition complete: %d cards from '%s' via %s",
@@ -452,27 +451,3 @@ def _build_correction_prompt(
     filled = filled.replace("{{candidates_table}}", candidates_table)
     return filled
 
-
-def _apply_dedup(validation_result: ValidationBatchResult) -> ValidationBatchResult:
-    """Collapse duplicate validated cards that resolved to the same UUID.
-
-    Only used for single-image recognition where the LLM may return both faces
-    of a split card as separate entries. Not applied to multi-crop responses
-    where each crop is a distinct physical card.
-    """
-    results = [
-        ValidatedCardResult(card=card, trace=trace, correction_candidates=candidates)
-        for card, trace, candidates in zip(
-            validation_result.response.cards,
-            validation_result.traces,
-            validation_result.correction_candidates,
-        )
-    ]
-    deduped = dedup_by_uuid(results)
-    return ValidationBatchResult(
-        response=RecognitionResponse(cards=[r.card for r in deduped]),
-        traces=[r.trace for r in deduped],
-        enabled=validation_result.enabled,
-        available=validation_result.available,
-        correction_candidates=[r.correction_candidates for r in deduped],
-    )

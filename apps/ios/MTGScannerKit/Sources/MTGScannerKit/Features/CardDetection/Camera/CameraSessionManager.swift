@@ -20,6 +20,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
     private var photoCaptureCompletion: ((Data?) -> Void)?
+    private var isCaptureInFlight = false
     private(set) var captureDevice: AVCaptureDevice?
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
@@ -83,11 +84,17 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     // MARK: - Photo Capture
 
     /// Triggers a still photo capture and returns JPEG data via `completion`.
-    /// Must be called from the main thread.
-    func capturePhoto(completion: @escaping (Data?) -> Void) {
-        photoCaptureCompletion = completion
+    /// If a capture is already in flight, `completion` is called immediately with `nil`.
+    func capturePhoto(completion: @escaping @Sendable (Data?) -> Void) {
         sessionQueue.async { [weak self] in
-            self?.lockFocusThenCapture()
+            guard let self else { return }
+            guard !self.isCaptureInFlight else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            self.isCaptureInFlight = true
+            self.photoCaptureCompletion = completion
+            self.lockFocusThenCapture()
         }
     }
 
@@ -107,7 +114,6 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         }
         sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.captureWithCurrentSettings()
-            self?.restoreContinuousAutoFocus()
         }
     }
 
@@ -165,7 +171,14 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     func stop() {
         sessionQueue.async { [weak self] in
-            guard let self, self.session.isRunning else { return }
+            guard let self else { return }
+            if self.isCaptureInFlight {
+                let pending = self.photoCaptureCompletion
+                self.photoCaptureCompletion = nil
+                self.isCaptureInFlight = false
+                DispatchQueue.main.async { pending?(nil) }
+            }
+            guard self.session.isRunning else { return }
             self.session.stopRunning()
         }
     }
@@ -190,6 +203,8 @@ extension CameraSessionManager: AVCapturePhotoCaptureDelegate {
         let data = error == nil ? photo.fileDataRepresentation() : nil
         let completion = photoCaptureCompletion
         photoCaptureCompletion = nil
+        isCaptureInFlight = false
+        restoreContinuousAutoFocus()
         DispatchQueue.main.async { completion?(data) }
     }
 }

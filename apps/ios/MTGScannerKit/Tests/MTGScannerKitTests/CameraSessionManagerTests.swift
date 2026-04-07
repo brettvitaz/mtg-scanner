@@ -7,64 +7,82 @@ final class CameraSessionManagerTests: XCTestCase {
 
     func testSecondCaptureWhileInFlightReturnsNilImmediately() async {
         let manager = CameraSessionManager()
-        nonisolated(unsafe) var firstResult: Data?? = .none
-        nonisolated(unsafe) var secondResult: Data?? = .none
+        let firstStarted = expectation(description: "first capture enqueued")
+        let secondFailed = expectation(description: "second capture fast-fails with nil")
+        nonisolated(unsafe) var secondResult: Data?? = .some(.some(Data()))
 
-        manager.capturePhoto { data in firstResult = data }
+        // First capture: just marks in-flight; no hardware → completion never fires naturally
+        manager.capturePhoto { _ in firstStarted.fulfill() }
+        // stop() drains the first so the fast-fail check is observable in isolation
+        manager.stop()
+        await fulfillment(of: [firstStarted], timeout: 1.0)
 
-        await Task.yield()
-        // Flush sessionQueue: by the time a second async block runs, the first has set isCaptureInFlight
-        let exp = expectation(description: "second capture fast-fails")
-        manager.capturePhoto { data in
-            secondResult = data
-            exp.fulfill()
+        // Reinstall in-flight state for the second test: issue a capture, then immediately
+        // issue a second one before stop() can drain the first.
+        let manager2 = CameraSessionManager()
+        nonisolated(unsafe) var secondReceivedNil = false
+        manager2.capturePhoto { _ in }  // first — stays in-flight
+        manager2.capturePhoto { data in
+            secondReceivedNil = (data == nil)
+            secondFailed.fulfill()
         }
-        await fulfillment(of: [exp], timeout: 1.0)
-
-        // Second caller must receive nil, not block indefinitely
-        XCTAssertEqual(secondResult as? Data?, Optional<Data>.none)
+        await fulfillment(of: [secondFailed], timeout: 1.0)
+        XCTAssertTrue(secondReceivedNil, "Second capture while first is in flight must receive nil")
+        manager2.stop()
     }
 
     // MARK: - stop() drains in-flight completion
 
-    func testStopDuringAutofocusDelayCallsCompletionWithNil() async {
+    func testStopCallsCompletionWithNilWhenNoCaptureDevice() async {
+        // captureDevice is nil on an unconfigured manager, so the focus path is skipped.
+        // This verifies that stop() drains the stored completion with nil regardless.
         let manager = CameraSessionManager()
-        let exp = expectation(description: "completion called after stop")
+        let exp = expectation(description: "completion called with nil after stop")
         nonisolated(unsafe) var receivedData: Data?? = .some(.some(Data()))
 
         manager.capturePhoto { data in
             receivedData = data
             exp.fulfill()
         }
-
-        // stop() before the 300 ms delay fires
         manager.stop()
 
         await fulfillment(of: [exp], timeout: 1.0)
-        XCTAssertEqual(receivedData as? Data?, Optional<Data>.none)
+        XCTAssertNil(receivedData as? Data?, "stop() must resolve pending completion with nil")
     }
 
-    // MARK: - Capture accepted again after stop()
+    // MARK: - isCaptureInFlight cleared after stop()
 
-    func testCaptureAcceptedAfterStopClearsInFlightFlag() async {
+    func testCaptureFlagClearedAfterStop() async {
+        // After stop() drains an in-flight capture, a subsequent capturePhoto must be
+        // accepted (not fast-failed). We verify acceptance by confirming stop() is
+        // required to resolve the second request — if it were fast-failed it would
+        // have already called the completion with nil before the second stop().
         let manager = CameraSessionManager()
-        let exp1 = expectation(description: "first completion called")
-        let exp2 = expectation(description: "second capture accepted")
-        nonisolated(unsafe) var secondWasAccepted = false
+        let exp1 = expectation(description: "first completion drained by first stop")
+        let exp2 = expectation(description: "second capture accepted and drained by second stop")
+        nonisolated(unsafe) var secondCompletionCalledBeforeSecondStop = false
 
         manager.capturePhoto { _ in exp1.fulfill() }
         manager.stop()
         await fulfillment(of: [exp1], timeout: 1.0)
 
-        // After stop drains the flag, a new capture must be accepted (not fast-failed)
+        // If isCaptureInFlight is incorrectly stuck true, this would fast-fail
+        // synchronously on the session queue, setting the flag before the second stop().
         manager.capturePhoto { _ in
-            secondWasAccepted = true
+            secondCompletionCalledBeforeSecondStop = true
             exp2.fulfill()
         }
-        // stop() again so the second capture also resolves (don't need hardware)
+
+        // Yield to let the session queue process capturePhoto — if it fast-failed, exp2
+        // is already fulfilled and secondCompletionCalledBeforeSecondStop is true.
+        // If it was accepted, the completion is pending and exp2 is not yet fulfilled.
+        await Task.yield()
+
+        // Second capture must still be pending here (not fast-failed)
+        XCTAssertFalse(secondCompletionCalledBeforeSecondStop,
+                       "Second capture must be accepted (pending), not fast-failed before second stop()")
+
         manager.stop()
         await fulfillment(of: [exp2], timeout: 1.0)
-
-        XCTAssertTrue(secondWasAccepted)
     }
 }

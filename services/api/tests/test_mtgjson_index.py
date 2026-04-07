@@ -261,9 +261,9 @@ def test_lookup_by_face_name_finds_second_face(tmp_path: Path, mtgjson_fixture_w
     assert results[0].name == "Warrant // Warden"
 
 
-def test_import_deduplicates_split_card_faces(tmp_path: Path) -> None:
+def test_import_merges_split_card_face_metadata(tmp_path: Path) -> None:
     """MTGJSON stores each face of a split card as a separate record with the same name+set+number.
-    The importer must keep only the first face to avoid ambiguous_match during validation."""
+    The importer keeps one row but merges per-face type_line, oracle_text, and mana_cost."""
     payload = {
         "meta": {"date": "2026-03-26", "version": "1.0.0"},
         "data": {
@@ -279,6 +279,8 @@ def test_import_deduplicates_split_card_faces(tmp_path: Path) -> None:
                         "layout": "split",
                         "language": "English",
                         "type": "Sorcery",
+                        "text": "Look at the top five cards.",
+                        "manaCost": "{G}",
                     },
                     {
                         "uuid": "incubation-face2",
@@ -287,6 +289,8 @@ def test_import_deduplicates_split_card_faces(tmp_path: Path) -> None:
                         "layout": "split",
                         "language": "English",
                         "type": "Instant",
+                        "text": "Exile target creature.",
+                        "manaCost": "{1}{U}",
                     },
                 ],
             },
@@ -303,6 +307,11 @@ def test_import_deduplicates_split_card_faces(tmp_path: Path) -> None:
     index = MTGJSONIndex(db_path)
     results = index.lookup_by_name_and_set(title="Incubation // Incongruity", set_code="RNA")
     assert len(results) == 1
+    card = results[0]
+    assert card.type_line == "Sorcery // Instant"
+    assert card.oracle_text is not None and "Look at the top five cards." in card.oracle_text
+    assert card.oracle_text is not None and "Exile target creature." in card.oracle_text
+    assert card.mana_cost == "{G} // {1}{U}"
 
 
 def test_lookup_by_face_name_returns_empty_on_old_db_without_table(tmp_path: Path, mtgjson_fixture: Path) -> None:

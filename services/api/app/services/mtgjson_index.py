@@ -459,6 +459,35 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                 collector_number = card.get("number")
                 dedup_key = (normalize_title(card.get("asciiName") or name), normalize_collector_number(collector_number))
                 if dedup_key in seen_in_set:
+                    # Second face of a split card — merge per-face fields into the existing row
+                    face_type = card.get("type")
+                    face_text = card.get("text")
+                    face_mana = card.get("manaCost")
+                    if face_type or face_text or face_mana:
+                        conn.execute(
+                            """
+                            UPDATE cards SET
+                                type_line = CASE WHEN type_line IS NOT NULL AND ? IS NOT NULL
+                                                 THEN type_line || ' // ' || ?
+                                                 ELSE COALESCE(type_line, ?) END,
+                                oracle_text = CASE WHEN oracle_text IS NOT NULL AND ? IS NOT NULL
+                                                   THEN oracle_text || '\n---\n' || ?
+                                                   ELSE COALESCE(oracle_text, ?) END,
+                                mana_cost = CASE WHEN mana_cost IS NOT NULL AND ? IS NOT NULL
+                                                 THEN mana_cost || ' // ' || ?
+                                                 ELSE COALESCE(mana_cost, ?) END
+                            WHERE normalized_name = ? AND set_code = ?
+                              AND normalized_collector_number = ?
+                            """,
+                            (
+                                face_type, face_type, face_type,
+                                face_text, face_text, face_text,
+                                face_mana, face_mana, face_mana,
+                                normalize_title(card.get("asciiName") or name),
+                                canonical_set_code,
+                                normalize_collector_number(collector_number),
+                            ),
+                        )
                     skipped_card_count += 1
                     continue
                 seen_in_set.add(dedup_key)

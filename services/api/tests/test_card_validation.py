@@ -468,6 +468,22 @@ def test_validate_response_preserves_full_name_match_alongside_face_correction(v
     assert batch.traces[0].status == "exact_match"
 
 
+def test_validate_response_preserves_duplicate_split_cards_by_face_name(validation_service: CardValidationService) -> None:
+    # Two physical copies of the same split card, both recognized by the same face name.
+    # Both should be kept — same original title means different physical cards, not siblings.
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    assert len(batch.response.cards) == 2
+    assert batch.response.cards[0].title == "Warrant // Warden"
+    assert batch.response.cards[1].title == "Warrant // Warden"
+
+
 def test_validate_response_preserves_duplicate_physical_cards(validation_service: CardValidationService) -> None:
     # Two copies of the same card on a page must NOT be collapsed
     response = RecognitionResponse(

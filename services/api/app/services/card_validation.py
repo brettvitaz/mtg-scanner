@@ -524,20 +524,35 @@ def _drop_face_name_redundancies(
         if i not in face_corrected_indices and result.trace.matched_uuid is not None
     }
 
-    # For each non-face-corrected result, check if its original title is a face
-    # of any already-matched split card UUID. If so, it is a sibling and should
-    # be dropped.
+    # Collect (uuid, original_title) pairs for all face-corrected entries so we can
+    # identify true siblings (different original title, same UUID) vs. duplicate
+    # physical copies (same original title, same UUID).
+    face_corrected_titles: dict[int, str] = {
+        i: str(results[i].trace.original.get("title") or "")
+        for i in face_corrected_indices
+    }
+
+    # For each result, decide whether to keep or drop it.
     output: list[ValidatedCardResult] = []
-    emitted_face_uuids: set[str] = set()
     for i, result in enumerate(results):
         if i in face_corrected_indices:
             uuid = result.trace.matched_uuid
-            # Drop if a better (non-face-corrected) result covers the same UUID,
-            # or if another face-corrected entry already emitted this UUID.
-            if uuid in non_face_uuids or uuid in emitted_face_uuids:
+            orig = face_corrected_titles[i]
+            # Drop if a non-face-corrected result already covers this UUID
+            if uuid in non_face_uuids:
+                continue
+            # Drop if another face-corrected entry with a DIFFERENT original title
+            # already resolved to the same UUID (i.e. it was the sibling face)
+            is_sibling_already_emitted = any(
+                j != i
+                and results[j].trace.matched_uuid == uuid
+                and face_corrected_titles[j] != orig
+                and j < i
+                for j in face_corrected_indices
+            )
+            if is_sibling_already_emitted:
                 continue
             output.append(result)
-            emitted_face_uuids.add(uuid)  # type: ignore[arg-type]
             continue
         original_title = str(result.trace.original.get("title") or "")
         face_parents = {r.uuid for r in index.lookup_by_face_name(title=original_title)}

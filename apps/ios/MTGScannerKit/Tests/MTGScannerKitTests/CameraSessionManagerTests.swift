@@ -9,14 +9,42 @@ import XCTest
 ///
 /// No real camera hardware is available in tests. `captureDevice` remains nil,
 /// so the autofocus path is skipped and `issueCapture` is never called.
+/// `isSessionReady` is set to `true` directly so the readiness guard passes
+/// without requiring a real running session.
 /// These tests cover the guard logic and state-machine bookkeeping, not
 /// hardware behavior.
 final class CameraSessionManagerTests: XCTestCase {
 
+    // MARK: - Helpers
+
+    /// Returns a manager with `isSessionReady` set to `true` on its session queue,
+    /// simulating a session that has been configured and started.
+    private func makeReadyManager() -> CameraSessionManager {
+        let manager = CameraSessionManager()
+        manager.sessionQueue.sync { manager.isSessionReady = true }
+        return manager
+    }
+
+    // MARK: - Session not ready
+
+    func testCaptureBeforeSessionReadyFastFailsWithNil() {
+        let manager = CameraSessionManager()
+        let exp = expectation(description: "capture fast-fails when session not ready")
+        nonisolated(unsafe) var result: Data?? = .some(.some(Data()))
+
+        manager.capturePhoto { data in
+            result = data
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 1.0)
+
+        XCTAssertNil(result as? Data?, "Capture before session is ready must receive nil")
+    }
+
     // MARK: - Duplicate capture requests
 
     func testSecondCaptureWhileInFlightFastFailsWithNil() {
-        let manager = CameraSessionManager()
+        let manager = makeReadyManager()
         nonisolated(unsafe) var firstCallbackFired = false
         nonisolated(unsafe) var secondResult: Data?? = .some(.some(Data()))
 
@@ -42,7 +70,7 @@ final class CameraSessionManagerTests: XCTestCase {
     // MARK: - stop() drains in-flight completion
 
     func testStopResolvesInFlightCompletionWithNil() {
-        let manager = CameraSessionManager()
+        let manager = makeReadyManager()
         let exp = expectation(description: "completion resolved with nil by stop")
         nonisolated(unsafe) var receivedNil = false
 
@@ -59,7 +87,7 @@ final class CameraSessionManagerTests: XCTestCase {
     // MARK: - isCaptureInFlight cleared after stop()
 
     func testStopClearsInFlightSoSubsequentCaptureIsAccepted() {
-        let manager = CameraSessionManager()
+        let manager = makeReadyManager()
         let exp1 = expectation(description: "first capture drained by stop")
 
         manager.capturePhoto { _ in exp1.fulfill() }
@@ -67,7 +95,8 @@ final class CameraSessionManagerTests: XCTestCase {
         wait(for: [exp1], timeout: 1.0)
 
         // Flush: all enqueued work from stop() has finished.
-        manager.sessionQueue.sync {}
+        // Re-arm isSessionReady since stop() clears it.
+        manager.sessionQueue.sync { manager.isSessionReady = true }
 
         // isCaptureInFlight must now be false. Issue a second capture and verify
         // it is accepted (not fast-failed) by checking it stays pending after the
@@ -94,7 +123,7 @@ final class CameraSessionManagerTests: XCTestCase {
         // capture B starts. Then A's onDone fires (as would happen if a stale
         // didFinishProcessingPhoto arrived after re-entry).
         // captureDidFinish(handler:) must guard on handler identity and leave B intact.
-        let manager = CameraSessionManager()
+        let manager = makeReadyManager()
         let exp1 = expectation(description: "capture A drained by stop")
 
         // Capture A
@@ -104,7 +133,8 @@ final class CameraSessionManagerTests: XCTestCase {
         manager.sessionQueue.sync { handlerA = manager.activeHandler }
         manager.stop()
         wait(for: [exp1], timeout: 1.0)
-        manager.sessionQueue.sync {}
+        // Re-arm isSessionReady since stop() clears it.
+        manager.sessionQueue.sync { manager.isSessionReady = true }
 
         // Capture B
         manager.capturePhoto { _ in }
@@ -124,7 +154,7 @@ final class CameraSessionManagerTests: XCTestCase {
         // The key assertion: after second stop, isCaptureInFlight is false and a third
         // capture is accepted.
         manager.stop()
-        manager.sessionQueue.sync {}
+        manager.sessionQueue.sync { manager.isSessionReady = true }
 
         nonisolated(unsafe) var thirdCallbackFired = false
         manager.capturePhoto { _ in

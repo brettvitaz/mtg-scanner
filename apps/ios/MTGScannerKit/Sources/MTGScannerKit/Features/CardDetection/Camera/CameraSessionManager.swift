@@ -24,6 +24,10 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     /// Typed as `AnyObject?` so the private `PhotoCaptureHandler` type stays private.
     var activeHandler: AnyObject? { _activeHandler }
 
+    /// Set to `true` in tests to simulate a running session without real hardware.
+    /// In production this is always driven by `session.isRunning` via `start()`/`stop()`.
+    var isSessionReady = false
+
     // MARK: - Private
 
     private let photoOutput = AVCapturePhotoOutput()
@@ -98,7 +102,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     func capturePhoto(completion: @escaping @Sendable (Data?) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            guard self.session.isRunning, !self.isCaptureInFlight else {
+            guard self.isSessionReady, !self.isCaptureInFlight else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
@@ -187,12 +191,14 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         sessionQueue.async { [weak self] in
             guard let self, !self.session.isRunning else { return }
             self.session.startRunning()
+            self.isSessionReady = true
         }
     }
 
     func stop() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
+            self.isSessionReady = false
             if self.isCaptureInFlight {
                 self.captureGeneration &+= 1
                 self._activeHandler?.cancel()

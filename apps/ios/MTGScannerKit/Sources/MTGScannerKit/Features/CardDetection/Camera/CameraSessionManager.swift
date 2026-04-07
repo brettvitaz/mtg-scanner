@@ -20,13 +20,13 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     /// Exposed so tests can flush the queue with `sync {}` to assert state after enqueued work completes.
     let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
 
-    /// Exposed for testing: allows tests to verify handler identity across stop/restart cycles.
-    /// Typed as `AnyObject?` so the private `PhotoCaptureHandler` type stays private.
-    var activeHandler: AnyObject? { _activeHandler }
-
     /// Set to `true` in tests to simulate a running session without real hardware.
     /// In production this is always driven by `session.isRunning` via `start()`/`stop()`.
     var isSessionReady = false
+
+    /// Set to `true` in tests to skip issuing a real AVCapturePhotoOutput request.
+    /// This allows state-machine tests to run without a configured camera pipeline.
+    var suppressCaptureForTesting = false
 
     // MARK: - Private
 
@@ -130,6 +130,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     }
 
     private func lockFocusThenCapture(handler: PhotoCaptureHandler) {
+        guard !suppressCaptureForTesting else { return }
         guard let device = captureDevice,
               device.isFocusModeSupported(.autoFocus) else {
             handler.issueCapture(to: photoOutput)
@@ -157,6 +158,25 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
             device.focusMode = .continuousAutoFocus
         }
         device.unlockForConfiguration()
+    }
+
+    /// Test-only accessor for queue-confined capture state.
+    func activeHandlerForTesting() -> AnyObject? {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return _activeHandler
+    }
+
+    /// Test-only accessor for queue-confined capture state.
+    func isCaptureInFlightForTesting() -> Bool {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return isCaptureInFlight
+    }
+
+    /// Test-only hook that exercises the same stale-handler guard used by AVFoundation callbacks.
+    func finishCaptureForTesting(handler: AnyObject?) {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        guard let handler = handler as? PhotoCaptureHandler else { return }
+        captureDidFinish(handler: handler)
     }
 
     // MARK: - Torch
@@ -273,16 +293,14 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         // Serialize completion mutation onto sessionQueue so cancel() and this delegate
         // callback cannot race — only one of them will find a non-nil completion.
-        let capturedPhoto = photo
-        let capturedError = error
+        let photoData = error == nil ? photo.fileDataRepresentation() : nil
         sessionQueue.async { [weak self] in
             guard let self else { return }
             let pending = self.completion
             self.completion = nil
             self.onDone(self)
             guard let pending else { return }
-            let data = capturedError == nil ? capturedPhoto.fileDataRepresentation() : nil
-            DispatchQueue.main.async { pending(data) }
+            DispatchQueue.main.async { pending(photoData) }
         }
     }
 }

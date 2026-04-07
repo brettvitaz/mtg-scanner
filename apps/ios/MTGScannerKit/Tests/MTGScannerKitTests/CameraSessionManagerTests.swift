@@ -7,10 +7,10 @@ import XCTest
 /// because sessionQueue is serial, a sync barrier guarantees all previously
 /// enqueued work has completed before assertions run.
 ///
-/// No real camera hardware is available in tests. `captureDevice` remains nil,
-/// so the autofocus path is skipped and `issueCapture` is never called.
-/// `isSessionReady` is set to `true` directly so the readiness guard passes
-/// without requiring a real running session.
+/// No real camera hardware is available in tests. `suppressCaptureForTesting`
+/// keeps the manager from issuing a real `AVCapturePhotoOutput` request, while
+/// `isSessionReady` is set directly so the readiness guard passes without
+/// requiring a real running session.
 /// These tests cover the guard logic and state-machine bookkeeping, not
 /// hardware behavior.
 final class CameraSessionManagerTests: XCTestCase {
@@ -21,7 +21,10 @@ final class CameraSessionManagerTests: XCTestCase {
     /// simulating a session that has been configured and started.
     private func makeReadyManager() -> CameraSessionManager {
         let manager = CameraSessionManager()
-        manager.sessionQueue.sync { manager.isSessionReady = true }
+        manager.sessionQueue.sync {
+            manager.isSessionReady = true
+            manager.suppressCaptureForTesting = true
+        }
         return manager
     }
 
@@ -30,15 +33,15 @@ final class CameraSessionManagerTests: XCTestCase {
     func testCaptureBeforeSessionReadyFastFailsWithNil() {
         let manager = CameraSessionManager()
         let exp = expectation(description: "capture fast-fails when session not ready")
-        nonisolated(unsafe) var result: Data?? = .some(.some(Data()))
+        nonisolated(unsafe) var receivedNil = false
 
         manager.capturePhoto { data in
-            result = data
+            receivedNil = (data == nil)
             exp.fulfill()
         }
         wait(for: [exp], timeout: 1.0)
 
-        XCTAssertNil(result as? Data?, "Capture before session is ready must receive nil")
+        XCTAssertTrue(receivedNil, "Capture before session is ready must receive nil")
     }
 
     // MARK: - Duplicate capture requests
@@ -46,7 +49,7 @@ final class CameraSessionManagerTests: XCTestCase {
     func testSecondCaptureWhileInFlightFastFailsWithNil() {
         let manager = makeReadyManager()
         nonisolated(unsafe) var firstCallbackFired = false
-        nonisolated(unsafe) var secondResult: Data?? = .some(.some(Data()))
+        nonisolated(unsafe) var secondReceivedNil = false
 
         // First capture: accepted, stays in-flight (no hardware to complete it).
         manager.capturePhoto { _ in firstCallbackFired = true }
@@ -56,13 +59,13 @@ final class CameraSessionManagerTests: XCTestCase {
         // Second capture: must be fast-failed synchronously on the session queue.
         let exp = expectation(description: "second capture fast-fails")
         manager.capturePhoto { data in
-            secondResult = data
+            secondReceivedNil = (data == nil)
             exp.fulfill()
         }
         wait(for: [exp], timeout: 1.0)
 
         XCTAssertFalse(firstCallbackFired, "First capture completion must not be called by the fast-fail path")
-        XCTAssertNil(secondResult as? Data?, "Second capture while in-flight must receive nil")
+        XCTAssertTrue(secondReceivedNil, "Second capture while in-flight must receive nil")
 
         manager.stop()
     }
@@ -130,39 +133,50 @@ final class CameraSessionManagerTests: XCTestCase {
         manager.capturePhoto { _ in exp1.fulfill() }
         // Grab handler A before stop() clears it.
         var handlerA: AnyObject?
-        manager.sessionQueue.sync { handlerA = manager.activeHandler }
+        manager.sessionQueue.sync { handlerA = manager.activeHandlerForTesting() }
         manager.stop()
         wait(for: [exp1], timeout: 1.0)
         // Re-arm isSessionReady since stop() clears it.
         manager.sessionQueue.sync { manager.isSessionReady = true }
 
         // Capture B
-        manager.capturePhoto { _ in }
+        let exp2 = expectation(description: "capture B drained by second stop")
+        nonisolated(unsafe) var captureBReceivedNil = false
+        manager.capturePhoto { data in
+            captureBReceivedNil = (data == nil)
+            exp2.fulfill()
+        }
         manager.sessionQueue.sync {}
         var handlerB: AnyObject?
-        manager.sessionQueue.sync { handlerB = manager.activeHandler }
+        nonisolated(unsafe) var staleHandlerDidNotClearActiveCapture = false
+        nonisolated(unsafe) var captureBStillInFlightAfterStaleCompletion = false
+        manager.sessionQueue.sync {
+            handlerB = manager.activeHandlerForTesting()
+            manager.finishCaptureForTesting(handler: handlerA)
+            staleHandlerDidNotClearActiveCapture = (manager.activeHandlerForTesting() === handlerB)
+            captureBStillInFlightAfterStaleCompletion = manager.isCaptureInFlightForTesting()
+        }
 
         XCTAssertNotNil(handlerB, "Capture B must be in-flight")
         XCTAssertFalse(handlerA === handlerB, "Handler A and B must be distinct objects")
+        XCTAssertTrue(staleHandlerDidNotClearActiveCapture, "Stale handler completion must not clear the newer active handler")
+        XCTAssertTrue(captureBStillInFlightAfterStaleCompletion, "Stale handler completion must not clear in-flight state for capture B")
 
-        // Now simulate stale A onDone arriving: call captureDidFinish with the old handler.
-        // We do this by invoking stop() a second time — which increments generation again
-        // and cancels B. Then we check B's completion resolves and no state corruption occurs.
-        let exp2 = expectation(description: "capture B drained by second stop")
-        // Re-install a completion on B so we can detect it.
-        // (We can't re-install directly; instead verify stop resolves it cleanly.)
-        // The key assertion: after second stop, isCaptureInFlight is false and a third
-        // capture is accepted.
+        // Explicitly cancel B and verify its completion still resolves normally.
         manager.stop()
         manager.sessionQueue.sync { manager.isSessionReady = true }
+        wait(for: [exp2], timeout: 1.0)
+        XCTAssertTrue(captureBReceivedNil, "stop() must still resolve the current capture after a stale completion attempt")
 
+        // After cancelling B, a third capture should be accepted.
+        let exp3 = expectation(description: "third capture drained by stop")
         nonisolated(unsafe) var thirdCallbackFired = false
         manager.capturePhoto { _ in
             thirdCallbackFired = true
-            exp2.fulfill()
+            exp3.fulfill()
         }
         manager.stop()
-        wait(for: [exp2], timeout: 1.0)
+        wait(for: [exp3], timeout: 1.0)
 
         XCTAssertTrue(thirdCallbackFired, "Third capture after two stops must be accepted and resolved")
     }

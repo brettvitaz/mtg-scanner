@@ -261,6 +261,50 @@ def test_lookup_by_face_name_finds_second_face(tmp_path: Path, mtgjson_fixture_w
     assert results[0].name == "Warrant // Warden"
 
 
+def test_import_deduplicates_split_card_faces(tmp_path: Path) -> None:
+    """MTGJSON stores each face of a split card as a separate record with the same name+set+number.
+    The importer must keep only the first face to avoid ambiguous_match during validation."""
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "RNA": {
+                "code": "RNA",
+                "name": "Ravnica Allegiance",
+                "releaseDate": "2019-01-25",
+                "cards": [
+                    {
+                        "uuid": "incubation-face1",
+                        "name": "Incubation // Incongruity",
+                        "number": "226",
+                        "layout": "split",
+                        "language": "English",
+                        "type": "Sorcery",
+                    },
+                    {
+                        "uuid": "incubation-face2",
+                        "name": "Incubation // Incongruity",
+                        "number": "226",
+                        "layout": "split",
+                        "language": "English",
+                        "type": "Instant",
+                    },
+                ],
+            },
+        },
+    }
+    source_path = tmp_path / "AllPrintings.json"
+    source_path.write_text(json.dumps(payload))
+    db_path = tmp_path / "mtgjson.sqlite"
+    summary = import_all_printings(source_path=source_path, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    assert summary.card_count == 1
+    assert summary.skipped_card_count == 1
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_name_and_set(title="Incubation // Incongruity", set_code="RNA")
+    assert len(results) == 1
+
+
 def test_lookup_by_face_name_no_match_for_normal_card(tmp_path: Path, mtgjson_fixture: Path) -> None:
     db_path = tmp_path / "mtgjson.sqlite"
     import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=tmp_path / "manifest.json")

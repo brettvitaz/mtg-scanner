@@ -435,6 +435,7 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                 ),
             )
 
+            seen_in_set: set[tuple[str, str]] = set()
             for card in set_payload.get("cards", []):
                 if not isinstance(card, dict):
                     skipped_card_count += 1
@@ -445,6 +446,11 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                     skipped_card_count += 1
                     continue
                 collector_number = card.get("number")
+                dedup_key = (normalize_title(card.get("asciiName") or name), normalize_collector_number(collector_number))
+                if dedup_key in seen_in_set:
+                    skipped_card_count += 1
+                    continue
+                seen_in_set.add(dedup_key)
                 identifiers = card.get("identifiers") or {}
                 purchase_urls = card.get("purchaseUrls") or {}
                 finishes_list: list[str] = card.get("finishes") or []

@@ -4,6 +4,7 @@ import XCTest
 
 final class AccessibilitySummaryTests: XCTestCase {
 
+    @MainActor
     func testCollectionItemRowSummaryIncludesCoreCardDetails() {
         let item = CollectionItem(
             title: "Lightning Bolt",

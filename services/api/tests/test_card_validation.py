@@ -408,21 +408,46 @@ def test_validate_split_card_full_name_still_works(validation_service: CardValid
     assert result.card.set_code == "WAR"
 
 
-def test_validate_response_deduplicates_split_card_faces(validation_service: CardValidationService) -> None:
-    # LLM returned both face names as separate entries; set context pins both to WAR
+def test_dedup_by_uuid_collapses_same_uuid(validation_service: CardValidationService) -> None:
+    # Both face names resolve to the same UUID — dedup_by_uuid should keep highest confidence
+    from app.services.card_validation import ValidatedCardResult, dedup_by_uuid
+
     response = RecognitionResponse(
         cards=[
             RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
             RecognizedCard(title="Warden", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
         ]
     )
+    batch = validation_service.validate_response(response)
+    assert len(batch.response.cards) == 2  # validate_response does NOT dedup
+
+    results = [
+        ValidatedCardResult(card=card, trace=trace, correction_candidates=candidates)
+        for card, trace, candidates in zip(
+            batch.response.cards, batch.traces, batch.correction_candidates
+        )
+    ]
+    deduped = dedup_by_uuid(results)
+
+    assert len(deduped) == 1
+    assert deduped[0].card.title == "Warrant // Warden"
+    assert deduped[0].card.confidence == pytest.approx(0.81)
+
+
+def test_validate_response_preserves_duplicate_physical_cards(validation_service: CardValidationService) -> None:
+    # Two copies of the same card on a page must NOT be collapsed
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Lightning Bolt", edition="M10", collector_number="146", foil=False, confidence=0.95, notes=None),
+            RecognizedCard(title="Lightning Bolt", edition="M10", collector_number="146", foil=False, confidence=0.93, notes=None),
+        ]
+    )
 
     batch = validation_service.validate_response(response)
 
-    assert len(batch.response.cards) == 1
-    assert batch.response.cards[0].title == "Warrant // Warden"
-    # Higher confidence card (Warrant at 0.86) wins after corrected_match penalty
-    assert batch.response.cards[0].confidence == pytest.approx(0.81)
+    assert len(batch.response.cards) == 2
+    assert batch.traces[0].matched_uuid == "bolt-m10-146"
+    assert batch.traces[1].matched_uuid == "bolt-m10-146"
 
 
 def test_validate_response_exposes_correction_candidates(validation_service: CardValidationService) -> None:

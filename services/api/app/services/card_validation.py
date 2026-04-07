@@ -81,7 +81,6 @@ class CardValidationService:
                 correction_candidates=[[] for _ in response.cards],
             )
 
-        results = _dedup_by_uuid(results)
         return ValidationBatchResult(
             response=RecognitionResponse(cards=[result.card for result in results]),
             traces=[result.trace for result in results],
@@ -489,7 +488,7 @@ def _narrow_face_matches(
     return face_matches
 
 
-def _dedup_by_uuid(results: list[ValidatedCardResult]) -> list[ValidatedCardResult]:
+def dedup_by_uuid(results: list[ValidatedCardResult]) -> list[ValidatedCardResult]:
     """Remove duplicate validated results that resolved to the same card UUID.
 
     Keeps the highest-confidence result for each UUID. Unmatched cards (no UUID)

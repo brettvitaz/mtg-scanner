@@ -93,11 +93,12 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     // MARK: - Photo Capture
 
     /// Triggers a still photo capture and returns JPEG data via `completion`.
-    /// If a capture is already in flight, `completion` is called immediately with `nil`.
+    /// If a capture is already in flight, or the session is not yet running, `completion`
+    /// is called immediately with `nil`.
     func capturePhoto(completion: @escaping @Sendable (Data?) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            guard !self.isCaptureInFlight else {
+            guard self.session.isRunning, !self.isCaptureInFlight else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }

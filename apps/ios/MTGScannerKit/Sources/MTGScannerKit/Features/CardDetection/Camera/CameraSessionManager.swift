@@ -20,12 +20,16 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     /// Exposed so tests can flush the queue with `sync {}` to assert state after enqueued work completes.
     let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
 
+    /// Exposed for testing: allows tests to verify handler identity across stop/restart cycles.
+    /// Typed as `AnyObject?` so the private `PhotoCaptureHandler` type stays private.
+    var activeHandler: AnyObject? { _activeHandler }
+
     // MARK: - Private
 
     private let photoOutput = AVCapturePhotoOutput()
     private var isCaptureInFlight = false
     private var captureGeneration = 0
-    private var activeHandler: PhotoCaptureHandler?
+    private var _activeHandler: PhotoCaptureHandler?
     private(set) var captureDevice: AVCaptureDevice?
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
@@ -106,7 +110,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
                 sessionQueue: self.sessionQueue,
                 onDone: { [weak self] handler in self?.captureDidFinish(handler: handler) }
             )
-            self.activeHandler = handler
+            self._activeHandler = handler
             self.lockFocusThenCapture(handler: handler)
         }
     }
@@ -114,9 +118,9 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     /// Only clears manager-level in-flight state if `handler` is still the active one.
     /// Prevents a stale or cancelled handler from clobbering a newer capture's state.
     private func captureDidFinish(handler: PhotoCaptureHandler) {
-        guard activeHandler === handler else { return }
+        guard _activeHandler === handler else { return }
         isCaptureInFlight = false
-        activeHandler = nil
+        _activeHandler = nil
         restoreContinuousAutoFocus()
     }
 
@@ -190,8 +194,8 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
             guard let self else { return }
             if self.isCaptureInFlight {
                 self.captureGeneration &+= 1
-                self.activeHandler?.cancel()
-                self.activeHandler = nil
+                self._activeHandler?.cancel()
+                self._activeHandler = nil
                 self.isCaptureInFlight = false
                 self.restoreContinuousAutoFocus()
             }

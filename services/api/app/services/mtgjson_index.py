@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 
+SPLIT_LAYOUTS = {"split", "aftermath", "fuse"}
+
 SPACE_PUNCTUATION = {
     "-",
     "‐",
@@ -162,6 +164,21 @@ class MTGJSONIndex:
             ORDER BY release_date DESC, set_code ASC
             """,
             (normalize_title(title), normalize_collector_number(collector_number)),
+        )
+
+    def lookup_by_face_name(self, *, title: str) -> list[CardRecord]:
+        """Look up cards where title matches an individual face of a split card."""
+        return self._fetch_cards(
+            f"""
+            SELECT {_CARD_COLUMNS}
+            FROM cards
+            WHERE uuid IN (
+                SELECT full_card_uuid FROM face_names
+                WHERE normalized_face_name = ?
+            )
+            ORDER BY release_date DESC, set_code ASC
+            """,
+            (normalize_title(title),),
         )
 
     def lookup_all_printings_by_name(self, *, title: str) -> list[CardRecord]:
@@ -368,6 +385,15 @@ def create_schema(db_path: Path) -> None:
             CREATE INDEX idx_cards_name_set_number ON cards(normalized_name, set_code, normalized_collector_number);
             CREATE INDEX idx_cards_set_number ON cards(set_code, normalized_collector_number);
             CREATE INDEX idx_sets_name ON sets(normalized_set_name);
+
+            DROP TABLE IF EXISTS face_names;
+            CREATE TABLE face_names (
+                face_name TEXT NOT NULL,
+                normalized_face_name TEXT NOT NULL,
+                full_card_uuid TEXT NOT NULL,
+                UNIQUE(normalized_face_name, full_card_uuid)
+            );
+            CREATE INDEX idx_face_names ON face_names(normalized_face_name);
             """
         )
 
@@ -464,6 +490,18 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                     ),
                 )
                 card_count += 1
+
+                if card.get("layout") in SPLIT_LAYOUTS and " // " in name:
+                    for face in name.split(" // "):
+                        face_stripped = face.strip()
+                        if face_stripped:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO face_names "
+                                "(face_name, normalized_face_name, full_card_uuid) "
+                                "VALUES (?, ?, ?)",
+                                (face_stripped, normalize_title(face_stripped), uuid),
+                            )
+
         conn.commit()
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)

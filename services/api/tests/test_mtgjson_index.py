@@ -16,6 +16,32 @@ from app.services.mtgjson_index import (
 
 
 @pytest.fixture
+def mtgjson_fixture_with_split(tmp_path: Path) -> Path:
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "WAR": {
+                "code": "WAR",
+                "name": "War of the Spark",
+                "releaseDate": "2019-05-03",
+                "cards": [
+                    {
+                        "uuid": "warrant-warden-war-230",
+                        "name": "Warrant // Warden",
+                        "number": "230",
+                        "layout": "split",
+                        "language": "English",
+                    },
+                ],
+            },
+        },
+    }
+    path = tmp_path / "AllPrintings.split.json"
+    path.write_text(json.dumps(payload))
+    return path
+
+
+@pytest.fixture
 def mtgjson_fixture(tmp_path: Path) -> Path:
     payload = {
         "meta": {"date": "2026-03-26", "version": "1.0.0"},
@@ -201,3 +227,44 @@ def test_lookup_all_printings_by_name(tmp_path: Path, mtgjson_fixture: Path) -> 
     set_codes = [p.set_code for p in printings]
     assert "M10" in set_codes
     assert "2XM" in set_codes
+
+
+def test_face_names_table_populated(tmp_path: Path, mtgjson_fixture_with_split: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture_with_split, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute("SELECT face_name FROM face_names ORDER BY face_name").fetchall()
+    face_names = [row[0] for row in rows]
+    assert "Warrant" in face_names
+    assert "Warden" in face_names
+
+
+def test_lookup_by_face_name_finds_split_card(tmp_path: Path, mtgjson_fixture_with_split: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture_with_split, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Warrant")
+    assert len(results) == 1
+    assert results[0].name == "Warrant // Warden"
+    assert results[0].uuid == "warrant-warden-war-230"
+
+
+def test_lookup_by_face_name_finds_second_face(tmp_path: Path, mtgjson_fixture_with_split: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture_with_split, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Warden")
+    assert len(results) == 1
+    assert results[0].name == "Warrant // Warden"
+
+
+def test_lookup_by_face_name_no_match_for_normal_card(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Lightning Bolt")
+    assert results == []

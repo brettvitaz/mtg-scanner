@@ -18,6 +18,12 @@ You are extracting structured data from an image containing one or more Magic: T
 - confidence
 - notes
 
+## Split / Aftermath / Fuse Cards
+- Cards divided into two halves (split, aftermath, fuse) are ONE card, not two.
+- Return the full combined name with " // " separator: e.g., "Fire // Ice", "Warrant // Warden".
+- Do NOT return split card halves as separate entries.
+- The collector number is shared by both halves.
+
 ## Guidance
 - Multi-card images may contain glare, perspective distortion, overlap, sleeves, or low-resolution text.
 - If collector number or set symbol is unreadable, do not guess unless other visible evidence is strong.
@@ -37,6 +43,14 @@ Return valid JSON only.
       "foil": false,
       "confidence": 0.94,
       "notes": "Set symbol and title appear readable."
+    },
+    {
+      "title": "Fire // Ice",
+      "edition": "Apocalypse",
+      "collector_number": "128",
+      "foil": false,
+      "confidence": 0.88,
+      "notes": "Split card; both halves visible."
     }
   ]
 }

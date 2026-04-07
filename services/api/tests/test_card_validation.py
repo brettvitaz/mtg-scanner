@@ -50,6 +50,14 @@ def validation_service(tmp_path: Path) -> CardValidationService:
                 {"uuid": "laughing-jasper-flint-otj-215", "name": "Laughing Jasper Flint", "setCode": "OTJ", "number": "215", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]},
                 {"uuid": "foil-only-otj-001", "name": "Foil Only Card", "setCode": "OTJ", "number": "001", "language": "English", "layout": "normal", "finishes": ["foil"]}
               ]
+            },
+            "WAR": {
+              "code": "WAR",
+              "name": "War of the Spark",
+              "releaseDate": "2019-05-03",
+              "cards": [
+                {"uuid": "warrant-warden-war-230", "name": "Warrant // Warden", "setCode": "WAR", "number": "230", "language": "English", "layout": "split", "finishes": ["nonfoil", "foil"]}
+              ]
             }
           }
         }
@@ -334,6 +342,43 @@ def test_validate_response_validates_each_card_independently(validation_service:
     assert batch.traces[1].status == "no_match"
     assert batch.response.cards[0].edition == "Magic 2010"
     assert batch.response.cards[1].title == "Totally Fake Card"
+
+
+def test_validate_split_card_face_name_fallback(validation_service: CardValidationService) -> None:
+    # LLM returned a single face name instead of the full combined name
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Warrant",
+            edition=None,
+            collector_number=None,
+            foil=False,
+            confidence=0.75,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "corrected_match"
+    assert result.card.title == "Warrant // Warden"
+    assert result.card.set_code == "WAR"
+    assert result.trace.matched_uuid == "warrant-warden-war-230"
+
+
+def test_validate_split_card_full_name_still_works(validation_service: CardValidationService) -> None:
+    # LLM correctly returned the full combined name
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Warrant // Warden",
+            edition="WAR",
+            collector_number="230",
+            foil=False,
+            confidence=0.88,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "exact_match"
+    assert result.card.title == "Warrant // Warden"
+    assert result.card.set_code == "WAR"
 
 
 def test_validate_response_exposes_correction_candidates(validation_service: CardValidationService) -> None:

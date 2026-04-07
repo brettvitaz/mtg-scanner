@@ -254,6 +254,19 @@ class CardValidationService:
                 "Title found in multiple sets; cannot auto-correct without LLM retry.",
             )
 
+        # Face-name fallback for split cards
+        face_matches = self._index.lookup_by_face_name(title=card.title or "")
+        if len(face_matches) == 1:
+            return self._matched(
+                card, trace_base, face_matches[0], "corrected_match",
+                "Auto-corrected: matched as face name of split card.",
+            )
+        if len(face_matches) > 1:
+            return self._needs_correction(
+                card, trace_base, face_matches,
+                "Title matched as face name of split card in multiple sets.",
+            )
+
         return self._result(
             card,
             trace_base,

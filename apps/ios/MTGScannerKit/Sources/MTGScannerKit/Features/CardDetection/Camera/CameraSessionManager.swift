@@ -21,6 +21,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     private let photoOutput = AVCapturePhotoOutput()
     private var photoCaptureCompletion: ((Data?) -> Void)?
     private var isCaptureInFlight = false
+    private var captureGeneration = 0
     private(set) var captureDevice: AVCaptureDevice?
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
@@ -93,15 +94,16 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
                 return
             }
             self.isCaptureInFlight = true
+            self.captureGeneration &+= 1
             self.photoCaptureCompletion = completion
-            self.lockFocusThenCapture()
+            self.lockFocusThenCapture(generation: self.captureGeneration)
         }
     }
 
-    private func lockFocusThenCapture() {
+    private func lockFocusThenCapture(generation: Int) {
         guard let device = captureDevice,
               device.isFocusModeSupported(.autoFocus) else {
-            captureWithCurrentSettings()
+            captureWithCurrentSettings(generation: generation)
             return
         }
         do {
@@ -109,15 +111,19 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
             device.focusMode = .autoFocus
             device.unlockForConfiguration()
         } catch {
-            captureWithCurrentSettings()
+            captureWithCurrentSettings(generation: generation)
             return
         }
         sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.captureWithCurrentSettings()
+            self?.captureWithCurrentSettings(generation: generation)
         }
     }
 
-    private func captureWithCurrentSettings() {
+    private func captureWithCurrentSettings(generation: Int) {
+        guard generation == captureGeneration else {
+            restoreContinuousAutoFocus()
+            return
+        }
         let settings = AVCapturePhotoSettings()
         if maxPhotoDimensions.width > 0 {
             settings.maxPhotoDimensions = maxPhotoDimensions
@@ -173,9 +179,11 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             if self.isCaptureInFlight {
+                self.captureGeneration &+= 1
                 let pending = self.photoCaptureCompletion
                 self.photoCaptureCompletion = nil
                 self.isCaptureInFlight = false
+                self.restoreContinuousAutoFocus()
                 DispatchQueue.main.async { pending?(nil) }
             }
             guard self.session.isRunning else { return }
@@ -200,11 +208,12 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 
 extension CameraSessionManager: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        let data = error == nil ? photo.fileDataRepresentation() : nil
         let completion = photoCaptureCompletion
         photoCaptureCompletion = nil
         isCaptureInFlight = false
         restoreContinuousAutoFocus()
+        guard completion != nil else { return }  // cancelled by stop()
+        let data = error == nil ? photo.fileDataRepresentation() : nil
         DispatchQueue.main.async { completion?(data) }
     }
 }

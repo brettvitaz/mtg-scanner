@@ -35,7 +35,7 @@ struct FlashlightButton: View {
                 BrightnessPopover(torchLevel: $torchLevel, lastTorchLevel: $lastTorchLevel)
             }
             .accessibilityLabel("Flashlight")
-            .accessibilityHint("tap to toggle, long press for brightness")
+            .accessibilityHint("Double tap to toggle. Long press to adjust brightness.")
             .accessibilityValue(accessibilityValue)
     }
 
@@ -90,12 +90,16 @@ private struct BrightnessPopover: View {
                 } label: {
                     Image(systemName: "sun.min")
                 }
+                .accessibilityLabel("Decrease brightness")
                 Slider(value: sliderValue, in: 0.01...1.0)
+                    .accessibilityLabel("Flashlight brightness")
+                    .accessibilityValue("\(Int(torchLevel * 100 + 0.5)) percent")
                 Button {
                     setLevel(torchLevel + 0.05)
                 } label: {
                     Image(systemName: "sun.max.fill")
                 }
+                .accessibilityLabel("Increase brightness")
             }
             Text("\(Int(torchLevel * 100 + 0.5))%")
                 .font(.caption)

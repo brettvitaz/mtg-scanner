@@ -114,6 +114,8 @@ private struct SettingsForm: View {
                 Text(String(format: "%.1f s", appModel.autoScanCaptureDelay)).foregroundStyle(.secondary)
             }
             Slider(value: $appModel.autoScanCaptureDelay, in: 0.5...5.0, step: 0.5)
+                .accessibilityLabel("Capture delay")
+                .accessibilityValue(String(format: "%.1f seconds", appModel.autoScanCaptureDelay))
         }
     }
 
@@ -125,6 +127,8 @@ private struct SettingsForm: View {
                 Text(String(format: "%.1f", appModel.autoScanConfidenceThreshold)).foregroundStyle(.secondary)
             }
             Slider(value: $appModel.autoScanConfidenceThreshold, in: 0.3...0.9, step: 0.1)
+                .accessibilityLabel("Detection confidence")
+                .accessibilityValue(String(format: "%.1f", appModel.autoScanConfidenceThreshold))
         }
     }
 
@@ -143,6 +147,8 @@ private struct SettingsForm: View {
                 in: 1...6,
                 step: 1
             )
+            .accessibilityLabel("Concurrent uploads")
+            .accessibilityValue("\(appModel.maxConcurrentUploads)")
         }
     }
 

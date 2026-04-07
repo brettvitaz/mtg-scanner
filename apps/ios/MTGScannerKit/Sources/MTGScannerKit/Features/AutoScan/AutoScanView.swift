@@ -42,6 +42,8 @@ struct AutoScanView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.6), lineWidth: 1))
                 .shadow(radius: 4)
+                .accessibilityLabel("Last cropped card preview")
+                .accessibilityHint("Shows the most recent card image prepared for recognition.")
         }
     }
 
@@ -56,6 +58,9 @@ struct AutoScanView: View {
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Auto scan status")
+        .accessibilityValue(viewModel.statusMessage)
     }
 
     private var stateIndicator: some View {
@@ -95,5 +100,8 @@ struct AutoScanView: View {
                 .background(viewModel.isActive ? Color.red.opacity(0.85) : Color.green.opacity(0.85))
                 .clipShape(Capsule())
         }
+        .accessibilityLabel(viewModel.isActive ? "Stop auto scan" : "Start auto scan")
+        .accessibilityValue(viewModel.isActive ? "Running" : "Stopped")
+        .accessibilityHint(viewModel.isActive ? "Stops automatic card capture." : "Starts automatic card capture.")
     }
 }

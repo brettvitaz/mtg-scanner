@@ -71,6 +71,7 @@ struct LibraryView: View {
             } label: {
                 Image(systemName: "plus")
             }
+            .accessibilityLabel("Add library item")
         }
     }
 
@@ -174,5 +175,7 @@ private struct CollectionRow: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name), \(count) card(s)")
     }
 }

@@ -38,6 +38,9 @@ struct RecognitionBadgeView: View {
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Recognition in progress")
+        .accessibilityValue("\(recognitionQueue.pendingCount) pending")
     }
 
     private func cancelButton(action: @escaping () -> Void) -> some View {
@@ -46,6 +49,8 @@ struct RecognitionBadgeView: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.white.opacity(0.8))
         }
+        .accessibilityLabel("Cancel recognition")
+        .accessibilityHint("Cancels pending card recognition requests.")
     }
 
     private var failedBadge: some View {
@@ -56,5 +61,7 @@ struct RecognitionBadgeView: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
+            .accessibilityLabel("Recognition failures")
+            .accessibilityValue("\(recognitionQueue.failedCount) failed")
     }
 }

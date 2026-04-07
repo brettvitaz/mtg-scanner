@@ -29,6 +29,11 @@ struct FullscreenImageView: View {
             }
         }
         .onTapGesture { dismiss() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Full screen card image")
+        .accessibilityHint("Double tap to dismiss.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { dismiss() }
         .statusBarHidden()
     }
 
@@ -36,5 +41,6 @@ struct FullscreenImageView: View {
         Image(systemName: "photo")
             .font(.system(size: 60))
             .foregroundStyle(.white.opacity(0.5))
+            .accessibilityLabel("No image available")
     }
 }

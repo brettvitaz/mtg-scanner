@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CorrectionView: View {
     @Environment(AppModel.self) private var appModel
@@ -104,6 +105,7 @@ private struct LabeledTextField: View {
             TextField(placeholder, text: $text)
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(.secondary)
+                .accessibilityLabel(label)
         }
     }
 }
@@ -119,6 +121,11 @@ private struct SavedBanner: View {
                 .background(Color.green, in: Capsule())
                 .padding(.top, 12)
             Spacer()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Correction saved")
+        .onAppear {
+            UIAccessibility.post(notification: .announcement, argument: "Correction saved")
         }
     }
 }
@@ -150,5 +157,8 @@ struct ConfidenceBadge: View {
                 .foregroundStyle(color)
                 .frame(width: 40, alignment: .trailing)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Recognition confidence")
+        .accessibilityValue("\(Int(value * 100)) percent")
     }
 }

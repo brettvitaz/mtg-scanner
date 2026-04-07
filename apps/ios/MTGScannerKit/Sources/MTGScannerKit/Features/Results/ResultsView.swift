@@ -168,15 +168,18 @@ struct ResultsView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export results")
                 Button { exitSelecting() } label: {
                     Image(systemName: "xmark")
                 }
+                .accessibilityLabel("Exit selection mode")
             } else if !inboxItems.isEmpty {
                 Menu {
                     ExportMenuContent(items: inboxItems, name: "results", exportFile: $exportFile)
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export results")
                 Button("Select") { enterSelecting() }
                 FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }
@@ -326,23 +329,9 @@ private extension ResultsView {
             item.toggleFoilUnconditionally()
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let fetchRequests = items.map { (id: $0.id, name: $0.title, scryfallId: $0.scryfallId, isFoil: $0.foil) }
+        let fetchRequests = items.map { PriceFetchRequest(item: $0) }
         Task {
-            let results = await withTaskGroup(of: (UUID, CardPrice?).self) { group in
-                for req in fetchRequests {
-                    group.addTask {
-                        let price = try? await self.appModel.fetchPrice(
-                            name: req.name, scryfallId: req.scryfallId, isFoil: req.isFoil
-                        )
-                        return (req.id, price)
-                    }
-                }
-                var collected: [(UUID, CardPrice?)] = []
-                for await result in group {
-                    collected.append(result)
-                }
-                return collected
-            }
+            let results = await fetchPrices(for: fetchRequests)
             for (id, price) in results {
                 guard
                     let price,
@@ -355,6 +344,24 @@ private extension ResultsView {
         }
     }
 
+    func fetchPrices(for requests: [PriceFetchRequest]) async -> [(UUID, CardPrice?)] {
+        await withTaskGroup(of: (UUID, CardPrice?).self) { group in
+            for req in requests {
+                group.addTask {
+                    let price = try? await self.appModel.fetchPrice(
+                        name: req.name, scryfallId: req.scryfallId, isFoil: req.isFoil
+                    )
+                    return (req.id, price)
+                }
+            }
+            var collected: [(UUID, CardPrice?)] = []
+            for await result in group {
+                collected.append(result)
+            }
+            return collected
+        }
+    }
+
     func registerUndo(for items: [CollectionItem]) {
         let deletedItems = items
         appModel.registerUndoAction {
@@ -363,6 +370,20 @@ private extension ResultsView {
             }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
+    }
+}
+
+private struct PriceFetchRequest {
+    let id: UUID
+    let name: String
+    let scryfallId: String?
+    let isFoil: Bool
+
+    init(item: CollectionItem) {
+        self.id = item.id
+        self.name = item.title
+        self.scryfallId = item.scryfallId
+        self.isFoil = item.foil
     }
 }
 

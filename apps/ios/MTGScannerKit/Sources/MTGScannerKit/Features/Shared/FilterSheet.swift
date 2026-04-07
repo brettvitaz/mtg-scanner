@@ -77,6 +77,9 @@ struct FilterSheet: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(rarity.displayName)
+                    .accessibilityValue(selected ? "Selected" : "Not selected")
+                    .accessibilityAddTraits(selected ? [.isSelected] : [])
                 }
             }
             .padding(.vertical, 4)
@@ -105,6 +108,9 @@ struct FilterSheet: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(color.displayName) color identity")
+                    .accessibilityValue(selected ? "Selected" : "Not selected")
+                    .accessibilityAddTraits(selected ? [.isSelected] : [])
                 }
             }
             .padding(.vertical, 4)
@@ -141,9 +147,13 @@ struct FilterSheet: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
                 }
             }
         }
+        .accessibilityLabel(label)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     private func priceRangeRow(label: String, value: Binding<Double?>) -> some View {

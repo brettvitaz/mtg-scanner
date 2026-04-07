@@ -157,15 +157,18 @@ struct CollectionDetailView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export collection")
                 Button { exitSelecting() } label: {
                     Image(systemName: "xmark")
                 }
+                .accessibilityLabel("Exit selection mode")
             } else if !collection.items.isEmpty {
                 Menu {
                     ExportMenuContent(items: collection.items, name: collection.name, exportFile: $exportFile)
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export collection")
                 Button("Select") { enterSelecting() }
                 FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }

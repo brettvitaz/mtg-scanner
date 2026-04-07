@@ -28,6 +28,8 @@ struct FilterSortToolbar: View {
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
+        .accessibilityLabel("Sort cards")
+        .accessibilityValue("\(filterState.sort.field.rawValue), \(filterState.sort.direction.rawValue)")
     }
 
     private var filterButton: some View {
@@ -35,5 +37,7 @@ struct FilterSortToolbar: View {
             ? "line.3.horizontal.decrease.circle.fill"
             : "line.3.horizontal.decrease.circle"
         return Button { showFilterSheet = true } label: { Image(systemName: icon) }
+            .accessibilityLabel("Filter cards")
+            .accessibilityValue(filterState.isFilterActive ? "Filters active" : "No filters active")
     }
 }

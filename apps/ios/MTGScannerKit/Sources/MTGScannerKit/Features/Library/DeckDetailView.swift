@@ -171,15 +171,18 @@ struct DeckDetailView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export deck")
                 Button { exitSelecting() } label: {
                     Image(systemName: "xmark")
                 }
+                .accessibilityLabel("Exit selection mode")
             } else if !deck.items.isEmpty {
                 Menu {
                     ExportMenuContent(items: deck.items, name: deck.name, exportFile: $exportFile)
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export deck")
                 Button("Select") { enterSelecting() }
                 FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
             }

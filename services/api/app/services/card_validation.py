@@ -81,6 +81,7 @@ class CardValidationService:
                 correction_candidates=[[] for _ in response.cards],
             )
 
+        results = _dedup_by_uuid(results)
         return ValidationBatchResult(
             response=RecognitionResponse(cards=[result.card for result in results]),
             traces=[result.trace for result in results],
@@ -456,6 +457,34 @@ def _adjust_confidence(value: float, status: str) -> float:
     if status == "needs_correction":
         return max(0.0, round(value - 0.1, 4))
     return max(0.0, round(value - 0.25, 4)) if status == "no_match" else round(value, 4)
+
+
+def _dedup_by_uuid(results: list[ValidatedCardResult]) -> list[ValidatedCardResult]:
+    """Remove duplicate validated results that resolved to the same card UUID.
+
+    Keeps the highest-confidence result for each UUID. Unmatched cards (no UUID)
+    are always kept as-is.
+    """
+    seen: dict[str, ValidatedCardResult] = {}
+    deduped: list[ValidatedCardResult] = []
+    for result in results:
+        uuid = result.trace.matched_uuid
+        if uuid is None:
+            deduped.append(result)
+            continue
+        if uuid not in seen or result.card.confidence > seen[uuid].card.confidence:
+            seen[uuid] = result
+    # Preserve original order for matched UUIDs
+    added_uuids: set[str] = set()
+    output: list[ValidatedCardResult] = []
+    for result in results:
+        uuid = result.trace.matched_uuid
+        if uuid is None:
+            output.append(result)
+        elif uuid not in added_uuids:
+            output.append(seen[uuid])
+            added_uuids.add(uuid)
+    return output
 
 
 def _merge_notes(existing: str | None, addition: str) -> str:

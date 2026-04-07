@@ -381,6 +381,23 @@ def test_validate_split_card_full_name_still_works(validation_service: CardValid
     assert result.card.set_code == "WAR"
 
 
+def test_validate_response_deduplicates_split_card_faces(validation_service: CardValidationService) -> None:
+    # LLM returned both face names of Warrant // Warden as separate entries
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition=None, collector_number=None, foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Warden", edition=None, collector_number=None, foil=False, confidence=0.84, notes=None),
+        ]
+    )
+
+    batch = validation_service.validate_response(response)
+
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
+    # Higher confidence card (Warrant at 0.86) wins after corrected_match penalty
+    assert batch.response.cards[0].confidence == pytest.approx(0.81)
+
+
 def test_validate_response_exposes_correction_candidates(validation_service: CardValidationService) -> None:
     response = RecognitionResponse(
         cards=[

@@ -17,13 +17,21 @@ struct CaptureButton: View {
         }
         .disabled(isDisabled)
         .buttonStyle(CaptureButtonStyle())
+        .accessibilityLabel("Capture card")
+        .accessibilityHint("Takes a photo and sends it for recognition.")
     }
 }
 
 private struct CaptureButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.9 : 1.0)
+            .animation(animation, value: configuration.isPressed)
+    }
+
+    private var animation: Animation? {
+        reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.6)
     }
 }

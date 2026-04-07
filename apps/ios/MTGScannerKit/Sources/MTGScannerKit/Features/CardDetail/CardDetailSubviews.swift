@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Card Image Section
 
@@ -15,12 +16,24 @@ struct CardImageSection: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .contentShape(Rectangle())
                 .onTapGesture { showFullscreen = true }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(cardImageAccessibilityLabel)
+                .accessibilityHint("Double tap to view full screen.")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { showFullscreen = true }
 
             if appModel.cardCropImages[viewModel.card.id] != nil {
                 cropToggleButton
             }
         }
         .frame(maxWidth: .infinity, minHeight: 340)
+    }
+
+    private var cardImageAccessibilityLabel: String {
+        if viewModel.showingCropImage {
+            return "Cropped image of \(viewModel.displayTitle)"
+        }
+        return "Image of \(viewModel.displayTitle)"
     }
 
     @ViewBuilder
@@ -48,6 +61,9 @@ struct CardImageSection: View {
                 .background(.ultraThinMaterial, in: Circle())
         }
         .padding(8)
+        .accessibilityLabel("Card image source")
+        .accessibilityValue(viewModel.showingCropImage ? "Cropped scan" : "Card artwork")
+        .accessibilityHint("Switches between the card artwork and the cropped scan.")
     }
 }
 
@@ -129,6 +145,8 @@ struct ConfidenceTag: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color, in: Capsule())
+            .accessibilityLabel("Recognition confidence")
+            .accessibilityValue("\(Int(value * 100)) percent")
     }
 
     private var color: Color {
@@ -156,6 +174,16 @@ struct PriceLabel: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: String {
+        if let detail {
+            return "$\(price), \(detail)"
+        }
+        return "$\(price)"
     }
 }
 
@@ -168,7 +196,9 @@ struct CardImagePlaceholder: View {
                 Image(systemName: "photo")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
+            .accessibilityLabel("No card image available")
     }
 }
 
@@ -182,6 +212,8 @@ struct RarityBadge: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .background(color, in: Capsule())
+            .accessibilityLabel("Rarity")
+            .accessibilityValue(rarity.capitalized)
     }
 
     private var color: Color {
@@ -223,6 +255,7 @@ struct StatBadge: View {
         VStack(spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: icon).font(.caption).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text(value).font(.title3.bold().monospacedDigit())
             }
             Text(label).font(.caption2).foregroundStyle(.secondary)
@@ -230,6 +263,9 @@ struct StatBadge: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
 
@@ -249,5 +285,10 @@ struct ToastOverlay: View {
             Spacer()
         }
         .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(message)
+        .onAppear {
+            UIAccessibility.post(notification: .announcement, argument: message)
+        }
     }
 }

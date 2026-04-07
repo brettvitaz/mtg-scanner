@@ -17,6 +17,8 @@ struct CollectionItemRow: View {
         }
         .padding(.vertical, 4)
         .modifier(ContextMenuModifier(row: self))
+        .accessibilityElement(children: showQuantityStepper ? .contain : .ignore)
+        .accessibilityLabel(accessibilitySummary)
     }
 
     private var hasContextMenu: Bool {
@@ -77,6 +79,7 @@ struct CollectionItemRow: View {
         }
         .frame(width: 60, height: 84)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+        .accessibilityHidden(true)
     }
 
     private var thumbnailPlaceholder: some View {
@@ -98,7 +101,7 @@ struct CollectionItemRow: View {
                     Image(systemName: "sparkles")
                         .font(.caption)
                         .foregroundStyle(Color(.systemYellow))
-                        .accessibilityLabel("Foil")
+                        .accessibilityHidden(true)
                 }
             }
             Text(item.edition)
@@ -134,5 +137,29 @@ struct CollectionItemRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    var accessibilitySummary: String {
+        Self.accessibilitySummary(for: item)
+    }
+
+    static func accessibilitySummary(for item: CollectionItem) -> String {
+        var parts = [item.title, item.edition]
+        if let collectorNumber = item.collectorNumber {
+            parts.append("collector number \(collectorNumber)")
+        }
+        if item.foil {
+            parts.append("foil")
+        }
+        if item.quantity > 1 {
+            parts.append("quantity \(item.quantity)")
+        }
+        if let priceRetail = item.priceRetail {
+            parts.append("sell price \(priceRetail)")
+        }
+        if let priceBuy = item.priceBuy {
+            parts.append("buy price \(priceBuy)")
+        }
+        return parts.joined(separator: ", ")
     }
 }

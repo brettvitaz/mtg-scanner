@@ -6,6 +6,7 @@ import SwiftUI
 /// with a white fill and dark text. Tapping a button calls `onSelect` with the
 /// preset value.
 struct ZoomPresetControl: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static let presets: [CGFloat] = [1, 2, 3, 5]
 
@@ -20,6 +21,8 @@ struct ZoomPresetControl: View {
         }
         .padding(4)
         .background(.ultraThinMaterial, in: Capsule())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Zoom presets")
     }
 
     private func presetButton(for preset: CGFloat) -> some View {
@@ -31,10 +34,13 @@ struct ZoomPresetControl: View {
                 .padding(.horizontal, 11)
                 .padding(.vertical, 7)
                 .background(active ? Color.white : Color.clear, in: Capsule())
-                .scaleEffect(active ? 1.1 : 1.0)
-                .animation(.spring(response: 0.22, dampingFraction: 0.65), value: active)
+                .scaleEffect(active && !reduceMotion ? 1.1 : 1.0)
+                .animation(reduceMotion ? nil : .spring(response: 0.22, dampingFraction: 0.65), value: active)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(Int(preset)) times zoom")
+        .accessibilityValue(active ? "Selected" : "Not selected")
+        .accessibilityAddTraits(active ? [.isSelected] : [])
     }
 
     static func isActive(_ preset: CGFloat, currentZoom: CGFloat) -> Bool {

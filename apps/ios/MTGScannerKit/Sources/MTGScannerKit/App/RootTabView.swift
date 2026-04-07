@@ -104,7 +104,8 @@ private struct ScanModePickerSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .accessibilityLabel("\(mode.displayName) mode")
-        .accessibilityHint("Double tap to select")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Selects this scan mode.")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

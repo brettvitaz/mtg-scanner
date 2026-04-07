@@ -69,11 +69,13 @@ struct CardDetailView: View {
             }
             if let manaCost = viewModel.displayManaCost {
                 Text(manaCost).font(.subheadline.monospaced()).foregroundStyle(.secondary)
+                    .accessibilityLabel("Mana cost \(manaCost)")
             }
             editionButton
             Toggle("Foil", isOn: $viewModel.editFoil).font(.subheadline)
             collectorRarityRow
         }
+        .accessibilityElement(children: .contain)
     }
 
     private var editionButton: some View {
@@ -90,6 +92,9 @@ struct CardDetailView: View {
             }
             .foregroundStyle(.primary)
         }
+        .accessibilityLabel("Edition")
+        .accessibilityValue(viewModel.displayEdition)
+        .accessibilityHint("Choose a different printing.")
     }
 
     private var collectorRarityRow: some View {

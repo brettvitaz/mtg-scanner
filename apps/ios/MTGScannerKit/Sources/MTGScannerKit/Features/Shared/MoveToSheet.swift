@@ -6,7 +6,8 @@ import SwiftUI
 struct MoveToSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \CardCollection.updatedAt, order: .reverse) private var collections: [CardCollection]
+    @Query(sort: \CardCollection.updatedAt, order: .reverse) private var collections:
+        [CardCollection]
     @Query(sort: \Deck.updatedAt, order: .reverse) private var decks: [Deck]
 
     let title: String
@@ -71,6 +72,7 @@ struct MoveToSheet: View {
                     }
                 }
                 .foregroundStyle(.primary)
+                .accessibilityLabel("\(collection.name), \(collection.items.totalQuantity) card(s)")
             }
         }
     }
@@ -96,6 +98,7 @@ struct MoveToSheet: View {
                     }
                 }
                 .foregroundStyle(.primary)
+                .accessibilityLabel("\(deck.name), \(deck.items.totalQuantity) card(s)")
             }
         }
     }

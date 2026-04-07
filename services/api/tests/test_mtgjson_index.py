@@ -16,6 +16,32 @@ from app.services.mtgjson_index import (
 
 
 @pytest.fixture
+def mtgjson_fixture_with_split(tmp_path: Path) -> Path:
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "WAR": {
+                "code": "WAR",
+                "name": "War of the Spark",
+                "releaseDate": "2019-05-03",
+                "cards": [
+                    {
+                        "uuid": "warrant-warden-war-230",
+                        "name": "Warrant // Warden",
+                        "number": "230",
+                        "layout": "split",
+                        "language": "English",
+                    },
+                ],
+            },
+        },
+    }
+    path = tmp_path / "AllPrintings.split.json"
+    path.write_text(json.dumps(payload))
+    return path
+
+
+@pytest.fixture
 def mtgjson_fixture(tmp_path: Path) -> Path:
     payload = {
         "meta": {"date": "2026-03-26", "version": "1.0.0"},
@@ -201,3 +227,111 @@ def test_lookup_all_printings_by_name(tmp_path: Path, mtgjson_fixture: Path) -> 
     set_codes = [p.set_code for p in printings]
     assert "M10" in set_codes
     assert "2XM" in set_codes
+
+
+def test_face_names_table_populated(tmp_path: Path, mtgjson_fixture_with_split: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture_with_split, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute("SELECT face_name FROM face_names ORDER BY face_name").fetchall()
+    face_names = [row[0] for row in rows]
+    assert "Warrant" in face_names
+    assert "Warden" in face_names
+
+
+def test_lookup_by_face_name_finds_split_card(tmp_path: Path, mtgjson_fixture_with_split: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture_with_split, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Warrant")
+    assert len(results) == 1
+    assert results[0].name == "Warrant // Warden"
+    assert results[0].uuid == "warrant-warden-war-230"
+
+
+def test_lookup_by_face_name_finds_second_face(tmp_path: Path, mtgjson_fixture_with_split: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture_with_split, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Warden")
+    assert len(results) == 1
+    assert results[0].name == "Warrant // Warden"
+
+
+def test_import_merges_split_card_face_metadata(tmp_path: Path) -> None:
+    """MTGJSON stores each face of a split card as a separate record with the same name+set+number.
+    The importer keeps one row but merges per-face type_line, oracle_text, and mana_cost."""
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "RNA": {
+                "code": "RNA",
+                "name": "Ravnica Allegiance",
+                "releaseDate": "2019-01-25",
+                "cards": [
+                    {
+                        "uuid": "incubation-face1",
+                        "name": "Incubation // Incongruity",
+                        "number": "226",
+                        "layout": "split",
+                        "language": "English",
+                        "type": "Sorcery",
+                        "text": "Look at the top five cards.",
+                        "manaCost": "{G}",
+                    },
+                    {
+                        "uuid": "incubation-face2",
+                        "name": "Incubation // Incongruity",
+                        "number": "226",
+                        "layout": "split",
+                        "language": "English",
+                        "type": "Instant",
+                        "text": "Exile target creature.",
+                        "manaCost": "{1}{U}",
+                    },
+                ],
+            },
+        },
+    }
+    source_path = tmp_path / "AllPrintings.json"
+    source_path.write_text(json.dumps(payload))
+    db_path = tmp_path / "mtgjson.sqlite"
+    summary = import_all_printings(source_path=source_path, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    assert summary.card_count == 1
+    assert summary.skipped_card_count == 1
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_name_and_set(title="Incubation // Incongruity", set_code="RNA")
+    assert len(results) == 1
+    card = results[0]
+    assert card.type_line == "Sorcery // Instant"
+    assert card.oracle_text is not None and "Look at the top five cards." in card.oracle_text
+    assert card.oracle_text is not None and "Exile target creature." in card.oracle_text
+    assert card.mana_cost == "{G} // {1}{U}"
+
+
+def test_lookup_by_face_name_returns_empty_on_old_db_without_table(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    """Old databases without face_names table must not raise — return empty list."""
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    # Drop the face_names table to simulate an old database
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS face_names")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Lightning Bolt")
+    assert results == []
+
+
+def test_lookup_by_face_name_no_match_for_normal_card(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Lightning Bolt")
+    assert results == []

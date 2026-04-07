@@ -81,6 +81,7 @@ class CardValidationService:
                 correction_candidates=[[] for _ in response.cards],
             )
 
+        results = _drop_face_name_redundancies(results, self._index)
         return ValidationBatchResult(
             response=RecognitionResponse(cards=[result.card for result in results]),
             traces=[result.trace for result in results],
@@ -252,6 +253,25 @@ class CardValidationService:
                 trace_base,
                 all_printings,
                 "Title found in multiple sets; cannot auto-correct without LLM retry.",
+            )
+
+        # Face-name fallback for split cards
+        face_matches = self._index.lookup_by_face_name(title=card.title or "")
+        if len(face_matches) == 1:
+            return self._matched(
+                card, trace_base, face_matches[0], "corrected_match",
+                "Auto-corrected: matched as face name of split card.",
+            )
+        if len(face_matches) > 1:
+            narrowed = _narrow_face_matches(face_matches, resolved_set_code, normalized_number)
+            if len(narrowed) == 1:
+                return self._matched(
+                    card, trace_base, narrowed[0], "corrected_match",
+                    "Auto-corrected: matched as face name of split card.",
+                )
+            return self._needs_correction(
+                card, trace_base, face_matches,
+                "Title matched as face name of split card in multiple sets.",
             )
 
         return self._result(
@@ -443,6 +463,103 @@ def _adjust_confidence(value: float, status: str) -> float:
     if status == "needs_correction":
         return max(0.0, round(value - 0.1, 4))
     return max(0.0, round(value - 0.25, 4)) if status == "no_match" else round(value, 4)
+
+
+def _narrow_face_matches(
+    face_matches: list[CardRecord],
+    resolved_set_code: str | None,
+    normalized_number: str,
+) -> list[CardRecord]:
+    """Narrow multiple face-name matches using set and/or collector number context."""
+    if resolved_set_code and normalized_number:
+        candidates = [
+            c for c in face_matches
+            if c.set_code == resolved_set_code and c.normalized_collector_number == normalized_number
+        ]
+        if candidates:
+            return candidates
+    if resolved_set_code:
+        candidates = [c for c in face_matches if c.set_code == resolved_set_code]
+        if candidates:
+            return candidates
+    if normalized_number:
+        candidates = [c for c in face_matches if c.normalized_collector_number == normalized_number]
+        if candidates:
+            return candidates
+    return face_matches
+
+
+def _drop_face_name_redundancies(
+    results: list[ValidatedCardResult],
+    index: MTGJSONIndex,
+) -> list[ValidatedCardResult]:
+    """Drop entries whose title is a face of a split card that another entry already matched.
+
+    When the LLM returns both face names of a split card, one may be corrected
+    (face-name match) and the other may fail (no_match or needs_correction).
+    The unmatched half is redundant and should be dropped.
+
+    Only entries matched via face-name correction trigger this — normal UUID
+    matches from identical physical cards are not touched.
+    """
+    # Identify results that were matched by face-name correction and record
+    # which UUIDs they resolved to.
+    face_corrected_uuids: set[str] = set()
+    face_corrected_indices: set[int] = set()
+    for i, result in enumerate(results):
+        if (
+            result.trace.matched_uuid is not None
+            and "face name of split card" in result.trace.reason
+        ):
+            face_corrected_uuids.add(result.trace.matched_uuid)
+            face_corrected_indices.add(i)
+
+    if not face_corrected_uuids:
+        return results
+
+    # UUIDs already claimed by non-face-corrected results take priority
+    non_face_uuids: set[str] = {
+        result.trace.matched_uuid
+        for i, result in enumerate(results)
+        if i not in face_corrected_indices and result.trace.matched_uuid is not None
+    }
+
+    # Collect (uuid, original_title) pairs for all face-corrected entries so we can
+    # identify true siblings (different original title, same UUID) vs. duplicate
+    # physical copies (same original title, same UUID).
+    face_corrected_titles: dict[int, str] = {
+        i: str(results[i].trace.original.get("title") or "")
+        for i in face_corrected_indices
+    }
+
+    # For each result, decide whether to keep or drop it.
+    output: list[ValidatedCardResult] = []
+    for i, result in enumerate(results):
+        if i in face_corrected_indices:
+            uuid = result.trace.matched_uuid
+            orig = face_corrected_titles[i]
+            # Drop if a non-face-corrected result already covers this UUID
+            if uuid in non_face_uuids:
+                continue
+            # Drop if another face-corrected entry with a DIFFERENT original title
+            # already resolved to the same UUID (i.e. it was the sibling face)
+            is_sibling_already_emitted = any(
+                j != i
+                and results[j].trace.matched_uuid == uuid
+                and face_corrected_titles[j] != orig
+                and j < i
+                for j in face_corrected_indices
+            )
+            if is_sibling_already_emitted:
+                continue
+            output.append(result)
+            continue
+        original_title = str(result.trace.original.get("title") or "")
+        face_parents = {r.uuid for r in index.lookup_by_face_name(title=original_title)}
+        if face_parents & face_corrected_uuids:
+            continue  # sibling face — drop
+        output.append(result)
+    return output
 
 
 def _merge_notes(existing: str | None, addition: str) -> str:

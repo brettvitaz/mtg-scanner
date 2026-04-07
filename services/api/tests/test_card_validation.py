@@ -50,6 +50,22 @@ def validation_service(tmp_path: Path) -> CardValidationService:
                 {"uuid": "laughing-jasper-flint-otj-215", "name": "Laughing Jasper Flint", "setCode": "OTJ", "number": "215", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]},
                 {"uuid": "foil-only-otj-001", "name": "Foil Only Card", "setCode": "OTJ", "number": "001", "language": "English", "layout": "normal", "finishes": ["foil"]}
               ]
+            },
+            "WAR": {
+              "code": "WAR",
+              "name": "War of the Spark",
+              "releaseDate": "2019-05-03",
+              "cards": [
+                {"uuid": "warrant-warden-war-230", "name": "Warrant // Warden", "setCode": "WAR", "number": "230", "language": "English", "layout": "split", "finishes": ["nonfoil", "foil"]}
+              ]
+            },
+            "C21": {
+              "code": "C21",
+              "name": "Commander 2021",
+              "releaseDate": "2021-04-23",
+              "cards": [
+                {"uuid": "warrant-warden-c21-219", "name": "Warrant // Warden", "setCode": "C21", "number": "219", "language": "English", "layout": "split", "finishes": ["nonfoil"]}
+              ]
             }
           }
         }
@@ -334,6 +350,154 @@ def test_validate_response_validates_each_card_independently(validation_service:
     assert batch.traces[1].status == "no_match"
     assert batch.response.cards[0].edition == "Magic 2010"
     assert batch.response.cards[1].title == "Totally Fake Card"
+
+
+def test_validate_split_card_face_name_narrows_by_set_and_number(validation_service: CardValidationService) -> None:
+    # Face name "Warrant" exists in WAR and C21, but edition+number pins it to WAR 230
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Warrant",
+            edition="War of the Spark",
+            collector_number="230",
+            foil=False,
+            confidence=0.99,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "corrected_match"
+    assert result.card.title == "Warrant // Warden"
+    assert result.card.set_code == "WAR"
+    assert result.trace.matched_uuid == "warrant-warden-war-230"
+
+
+def test_validate_split_card_face_name_fallback(validation_service: CardValidationService) -> None:
+    # LLM returned a single face name with set context that pins it to one printing
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Warrant",
+            edition="War of the Spark",
+            collector_number=None,
+            foil=False,
+            confidence=0.75,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "corrected_match"
+    assert result.card.title == "Warrant // Warden"
+    assert result.card.set_code == "WAR"
+    assert result.trace.matched_uuid == "warrant-warden-war-230"
+
+
+def test_validate_split_card_full_name_still_works(validation_service: CardValidationService) -> None:
+    # LLM correctly returned the full combined name
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Warrant // Warden",
+            edition="WAR",
+            collector_number="230",
+            foil=False,
+            confidence=0.88,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "exact_match"
+    assert result.card.title == "Warrant // Warden"
+    assert result.card.set_code == "WAR"
+
+
+def test_validate_response_collapses_split_card_faces(validation_service: CardValidationService) -> None:
+    # Both face names corrected to same card — redundant second entry dropped
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Warden", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
+
+
+def test_validate_response_drops_unmatched_face_when_other_half_matched(validation_service: CardValidationService) -> None:
+    # One face matched, the other failed — the failed half is dropped as redundant
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Xarden", edition=None, collector_number=None, foil=False, confidence=0.5, notes=None),  # misspelling, no_match
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    # "Xarden" doesn't match any face — both cards kept
+    assert len(batch.response.cards) == 2
+
+
+def test_validate_response_drops_valid_face_when_sibling_matched(validation_service: CardValidationService) -> None:
+    # "Warden" corrected to full card; "Warrant" (valid face name) is redundant — drop it
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition=None, collector_number=None, foil=False, confidence=0.84, notes=None),
+            RecognizedCard(title="Warden", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    # Both faces resolve to the same card; the redundant entry is dropped
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
+
+
+def test_validate_response_preserves_full_name_match_alongside_face_correction(validation_service: CardValidationService) -> None:
+    # One card recognized by full name (exact_match) + one corrected from face name.
+    # Both resolve to same UUID but full-name match must not be dropped.
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant // Warden", edition="WAR", collector_number="230", foil=False, confidence=0.95, notes=None),
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    # Full-name exact match kept; face-name correction dropped as sibling
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
+    assert batch.traces[0].status == "exact_match"
+
+
+def test_validate_response_preserves_duplicate_split_cards_by_face_name(validation_service: CardValidationService) -> None:
+    # Two physical copies of the same split card, both recognized by the same face name.
+    # Both should be kept — same original title means different physical cards, not siblings.
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    assert len(batch.response.cards) == 2
+    assert batch.response.cards[0].title == "Warrant // Warden"
+    assert batch.response.cards[1].title == "Warrant // Warden"
+
+
+def test_validate_response_preserves_duplicate_physical_cards(validation_service: CardValidationService) -> None:
+    # Two copies of the same card on a page must NOT be collapsed
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Lightning Bolt", edition="M10", collector_number="146", foil=False, confidence=0.95, notes=None),
+            RecognizedCard(title="Lightning Bolt", edition="M10", collector_number="146", foil=False, confidence=0.93, notes=None),
+        ]
+    )
+
+    batch = validation_service.validate_response(response)
+
+    assert len(batch.response.cards) == 2
+    assert batch.traces[0].matched_uuid == "bolt-m10-146"
+    assert batch.traces[1].matched_uuid == "bolt-m10-146"
 
 
 def test_validate_response_exposes_correction_candidates(validation_service: CardValidationService) -> None:

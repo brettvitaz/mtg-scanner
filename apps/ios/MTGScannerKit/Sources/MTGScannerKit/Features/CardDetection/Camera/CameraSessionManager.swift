@@ -15,11 +15,25 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     /// Called on the session queue for each delivered video frame.
     var onFrame: ((CMSampleBuffer) -> Void)?
 
+    // MARK: - Internal (visible for testing)
+
+    /// Exposed so tests can flush the queue with `sync {}` to assert state after enqueued work completes.
+    let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
+
+    /// Set to `true` in tests to simulate a running session without real hardware.
+    /// In production this is always driven by `session.isRunning` via `start()`/`stop()`.
+    var isSessionReady = false
+
+    /// Set to `true` in tests to skip issuing a real AVCapturePhotoOutput request.
+    /// This allows state-machine tests to run without a configured camera pipeline.
+    var suppressCaptureForTesting = false
+
     // MARK: - Private
 
-    private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
-    private var photoCaptureCompletion: ((Data?) -> Void)?
+    private var isCaptureInFlight = false
+    private var captureGeneration = 0
+    private var _activeHandler: PhotoCaptureHandler?
     private(set) var captureDevice: AVCaptureDevice?
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
@@ -47,6 +61,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         else { return }
         session.addInput(input)
         captureDevice = device
+        configureFocus(device)
 
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true
@@ -65,20 +80,103 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         }
     }
 
+    private func configureFocus(_ device: AVCaptureDevice) {
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        if device.isFocusPointOfInterestSupported {
+            device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+        }
+        if device.isAutoFocusRangeRestrictionSupported {
+            device.autoFocusRangeRestriction = .near
+        }
+        device.unlockForConfiguration()
+    }
+
     // MARK: - Photo Capture
 
     /// Triggers a still photo capture and returns JPEG data via `completion`.
-    /// Must be called from the main thread.
-    func capturePhoto(completion: @escaping (Data?) -> Void) {
-        photoCaptureCompletion = completion
-        let settings = AVCapturePhotoSettings()
-        if maxPhotoDimensions.width > 0 {
-            settings.maxPhotoDimensions = maxPhotoDimensions
-        }
+    /// If a capture is already in flight, or the session is not yet running, `completion`
+    /// is called immediately with `nil`.
+    func capturePhoto(completion: @escaping @Sendable (Data?) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            self.photoOutput.capturePhoto(with: settings, delegate: self)
+            guard self.isSessionReady, !self.isCaptureInFlight else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            self.isCaptureInFlight = true
+            self.captureGeneration &+= 1
+            let handler = PhotoCaptureHandler(
+                generation: self.captureGeneration,
+                maxPhotoDimensions: self.maxPhotoDimensions,
+                completion: completion,
+                sessionQueue: self.sessionQueue,
+                onDone: { [weak self] handler in self?.captureDidFinish(handler: handler) }
+            )
+            self._activeHandler = handler
+            self.lockFocusThenCapture(handler: handler)
         }
+    }
+
+    /// Only clears manager-level in-flight state if `handler` is still the active one.
+    /// Prevents a stale or cancelled handler from clobbering a newer capture's state.
+    private func captureDidFinish(handler: PhotoCaptureHandler) {
+        guard _activeHandler === handler else { return }
+        isCaptureInFlight = false
+        _activeHandler = nil
+        restoreContinuousAutoFocus()
+    }
+
+    private func lockFocusThenCapture(handler: PhotoCaptureHandler) {
+        guard !suppressCaptureForTesting else { return }
+        guard let device = captureDevice,
+              device.isFocusModeSupported(.autoFocus) else {
+            handler.issueCapture(to: photoOutput)
+            return
+        }
+        do {
+            try device.lockForConfiguration()
+            device.focusMode = .autoFocus
+            device.unlockForConfiguration()
+        } catch {
+            handler.issueCapture(to: photoOutput)
+            return
+        }
+        sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self else { return }
+            guard handler.generation == self.captureGeneration else { return }
+            handler.issueCapture(to: self.photoOutput)
+        }
+    }
+
+    private func restoreContinuousAutoFocus() {
+        guard let device = captureDevice,
+              (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        device.unlockForConfiguration()
+    }
+
+    /// Test-only accessor for queue-confined capture state.
+    func activeHandlerForTesting() -> AnyObject? {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return _activeHandler
+    }
+
+    /// Test-only accessor for queue-confined capture state.
+    func isCaptureInFlightForTesting() -> Bool {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return isCaptureInFlight
+    }
+
+    /// Test-only hook that exercises the same stale-handler guard used by AVFoundation callbacks.
+    func finishCaptureForTesting(handler: AnyObject?) {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        guard let handler = handler as? PhotoCaptureHandler else { return }
+        captureDidFinish(handler: handler)
     }
 
     // MARK: - Torch
@@ -113,12 +211,22 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         sessionQueue.async { [weak self] in
             guard let self, !self.session.isRunning else { return }
             self.session.startRunning()
+            self.isSessionReady = true
         }
     }
 
     func stop() {
         sessionQueue.async { [weak self] in
-            guard let self, self.session.isRunning else { return }
+            guard let self else { return }
+            self.isSessionReady = false
+            if self.isCaptureInFlight {
+                self.captureGeneration &+= 1
+                self._activeHandler?.cancel()
+                self._activeHandler = nil
+                self.isCaptureInFlight = false
+                self.restoreContinuousAutoFocus()
+            }
+            guard self.session.isRunning else { return }
             self.session.stopRunning()
         }
     }
@@ -136,13 +244,63 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
-// MARK: - AVCapturePhotoCaptureDelegate
+// MARK: - Per-capture delegate
 
-extension CameraSessionManager: AVCapturePhotoCaptureDelegate {
+/// Owns the completion and AVCapturePhotoCaptureDelegate for exactly one photo capture.
+///
+/// By making each capture its own delegate, a stale AVFoundation callback can never
+/// reach a different capture's completion — it only talks to the object it was given.
+///
+/// Both `cancel()` and `photoOutput(_:didFinishProcessingPhoto:)` are serialized through
+/// `sessionQueue` so the `completion` slot has a single writer at a time.
+private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
+
+    let generation: Int
+    private let maxPhotoDimensions: CMVideoDimensions
+    private var completion: (@Sendable (Data?) -> Void)?
+    private let sessionQueue: DispatchQueue
+    private let onDone: @Sendable (PhotoCaptureHandler) -> Void
+
+    init(
+        generation: Int,
+        maxPhotoDimensions: CMVideoDimensions,
+        completion: @escaping @Sendable (Data?) -> Void,
+        sessionQueue: DispatchQueue,
+        onDone: @escaping @Sendable (PhotoCaptureHandler) -> Void
+    ) {
+        self.generation = generation
+        self.maxPhotoDimensions = maxPhotoDimensions
+        self.completion = completion
+        self.sessionQueue = sessionQueue
+        self.onDone = onDone
+    }
+
+    func issueCapture(to output: AVCapturePhotoOutput) {
+        let settings = AVCapturePhotoSettings()
+        if maxPhotoDimensions.width > 0 {
+            settings.maxPhotoDimensions = maxPhotoDimensions
+        }
+        output.capturePhoto(with: settings, delegate: self)
+    }
+
+    /// Called by `stop()` (on sessionQueue) to resolve the pending continuation with nil.
+    func cancel() {
+        let pending = completion
+        completion = nil
+        DispatchQueue.main.async { pending?(nil) }
+    }
+
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        let data = error == nil ? photo.fileDataRepresentation() : nil
-        let completion = photoCaptureCompletion
-        photoCaptureCompletion = nil
-        DispatchQueue.main.async { completion?(data) }
+        // Serialize completion mutation onto sessionQueue so cancel() and this delegate
+        // callback cannot race — only one of them will find a non-nil completion.
+        let photoData = error == nil ? photo.fileDataRepresentation() : nil
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let pending = self.completion
+            self.completion = nil
+            self.onDone(self)
+            guard let pending else { return }
+            DispatchQueue.main.async { pending(photoData) }
+        }
     }
 }

@@ -100,7 +100,7 @@ final class CameraViewController: UIViewController {
         engine.detectionMode = mode
     }
 
-    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
+    func capturePhoto(completion: @escaping @Sendable (UIImage?) -> Void) {
         sessionManager.capturePhoto { data in
             guard let data, let image = UIImage(data: data) else {
                 DispatchQueue.main.async { completion(nil) }

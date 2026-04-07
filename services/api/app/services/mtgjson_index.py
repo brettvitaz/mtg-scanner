@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 
+SPLIT_LAYOUTS = {"split", "aftermath", "fuse"}
+
 SPACE_PUNCTUATION = {
     "-",
     "‐",
@@ -162,6 +164,32 @@ class MTGJSONIndex:
             ORDER BY release_date DESC, set_code ASC
             """,
             (normalize_title(title), normalize_collector_number(collector_number)),
+        )
+
+    def lookup_by_face_name(self, *, title: str) -> list[CardRecord]:
+        """Look up cards where title matches an individual face of a split card.
+
+        Returns an empty list if the face_names table does not exist (old database).
+        """
+        if not self.is_available():
+            return []
+        with sqlite3.connect(self._db_path) as conn:
+            table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='face_names'"
+            ).fetchone()
+        if not table_exists:
+            return []
+        return self._fetch_cards(
+            f"""
+            SELECT {_CARD_COLUMNS}
+            FROM cards
+            WHERE uuid IN (
+                SELECT full_card_uuid FROM face_names
+                WHERE normalized_face_name = ?
+            )
+            ORDER BY release_date DESC, set_code ASC
+            """,
+            (normalize_title(title),),
         )
 
     def lookup_all_printings_by_name(self, *, title: str) -> list[CardRecord]:
@@ -368,6 +396,15 @@ def create_schema(db_path: Path) -> None:
             CREATE INDEX idx_cards_name_set_number ON cards(normalized_name, set_code, normalized_collector_number);
             CREATE INDEX idx_cards_set_number ON cards(set_code, normalized_collector_number);
             CREATE INDEX idx_sets_name ON sets(normalized_set_name);
+
+            DROP TABLE IF EXISTS face_names;
+            CREATE TABLE face_names (
+                face_name TEXT NOT NULL,
+                normalized_face_name TEXT NOT NULL,
+                full_card_uuid TEXT NOT NULL,
+                UNIQUE(normalized_face_name, full_card_uuid)
+            );
+            CREATE INDEX idx_face_names ON face_names(normalized_face_name);
             """
         )
 
@@ -409,6 +446,7 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                 ),
             )
 
+            seen_in_set: set[tuple[str, str]] = set()
             for card in set_payload.get("cards", []):
                 if not isinstance(card, dict):
                     skipped_card_count += 1
@@ -419,6 +457,40 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                     skipped_card_count += 1
                     continue
                 collector_number = card.get("number")
+                dedup_key = (normalize_title(card.get("asciiName") or name), normalize_collector_number(collector_number))
+                if dedup_key in seen_in_set:
+                    # Second face of a split card — merge per-face fields into the existing row
+                    face_type = card.get("type")
+                    face_text = card.get("text")
+                    face_mana = card.get("manaCost")
+                    if face_type or face_text or face_mana:
+                        conn.execute(
+                            """
+                            UPDATE cards SET
+                                type_line = CASE WHEN type_line IS NOT NULL AND ? IS NOT NULL
+                                                 THEN type_line || ' // ' || ?
+                                                 ELSE COALESCE(type_line, ?) END,
+                                oracle_text = CASE WHEN oracle_text IS NOT NULL AND ? IS NOT NULL
+                                                   THEN oracle_text || '\n---\n' || ?
+                                                   ELSE COALESCE(oracle_text, ?) END,
+                                mana_cost = CASE WHEN mana_cost IS NOT NULL AND ? IS NOT NULL
+                                                 THEN mana_cost || ' // ' || ?
+                                                 ELSE COALESCE(mana_cost, ?) END
+                            WHERE normalized_name = ? AND set_code = ?
+                              AND normalized_collector_number = ?
+                            """,
+                            (
+                                face_type, face_type, face_type,
+                                face_text, face_text, face_text,
+                                face_mana, face_mana, face_mana,
+                                normalize_title(card.get("asciiName") or name),
+                                canonical_set_code,
+                                normalize_collector_number(collector_number),
+                            ),
+                        )
+                    skipped_card_count += 1
+                    continue
+                seen_in_set.add(dedup_key)
                 identifiers = card.get("identifiers") or {}
                 purchase_urls = card.get("purchaseUrls") or {}
                 finishes_list: list[str] = card.get("finishes") or []
@@ -464,6 +536,18 @@ def import_all_printings(*, source_path: Path, db_path: Path, manifest_path: Pat
                     ),
                 )
                 card_count += 1
+
+                if card.get("layout") in SPLIT_LAYOUTS and " // " in name:
+                    for face in name.split(" // "):
+                        face_stripped = face.strip()
+                        if face_stripped:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO face_names "
+                                "(face_name, normalized_face_name, full_card_uuid) "
+                                "VALUES (?, ?, ?)",
+                                (face_stripped, normalize_title(face_stripped), uuid),
+                            )
+
         conn.commit()
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)

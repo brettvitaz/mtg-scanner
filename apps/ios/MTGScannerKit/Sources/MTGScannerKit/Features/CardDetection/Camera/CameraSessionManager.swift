@@ -15,9 +15,13 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     /// Called on the session queue for each delivered video frame.
     var onFrame: ((CMSampleBuffer) -> Void)?
 
+    // MARK: - Internal (visible for testing)
+
+    /// Exposed so tests can flush the queue with `sync {}` to assert state after enqueued work completes.
+    let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
+
     // MARK: - Private
 
-    private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
     private var isCaptureInFlight = false
     private var captureGeneration = 0
@@ -99,14 +103,18 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
                 generation: self.captureGeneration,
                 maxPhotoDimensions: self.maxPhotoDimensions,
                 completion: completion,
-                onDone: { [weak self] in self?.captureDidFinish() }
+                sessionQueue: self.sessionQueue,
+                onDone: { [weak self] handler in self?.captureDidFinish(handler: handler) }
             )
             self.activeHandler = handler
             self.lockFocusThenCapture(handler: handler)
         }
     }
 
-    private func captureDidFinish() {
+    /// Only clears manager-level in-flight state if `handler` is still the active one.
+    /// Prevents a stale or cancelled handler from clobbering a newer capture's state.
+    private func captureDidFinish(handler: PhotoCaptureHandler) {
+        guard activeHandler === handler else { return }
         isCaptureInFlight = false
         activeHandler = nil
         restoreContinuousAutoFocus()
@@ -128,10 +136,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         }
         sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self else { return }
-            guard handler.generation == self.captureGeneration else {
-                self.captureDidFinish()
-                return
-            }
+            guard handler.generation == self.captureGeneration else { return }
             handler.issueCapture(to: self.photoOutput)
         }
     }
@@ -214,22 +219,28 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 ///
 /// By making each capture its own delegate, a stale AVFoundation callback can never
 /// reach a different capture's completion — it only talks to the object it was given.
+///
+/// Both `cancel()` and `photoOutput(_:didFinishProcessingPhoto:)` are serialized through
+/// `sessionQueue` so the `completion` slot has a single writer at a time.
 private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
 
     let generation: Int
     private let maxPhotoDimensions: CMVideoDimensions
     private var completion: (@Sendable (Data?) -> Void)?
-    private let onDone: @Sendable () -> Void
+    private let sessionQueue: DispatchQueue
+    private let onDone: @Sendable (PhotoCaptureHandler) -> Void
 
     init(
         generation: Int,
         maxPhotoDimensions: CMVideoDimensions,
         completion: @escaping @Sendable (Data?) -> Void,
-        onDone: @escaping @Sendable () -> Void
+        sessionQueue: DispatchQueue,
+        onDone: @escaping @Sendable (PhotoCaptureHandler) -> Void
     ) {
         self.generation = generation
         self.maxPhotoDimensions = maxPhotoDimensions
         self.completion = completion
+        self.sessionQueue = sessionQueue
         self.onDone = onDone
     }
 
@@ -241,7 +252,7 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
         output.capturePhoto(with: settings, delegate: self)
     }
 
-    /// Called by `stop()` to resolve the pending continuation with nil without waiting for the delegate.
+    /// Called by `stop()` (on sessionQueue) to resolve the pending continuation with nil.
     func cancel() {
         let pending = completion
         completion = nil
@@ -249,11 +260,18 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
     }
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        let pending = completion
-        completion = nil
-        onDone()
-        guard let pending else { return }
-        let data = error == nil ? photo.fileDataRepresentation() : nil
-        DispatchQueue.main.async { pending(data) }
+        // Serialize completion mutation onto sessionQueue so cancel() and this delegate
+        // callback cannot race — only one of them will find a non-nil completion.
+        let capturedPhoto = photo
+        let capturedError = error
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let pending = self.completion
+            self.completion = nil
+            self.onDone(self)
+            guard let pending else { return }
+            let data = capturedError == nil ? capturedPhoto.fileDataRepresentation() : nil
+            DispatchQueue.main.async { pending(data) }
+        }
     }
 }

@@ -47,6 +47,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         else { return }
         session.addInput(input)
         captureDevice = device
+        configureFocus(device)
 
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true
@@ -65,20 +66,66 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         }
     }
 
+    private func configureFocus(_ device: AVCaptureDevice) {
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        if device.isFocusPointOfInterestSupported {
+            device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+        }
+        if device.isAutoFocusRangeRestrictionSupported {
+            device.autoFocusRangeRestriction = .near
+        }
+        device.unlockForConfiguration()
+    }
+
     // MARK: - Photo Capture
 
     /// Triggers a still photo capture and returns JPEG data via `completion`.
     /// Must be called from the main thread.
     func capturePhoto(completion: @escaping (Data?) -> Void) {
         photoCaptureCompletion = completion
+        sessionQueue.async { [weak self] in
+            self?.lockFocusThenCapture()
+        }
+    }
+
+    private func lockFocusThenCapture() {
+        guard let device = captureDevice,
+              device.isFocusModeSupported(.autoFocus) else {
+            captureWithCurrentSettings()
+            return
+        }
+        do {
+            try device.lockForConfiguration()
+            device.focusMode = .autoFocus
+            device.unlockForConfiguration()
+        } catch {
+            captureWithCurrentSettings()
+            return
+        }
+        sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.captureWithCurrentSettings()
+            self?.restoreContinuousAutoFocus()
+        }
+    }
+
+    private func captureWithCurrentSettings() {
         let settings = AVCapturePhotoSettings()
         if maxPhotoDimensions.width > 0 {
             settings.maxPhotoDimensions = maxPhotoDimensions
         }
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            self.photoOutput.capturePhoto(with: settings, delegate: self)
+        photoOutput.capturePhoto(with: settings, delegate: self)
+    }
+
+    private func restoreContinuousAutoFocus() {
+        guard let device = captureDevice,
+              (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
         }
+        device.unlockForConfiguration()
     }
 
     // MARK: - Torch

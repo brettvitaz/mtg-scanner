@@ -86,6 +86,10 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         guard session.canAddOutput(photoOutput) else { return }
         session.addOutput(photoOutput)
 
+        if device.activeFormat.isHighPhotoQualitySupported {
+            photoOutput.maxPhotoQualityPrioritization = .quality
+        }
+
         if let largest = Self.largestPhotoDimensions(in: device.activeFormat.supportedMaxPhotoDimensions) {
             photoOutput.maxPhotoDimensions = largest
             maxPhotoDimensions = largest

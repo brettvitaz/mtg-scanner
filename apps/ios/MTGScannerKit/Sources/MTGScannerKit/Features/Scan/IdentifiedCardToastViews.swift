@@ -29,9 +29,7 @@ struct IdentifiedCardToastView: View {
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
         .overlay(shimmerOverlay)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Recently recognized card.")
+        .accessibilityElement(children: .contain)
         .onAppear {
             UIAccessibility.post(notification: .announcement, argument: accessibilityLabel)
         }
@@ -51,26 +49,32 @@ struct IdentifiedCardToastView: View {
 
     @ViewBuilder
     private var cardLabels: some View {
-        Text(card.title)
-            .font(.system(size: 16, weight: .bold))
-            .lineLimit(1)
-        if card.isFoil {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14))
-                .foregroundStyle(.yellow)
-        }
-        Text(card.setCode.uppercased())
-            .font(.system(size: 13))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .layoutPriority(1)
-        if !card.collectorNumber.isEmpty {
-            Text("#\(card.collectorNumber)")
+        HStack(spacing: 8) {
+            Text(card.title)
+                .font(.system(size: 16, weight: .bold))
+                .lineLimit(1)
+            if card.isFoil {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
+            }
+            Text(card.setCode.uppercased())
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .layoutPriority(1)
+            if !card.collectorNumber.isEmpty {
+                Text("#\(card.collectorNumber)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+            }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("Recently recognized card.")
     }
 
     private var dismissButton: some View {

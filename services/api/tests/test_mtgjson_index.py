@@ -305,6 +305,20 @@ def test_import_deduplicates_split_card_faces(tmp_path: Path) -> None:
     assert len(results) == 1
 
 
+def test_lookup_by_face_name_returns_empty_on_old_db_without_table(tmp_path: Path, mtgjson_fixture: Path) -> None:
+    """Old databases without face_names table must not raise — return empty list."""
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+
+    # Drop the face_names table to simulate an old database
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS face_names")
+
+    index = MTGJSONIndex(db_path)
+    results = index.lookup_by_face_name(title="Lightning Bolt")
+    assert results == []
+
+
 def test_lookup_by_face_name_no_match_for_normal_card(tmp_path: Path, mtgjson_fixture: Path) -> None:
     db_path = tmp_path / "mtgjson.sqlite"
     import_all_printings(source_path=mtgjson_fixture, db_path=db_path, manifest_path=tmp_path / "manifest.json")

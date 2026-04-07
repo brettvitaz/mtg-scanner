@@ -19,9 +19,9 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     private let sessionQueue = DispatchQueue(label: "com.mtgscanner.camera-session", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
-    private var photoCaptureCompletion: ((Data?) -> Void)?
     private var isCaptureInFlight = false
     private var captureGeneration = 0
+    private var activeHandler: PhotoCaptureHandler?
     private(set) var captureDevice: AVCaptureDevice?
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
@@ -95,15 +95,27 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
             }
             self.isCaptureInFlight = true
             self.captureGeneration &+= 1
-            self.photoCaptureCompletion = completion
-            self.lockFocusThenCapture(generation: self.captureGeneration)
+            let handler = PhotoCaptureHandler(
+                generation: self.captureGeneration,
+                maxPhotoDimensions: self.maxPhotoDimensions,
+                completion: completion,
+                onDone: { [weak self] in self?.captureDidFinish() }
+            )
+            self.activeHandler = handler
+            self.lockFocusThenCapture(handler: handler)
         }
     }
 
-    private func lockFocusThenCapture(generation: Int) {
+    private func captureDidFinish() {
+        isCaptureInFlight = false
+        activeHandler = nil
+        restoreContinuousAutoFocus()
+    }
+
+    private func lockFocusThenCapture(handler: PhotoCaptureHandler) {
         guard let device = captureDevice,
               device.isFocusModeSupported(.autoFocus) else {
-            captureWithCurrentSettings(generation: generation)
+            handler.issueCapture(to: photoOutput)
             return
         }
         do {
@@ -111,24 +123,17 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
             device.focusMode = .autoFocus
             device.unlockForConfiguration()
         } catch {
-            captureWithCurrentSettings(generation: generation)
+            handler.issueCapture(to: photoOutput)
             return
         }
         sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.captureWithCurrentSettings(generation: generation)
+            guard let self else { return }
+            guard handler.generation == self.captureGeneration else {
+                self.captureDidFinish()
+                return
+            }
+            handler.issueCapture(to: self.photoOutput)
         }
-    }
-
-    private func captureWithCurrentSettings(generation: Int) {
-        guard generation == captureGeneration else {
-            restoreContinuousAutoFocus()
-            return
-        }
-        let settings = AVCapturePhotoSettings()
-        if maxPhotoDimensions.width > 0 {
-            settings.maxPhotoDimensions = maxPhotoDimensions
-        }
-        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
     private func restoreContinuousAutoFocus() {
@@ -180,11 +185,10 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
             guard let self else { return }
             if self.isCaptureInFlight {
                 self.captureGeneration &+= 1
-                let pending = self.photoCaptureCompletion
-                self.photoCaptureCompletion = nil
+                self.activeHandler?.cancel()
+                self.activeHandler = nil
                 self.isCaptureInFlight = false
                 self.restoreContinuousAutoFocus()
-                DispatchQueue.main.async { pending?(nil) }
             }
             guard self.session.isRunning else { return }
             self.session.stopRunning()
@@ -204,16 +208,52 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
-// MARK: - AVCapturePhotoCaptureDelegate
+// MARK: - Per-capture delegate
 
-extension CameraSessionManager: AVCapturePhotoCaptureDelegate {
+/// Owns the completion and AVCapturePhotoCaptureDelegate for exactly one photo capture.
+///
+/// By making each capture its own delegate, a stale AVFoundation callback can never
+/// reach a different capture's completion — it only talks to the object it was given.
+private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
+
+    let generation: Int
+    private let maxPhotoDimensions: CMVideoDimensions
+    private var completion: (@Sendable (Data?) -> Void)?
+    private let onDone: @Sendable () -> Void
+
+    init(
+        generation: Int,
+        maxPhotoDimensions: CMVideoDimensions,
+        completion: @escaping @Sendable (Data?) -> Void,
+        onDone: @escaping @Sendable () -> Void
+    ) {
+        self.generation = generation
+        self.maxPhotoDimensions = maxPhotoDimensions
+        self.completion = completion
+        self.onDone = onDone
+    }
+
+    func issueCapture(to output: AVCapturePhotoOutput) {
+        let settings = AVCapturePhotoSettings()
+        if maxPhotoDimensions.width > 0 {
+            settings.maxPhotoDimensions = maxPhotoDimensions
+        }
+        output.capturePhoto(with: settings, delegate: self)
+    }
+
+    /// Called by `stop()` to resolve the pending continuation with nil without waiting for the delegate.
+    func cancel() {
+        let pending = completion
+        completion = nil
+        DispatchQueue.main.async { pending?(nil) }
+    }
+
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        let completion = photoCaptureCompletion
-        photoCaptureCompletion = nil
-        isCaptureInFlight = false
-        restoreContinuousAutoFocus()
-        guard completion != nil else { return }  // cancelled by stop()
+        let pending = completion
+        completion = nil
+        onDone()
+        guard let pending else { return }
         let data = error == nil ? photo.fileDataRepresentation() : nil
-        DispatchQueue.main.async { completion?(data) }
+        DispatchQueue.main.async { pending(data) }
     }
 }

@@ -502,27 +502,47 @@ def _drop_face_name_redundancies(
     Only entries matched via face-name correction trigger this — normal UUID
     matches from identical physical cards are not touched.
     """
-    face_matched_uuids: set[str] = {
-        result.trace.matched_uuid
-        for result in results
-        if result.trace.matched_uuid is not None
-        and "face name of split card" in result.trace.reason
-    }
-    if not face_matched_uuids:
+    # Identify results that were matched by face-name correction and record
+    # which UUIDs they resolved to.
+    face_corrected_uuids: set[str] = set()
+    face_corrected_indices: set[int] = set()
+    for i, result in enumerate(results):
+        if (
+            result.trace.matched_uuid is not None
+            and "face name of split card" in result.trace.reason
+        ):
+            face_corrected_uuids.add(result.trace.matched_uuid)
+            face_corrected_indices.add(i)
+
+    if not face_corrected_uuids:
         return results
 
-    emitted_face_uuids: set[str] = set()
+    # UUIDs already claimed by non-face-corrected results take priority
+    non_face_uuids: set[str] = {
+        result.trace.matched_uuid
+        for i, result in enumerate(results)
+        if i not in face_corrected_indices and result.trace.matched_uuid is not None
+    }
+
+    # For each non-face-corrected result, check if its original title is a face
+    # of any already-matched split card UUID. If so, it is a sibling and should
+    # be dropped.
     output: list[ValidatedCardResult] = []
-    for result in results:
-        uuid = result.trace.matched_uuid
-        if uuid in face_matched_uuids:
-            if uuid not in emitted_face_uuids:
-                output.append(result)
-                emitted_face_uuids.add(uuid)
+    emitted_face_uuids: set[str] = set()
+    for i, result in enumerate(results):
+        if i in face_corrected_indices:
+            uuid = result.trace.matched_uuid
+            # Drop if a better (non-face-corrected) result covers the same UUID,
+            # or if another face-corrected entry already emitted this UUID.
+            if uuid in non_face_uuids or uuid in emitted_face_uuids:
+                continue
+            output.append(result)
+            emitted_face_uuids.add(uuid)  # type: ignore[arg-type]
             continue
-        face_parents = {r.uuid for r in index.lookup_by_face_name(title=result.card.title or "")}
-        if face_parents & face_matched_uuids:
-            continue  # this title is a face of an already-matched split card — drop it
+        original_title = str(result.trace.original.get("title") or "")
+        face_parents = {r.uuid for r in index.lookup_by_face_name(title=original_title)}
+        if face_parents & face_corrected_uuids:
+            continue  # sibling face — drop
         output.append(result)
     return output
 

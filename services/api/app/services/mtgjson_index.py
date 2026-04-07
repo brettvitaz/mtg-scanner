@@ -167,7 +167,18 @@ class MTGJSONIndex:
         )
 
     def lookup_by_face_name(self, *, title: str) -> list[CardRecord]:
-        """Look up cards where title matches an individual face of a split card."""
+        """Look up cards where title matches an individual face of a split card.
+
+        Returns an empty list if the face_names table does not exist (old database).
+        """
+        if not self.is_available():
+            return []
+        with sqlite3.connect(self._db_path) as conn:
+            table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='face_names'"
+            ).fetchone()
+        if not table_exists:
+            return []
         return self._fetch_cards(
             f"""
             SELECT {_CARD_COLUMNS}

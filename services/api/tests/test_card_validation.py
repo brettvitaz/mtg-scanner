@@ -451,6 +451,23 @@ def test_validate_response_drops_valid_face_when_sibling_matched(validation_serv
     assert batch.response.cards[0].title == "Warrant // Warden"
 
 
+def test_validate_response_preserves_full_name_match_alongside_face_correction(validation_service: CardValidationService) -> None:
+    # One card recognized by full name (exact_match) + one corrected from face name.
+    # Both resolve to same UUID but full-name match must not be dropped.
+    response = RecognitionResponse(
+        cards=[
+            RecognizedCard(title="Warrant // Warden", edition="WAR", collector_number="230", foil=False, confidence=0.95, notes=None),
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
+        ]
+    )
+    batch = validation_service.validate_response(response)
+
+    # Full-name exact match kept; face-name correction dropped as sibling
+    assert len(batch.response.cards) == 1
+    assert batch.response.cards[0].title == "Warrant // Warden"
+    assert batch.traces[0].status == "exact_match"
+
+
 def test_validate_response_preserves_duplicate_physical_cards(validation_service: CardValidationService) -> None:
     # Two copies of the same card on a page must NOT be collapsed
     response = RecognitionResponse(

@@ -52,13 +52,27 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertFalse(ScanYOLOSupport.supports(rectangle: rectangle, with: [yoloBox]))
     }
 
-    func testValidateFallsBackWhenYOLOBoxesAreEmpty() {
+    func testValidateRejectsRectanglesWhenYOLORunsButFindsNoCards() {
         let observation = makeObservation(
             box: CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30),
             confidence: 0.90
         )
 
         let result = ScanYOLOSupport.validate([observation], with: [])
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 0)
+        XCTAssertEqual(result.yoloRejectedCount, 1)
+        XCTAssertTrue(result.observations.isEmpty)
+    }
+
+    func testValidateFallsBackWhenYOLOIsUnavailable() {
+        let observation = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30),
+            confidence: 0.90
+        )
+
+        let result = ScanYOLOSupport.validate([observation], with: nil)
 
         XCTAssertTrue(result.usedFallback)
         XCTAssertEqual(result.yoloAcceptedCount, 0)

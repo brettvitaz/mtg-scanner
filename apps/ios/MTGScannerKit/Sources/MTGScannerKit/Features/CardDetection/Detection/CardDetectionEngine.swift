@@ -316,12 +316,21 @@ enum ScanYOLOSupport {
             )
         }
 
-        guard let yoloBoxes, !yoloBoxes.isEmpty else {
+        guard let yoloBoxes else {
             return ValidationResult(
                 observations: observations,
                 yoloAcceptedCount: 0,
                 yoloRejectedCount: 0,
                 usedFallback: true
+            )
+        }
+
+        guard !yoloBoxes.isEmpty else {
+            return ValidationResult(
+                observations: [],
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: observations.count,
+                usedFallback: false
             )
         }
 

@@ -167,7 +167,8 @@ struct RectangleFilter {
                 continue
             }
 
-            if let replacedIndex = kept.firstIndex(where: { accepted in
+            let replacedIndices = kept.indices.filter { index in
+                let accepted = kept[index]
                 let acceptedArea = Self.area(of: accepted.boundingBox)
                 guard acceptedArea > 0 else { return false }
                 guard candidateArea / acceptedArea >= Self.containmentReplacementAreaRatioThreshold else {
@@ -175,9 +176,14 @@ struct RectangleFilter {
                 }
                 return Self.containmentRatio(of: accepted.boundingBox, in: observation.boundingBox) >=
                     Self.containmentThreshold
-            }) {
-                kept[replacedIndex] = observation
-                suppressionCount += 1
+            }
+
+            if !replacedIndices.isEmpty {
+                for index in replacedIndices.reversed() {
+                    kept.remove(at: index)
+                }
+                kept.append(observation)
+                suppressionCount += replacedIndices.count
                 continue
             }
 

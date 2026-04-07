@@ -58,6 +58,14 @@ def validation_service(tmp_path: Path) -> CardValidationService:
               "cards": [
                 {"uuid": "warrant-warden-war-230", "name": "Warrant // Warden", "setCode": "WAR", "number": "230", "language": "English", "layout": "split", "finishes": ["nonfoil", "foil"]}
               ]
+            },
+            "C21": {
+              "code": "C21",
+              "name": "Commander 2021",
+              "releaseDate": "2021-04-23",
+              "cards": [
+                {"uuid": "warrant-warden-c21-219", "name": "Warrant // Warden", "setCode": "C21", "number": "219", "language": "English", "layout": "split", "finishes": ["nonfoil"]}
+              ]
             }
           }
         }
@@ -344,12 +352,31 @@ def test_validate_response_validates_each_card_independently(validation_service:
     assert batch.response.cards[1].title == "Totally Fake Card"
 
 
-def test_validate_split_card_face_name_fallback(validation_service: CardValidationService) -> None:
-    # LLM returned a single face name instead of the full combined name
+def test_validate_split_card_face_name_narrows_by_set_and_number(validation_service: CardValidationService) -> None:
+    # Face name "Warrant" exists in WAR and C21, but edition+number pins it to WAR 230
     result = validation_service.validate_card(
         RecognizedCard(
             title="Warrant",
-            edition=None,
+            edition="War of the Spark",
+            collector_number="230",
+            foil=False,
+            confidence=0.99,
+            notes=None,
+        )
+    )
+
+    assert result.trace.status == "corrected_match"
+    assert result.card.title == "Warrant // Warden"
+    assert result.card.set_code == "WAR"
+    assert result.trace.matched_uuid == "warrant-warden-war-230"
+
+
+def test_validate_split_card_face_name_fallback(validation_service: CardValidationService) -> None:
+    # LLM returned a single face name with set context that pins it to one printing
+    result = validation_service.validate_card(
+        RecognizedCard(
+            title="Warrant",
+            edition="War of the Spark",
             collector_number=None,
             foil=False,
             confidence=0.75,
@@ -382,11 +409,11 @@ def test_validate_split_card_full_name_still_works(validation_service: CardValid
 
 
 def test_validate_response_deduplicates_split_card_faces(validation_service: CardValidationService) -> None:
-    # LLM returned both face names of Warrant // Warden as separate entries
+    # LLM returned both face names as separate entries; set context pins both to WAR
     response = RecognitionResponse(
         cards=[
-            RecognizedCard(title="Warrant", edition=None, collector_number=None, foil=False, confidence=0.86, notes=None),
-            RecognizedCard(title="Warden", edition=None, collector_number=None, foil=False, confidence=0.84, notes=None),
+            RecognizedCard(title="Warrant", edition="War of the Spark", collector_number="230", foil=False, confidence=0.86, notes=None),
+            RecognizedCard(title="Warden", edition="War of the Spark", collector_number="230", foil=False, confidence=0.84, notes=None),
         ]
     )
 

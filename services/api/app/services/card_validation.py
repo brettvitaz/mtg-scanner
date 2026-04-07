@@ -263,6 +263,12 @@ class CardValidationService:
                 "Auto-corrected: matched as face name of split card.",
             )
         if len(face_matches) > 1:
+            narrowed = _narrow_face_matches(face_matches, resolved_set_code, normalized_number)
+            if len(narrowed) == 1:
+                return self._matched(
+                    card, trace_base, narrowed[0], "corrected_match",
+                    "Auto-corrected: matched as face name of split card.",
+                )
             return self._needs_correction(
                 card, trace_base, face_matches,
                 "Title matched as face name of split card in multiple sets.",
@@ -457,6 +463,30 @@ def _adjust_confidence(value: float, status: str) -> float:
     if status == "needs_correction":
         return max(0.0, round(value - 0.1, 4))
     return max(0.0, round(value - 0.25, 4)) if status == "no_match" else round(value, 4)
+
+
+def _narrow_face_matches(
+    face_matches: list[CardRecord],
+    resolved_set_code: str | None,
+    normalized_number: str,
+) -> list[CardRecord]:
+    """Narrow multiple face-name matches using set and/or collector number context."""
+    if resolved_set_code and normalized_number:
+        candidates = [
+            c for c in face_matches
+            if c.set_code == resolved_set_code and c.normalized_collector_number == normalized_number
+        ]
+        if candidates:
+            return candidates
+    if resolved_set_code:
+        candidates = [c for c in face_matches if c.set_code == resolved_set_code]
+        if candidates:
+            return candidates
+    if normalized_number:
+        candidates = [c for c in face_matches if c.normalized_collector_number == normalized_number]
+        if candidates:
+            return candidates
+    return face_matches
 
 
 def _dedup_by_uuid(results: list[ValidatedCardResult]) -> list[ValidatedCardResult]:

@@ -58,6 +58,10 @@ struct RectangleFilter {
     /// Minimum larger/smaller area ratio required before containment suppression fires.
     static let containmentAreaRatioThreshold: CGFloat = 1.20
 
+    /// A later, larger rectangle can replace an earlier contained rectangle only when the size
+    /// gap is substantial; this avoids weak enclosing boxes displacing the actual card bounds.
+    static let containmentReplacementAreaRatioThreshold: CGFloat = 1.50
+
     // MARK: - Public API
 
     /// Returns filtered, deduplicated, and sorted observations from the given array.
@@ -143,33 +147,41 @@ struct RectangleFilter {
     private func suppressContainedObservations(
         _ observations: [VNRectangleObservation]
     ) -> ContainmentSuppressionResult {
-        let sorted = observations.sorted { lhs, rhs in
-            let lhsArea = Self.area(of: lhs.boundingBox)
-            let rhsArea = Self.area(of: rhs.boundingBox)
-            if abs(lhsArea - rhsArea) > 0.0001 {
-                return lhsArea > rhsArea
-            }
-            return lhs.confidence > rhs.confidence
-        }
-
         var kept: [VNRectangleObservation] = []
         var suppressionCount = 0
 
-        for observation in sorted {
-            let isContained = kept.contains { accepted in
+        for observation in observations {
+            let candidateArea = Self.area(of: observation.boundingBox)
+            guard candidateArea > 0 else {
+                kept.append(observation)
+                continue
+            }
+
+            if kept.contains(where: { accepted in
                 let acceptedArea = Self.area(of: accepted.boundingBox)
-                let candidateArea = Self.area(of: observation.boundingBox)
-                guard candidateArea > 0 else { return false }
                 guard acceptedArea / candidateArea >= Self.containmentAreaRatioThreshold else { return false }
                 return Self.containmentRatio(of: observation.boundingBox, in: accepted.boundingBox) >=
                     Self.containmentThreshold
+            }) {
+                suppressionCount += 1
+                continue
             }
 
-            if isContained {
+            if let replacedIndex = kept.firstIndex(where: { accepted in
+                let acceptedArea = Self.area(of: accepted.boundingBox)
+                guard acceptedArea > 0 else { return false }
+                guard candidateArea / acceptedArea >= Self.containmentReplacementAreaRatioThreshold else {
+                    return false
+                }
+                return Self.containmentRatio(of: accepted.boundingBox, in: observation.boundingBox) >=
+                    Self.containmentThreshold
+            }) {
+                kept[replacedIndex] = observation
                 suppressionCount += 1
-            } else {
-                kept.append(observation)
+                continue
             }
+
+            kept.append(observation)
         }
 
         return ContainmentSuppressionResult(observations: kept, suppressionCount: suppressionCount)

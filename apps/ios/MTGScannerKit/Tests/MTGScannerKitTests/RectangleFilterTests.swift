@@ -281,6 +281,27 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
     }
 
+    func testFilterKeepsHigherConfidenceInnerCardWhenOuterBoxIsOnlySlightlyLarger() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let innerHeight: CGFloat = 0.40
+        let innerWidth = innerHeight * ratio
+        let outerHeight: CGFloat = 0.43
+        let outerWidth = outerHeight * ratio
+
+        let inner = makeObservation(
+            box: CGRect(x: 0.12, y: 0.12, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+        let outer = makeObservation(
+            box: CGRect(x: 0.105, y: 0.105, width: outerWidth, height: outerHeight),
+            confidence: 0.45
+        )
+
+        let result = filter.filter([inner, outer], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, inner.boundingBox)
+    }
+
     func testFilterKeepsPartiallyOverlappingBoxesBelowContainmentThreshold() {
         let ratio = RectangleFilter.targetAspectRatio
         let height: CGFloat = 0.32

@@ -221,41 +221,15 @@ final class CardDetectionEngine: @unchecked Sendable {
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval
     ) -> ScanYOLOValidationResult {
-        guard !observations.isEmpty else {
-            return ScanYOLOValidationResult(
-                observations: [],
-                yoloBoxes: [],
-                yoloAcceptedCount: 0,
-                yoloRejectedCount: 0,
-                usedFallback: false
-            )
-        }
-
-        guard let yoloBoxes = scanYOLOBoxes(pixelBuffer: pixelBuffer, timestamp: timestamp) else {
-            return ScanYOLOValidationResult(
-                observations: observations,
-                yoloBoxes: [],
-                yoloAcceptedCount: 0,
-                yoloRejectedCount: 0,
-                usedFallback: true
-            )
-        }
-
-        var accepted: [VNRectangleObservation] = []
-        accepted.reserveCapacity(observations.count)
-
-        for observation in observations {
-            if ScanYOLOSupport.supports(rectangle: observation.boundingBox, with: yoloBoxes) {
-                accepted.append(observation)
-            }
-        }
+        let yoloBoxes = scanYOLOBoxes(pixelBuffer: pixelBuffer, timestamp: timestamp)
+        let validation = ScanYOLOSupport.validate(observations, with: yoloBoxes)
 
         return ScanYOLOValidationResult(
-            observations: accepted,
-            yoloBoxes: yoloBoxes,
-            yoloAcceptedCount: accepted.count,
-            yoloRejectedCount: observations.count - accepted.count,
-            usedFallback: false
+            observations: validation.observations,
+            yoloBoxes: yoloBoxes ?? [],
+            yoloAcceptedCount: validation.yoloAcceptedCount,
+            yoloRejectedCount: validation.yoloRejectedCount,
+            usedFallback: validation.usedFallback
         )
     }
 
@@ -329,6 +303,45 @@ enum ScanYOLOSupport {
     static let iouThreshold: CGFloat = 0.35
     static let coverageThreshold: CGFloat = 0.60
 
+    static func validate(
+        _ observations: [VNRectangleObservation],
+        with yoloBoxes: [CGRect]?
+    ) -> ValidationResult {
+        guard !observations.isEmpty else {
+            return ValidationResult(
+                observations: [],
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: 0,
+                usedFallback: false
+            )
+        }
+
+        guard let yoloBoxes, !yoloBoxes.isEmpty else {
+            return ValidationResult(
+                observations: observations,
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: 0,
+                usedFallback: true
+            )
+        }
+
+        var accepted: [VNRectangleObservation] = []
+        accepted.reserveCapacity(observations.count)
+
+        for observation in observations {
+            if supports(rectangle: observation.boundingBox, with: yoloBoxes) {
+                accepted.append(observation)
+            }
+        }
+
+        return ValidationResult(
+            observations: accepted,
+            yoloAcceptedCount: accepted.count,
+            yoloRejectedCount: observations.count - accepted.count,
+            usedFallback: false
+        )
+    }
+
     static func supports(rectangle: CGRect, with yoloBoxes: [CGRect]) -> Bool {
         yoloBoxes.contains { yoloBox in
             RectangleFilter.iou(rectangle, yoloBox) >= iouThreshold
@@ -351,5 +364,12 @@ enum ScanYOLOSupport {
         let rectArea = RectangleFilter.area(of: rect)
         guard rectArea > 0 else { return 0 }
         return RectangleFilter.area(of: intersection) / rectArea
+    }
+
+    struct ValidationResult {
+        let observations: [VNRectangleObservation]
+        let yoloAcceptedCount: Int
+        let yoloRejectedCount: Int
+        let usedFallback: Bool
     }
 }

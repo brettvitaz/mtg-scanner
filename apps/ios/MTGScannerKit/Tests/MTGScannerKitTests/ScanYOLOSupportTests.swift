@@ -1,4 +1,5 @@
 import XCTest
+import Vision
 @testable import MTGScannerKit
 
 final class ScanYOLOSupportTests: XCTestCase {
@@ -49,5 +50,31 @@ final class ScanYOLOSupportTests: XCTestCase {
         let yoloBox = CGRect(x: 0.70, y: 0.70, width: 0.15, height: 0.20)
 
         XCTAssertFalse(ScanYOLOSupport.supports(rectangle: rectangle, with: [yoloBox]))
+    }
+
+    func testValidateFallsBackWhenYOLOBoxesAreEmpty() {
+        let observation = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30),
+            confidence: 0.90
+        )
+
+        let result = ScanYOLOSupport.validate([observation], with: [])
+
+        XCTAssertTrue(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 0)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 1)
+        XCTAssertEqual(result.observations[0].boundingBox, observation.boundingBox)
+    }
+
+    private func makeObservation(box: CGRect, confidence: Float) -> VNRectangleObservation {
+        let obs = VNRectangleObservation()
+        obs.setValue(box, forKey: "boundingBox")
+        obs.setValue(confidence, forKey: "confidence")
+        obs.setValue(CGPoint(x: box.minX, y: box.maxY), forKey: "topLeft")
+        obs.setValue(CGPoint(x: box.maxX, y: box.maxY), forKey: "topRight")
+        obs.setValue(CGPoint(x: box.maxX, y: box.minY), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: box.minX, y: box.minY), forKey: "bottomLeft")
+        return obs
     }
 }

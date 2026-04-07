@@ -1,9 +1,10 @@
 import AVFoundation
 
+// swiftlint:disable type_body_length
 /// Manages the `AVCaptureSession` lifecycle for real-time card detection.
 ///
 /// Responsibilities:
-/// - Configure the back wide-angle camera for 1080p video output.
+/// - Configure the best available back camera for 1080p video output.
 /// - Deliver `CMSampleBuffer` frames to `onFrame` on the session queue.
 /// - Start and stop the session from outside the session queue safely.
 final class CameraSessionManager: NSObject, @unchecked Sendable {
@@ -14,6 +15,13 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     /// Called on the session queue for each delivered video frame.
     var onFrame: ((CMSampleBuffer) -> Void)?
+
+    static let preferredBackCameraTypes: [AVCaptureDevice.DeviceType] = [
+        .builtInTripleCamera,
+        .builtInDualWideCamera,
+        .builtInDualCamera,
+        .builtInWideAngleCamera
+    ]
 
     // MARK: - Internal (visible for testing)
 
@@ -37,6 +45,10 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
     private(set) var captureDevice: AVCaptureDevice?
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
+    private static let capturePointOfInterest = CGPoint(x: 0.5, y: 0.5)
+    private static let captureSettleTimeout: TimeInterval = 1.2
+    private static let captureSettlePollInterval: TimeInterval = 0.05
+
     // MARK: - Setup
 
     /// Configures the capture session.
@@ -55,7 +67,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         session.sessionPreset = .hd1920x1080
 
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let device = makeBackCameraDevice(),
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else { return }
@@ -74,24 +86,49 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         guard session.canAddOutput(photoOutput) else { return }
         session.addOutput(photoOutput)
 
-        if let largest = device.activeFormat.supportedMaxPhotoDimensions.last {
+        if let largest = Self.largestPhotoDimensions(in: device.activeFormat.supportedMaxPhotoDimensions) {
             photoOutput.maxPhotoDimensions = largest
             maxPhotoDimensions = largest
         }
     }
 
+    private func makeBackCameraDevice() -> AVCaptureDevice? {
+        for deviceType in Self.preferredBackCameraTypes {
+            if let device = AVCaptureDevice.default(deviceType, for: .video, position: .back) {
+                return device
+            }
+        }
+        return nil
+    }
+
+    static func largestPhotoDimensions(in dimensions: [CMVideoDimensions]) -> CMVideoDimensions? {
+        dimensions.max { lhs, rhs in
+            Int64(lhs.width) * Int64(lhs.height) < Int64(rhs.width) * Int64(rhs.height)
+        }
+    }
+
     private func configureFocus(_ device: AVCaptureDevice) {
         guard (try? device.lockForConfiguration()) != nil else { return }
+        configurePointsOfInterest(device)
         if device.isFocusModeSupported(.continuousAutoFocus) {
             device.focusMode = .continuousAutoFocus
-        }
-        if device.isFocusPointOfInterestSupported {
-            device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
         }
         if device.isAutoFocusRangeRestrictionSupported {
             device.autoFocusRangeRestriction = .near
         }
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+        }
         device.unlockForConfiguration()
+    }
+
+    private func configurePointsOfInterest(_ device: AVCaptureDevice) {
+        if device.isFocusPointOfInterestSupported {
+            device.focusPointOfInterest = Self.capturePointOfInterest
+        }
+        if device.isExposurePointOfInterestSupported {
+            device.exposurePointOfInterest = Self.capturePointOfInterest
+        }
     }
 
     // MARK: - Photo Capture
@@ -131,23 +168,52 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     private func lockFocusThenCapture(handler: PhotoCaptureHandler) {
         guard !suppressCaptureForTesting else { return }
-        guard let device = captureDevice,
-              device.isFocusModeSupported(.autoFocus) else {
+        guard let device = captureDevice else {
             handler.issueCapture(to: photoOutput)
             return
         }
+        var shouldWaitForSettle = false
         do {
             try device.lockForConfiguration()
-            device.focusMode = .autoFocus
+            configurePointsOfInterest(device)
+            if device.isFocusModeSupported(.autoFocus) {
+                device.focusMode = .autoFocus
+                shouldWaitForSettle = true
+            }
+            if device.isExposureModeSupported(.autoExpose) {
+                device.exposureMode = .autoExpose
+                shouldWaitForSettle = true
+            }
             device.unlockForConfiguration()
         } catch {
             handler.issueCapture(to: photoOutput)
             return
         }
-        sessionQueue.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self else { return }
-            guard handler.generation == self.captureGeneration else { return }
-            handler.issueCapture(to: self.photoOutput)
+
+        guard shouldWaitForSettle else {
+            handler.issueCapture(to: photoOutput)
+            return
+        }
+
+        waitForFocusAndExposureToSettle(handler: handler, startedAt: Date())
+    }
+
+    private func waitForFocusAndExposureToSettle(handler: PhotoCaptureHandler, startedAt: Date) {
+        guard handler.generation == captureGeneration, _activeHandler === handler else { return }
+        guard let device = captureDevice else {
+            handler.issueCapture(to: photoOutput)
+            return
+        }
+
+        let didSettle = !device.isAdjustingFocus && !device.isAdjustingExposure
+        let didTimeOut = Date().timeIntervalSince(startedAt) >= Self.captureSettleTimeout
+        guard !didSettle, !didTimeOut else {
+            handler.issueCapture(to: photoOutput)
+            return
+        }
+
+        sessionQueue.asyncAfter(deadline: .now() + Self.captureSettlePollInterval) { [weak self] in
+            self?.waitForFocusAndExposureToSettle(handler: handler, startedAt: startedAt)
         }
     }
 
@@ -156,6 +222,9 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
               (try? device.lockForConfiguration()) != nil else { return }
         if device.isFocusModeSupported(.continuousAutoFocus) {
             device.focusMode = .continuousAutoFocus
+        }
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
         }
         device.unlockForConfiguration()
     }
@@ -231,6 +300,7 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
         }
     }
 }
+// swiftlint:enable type_body_length
 
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
 
@@ -279,6 +349,11 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
         let settings = AVCapturePhotoSettings()
         if maxPhotoDimensions.width > 0 {
             settings.maxPhotoDimensions = maxPhotoDimensions
+        }
+        let supportsQuality = output.maxPhotoQualityPrioritization.rawValue >=
+            AVCapturePhotoOutput.QualityPrioritization.quality.rawValue
+        if supportsQuality {
+            settings.photoQualityPrioritization = .quality
         }
         output.capturePhoto(with: settings, delegate: self)
     }

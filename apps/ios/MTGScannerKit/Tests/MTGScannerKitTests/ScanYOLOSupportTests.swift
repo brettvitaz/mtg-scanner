@@ -88,6 +88,29 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertEqual(result.observations[0].boundingBox, card.boundingBox)
     }
 
+    func testValidateKeepsThreeCardsWhenYOLOMissesPerspectiveDistortedPeer() {
+        let top = makeObservation(
+            box: CGRect(x: 0.210, y: 0.664, width: 0.132, height: 0.317),
+            confidence: 1.0
+        )
+        let left = makeObservation(
+            box: CGRect(x: 0.302, y: 0.211, width: 0.130, height: 0.214),
+            confidence: 1.0
+        )
+        let right = makeObservation(
+            box: CGRect(x: 0.477, y: 0.193, width: 0.158, height: 0.234),
+            confidence: 1.0
+        )
+
+        let result = ScanYOLOSupport.validate([right, left, top], with: [right.boundingBox, left.boundingBox])
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 3)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [right, left, top].map(\.boundingBox))
+    }
+
     func testRejectsRectangleWithoutAnySupportingYOLOBox() {
         let rectangle = CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30)
         let yoloBox = CGRect(x: 0.70, y: 0.70, width: 0.15, height: 0.20)

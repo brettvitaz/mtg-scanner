@@ -112,10 +112,10 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterAcceptsAtLowerToleranceBound() {
-        // Edge ratio at the lower bound of tolerance should be accepted.
+        // Use a value just inside the lower bound to avoid floating-point boundary fragility.
         let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)
         let height: CGFloat = 0.4
-        let width = height * lower
+        let width = height * (lower + 0.005)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
         let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
@@ -214,6 +214,34 @@ final class RectangleFilterTests: XCTestCase {
 
         let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
+    }
+
+    func testFilterAcceptsPerspectiveDistortedCardNearPortraitLowerBound() {
+        let obs = VNRectangleObservation()
+        obs.setValue(CGRect(x: 0.210, y: 0.664, width: 0.132, height: 0.317), forKey: "boundingBox")
+        obs.setValue(Float(1.0), forKey: "confidence")
+        obs.setValue(CGPoint(x: 0.210, y: 0.929), forKey: "topLeft")
+        obs.setValue(CGPoint(x: 0.324, y: 0.981), forKey: "topRight")
+        obs.setValue(CGPoint(x: 0.342, y: 0.730), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: 0.220, y: 0.664), forKey: "bottomLeft")
+
+        let result = filter.filter([obs], isLandscape: false)
+
+        XCTAssertEqual(result.count, 1)
+    }
+
+    func testFilterRejectsTallAggregateBoxUnderPortraitTolerance() {
+        let obs = VNRectangleObservation()
+        obs.setValue(CGRect(x: 0.475, y: 0.434, width: 0.163, height: 0.451), forKey: "boundingBox")
+        obs.setValue(Float(1.0), forKey: "confidence")
+        obs.setValue(CGPoint(x: 0.475, y: 0.838), forKey: "topLeft")
+        obs.setValue(CGPoint(x: 0.633, y: 0.885), forKey: "topRight")
+        obs.setValue(CGPoint(x: 0.638, y: 0.434), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: 0.480, y: 0.436), forKey: "bottomLeft")
+
+        let result = filter.filter([obs], isLandscape: false)
+
+        XCTAssertTrue(result.isEmpty)
     }
 
     // MARK: - Vision bounds

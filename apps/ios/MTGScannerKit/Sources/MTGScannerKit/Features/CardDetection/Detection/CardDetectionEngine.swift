@@ -362,7 +362,7 @@ enum ScanYOLOSupport {
     static let iouThreshold: CGFloat = 0.35
     static let coverageThreshold: CGFloat = 0.60
     static let looseCoverageAreaRatioThreshold: CGFloat = 1.8
-    static let peerDimensionSimilarityThreshold: CGFloat = 0.75
+    static let peerDimensionSimilarityThreshold: CGFloat = 0.65
     static let peerAreaSimilarityThreshold: CGFloat = 0.65
     static let peerIoUUpperBound: CGFloat = 0.20
 

@@ -18,7 +18,7 @@ struct RectangleFilter {
     /// Relative tolerance applied to the target ratio on each side.
     /// Accommodates slight perspective distortion and detection imprecision
     /// while rejecting square objects (coasters, books, etc.).
-    static let aspectRatioTolerance: CGFloat = 0.20
+    static let aspectRatioTolerance: CGFloat = 0.30
 
     /// The camera buffer is 1920×1080 (16:9) per CameraSessionManager's `.hd1920x1080` preset.
     /// In Vision normalized coordinates (0–1), 1 unit in x = 1920 pixels but 1 unit in y = only

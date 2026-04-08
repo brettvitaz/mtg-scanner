@@ -363,7 +363,7 @@ enum ScanYOLOSupport {
     static let coverageThreshold: CGFloat = 0.60
     static let looseCoverageAreaRatioThreshold: CGFloat = 1.8
     static let peerDimensionSimilarityThreshold: CGFloat = 0.65
-    static let peerAreaSimilarityThreshold: CGFloat = 0.65
+    static let peerAreaSimilarityThreshold: CGFloat = 0.55
     static let peerIoUUpperBound: CGFloat = 0.20
 
     static func validate(
@@ -411,24 +411,35 @@ enum ScanYOLOSupport {
         }
 
         let accepted: [VNRectangleObservation]
-        if shouldRecoverPeerRectangles(
-            observationCount: observations.count,
-            directAcceptanceCount: directlyAccepted.count,
-            yoloBoxCount: yoloBoxes.count
-        ) {
+        if directlyAccepted.count > 0 && directlyAccepted.count < observations.count {
             // Small cards near the edge of the frame can undercount in YOLO even when
             // Vision finds a consistent multi-card row. Preserve same-sized peer boxes
-            // once at least one rectangle has direct YOLO support.
+            // once the accepted rectangles form a coherent card cluster.
             let recovered = rejected.filter { rejectedObservation in
-                directlyAccepted.contains { acceptedObservation in
-                    isPeerCardCandidate(
+                let peerSupportCount = directlyAccepted.reduce(into: 0) { count, acceptedObservation in
+                    if isPeerCardCandidate(
                         rejectedObservation.boundingBox,
                         of: acceptedObservation.boundingBox
-                    )
+                    ) {
+                        count += 1
+                    }
                 }
+                return shouldRecoverRejectedPeer(
+                    peerSupportCount: peerSupportCount,
+                    directAcceptanceCount: directlyAccepted.count,
+                    observationCount: observations.count,
+                    yoloBoxCount: yoloBoxes.count
+                )
             }
             let acceptedIDs = Set((directlyAccepted + recovered).map(ObjectIdentifier.init))
             accepted = observations.filter { acceptedIDs.contains(ObjectIdentifier($0)) }
+        } else if directlyAccepted.isEmpty && shouldFallbackToObservations(observations) {
+            return ValidationResult(
+                observations: observations,
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: 0,
+                usedFallback: true
+            )
         } else {
             accepted = directlyAccepted
         }
@@ -473,14 +484,35 @@ enum ScanYOLOSupport {
             && largerToSmallerAreaRatio(between: rectangle, and: yoloBox) <= looseCoverageAreaRatioThreshold
     }
 
-    private static func shouldRecoverPeerRectangles(
-        observationCount: Int,
+    private static func shouldRecoverRejectedPeer(
+        peerSupportCount: Int,
         directAcceptanceCount: Int,
+        observationCount: Int,
         yoloBoxCount: Int
     ) -> Bool {
-        directAcceptanceCount > 0
-            && directAcceptanceCount < observationCount
-            && yoloBoxCount < observationCount
+        if directAcceptanceCount >= 2 {
+            return peerSupportCount >= 2
+        }
+
+        return peerSupportCount >= 1 && yoloBoxCount < observationCount
+    }
+
+    private static func shouldFallbackToObservations(
+        _ observations: [VNRectangleObservation]
+    ) -> Bool {
+        guard observations.count >= 2 else { return false }
+
+        let requiredPeerSupport = observations.count == 2 ? 1 : 2
+
+        return observations.allSatisfy { candidate in
+            let peerSupportCount = observations.reduce(into: 0) { count, peer in
+                guard candidate !== peer else { return }
+                if isPeerCardCandidate(candidate.boundingBox, of: peer.boundingBox) {
+                    count += 1
+                }
+            }
+            return peerSupportCount >= requiredPeerSupport
+        }
     }
 
     private static func isPeerCardCandidate(_ candidate: CGRect, of supported: CGRect) -> Bool {

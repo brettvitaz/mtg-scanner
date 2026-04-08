@@ -111,6 +111,59 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertEqual(result.observations.map(\.boundingBox), [right, left, top].map(\.boundingBox))
     }
 
+    func testValidateRecoversRejectedPeerWhenYOLOBoxesIncludeAggregateInsteadOfThirdCard() {
+        let lowerRight = makeObservation(
+            box: CGRect(x: 0.429, y: 0.185, width: 0.169, height: 0.241),
+            confidence: 1.0
+        )
+        let left = makeObservation(
+            box: CGRect(x: 0.237, y: 0.175, width: 0.138, height: 0.228),
+            confidence: 1.0
+        )
+        let upperRight = makeObservation(
+            box: CGRect(x: 0.435, y: 0.665, width: 0.137, height: 0.238),
+            confidence: 1.0
+        )
+        let aggregate = CGRect(x: 0.412, y: 0.429, width: 0.186, height: 0.503)
+
+        let result = ScanYOLOSupport.validate(
+            [lowerRight, left, upperRight],
+            with: [aggregate, lowerRight.boundingBox, left.boundingBox]
+        )
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 3)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [lowerRight, left, upperRight].map(\.boundingBox))
+    }
+
+    func testValidateRecoversLeftPeerWhenYOLOOnlyAcceptsTwoRightCards() {
+        let lowerRight = makeObservation(
+            box: CGRect(x: 0.357, y: 0.151, width: 0.221, height: 0.318),
+            confidence: 1.0
+        )
+        let upperRight = makeObservation(
+            box: CGRect(x: 0.345, y: 0.481, width: 0.231, height: 0.374),
+            confidence: 1.0
+        )
+        let left = makeObservation(
+            box: CGRect(x: 0.154, y: 0.163, width: 0.171, height: 0.289),
+            confidence: 1.0
+        )
+
+        let result = ScanYOLOSupport.validate(
+            [lowerRight, upperRight, left],
+            with: [lowerRight.boundingBox, upperRight.boundingBox]
+        )
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 3)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [lowerRight, upperRight, left].map(\.boundingBox))
+    }
+
     func testRejectsRectangleWithoutAnySupportingYOLOBox() {
         let rectangle = CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30)
         let yoloBox = CGRect(x: 0.70, y: 0.70, width: 0.15, height: 0.20)
@@ -130,6 +183,28 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertEqual(result.yoloAcceptedCount, 0)
         XCTAssertEqual(result.yoloRejectedCount, 1)
         XCTAssertTrue(result.observations.isEmpty)
+    }
+
+    func testValidateFallsBackWhenYOLOSupportsNoneOfCoherentTwoCardScene() {
+        let lower = makeObservation(
+            box: CGRect(x: 0.426, y: 0.201, width: 0.234, height: 0.341),
+            confidence: 1.0
+        )
+        let upper = makeObservation(
+            box: CGRect(x: 0.386, y: 0.530, width: 0.209, height: 0.355),
+            confidence: 1.0
+        )
+        let unrelatedBoxes = [
+            CGRect(x: 0.05, y: 0.05, width: 0.10, height: 0.10)
+        ]
+
+        let result = ScanYOLOSupport.validate([lower, upper], with: unrelatedBoxes)
+
+        XCTAssertTrue(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 0)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 2)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [lower, upper].map(\.boundingBox))
     }
 
     func testValidateFallsBackWhenYOLOIsUnavailable() {

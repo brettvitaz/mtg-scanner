@@ -302,7 +302,7 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result[0].boundingBox, inner.boundingBox)
     }
 
-    func testFilterReplacesMultipleContainedInnerBoxesWithSingleOuterBox() {
+    func testFilterDoesNotReplaceMultipleContainedInnerBoxesWithSingleOuterBox() {
         let ratio = RectangleFilter.targetAspectRatio
         let outerHeight: CGFloat = 0.50
         let outerWidth = outerHeight * ratio
@@ -324,8 +324,9 @@ final class RectangleFilterTests: XCTestCase {
 
         let result = filter.filter([leftInner, rightInner, outer], isLandscape: false)
 
-        XCTAssertEqual(result.count, 1)
-        XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].boundingBox, leftInner.boundingBox)
+        XCTAssertEqual(result[1].boundingBox, rightInner.boundingBox)
     }
 
     func testFilterKeepsPartiallyOverlappingBoxesBelowContainmentThreshold() {

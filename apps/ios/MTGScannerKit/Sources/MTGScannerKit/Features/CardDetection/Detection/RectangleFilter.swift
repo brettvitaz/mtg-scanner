@@ -178,12 +178,19 @@ struct RectangleFilter {
                     Self.containmentThreshold
             }
 
-            if !replacedIndices.isEmpty {
+            if replacedIndices.count == 1 {
                 for index in replacedIndices.reversed() {
                     kept.remove(at: index)
                 }
                 kept.append(observation)
                 suppressionCount += replacedIndices.count
+                continue
+            }
+
+            if replacedIndices.count > 1 {
+                // A single enclosing box spanning multiple accepted rectangles is an aggregate
+                // detection, not a better replacement for any one card.
+                suppressionCount += 1
                 continue
             }
 

@@ -31,6 +31,7 @@ final class CardDetectionEngine: @unchecked Sendable {
     var onDetection: (([DetectedCard]) -> Void)?
 
     private let visionQueue = DispatchQueue(label: "com.mtgscanner.vision", qos: .userInitiated)
+    private let yoloQueue = DispatchQueue(label: "com.mtgscanner.yolo", qos: .userInitiated)
     /// Guarded by visionQueue — never read/written from other queues.
     private var isProcessing = false
     /// Guarded by visionQueue — stabilizes detections with EMA smoothing + hysteresis.
@@ -46,11 +47,17 @@ final class CardDetectionEngine: @unchecked Sendable {
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         let mode = detectionMode
         let landscape = isLandscape
+        let sendablePixelBuffer = SendablePixelBuffer(buffer: pixelBuffer)
 
         visionQueue.async { [weak self] in
             guard let self, !self.isProcessing else { return }
             self.isProcessing = true
-            let raw = self.detect(in: pixelBuffer, timestamp: timestamp, mode: mode, isLandscape: landscape)
+            let raw = self.detect(
+                in: sendablePixelBuffer.buffer,
+                timestamp: timestamp,
+                mode: mode,
+                isLandscape: landscape
+            )
             let cards = self.tracker.update(detections: raw)
             self.isProcessing = false
             DispatchQueue.main.async {
@@ -166,7 +173,7 @@ final class CardDetectionEngine: @unchecked Sendable {
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval
     ) -> [DetectedCard] {
-        guard let boxes = yoloDetector?.detect(in: pixelBuffer) else { return [] }
+        guard let boxes = runYOLODetection(in: pixelBuffer) else { return [] }
         return boxes.map { box in
             // Flip Y: Vision uses bottom-left origin; YOLO uses top-left origin.
             let visionBox = CGRect(
@@ -237,29 +244,39 @@ final class CardDetectionEngine: @unchecked Sendable {
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval
     ) -> [CGRect]? {
-        scanYOLOValidationState.frameCounter += 1
-
-        let cacheIsFresh: Bool
-        if let lastTimestamp = scanYOLOValidationState.lastTimestamp {
-            cacheIsFresh = (timestamp - lastTimestamp) <= ScanYOLOValidationState.cacheTTL
-        } else {
-            cacheIsFresh = false
+        let decision = scanYOLOValidationState.boxesForFrame(timestamp: timestamp)
+        if decision.shouldStartRefresh {
+            refreshScanYOLOBoxes(pixelBuffer: pixelBuffer, timestamp: timestamp)
         }
+        return decision.cachedBoxes
+    }
 
-        let shouldRefresh = !scanYOLOValidationState.hasCachedBoxes
-            || !cacheIsFresh
-            || scanYOLOValidationState.frameCounter % ScanYOLOValidationState.validationStride == 0
-
-        if !shouldRefresh {
-            return scanYOLOValidationState.boxes
-        }
-
+    private func runYOLODetection(in pixelBuffer: CVPixelBuffer) -> [CardBoundingBox]? {
         guard let detector = yoloDetector else { return nil }
-        let boxes = detector.detect(in: pixelBuffer).map { ScanYOLOSupport.visionBox(from: $0.rect) }
-        scanYOLOValidationState.boxes = boxes
-        scanYOLOValidationState.lastTimestamp = timestamp
-        scanYOLOValidationState.hasCachedBoxes = true
-        return boxes
+        return yoloQueue.sync {
+            detector.detect(in: pixelBuffer)
+        }
+    }
+
+    private func refreshScanYOLOBoxes(
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval
+    ) {
+        guard let detector = yoloDetector else {
+            scanYOLOValidationState.finishRefreshWithoutResult()
+            return
+        }
+
+        let sendableDetector = SendableYOLODetector(detector: detector)
+        let sendablePixelBuffer = SendablePixelBuffer(buffer: pixelBuffer)
+        yoloQueue.async { [weak self] in
+            let boxes = sendableDetector.detector.detect(in: sendablePixelBuffer.buffer)
+                .map { ScanYOLOSupport.visionBox(from: $0.rect) }
+            self?.visionQueue.async { [weak self] in
+                guard let self else { return }
+                self.scanYOLOValidationState.storeRefresh(boxes: boxes, timestamp: timestamp)
+            }
+        }
     }
 }
 
@@ -279,7 +296,7 @@ private extension DetectedCard {
     }
 }
 
-private extension CardDetectionEngine {
+extension CardDetectionEngine {
     struct ScanYOLOValidationState {
         static let validationStride = 3
         static let cacheTTL: TimeInterval = 0.25
@@ -288,6 +305,48 @@ private extension CardDetectionEngine {
         var lastTimestamp: TimeInterval?
         var frameCounter = 0
         var hasCachedBoxes = false
+        var refreshInFlight = false
+
+        mutating func boxesForFrame(timestamp: TimeInterval) -> ScanYOLORefreshDecision {
+            frameCounter += 1
+
+            let cacheIsFresh: Bool
+            if let lastTimestamp {
+                cacheIsFresh = (timestamp - lastTimestamp) <= Self.cacheTTL
+            } else {
+                cacheIsFresh = false
+            }
+
+            let shouldRefresh = !hasCachedBoxes
+                || !cacheIsFresh
+                || frameCounter % Self.validationStride == 0
+            let shouldStartRefresh = shouldRefresh && !refreshInFlight
+
+            if shouldStartRefresh {
+                refreshInFlight = true
+            }
+
+            return ScanYOLORefreshDecision(
+                cachedBoxes: hasCachedBoxes ? boxes : nil,
+                shouldStartRefresh: shouldStartRefresh
+            )
+        }
+
+        mutating func storeRefresh(boxes: [CGRect], timestamp: TimeInterval) {
+            self.boxes = boxes
+            lastTimestamp = timestamp
+            hasCachedBoxes = true
+            refreshInFlight = false
+        }
+
+        mutating func finishRefreshWithoutResult() {
+            refreshInFlight = false
+        }
+    }
+
+    struct ScanYOLORefreshDecision {
+        let cachedBoxes: [CGRect]?
+        let shouldStartRefresh: Bool
     }
 
     struct ScanYOLOValidationResult {
@@ -381,4 +440,12 @@ enum ScanYOLOSupport {
         let yoloRejectedCount: Int
         let usedFallback: Bool
     }
+}
+
+private struct SendablePixelBuffer: @unchecked Sendable {
+    let buffer: CVPixelBuffer
+}
+
+private struct SendableYOLODetector: @unchecked Sendable {
+    let detector: YOLOCardDetector
 }

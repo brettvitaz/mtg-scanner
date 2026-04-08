@@ -1,3 +1,4 @@
+import CoreMedia
 import XCTest
 @testable import MTGScannerKit
 
@@ -26,6 +27,34 @@ final class CameraSessionManagerTests: XCTestCase {
             manager.suppressCaptureForTesting = true
         }
         return manager
+    }
+
+    // MARK: - Camera/photo configuration helpers
+
+    func testPreferredBackCameraTypesPreferVirtualCloseRangeCapableDevices() {
+        XCTAssertEqual(
+            CameraSessionManager.preferredBackCameraTypes,
+            [
+                .builtInTripleCamera,
+                .builtInDualWideCamera,
+                .builtInDualCamera,
+                .builtInWideAngleCamera
+            ]
+        )
+    }
+
+    func testLargestPhotoDimensionsUsesPixelAreaInsteadOfArrayOrder() {
+        let dimensions = [
+            CMVideoDimensions(width: 4032, height: 2268),
+            CMVideoDimensions(width: 3840, height: 2160),
+            CMVideoDimensions(width: 4032, height: 3024),
+            CMVideoDimensions(width: 1920, height: 1080)
+        ]
+
+        let largest = CameraSessionManager.largestPhotoDimensions(in: dimensions)
+
+        XCTAssertEqual(largest?.width, 4032)
+        XCTAssertEqual(largest?.height, 3024)
     }
 
     // MARK: - Session not ready
@@ -121,6 +150,7 @@ final class CameraSessionManagerTests: XCTestCase {
 
     // MARK: - Stale handler cannot clear active capture state
 
+    // swiftlint:disable:next function_body_length
     func testCancelledHandlerOnDoneDoesNotClearNewerCapture() {
         // Simulate: capture A started, stop() cancels it (increments generation),
         // capture B starts. Then A's onDone fires (as would happen if a stale
@@ -149,24 +179,33 @@ final class CameraSessionManagerTests: XCTestCase {
         manager.sessionQueue.sync {}
         var handlerB: AnyObject?
         nonisolated(unsafe) var staleHandlerDidNotClearActiveCapture = false
-        nonisolated(unsafe) var captureBStillInFlightAfterStaleCompletion = false
+        nonisolated(unsafe) var captureBStillInFlight = false
         manager.sessionQueue.sync {
             handlerB = manager.activeHandlerForTesting()
             manager.finishCaptureForTesting(handler: handlerA)
             staleHandlerDidNotClearActiveCapture = (manager.activeHandlerForTesting() === handlerB)
-            captureBStillInFlightAfterStaleCompletion = manager.isCaptureInFlightForTesting()
+            captureBStillInFlight = manager.isCaptureInFlightForTesting()
         }
 
         XCTAssertNotNil(handlerB, "Capture B must be in-flight")
         XCTAssertFalse(handlerA === handlerB, "Handler A and B must be distinct objects")
-        XCTAssertTrue(staleHandlerDidNotClearActiveCapture, "Stale handler completion must not clear the newer active handler")
-        XCTAssertTrue(captureBStillInFlightAfterStaleCompletion, "Stale handler completion must not clear in-flight state for capture B")
+        XCTAssertTrue(
+            staleHandlerDidNotClearActiveCapture,
+            "Stale handler completion must not clear the newer active handler"
+        )
+        XCTAssertTrue(
+            captureBStillInFlight,
+            "Stale handler completion must not clear in-flight state for capture B"
+        )
 
         // Explicitly cancel B and verify its completion still resolves normally.
         manager.stop()
         manager.sessionQueue.sync { manager.isSessionReady = true }
         wait(for: [exp2], timeout: 1.0)
-        XCTAssertTrue(captureBReceivedNil, "stop() must still resolve the current capture after a stale completion attempt")
+        XCTAssertTrue(
+            captureBReceivedNil,
+            "stop() must still resolve the current capture after a stale completion attempt"
+        )
 
         // After cancelling B, a third capture should be accepted.
         let exp3 = expectation(description: "third capture drained by stop")

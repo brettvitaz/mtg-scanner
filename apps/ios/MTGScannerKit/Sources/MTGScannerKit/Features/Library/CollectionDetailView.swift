@@ -124,6 +124,11 @@ struct CollectionDetailView: View {
                     onDelete: { contextDeleteItem = item }
                 )
             }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) { deleteItem(item) } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
         }
     }
 

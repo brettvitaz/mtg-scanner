@@ -135,6 +135,14 @@ struct ResultsView: View {
                     onToggleFoil: { toggleFoil(item) }
                 )
             }
+            .simultaneousGesture(TapGesture(count: 2).onEnded { toggleFoil(item) })
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    deleteItem(item)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
         }
     }
 
@@ -370,20 +378,6 @@ private extension ResultsView {
             }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
-    }
-}
-
-private struct PriceFetchRequest {
-    let id: UUID
-    let name: String
-    let scryfallId: String?
-    let isFoil: Bool
-
-    init(item: CollectionItem) {
-        self.id = item.id
-        self.name = item.title
-        self.scryfallId = item.scryfallId
-        self.isFoil = item.foil
     }
 }
 

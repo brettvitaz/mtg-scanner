@@ -71,41 +71,41 @@ struct CardDetailView: View {
                 Text(manaCost).font(.subheadline.monospaced()).foregroundStyle(.secondary)
                     .accessibilityLabel("Mana cost \(manaCost)")
             }
+            if let typeLine = viewModel.displayTypeLine {
+                Text(typeLine).font(.subheadline.italic()).foregroundStyle(.secondary)
+            }
             editionButton
+            if !viewModel.displayCollectorNumber.isEmpty {
+                Text("#\(viewModel.displayCollectorNumber)").font(.subheadline).foregroundStyle(.secondary)
+            }
             Toggle("Foil", isOn: $viewModel.editFoil).font(.subheadline)
-            collectorRarityRow
         }
         .accessibilityElement(children: .contain)
     }
 
     private var editionButton: some View {
         Button { showEditionPicker = true } label: {
-            HStack(spacing: 6) {
-                if let symbolUrl = viewModel.displaySetSymbolUrl {
-                    CachedAsyncImage(url: symbolUrl) { phase in
-                        if case .success(let img) = phase { img.resizable().aspectRatio(contentMode: .fit) }
+            HStack(spacing: 24) {
+                HStack(spacing: 6) {
+                    if let symbolUrl = viewModel.displaySetSymbolUrl {
+                        CachedAsyncImage(url: symbolUrl) { phase in
+                            if case .success(let img) = phase { img.resizable().aspectRatio(contentMode: .fit) }
+                        }
+                        .frame(width: 16, height: 16)
                     }
-                    .frame(width: 16, height: 16)
+                    Text(viewModel.displayEdition).font(.subheadline)
+                    Image(systemName: "chevron.down").font(.caption2)
                 }
-                Text(viewModel.displayEdition).font(.subheadline)
-                Image(systemName: "chevron.down").font(.caption2)
+                .foregroundStyle(.primary)
+                Spacer()
+                if let rarity = viewModel.displayRarity {
+                    RarityBadge(rarity: rarity)
+                }
             }
-            .foregroundStyle(.primary)
         }
         .accessibilityLabel("Edition")
         .accessibilityValue(viewModel.displayEdition)
         .accessibilityHint("Choose a different printing.")
-    }
-
-    private var collectorRarityRow: some View {
-        HStack(spacing: 8) {
-            if !viewModel.displayCollectorNumber.isEmpty {
-                Text("#\(viewModel.displayCollectorNumber)").font(.subheadline).foregroundStyle(.secondary)
-            }
-            if let rarity = viewModel.displayRarity {
-                RarityBadge(rarity: rarity)
-            }
-        }
     }
 
     // MARK: - Details
@@ -113,9 +113,6 @@ struct CardDetailView: View {
     @ViewBuilder
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let typeLine = viewModel.displayTypeLine {
-                Text(typeLine).font(.subheadline.italic()).foregroundStyle(.secondary)
-            }
             if let oracleText = viewModel.displayOracleText {
                 Text(oracleText).font(.body).padding(.top, 2)
             }

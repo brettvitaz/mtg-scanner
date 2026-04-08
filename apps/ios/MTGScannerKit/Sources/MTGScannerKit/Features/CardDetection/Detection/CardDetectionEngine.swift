@@ -362,9 +362,6 @@ enum ScanYOLOSupport {
     static let iouThreshold: CGFloat = 0.35
     static let coverageThreshold: CGFloat = 0.60
     static let looseCoverageAreaRatioThreshold: CGFloat = 1.8
-    static let peerDimensionSimilarityThreshold: CGFloat = 0.65
-    static let peerAreaSimilarityThreshold: CGFloat = 0.55
-    static let peerIoUUpperBound: CGFloat = 0.20
 
     static func validate(
         _ observations: [VNRectangleObservation],
@@ -390,64 +387,25 @@ enum ScanYOLOSupport {
 
         guard !yoloBoxes.isEmpty else {
             return ValidationResult(
-                observations: [],
-                yoloAcceptedCount: 0,
-                yoloRejectedCount: observations.count,
-                usedFallback: false
-            )
-        }
-
-        var directlyAccepted: [VNRectangleObservation] = []
-        var rejected: [VNRectangleObservation] = []
-        directlyAccepted.reserveCapacity(observations.count)
-        rejected.reserveCapacity(observations.count)
-
-        for observation in observations {
-            if supports(rectangle: observation.boundingBox, with: yoloBoxes) {
-                directlyAccepted.append(observation)
-            } else {
-                rejected.append(observation)
-            }
-        }
-
-        let accepted: [VNRectangleObservation]
-        if directlyAccepted.count > 0 && directlyAccepted.count < observations.count {
-            // Small cards near the edge of the frame can undercount in YOLO even when
-            // Vision finds a consistent multi-card row. Preserve same-sized peer boxes
-            // once the accepted rectangles form a coherent card cluster.
-            let recovered = rejected.filter { rejectedObservation in
-                let peerSupportCount = directlyAccepted.reduce(into: 0) { count, acceptedObservation in
-                    if isPeerCardCandidate(
-                        rejectedObservation.boundingBox,
-                        of: acceptedObservation.boundingBox
-                    ) {
-                        count += 1
-                    }
-                }
-                return shouldRecoverRejectedPeer(
-                    peerSupportCount: peerSupportCount,
-                    directAcceptanceCount: directlyAccepted.count,
-                    observationCount: observations.count,
-                    yoloBoxCount: yoloBoxes.count
-                )
-            }
-            let acceptedIDs = Set((directlyAccepted + recovered).map(ObjectIdentifier.init))
-            accepted = observations.filter { acceptedIDs.contains(ObjectIdentifier($0)) }
-        } else if directlyAccepted.isEmpty && shouldFallbackToObservations(observations) {
-            return ValidationResult(
                 observations: observations,
                 yoloAcceptedCount: 0,
                 yoloRejectedCount: 0,
                 usedFallback: true
             )
-        } else {
-            accepted = directlyAccepted
         }
+
+        let supportScores = observations.map { bestSupportScore(for: $0.boundingBox, in: yoloBoxes) }
+        let directlyAcceptedCount = supportScores.filter { $0 >= coverageThreshold }.count
+        let rejectedIDs = nestedRejectionIDs(
+            observations: observations,
+            supportScores: supportScores
+        )
+        let accepted = observations.filter { !rejectedIDs.contains(ObjectIdentifier($0)) }
 
         return ValidationResult(
             observations: accepted,
-            yoloAcceptedCount: accepted.count,
-            yoloRejectedCount: observations.count - accepted.count,
+            yoloAcceptedCount: directlyAcceptedCount,
+            yoloRejectedCount: rejectedIDs.count,
             usedFallback: false
         )
     }
@@ -473,61 +431,55 @@ enum ScanYOLOSupport {
         return RectangleFilter.area(of: intersection) / rectArea
     }
 
-    private static func supports(rectangle: CGRect, with yoloBox: CGRect) -> Bool {
-        if RectangleFilter.iou(rectangle, yoloBox) >= iouThreshold {
-            return true
+    private static func bestSupportScore(for rectangle: CGRect, in yoloBoxes: [CGRect]) -> CGFloat {
+        yoloBoxes.reduce(0) { bestScore, yoloBox in
+            max(bestScore, supportScore(rectangle: rectangle, with: yoloBox))
         }
-        if coverage(of: yoloBox, by: rectangle) >= coverageThreshold {
-            return true
-        }
-        return coverage(of: rectangle, by: yoloBox) >= coverageThreshold
+    }
+
+    private static func supportScore(rectangle: CGRect, with yoloBox: CGRect) -> CGFloat {
+        let iou = RectangleFilter.iou(rectangle, yoloBox)
+        let yoloCoveredByRectangle = coverage(of: yoloBox, by: rectangle)
+        let rectangleCoveredByYOLO = coverage(of: rectangle, by: yoloBox)
+        let looseCoverage = rectangleCoveredByYOLO >= coverageThreshold
             && largerToSmallerAreaRatio(between: rectangle, and: yoloBox) <= looseCoverageAreaRatioThreshold
+        return max(iou, yoloCoveredByRectangle, looseCoverage ? rectangleCoveredByYOLO : 0)
     }
 
-    private static func shouldRecoverRejectedPeer(
-        peerSupportCount: Int,
-        directAcceptanceCount: Int,
-        observationCount: Int,
-        yoloBoxCount: Int
-    ) -> Bool {
-        if directAcceptanceCount >= 2 {
-            return peerSupportCount >= 2
-        }
-
-        return peerSupportCount >= 1 && yoloBoxCount < observationCount
+    private static func supports(rectangle: CGRect, with yoloBox: CGRect) -> Bool {
+        supportScore(rectangle: rectangle, with: yoloBox) >= coverageThreshold
     }
 
-    private static func shouldFallbackToObservations(
-        _ observations: [VNRectangleObservation]
-    ) -> Bool {
-        guard observations.count >= 2 else { return false }
+    private static func nestedRejectionIDs(
+        observations: [VNRectangleObservation],
+        supportScores: [CGFloat]
+    ) -> Set<ObjectIdentifier> {
+        var rejectedIDs: Set<ObjectIdentifier> = []
 
-        let requiredPeerSupport = observations.count == 2 ? 1 : 2
+        for (candidateIndex, candidate) in observations.enumerated() {
+            let candidateBox = candidate.boundingBox
+            let candidateArea = RectangleFilter.area(of: candidateBox)
+            guard candidateArea > 0 else { continue }
 
-        return observations.allSatisfy { candidate in
-            let peerSupportCount = observations.reduce(into: 0) { count, peer in
-                guard candidate !== peer else { return }
-                if isPeerCardCandidate(candidate.boundingBox, of: peer.boundingBox) {
-                    count += 1
+            let shouldReject = observations.enumerated().contains { index, supported in
+                guard index != candidateIndex else { return false }
+
+                let supportedBox = supported.boundingBox
+                let supportedArea = RectangleFilter.area(of: supportedBox)
+                guard supportedArea / candidateArea >= RectangleFilter.containmentAreaRatioThreshold else {
+                    return false
                 }
+                guard supportScores[index] >= coverageThreshold else { return false }
+                return RectangleFilter.containmentRatio(of: candidateBox, in: supportedBox) >=
+                    RectangleFilter.containmentThreshold
             }
-            return peerSupportCount >= requiredPeerSupport
+
+            if shouldReject {
+                rejectedIDs.insert(ObjectIdentifier(candidate))
+            }
         }
-    }
 
-    private static func isPeerCardCandidate(_ candidate: CGRect, of supported: CGRect) -> Bool {
-        similarityRatio(candidate.width, supported.width) >= peerDimensionSimilarityThreshold
-            && similarityRatio(candidate.height, supported.height) >= peerDimensionSimilarityThreshold
-            && similarityRatio(
-                RectangleFilter.area(of: candidate),
-                RectangleFilter.area(of: supported)
-            ) >= peerAreaSimilarityThreshold
-            && RectangleFilter.iou(candidate, supported) < peerIoUUpperBound
-    }
-
-    private static func similarityRatio(_ a: CGFloat, _ b: CGFloat) -> CGFloat {
-        guard a > 0, b > 0 else { return 0 }
-        return min(a, b) / max(a, b)
+        return rejectedIDs
     }
 
     private static func largerToSmallerAreaRatio(between a: CGRect, and b: CGRect) -> CGFloat {

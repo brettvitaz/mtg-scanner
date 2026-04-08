@@ -63,7 +63,7 @@ final class ScanYOLOSupportTests: XCTestCase {
         let result = ScanYOLOSupport.validate([left, middle, right], with: [yoloBox])
 
         XCTAssertFalse(result.usedFallback)
-        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloAcceptedCount, 1)
         XCTAssertEqual(result.yoloRejectedCount, 0)
         XCTAssertEqual(result.observations.count, 3)
         XCTAssertEqual(result.observations.map(\.boundingBox), [left, middle, right].map(\.boundingBox))
@@ -105,7 +105,7 @@ final class ScanYOLOSupportTests: XCTestCase {
         let result = ScanYOLOSupport.validate([right, left, top], with: [right.boundingBox, left.boundingBox])
 
         XCTAssertFalse(result.usedFallback)
-        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloAcceptedCount, 2)
         XCTAssertEqual(result.yoloRejectedCount, 0)
         XCTAssertEqual(result.observations.count, 3)
         XCTAssertEqual(result.observations.map(\.boundingBox), [right, left, top].map(\.boundingBox))
@@ -132,7 +132,7 @@ final class ScanYOLOSupportTests: XCTestCase {
         )
 
         XCTAssertFalse(result.usedFallback)
-        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloAcceptedCount, 2)
         XCTAssertEqual(result.yoloRejectedCount, 0)
         XCTAssertEqual(result.observations.count, 3)
         XCTAssertEqual(result.observations.map(\.boundingBox), [lowerRight, left, upperRight].map(\.boundingBox))
@@ -158,7 +158,7 @@ final class ScanYOLOSupportTests: XCTestCase {
         )
 
         XCTAssertFalse(result.usedFallback)
-        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloAcceptedCount, 2)
         XCTAssertEqual(result.yoloRejectedCount, 0)
         XCTAssertEqual(result.observations.count, 3)
         XCTAssertEqual(result.observations.map(\.boundingBox), [lowerRight, upperRight, left].map(\.boundingBox))
@@ -179,10 +179,11 @@ final class ScanYOLOSupportTests: XCTestCase {
 
         let result = ScanYOLOSupport.validate([observation], with: [])
 
-        XCTAssertFalse(result.usedFallback)
+        XCTAssertTrue(result.usedFallback)
         XCTAssertEqual(result.yoloAcceptedCount, 0)
-        XCTAssertEqual(result.yoloRejectedCount, 1)
-        XCTAssertTrue(result.observations.isEmpty)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 1)
+        XCTAssertEqual(result.observations[0].boundingBox, observation.boundingBox)
     }
 
     func testValidateFallsBackWhenYOLOSupportsNoneOfCoherentTwoCardScene() {
@@ -200,7 +201,7 @@ final class ScanYOLOSupportTests: XCTestCase {
 
         let result = ScanYOLOSupport.validate([lower, upper], with: unrelatedBoxes)
 
-        XCTAssertTrue(result.usedFallback)
+        XCTAssertFalse(result.usedFallback)
         XCTAssertEqual(result.yoloAcceptedCount, 0)
         XCTAssertEqual(result.yoloRejectedCount, 0)
         XCTAssertEqual(result.observations.count, 2)
@@ -220,6 +221,25 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertEqual(result.yoloRejectedCount, 0)
         XCTAssertEqual(result.observations.count, 1)
         XCTAssertEqual(result.observations[0].boundingBox, observation.boundingBox)
+    }
+
+    func testValidateRejectsNestedFeatureWhenOuterRectangleHasYOLOSupport() {
+        let outer = makeObservation(
+            box: CGRect(x: 0.35, y: 0.20, width: 0.24, height: 0.34),
+            confidence: 1.0
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.40, y: 0.28, width: 0.08, height: 0.12),
+            confidence: 1.0
+        )
+
+        let result = ScanYOLOSupport.validate([outer, inner], with: [outer.boundingBox])
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 1)
+        XCTAssertEqual(result.yoloRejectedCount, 1)
+        XCTAssertEqual(result.observations.count, 1)
+        XCTAssertEqual(result.observations[0].boundingBox, outer.boundingBox)
     }
 
     private func makeObservation(box: CGRect, confidence: Float) -> VNRectangleObservation {

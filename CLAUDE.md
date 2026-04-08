@@ -69,7 +69,7 @@ All code changes MUST pass a code review before the work is considered done. Aft
 2. **Correctness** — implementation matches the spec, edge cases handled.
 3. **Tests** — new/changed code has tests that exercise real code paths and would fail if the implementation were broken.
 4. **Best practices** — no force unwraps (Swift), no unhandled exceptions (Python), no scope creep, no dead code.
-5. **Static analysis** — `make lint` passes. For Python-only changes run `make api-lint`; for Swift-only changes run `make ios-lint`.
+5. **Static analysis** — `make lint` passes. For Python-only changes run `make api-lint`; for Swift-only changes run `make ios-lint`. Lint fixes must be structural, not cosmetic. Fix the underlying design issue the rule is detecting, not just the surface violation. Never suppress or work around a lint rule without explicit approval.
 
 Fix any failures before committing.
 

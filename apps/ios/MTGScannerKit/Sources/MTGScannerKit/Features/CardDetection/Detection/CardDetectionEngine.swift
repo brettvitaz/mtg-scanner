@@ -361,6 +361,10 @@ extension CardDetectionEngine {
 enum ScanYOLOSupport {
     static let iouThreshold: CGFloat = 0.35
     static let coverageThreshold: CGFloat = 0.60
+    static let looseCoverageAreaRatioThreshold: CGFloat = 1.8
+    static let peerDimensionSimilarityThreshold: CGFloat = 0.75
+    static let peerAreaSimilarityThreshold: CGFloat = 0.65
+    static let peerIoUUpperBound: CGFloat = 0.20
 
     static func validate(
         _ observations: [VNRectangleObservation],
@@ -393,13 +397,40 @@ enum ScanYOLOSupport {
             )
         }
 
-        var accepted: [VNRectangleObservation] = []
-        accepted.reserveCapacity(observations.count)
+        var directlyAccepted: [VNRectangleObservation] = []
+        var rejected: [VNRectangleObservation] = []
+        directlyAccepted.reserveCapacity(observations.count)
+        rejected.reserveCapacity(observations.count)
 
         for observation in observations {
             if supports(rectangle: observation.boundingBox, with: yoloBoxes) {
-                accepted.append(observation)
+                directlyAccepted.append(observation)
+            } else {
+                rejected.append(observation)
             }
+        }
+
+        let accepted: [VNRectangleObservation]
+        if shouldRecoverPeerRectangles(
+            observationCount: observations.count,
+            directAcceptanceCount: directlyAccepted.count,
+            yoloBoxCount: yoloBoxes.count
+        ) {
+            // Small cards near the edge of the frame can undercount in YOLO even when
+            // Vision finds a consistent multi-card row. Preserve same-sized peer boxes
+            // once at least one rectangle has direct YOLO support.
+            let recovered = rejected.filter { rejectedObservation in
+                directlyAccepted.contains { acceptedObservation in
+                    isPeerCardCandidate(
+                        rejectedObservation.boundingBox,
+                        of: acceptedObservation.boundingBox
+                    )
+                }
+            }
+            let acceptedIDs = Set((directlyAccepted + recovered).map(ObjectIdentifier.init))
+            accepted = observations.filter { acceptedIDs.contains(ObjectIdentifier($0)) }
+        } else {
+            accepted = directlyAccepted
         }
 
         return ValidationResult(
@@ -411,10 +442,7 @@ enum ScanYOLOSupport {
     }
 
     static func supports(rectangle: CGRect, with yoloBoxes: [CGRect]) -> Bool {
-        yoloBoxes.contains { yoloBox in
-            RectangleFilter.iou(rectangle, yoloBox) >= iouThreshold
-                || coverage(of: yoloBox, by: rectangle) >= coverageThreshold
-        }
+        yoloBoxes.contains { supports(rectangle: rectangle, with: $0) }
     }
 
     static func visionBox(from yoloBox: CGRect) -> CGRect {
@@ -432,6 +460,49 @@ enum ScanYOLOSupport {
         let rectArea = RectangleFilter.area(of: rect)
         guard rectArea > 0 else { return 0 }
         return RectangleFilter.area(of: intersection) / rectArea
+    }
+
+    private static func supports(rectangle: CGRect, with yoloBox: CGRect) -> Bool {
+        if RectangleFilter.iou(rectangle, yoloBox) >= iouThreshold {
+            return true
+        }
+        if coverage(of: yoloBox, by: rectangle) >= coverageThreshold {
+            return true
+        }
+        return coverage(of: rectangle, by: yoloBox) >= coverageThreshold
+            && largerToSmallerAreaRatio(between: rectangle, and: yoloBox) <= looseCoverageAreaRatioThreshold
+    }
+
+    private static func shouldRecoverPeerRectangles(
+        observationCount: Int,
+        directAcceptanceCount: Int,
+        yoloBoxCount: Int
+    ) -> Bool {
+        directAcceptanceCount > 0
+            && directAcceptanceCount < observationCount
+            && yoloBoxCount < observationCount
+    }
+
+    private static func isPeerCardCandidate(_ candidate: CGRect, of supported: CGRect) -> Bool {
+        similarityRatio(candidate.width, supported.width) >= peerDimensionSimilarityThreshold
+            && similarityRatio(candidate.height, supported.height) >= peerDimensionSimilarityThreshold
+            && similarityRatio(
+                RectangleFilter.area(of: candidate),
+                RectangleFilter.area(of: supported)
+            ) >= peerAreaSimilarityThreshold
+            && RectangleFilter.iou(candidate, supported) < peerIoUUpperBound
+    }
+
+    private static func similarityRatio(_ a: CGFloat, _ b: CGFloat) -> CGFloat {
+        guard a > 0, b > 0 else { return 0 }
+        return min(a, b) / max(a, b)
+    }
+
+    private static func largerToSmallerAreaRatio(between a: CGRect, and b: CGRect) -> CGFloat {
+        let aArea = RectangleFilter.area(of: a)
+        let bArea = RectangleFilter.area(of: b)
+        guard aArea > 0, bArea > 0 else { return .infinity }
+        return max(aArea, bArea) / min(aArea, bArea)
     }
 
     struct ValidationResult {

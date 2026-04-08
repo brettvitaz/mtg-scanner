@@ -45,6 +45,49 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertFalse(ScanYOLOSupport.supports(rectangle: featureRectangle, with: [yoloCardBox]))
     }
 
+    func testValidateKeepsPeerRectanglesWhenYOLOOnlyFindsOneCardInMultiCardScene() {
+        let left = makeObservation(
+            box: CGRect(x: 0.412, y: 0.038, width: 0.163, height: 0.263),
+            confidence: 1.0
+        )
+        let middle = makeObservation(
+            box: CGRect(x: 0.399, y: 0.310, width: 0.155, height: 0.276),
+            confidence: 1.0
+        )
+        let right = makeObservation(
+            box: CGRect(x: 0.389, y: 0.565, width: 0.141, height: 0.266),
+            confidence: 1.0
+        )
+        let yoloBox = middle.boundingBox
+
+        let result = ScanYOLOSupport.validate([left, middle, right], with: [yoloBox])
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 3)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.count, 3)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [left, middle, right].map(\.boundingBox))
+    }
+
+    func testValidateDoesNotRecoverSmallFeatureBoxFromSingleYOLOMatchedCard() {
+        let card = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30),
+            confidence: 0.95
+        )
+        let nestedFeature = makeObservation(
+            box: CGRect(x: 0.17, y: 0.20, width: 0.06, height: 0.09),
+            confidence: 0.92
+        )
+
+        let result = ScanYOLOSupport.validate([card, nestedFeature], with: [card.boundingBox])
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 1)
+        XCTAssertEqual(result.yoloRejectedCount, 1)
+        XCTAssertEqual(result.observations.count, 1)
+        XCTAssertEqual(result.observations[0].boundingBox, card.boundingBox)
+    }
+
     func testRejectsRectangleWithoutAnySupportingYOLOBox() {
         let rectangle = CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30)
         let yoloBox = CGRect(x: 0.70, y: 0.70, width: 0.15, height: 0.20)

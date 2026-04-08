@@ -104,9 +104,14 @@ struct CollectionItemRow: View {
                         .accessibilityHidden(true)
                 }
             }
-            Text(item.edition)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(item.edition)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let rarity = item.rarity, !rarity.isEmpty {
+                    RarityCircle(rarity: rarity)
+                }
+            }
             if let cn = item.collectorNumber {
                 Text("#\(cn)")
                     .font(.subheadline)
@@ -145,6 +150,9 @@ struct CollectionItemRow: View {
 
     static func accessibilitySummary(for item: CollectionItem) -> String {
         var parts = [item.title, item.edition]
+        if let rarity = item.rarity {
+            parts.append("\(rarity) rarity")
+        }
         if let collectorNumber = item.collectorNumber {
             parts.append("collector number \(collectorNumber)")
         }
@@ -161,5 +169,27 @@ struct CollectionItemRow: View {
             parts.append("buy price \(priceBuy)")
         }
         return parts.joined(separator: ", ")
+    }
+}
+
+private struct RarityCircle: View {
+    let rarity: String
+
+    var body: some View {
+        Text(String(rarity.prefix(1)).uppercased())
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 18, height: 18)
+            .background(color, in: Circle())
+            .accessibilityLabel("\(rarity.capitalized) rarity")
+    }
+
+    private var color: Color {
+        switch rarity.lowercased() {
+        case "mythic": return .orange
+        case "rare": return .yellow
+        case "uncommon": return .gray
+        default: return Color.secondary
+        }
     }
 }

@@ -138,6 +138,9 @@ struct DeckDetailView: View {
                     onDelete: { contextDeleteItem = item }
                 )
             }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) { deleteItem(item) } label: { Label("Delete", systemImage: "trash") }
+            }
         }
     }
 
@@ -189,9 +192,12 @@ struct DeckDetailView: View {
         }
     }
 
-    // MARK: - Bottom Action Bar
+}
 
-    private var bottomActionBar: some View {
+// MARK: - Bottom Action Bar
+
+private extension DeckDetailView {
+    var bottomActionBar: some View {
         HStack {
             actionButton("folder", "Move") { showMoveSheet = true }
             Spacer()
@@ -204,7 +210,7 @@ struct DeckDetailView: View {
         .background(.bar)
     }
 
-    private func actionButton(
+    func actionButton(
         _ icon: String, _ label: String, role: ButtonRole? = nil, action: @escaping () -> Void
     ) -> some View {
         Button(role: role) {
@@ -218,7 +224,6 @@ struct DeckDetailView: View {
         }
         .disabled(selectedItems.isEmpty)
     }
-
 }
 
 // MARK: - Actions

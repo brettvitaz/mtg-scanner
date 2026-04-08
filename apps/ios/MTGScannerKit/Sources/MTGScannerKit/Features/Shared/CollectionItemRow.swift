@@ -174,21 +174,29 @@ struct CollectionItemRow: View {
 
 private struct RarityCircle: View {
     let rarity: String
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Text(String(rarity.prefix(1)).uppercased())
             .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(textColor)
             .frame(width: 18, height: 18)
-            .background(color, in: Circle())
+            .background(backgroundColor, in: Circle())
             .accessibilityLabel("\(rarity.capitalized) rarity")
     }
 
-    private var color: Color {
+    private var isCommon: Bool { rarity.lowercased() == "common" }
+
+    private var textColor: Color {
+        isCommon ? (colorScheme == .dark ? .black : .white) : .white
+    }
+
+    private var backgroundColor: Color {
         switch rarity.lowercased() {
         case "mythic": return .orange
         case "rare": return .yellow
         case "uncommon": return .gray
+        case "common": return colorScheme == .dark ? .white : .black
         default: return Color.secondary
         }
     }

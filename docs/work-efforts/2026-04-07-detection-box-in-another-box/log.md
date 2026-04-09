@@ -2,6 +2,18 @@
 
 ## Progress
 
+### Step 0: Re-open the work after review rejection
+
+**Status:** done
+
+Reviewed the rejected follow-up and confirmed two root causes. First, the containment suppression rewrite still relied on confidence ordering and explicitly kept the tighter inner box when a lower-confidence enclosing card arrived later. Second, mode/orientation updates published new state immediately but only queued the scan-YOLO reset asynchronously, leaving a real window where the next processed scan frames could consume stale validation boxes.
+
+Also confirmed that the existing unit tests encoded the wrong behavior: one regression asserted that the higher-confidence inner box should beat the enclosing card. That made it too easy to "fix" the bug in a reviewer-rejected direction while still keeping tests green.
+
+Deviations from plan: this reopened the original work as a correctness rework rather than a threshold-tuning pass.
+
+---
+
 ### Step 1: Trace the scan-mode detection pipeline
 
 **Status:** done
@@ -59,5 +71,29 @@ Deviations from plan: skipped engine-level cache-specific tests because the extr
 Ran `xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`, which succeeded. The first focused test attempt against the app scheme failed because `MTGScannerKitTests` is not a member of that scheme’s test plan, so the verification path was adjusted to use the `MTGScannerKitTests` scheme directly. Ran `xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/RectangleFilterTests -only-testing:MTGScannerKitTests/ScanYOLOSupportTests -only-testing:MTGScannerKitTests/YOLOCardDetectorTests`, which passed. Ran `git diff --check`, which also passed.
 
 Deviations from plan: verification used the dedicated `MTGScannerKitTests` scheme instead of the app scheme because the app scheme is not wired to run those package tests directly.
+
+---
+
+### Step 7: Record the corrected algorithm and invariants
+
+**Status:** done
+
+Documented the actual decision rule the detection pipeline should follow: use confidence only for IoU duplicate suppression, then decide containment from the full set of NMS survivors. The correct outcome is to keep the enclosing single-card candidate over nested feature boxes, reject aggregate outers that cover multiple direct peers, preserve crop mode, and tie scan-YOLO cache validity to the same serialized state changes that govern frame processing.
+
+The documentation now calls out the main trade-offs explicitly. The corrected containment logic is more complex than the previous greedy pass, and synchronous queue coordination adds some update-path blocking, but those costs are acceptable because they remove the confidence-order and stale-cache failure modes that reviewers repeatedly flagged.
+
+Deviations from plan: added a focused findings/design note so the algorithm and risks are captured in one place instead of being spread across plan and review prose.
+
+---
+
+### Step 8: Confirm final follow-up and remaining work
+
+**Status:** done
+
+After implementation and focused simulator tests, the remaining open work is no longer in the core algorithm. The unresolved part of the original goal is live-scene confidence: the final implementation still relies on containment and YOLO-support heuristics, so it should be exercised against the original one-card and multi-card camera scenarios before this effort is considered fully closed.
+
+Updated the work-effort docs to state that clearly. The final position is: the code fix is sound and meaningfully better than the rejected attempts, but real scan validation and possible threshold tuning are still the necessary next steps to fully accomplish the product goal.
+
+Deviations from plan: none
 
 ---

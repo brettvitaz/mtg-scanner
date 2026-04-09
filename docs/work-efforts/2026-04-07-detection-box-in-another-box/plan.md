@@ -1,39 +1,39 @@
-# Plan: Suppress nested detection boxes in scan mode
+# Plan: Prefer enclosing cards over nested feature boxes in scan mode
 
 **Planned by:** Codex
-**Date:** 2026-04-07
+**Date:** 2026-04-09
 
 ## Approach
 
-Keep scan mode’s rectangle detector as the source of overlay geometry, then harden it in two stages. First, suppress smaller observations substantially contained inside a larger accepted rectangle. Second, validate the remaining scan-mode rectangles against the existing YOLO card detector so card-internal rectangular features do not survive just because they look card-shaped geometrically. Throttle and cache YOLO validation so scan mode stays responsive and falls back to rectangle-only behavior if YOLO is unavailable.
+Keep scan mode’s rectangle detector as the source of overlay geometry, but correct two flaws in the existing implementation. First, containment suppression must be order-independent: after IoU NMS, analyze containment relationships across the full candidate set and prefer the enclosing single-card candidate over nested feature boxes, while rejecting aggregate outer boxes that merely span multiple peer cards. Second, mode/orientation changes must reset scan-mode YOLO validation state synchronously on the same queue that processes frames so the first post-change frames cannot use stale cached validation.
 
 ## Implementation Steps
 
-1. Extend `RectangleFilter` to preserve current IoU NMS, then add containment-based nested-box suppression plus helpers and thresholds that can be reused by tests.
-2. Update `CardDetectionEngine` scan-mode flow to consume the richer rectangle-filter result, run throttled YOLO validation on scan frames, and reject unsupported rectangles while keeping rectangle quads as the final overlay geometry.
-3. Add focused tests for containment suppression and YOLO support heuristics, including small-feature rejection and coordinate conversion.
-4. Verify with simulator build/test commands and `git diff --check`.
+1. Rewrite `RectangleFilter` containment suppression so IoU NMS remains confidence-based, but containment decisions are made from pairwise relationships across all NMS survivors rather than greedy confidence order.
+2. Reject aggregate outer boxes with multiple direct contained peers, suppress descendants of surviving non-aggregate ancestors, and keep crop mode unchanged.
+3. Move `CardDetectionEngine` mode/orientation mutations and scan-YOLO resets onto `visionQueue`, and make frame processing read that state only after it reaches the same queue.
+4. Replace the incorrect nested-box tests, add regressions for containment chains and post-reset YOLO cache behavior, and verify with the Xcode-backed `MTGScannerKitTests` target plus `git diff --check`.
 
-Steps 2 and 3 depend on step 1 establishing the containment behavior and helper surfaces.
+Step 3 depends on step 2 only for the new regression surface; the queue-ordering fix is otherwise independent.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Detection/RectangleFilter.swift` | Add containment suppression, helper metrics, and richer filter result reporting |
-| `apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Detection/CardDetectionEngine.swift` | Add scan-mode YOLO validation, validation caching/throttling, and debug logging |
-| `apps/ios/MTGScannerKit/Tests/MTGScannerKitTests/RectangleFilterTests.swift` | Add nested-box and containment behavior coverage |
-| `apps/ios/MTGScannerKit/Tests/MTGScannerKitTests/ScanYOLOSupportTests.swift` | Add focused tests for scan-mode YOLO support heuristics |
+| `apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Detection/RectangleFilter.swift` | Replace greedy containment suppression with order-independent containment analysis |
+| `apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Detection/CardDetectionEngine.swift` | Make scan validation reset and mode/orientation state changes deterministic on `visionQueue` |
+| `apps/ios/MTGScannerKit/Tests/MTGScannerKitTests/RectangleFilterTests.swift` | Replace incorrect nested-box expectations and add containment-chain coverage |
+| `apps/ios/MTGScannerKit/Tests/MTGScannerKitTests/CardDetectionEngineTests.swift` | Add regressions for immediate post-change validation and stale-generation refresh rejection |
+| `docs/work-efforts/2026-04-07-detection-box-in-another-box/findings.md` | Record the goal, findings, correct high-level algorithm, and trade-offs |
 
 ## Risks and Open Questions
 
-- Thresholds for containment, IoU, and coverage are heuristic and may need tuning against real camera input.
-- The user’s report suggested smaller nested boxes are usually card features, so the implementation should prefer rejecting inner boxes over choosing by confidence.
-- Using YOLO as a validator is lower risk than replacing scan mode with YOLO, but it still adds compute cost; caching and stride-based refresh should keep that manageable.
-- Manual preview validation is still useful because the unit tests cover geometry and support logic, not live camera scenes.
+- Containment and YOLO support thresholds remain heuristic and may still need tuning against real camera input.
+- Aggregate-box detection is more correct than greedy suppression for multi-card scenes, but it adds logic complexity and depends on a direct-child interpretation of the containment graph.
+- Synchronous `visionQueue` resets eliminate stale-state races but make mode/orientation updates block until pending vision work reaches a safe point.
+- Manual preview validation is still useful because the unit tests cover geometry and queue-ordering invariants, not full live-camera behavior.
 
 ## Verification Plan
 
-- `xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
-- `xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/RectangleFilterTests -only-testing:MTGScannerKitTests/ScanYOLOSupportTests -only-testing:MTGScannerKitTests/YOLOCardDetectorTests`
+- `xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/RectangleFilterTests -only-testing:MTGScannerKitTests/CardDetectionEngineTests -only-testing:MTGScannerKitTests/ScanYOLOValidationStateTests -only-testing:MTGScannerKitTests/ScanYOLOSupportTests`
 - `git diff --check`

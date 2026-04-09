@@ -6,7 +6,7 @@ import Vision
 /// Responsibilities:
 /// - Accept observations whose aspect ratio matches a standard MTG card (63mm × 88mm ≈ 0.716).
 /// - Suppress overlapping detections using IoU-based Non-Maximum Suppression (NMS).
-/// - Suppress smaller rectangles substantially contained inside a larger accepted rectangle.
+/// - Prefer enclosing single-card rectangles over nested feature boxes while preserving peers.
 /// - Re-sort accepted observations in reading order (top-left to bottom-right).
 struct RectangleFilter {
 
@@ -93,7 +93,8 @@ struct RectangleFilter {
     /// 1. Drops observations below `minConfidence`.
     /// 2. Drops observations whose aspect ratio falls outside the active band.
     /// 3. Applies IoU-based NMS (higher-confidence observation wins ties).
-    /// 4. Suppresses nested inner boxes and discards looser late enclosing boxes.
+    /// 4. Suppresses nested inner boxes by preferring the enclosing single-card candidate and
+    ///    discarding aggregate outer boxes that merely contain multiple peer cards.
     /// 5. Re-sorts in top-left → bottom-right reading order.
     func filter(_ observations: [VNRectangleObservation], isLandscape: Bool) -> [VNRectangleObservation] {
         filterResult(observations, isLandscape: isLandscape).observations
@@ -172,44 +173,63 @@ struct RectangleFilter {
     private func suppressContainedObservations(
         _ observations: [VNRectangleObservation]
     ) -> ContainmentSuppressionResult {
-        var kept: [VNRectangleObservation] = []
-        var suppressionCount = 0
-
-        for observation in observations {
-            let candidateArea = Self.area(of: observation.boundingBox)
-            guard candidateArea > 0 else {
-                kept.append(observation)
-                continue
-            }
-
-            if kept.contains(where: { accepted in
-                let acceptedArea = Self.area(of: accepted.boundingBox)
-                guard acceptedArea / candidateArea >= Self.containmentAreaRatioThreshold else { return false }
-                return Self.containmentRatio(of: observation.boundingBox, in: accepted.boundingBox) >=
-                    Self.containmentThreshold
-            }) {
-                suppressionCount += 1
-                continue
-            }
-
-            if kept.contains(where: { accepted in
-                let acceptedArea = Self.area(of: accepted.boundingBox)
-                guard acceptedArea > 0 else { return false }
-                guard candidateArea / acceptedArea >= Self.containmentAreaRatioThreshold else {
-                    return false
-                }
-                return Self.containmentRatio(of: accepted.boundingBox, in: observation.boundingBox) >=
-                    Self.containmentThreshold
-            }) {
-                // Keep the tighter accepted box instead of promoting a looser enclosing box.
-                suppressionCount += 1
-                continue
-            }
-
-            kept.append(observation)
+        let containment = containmentGraph(for: observations)
+        guard containment.contains(where: { !$0.isEmpty }) else {
+            return ContainmentSuppressionResult(observations: observations, suppressionCount: 0)
         }
 
-        return ContainmentSuppressionResult(observations: kept, suppressionCount: suppressionCount)
+        let aggregateIndices = Set(observations.indices.filter {
+            directChildren(of: $0, in: containment).count > 1
+        })
+        let suppressedIndices = Set(observations.indices.filter { index in
+            if aggregateIndices.contains(index) {
+                return true
+            }
+
+            return observations.indices.contains { ancestor in
+                guard ancestor != index else { return false }
+                guard !aggregateIndices.contains(ancestor) else { return false }
+                return containment[ancestor].contains(index)
+            }
+        })
+
+        let kept = observations.enumerated().compactMap { index, observation in
+            suppressedIndices.contains(index) ? nil : observation
+        }
+
+        return ContainmentSuppressionResult(
+            observations: kept,
+            suppressionCount: suppressedIndices.count
+        )
+    }
+
+    private func containmentGraph(for observations: [VNRectangleObservation]) -> [Set<Int>] {
+        observations.indices.map { outerIndex in
+            Set(observations.indices.filter { innerIndex in
+                outerIndex != innerIndex
+                    && Self.substantiallyContains(
+                        observations[outerIndex].boundingBox,
+                        observations[innerIndex].boundingBox
+                    )
+            })
+        }
+    }
+
+    private func directChildren(of parentIndex: Int, in containment: [Set<Int>]) -> [Int] {
+        containment[parentIndex].filter { childIndex in
+            !containment[parentIndex].contains { intermediateIndex in
+                intermediateIndex != childIndex
+                    && containment[intermediateIndex].contains(childIndex)
+            }
+        }
+    }
+
+    private static func substantiallyContains(_ outer: CGRect, _ inner: CGRect) -> Bool {
+        let outerArea = area(of: outer)
+        let innerArea = area(of: inner)
+        guard outerArea > 0, innerArea > 0 else { return false }
+        guard outerArea / innerArea >= containmentAreaRatioThreshold else { return false }
+        return containmentRatio(of: inner, in: outer) >= containmentThreshold
     }
 
     /// Intersection-over-union of two axis-aligned rectangles in normalized coordinates.

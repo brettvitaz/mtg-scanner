@@ -1,15 +1,15 @@
 # Review: Suppress nested detection boxes in scan mode
 
 **Reviewed by:** Codex
-**Date:** 2026-04-07
+**Date:** 2026-04-09
 
 ## Summary
 
 **What was requested:** Stop scan mode from showing smaller detection boxes inside a larger card box and, if appropriate, use the existing YOLO detector to recognize that those inner boxes are really card features.
 
-**What was delivered:** Added containment-based nested-box suppression to the scan-mode rectangle filter and added throttled YOLO validation in scan mode so rectangle proposals must also look like real cards semantically before they reach overlay tracking.
+**What was delivered:** Reworked scan-mode containment suppression so enclosing single-card candidates beat nested feature boxes independently of confidence order, rejected aggregate outer boxes that span multiple peer cards, and made scan-mode YOLO cache resets deterministic across mode/orientation changes.
 
-**Deferred items:** Manual threshold tuning on live camera input remains recommended. No model retraining or scan UX redesign was attempted.
+**Deferred items:** Live preview validation and possible threshold tuning still remain before the goal can be considered fully closed out in production behavior. No model retraining, tracker reset redesign, or scan UX redesign was attempted.
 
 ## Code Review Checklist
 
@@ -17,7 +17,7 @@
 
 **Result:** pass
 
-The implementation addresses both parts of the request. `RectangleFilter` now removes substantially contained inner rectangles even when the inner box has higher confidence, and `CardDetectionEngine` uses YOLO support checks to reject card-feature rectangles that survive geometric filtering. The scan overlay still uses rectangle quads, so valid card overlays behave as before.
+The implementation addresses both parts of the request. `RectangleFilter` now decides containment from the full set of NMS survivors rather than greedy confidence order, which preserves the real enclosing card over nested card-feature boxes while still keeping peer cards by rejecting aggregate outers. `CardDetectionEngine` now applies mode/orientation changes and scan-YOLO cache resets on the same serial queue that processes frames, so stale validation results from the previous configuration cannot leak into the first post-change scan frames. The scan overlay still uses rectangle quads, so valid card overlays behave as before.
 
 ### 2. Simplicity
 
@@ -35,7 +35,7 @@ The work is limited to scan-mode detection, its supporting tests, and related do
 
 **Result:** pass
 
-Added coverage for containment behavior in `RectangleFilterTests` and created `ScanYOLOSupportTests` for scan-mode support heuristics and coordinate conversion. The focused simulator test run for `RectangleFilterTests`, `ScanYOLOSupportTests`, and `YOLOCardDetectorTests` passed on the `MTGScannerKitTests` scheme.
+Added coverage for corrected containment behavior in `RectangleFilterTests`, queue-ordering and stale-generation behavior in `CardDetectionEngineTests`, and existing scan-mode support heuristics in `ScanYOLOSupportTests`. The focused simulator test run should target the `MTGScannerKitTests` scheme rather than package-level `swift test`.
 
 ### 5. Safety
 
@@ -63,11 +63,10 @@ Added targeted debug logging in scan mode so containment suppression, YOLO accep
 
 ## Verification Results
 
-- `xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -sdk iphonesimulator -configuration Debug build` — passed.
-- `xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/RectangleFilterTests -only-testing:MTGScannerKitTests/ScanYOLOSupportTests -only-testing:MTGScannerKitTests/YOLOCardDetectorTests` — passed.
+- `xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/RectangleFilterTests -only-testing:MTGScannerKitTests/CardDetectionEngineTests -only-testing:MTGScannerKitTests/ScanYOLOValidationStateTests -only-testing:MTGScannerKitTests/ScanYOLOSupportTests` — passed.
 - `git diff --check` — passed.
 - `xcodebuild test` using the `MTGScanner` app scheme with `-only-testing:MTGScannerKitTests/...` — not a valid path here because `MTGScannerKitTests` is not part of that scheme’s test plan.
 
 ## Notes
 
-The main remaining risk is threshold tuning on real scan scenes. If preview behavior still rejects valid cards or keeps too many false positives, tune the containment, IoU, coverage, cache TTL, and validation-stride constants in the scan detection helpers using the new debug output as guidance.
+I am satisfied with this as a code-level fix because it corrects the two reviewer-identified logic errors and locks the intended invariants into tests. I am not satisfied calling the overall bug fully closed until live scan scenes are exercised against the original failure cases. The remaining work is operational rather than architectural: validate real preview behavior, tune thresholds if needed, and preserve the invariants documented in `findings.md`.

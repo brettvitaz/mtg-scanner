@@ -17,12 +17,11 @@ final class CardDetectionEngine: @unchecked Sendable {
 
     // MARK: - Properties
 
-    private(set) var detectionMode: DetectionMode = .scan
+    /// Guarded by `visionQueue`; read and written only through `syncOnVisionQueue`.
+    private var detectionMode: DetectionMode = .scan
 
-    /// Set to `true` when the device interface orientation is landscape.
-    /// Written from the main thread; read on the camera queue in `processFrame` — same
-    /// pattern as `detectionMode`. The worst-case race during rotation is one stale frame.
-    private(set) var isLandscape: Bool = false
+    /// Guarded by `visionQueue`; reset in the same critical section as scan validation state.
+    private var isLandscape: Bool = false
 
     // Loaded lazily so start-up time is not impacted if Auto Scan is not used.
     private lazy var yoloDetector: YOLOCardDetector? = YOLOCardDetector()
@@ -31,6 +30,7 @@ final class CardDetectionEngine: @unchecked Sendable {
     var onDetection: (([DetectedCard]) -> Void)?
 
     private let visionQueue = DispatchQueue(label: "com.mtgscanner.vision", qos: .userInitiated)
+    private let visionQueueKey = DispatchSpecificKey<Void>()
     private let yoloQueue = DispatchQueue(label: "com.mtgscanner.yolo", qos: .userInitiated)
     /// Guarded by visionQueue — never read/written from other queues.
     private var isProcessing = false
@@ -39,14 +39,16 @@ final class CardDetectionEngine: @unchecked Sendable {
     /// Guarded by visionQueue — caches throttled YOLO validation for scan mode.
     private var scanYOLOValidationState = ScanYOLOValidationState()
 
+    init() {
+        visionQueue.setSpecific(key: visionQueueKey, value: ())
+    }
+
     // MARK: - Frame Processing
 
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
-        let mode = detectionMode
-        let landscape = isLandscape
         let sendablePixelBuffer = SendablePixelBuffer(buffer: pixelBuffer)
 
         visionQueue.async { [weak self] in
@@ -55,8 +57,8 @@ final class CardDetectionEngine: @unchecked Sendable {
             let raw = self.detect(
                 in: sendablePixelBuffer.buffer,
                 timestamp: timestamp,
-                mode: mode,
-                isLandscape: landscape
+                mode: self.detectionMode,
+                isLandscape: self.isLandscape
             )
             let cards = self.tracker.update(detections: raw)
             self.isProcessing = false
@@ -67,15 +69,19 @@ final class CardDetectionEngine: @unchecked Sendable {
     }
 
     func updateDetectionMode(_ mode: DetectionMode) {
-        guard detectionMode != mode else { return }
-        detectionMode = mode
-        scheduleScanValidationReset()
+        syncOnVisionQueue {
+            guard detectionMode != mode else { return }
+            detectionMode = mode
+            scanYOLOValidationState.reset()
+        }
     }
 
     func updateIsLandscape(_ isLandscape: Bool) {
-        guard self.isLandscape != isLandscape else { return }
-        self.isLandscape = isLandscape
-        scheduleScanValidationReset()
+        syncOnVisionQueue {
+            guard self.isLandscape != isLandscape else { return }
+            self.isLandscape = isLandscape
+            scanYOLOValidationState.reset()
+        }
     }
 
     // MARK: - Private Detection
@@ -94,10 +100,11 @@ final class CardDetectionEngine: @unchecked Sendable {
         }
     }
 
-    private func scheduleScanValidationReset() {
-        visionQueue.async { [weak self] in
-            self?.scanYOLOValidationState.reset()
+    private func syncOnVisionQueue<T>(_ work: () -> T) -> T {
+        if DispatchQueue.getSpecific(key: visionQueueKey) != nil {
+            return work()
         }
+        return visionQueue.sync(execute: work)
     }
 
     // MARK: - Rectangle Scan Detection
@@ -316,17 +323,37 @@ final class CardDetectionEngine: @unchecked Sendable {
         }
     }
 
+    #if DEBUG
     func scanYOLOValidationStateSnapshot() -> ScanYOLOValidationState {
-        visionQueue.sync { scanYOLOValidationState }
+        syncOnVisionQueue { scanYOLOValidationState }
     }
 
-    #if DEBUG
+    func setScanYOLOValidationStateForTesting(_ state: ScanYOLOValidationState) {
+        syncOnVisionQueue {
+            scanYOLOValidationState = state
+        }
+    }
+
+    func storeScanYOLORefreshForTesting(
+        boxes: [CGRect],
+        timestamp: TimeInterval,
+        generation: Int
+    ) {
+        syncOnVisionQueue {
+            scanYOLOValidationState.storeRefresh(
+                boxes: boxes,
+                timestamp: timestamp,
+                generation: generation
+            )
+        }
+    }
+
     func validateScanObservationsForTesting(
         _ observations: [VNRectangleObservation],
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval
     ) -> ScanYOLOValidationResult {
-        visionQueue.sync {
+        syncOnVisionQueue {
             validateScanObservations(observations, pixelBuffer: pixelBuffer, timestamp: timestamp)
         }
     }

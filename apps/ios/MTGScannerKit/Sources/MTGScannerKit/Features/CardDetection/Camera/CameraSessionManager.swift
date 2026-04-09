@@ -1,4 +1,5 @@
 import AVFoundation
+import UIKit
 
 // swiftlint:disable type_body_length
 /// Manages the `AVCaptureSession` lifecycle for real-time card detection.
@@ -137,10 +138,10 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     // MARK: - Photo Capture
 
-    /// Triggers a still photo capture and returns JPEG data via `completion`.
+    /// Triggers a still photo capture and returns the captured upload payload via `completion`.
     /// If a capture is already in flight, or the session is not yet running, `completion`
     /// is called immediately with `nil`.
-    func capturePhoto(completion: @escaping @Sendable (Data?) -> Void) {
+    func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             guard self.isSessionReady, !self.isCaptureInFlight else {
@@ -331,14 +332,14 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
 
     let generation: Int
     private let maxPhotoDimensions: CMVideoDimensions
-    private var completion: (@Sendable (Data?) -> Void)?
+    private var completion: (@Sendable (RecognitionImagePayload?) -> Void)?
     private let sessionQueue: DispatchQueue
     private let onDone: @Sendable (PhotoCaptureHandler) -> Void
 
     init(
         generation: Int,
         maxPhotoDimensions: CMVideoDimensions,
-        completion: @escaping @Sendable (Data?) -> Void,
+        completion: @escaping @Sendable (RecognitionImagePayload?) -> Void,
         sessionQueue: DispatchQueue,
         onDone: @escaping @Sendable (PhotoCaptureHandler) -> Void
     ) {
@@ -350,7 +351,7 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
     }
 
     func issueCapture(to output: AVCapturePhotoOutput) {
-        let settings = AVCapturePhotoSettings()
+        let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
         if maxPhotoDimensions.width > 0 {
             settings.maxPhotoDimensions = maxPhotoDimensions
         }
@@ -372,14 +373,21 @@ private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         // Serialize completion mutation onto sessionQueue so cancel() and this delegate
         // callback cannot race — only one of them will find a non-nil completion.
-        let photoData = error == nil ? photo.fileDataRepresentation() : nil
+        let payload: RecognitionImagePayload?
+        if error == nil,
+           let photoData = photo.fileDataRepresentation(),
+           let image = UIImage(data: photoData) {
+            payload = .cameraCapture(image: image, data: photoData)
+        } else {
+            payload = nil
+        }
         sessionQueue.async { [weak self] in
             guard let self else { return }
             let pending = self.completion
             self.completion = nil
             self.onDone(self)
             guard let pending else { return }
-            DispatchQueue.main.async { pending(photoData) }
+            DispatchQueue.main.async { pending(payload) }
         }
     }
 }

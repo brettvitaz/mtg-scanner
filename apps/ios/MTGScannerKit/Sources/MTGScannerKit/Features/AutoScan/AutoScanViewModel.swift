@@ -128,23 +128,37 @@ final class AutoScanViewModel {
     /// Called by scan mode after a manual capture. Runs Vision detection
     /// on a detached background task to avoid blocking the main actor.
     @MainActor
-    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
+    func enqueueCapturedImage(_ payload: RecognitionImagePayload, cropEnabled: Bool) async {
+        let image = payload.displayImage
         if cropEnabled {
             let detectCrops = cropImage
             let crops = await Task.detached(priority: .userInitiated) {
                 await detectCrops(image)
             }.value
-            let pairs = crops.crops.isEmpty ? [(image, false)] : crops.crops.map { ($0, true) }
-            for (img, cropped) in pairs {
+            if crops.crops.isEmpty {
                 recognitionQueue.enqueue(
-                    image: img, isCropped: cropped, apiBaseURL: apiBaseURL, modelContext: modelContext
+                    payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                )
+                return
+            }
+
+            for crop in crops.crops {
+                guard let cropPayload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
+                recognitionQueue.enqueue(
+                    payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
                 )
             }
         } else {
             recognitionQueue.enqueue(
-                image: image, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
             )
         }
+    }
+
+    @MainActor
+    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
+        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else { return }
+        await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
     }
 
     // MARK: - Frame Forwarding
@@ -185,12 +199,13 @@ final class AutoScanViewModel {
         statusMessage = "Capturing…"
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
-        guard let image = await captureCoordinator?.capturePhoto() else {
+        guard let payload = await captureCoordinator?.capturePhoto() else {
             captureState = .watching
             statusMessage = "Capture failed — watching…"
             return
         }
 
+        let image = payload.displayImage
         let uprightImage = AutoScanCropHelper.normalizedImage(image)
         let cropped: UIImage?
         if let cgImage = uprightImage.cgImage,
@@ -199,14 +214,18 @@ final class AutoScanViewModel {
         } else {
             cropped = nil
         }
-        let enqueueImage = cropped ?? image
-        let isCropped = cropped != nil
-
         lastCroppedImage = cropped
         presenceTracker.markCaptured()
-        recognitionQueue.enqueue(
-            image: enqueueImage, isCropped: isCropped, apiBaseURL: apiBaseURL, modelContext: modelContext
-        )
+        if let cropped,
+           let cropPayload = RecognitionImagePayload.generatedJPEG(from: cropped) {
+            recognitionQueue.enqueue(
+                payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
+            )
+        } else {
+            recognitionQueue.enqueue(
+                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+            )
+        }
         captureState = .watching
         statusMessage = "Captured! Watching for next card…"
     }

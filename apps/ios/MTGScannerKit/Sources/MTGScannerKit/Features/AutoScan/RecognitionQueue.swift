@@ -41,7 +41,7 @@ final class RecognitionQueue {
 
     private struct Job {
         let id: UUID = UUID()
-        let image: UIImage
+        let payload: RecognitionImagePayload
         let filename: String
         let apiBaseURL: String
         let modelContext: ModelContext?
@@ -68,15 +68,28 @@ final class RecognitionQueue {
 
     // MARK: - Public API
 
-    func enqueue(image: UIImage, isCropped: Bool = false, apiBaseURL: String, modelContext: ModelContext?) {
-        let filename = "scan-\(UUID().uuidString.prefix(8)).jpg"
+    func enqueue(
+        payload: RecognitionImagePayload,
+        isCropped: Bool = false,
+        apiBaseURL: String,
+        modelContext: ModelContext?
+    ) {
+        let filename = "scan-\(UUID().uuidString.prefix(8)).\(payload.preferredFilenameExtension)"
         let job = Job(
-            image: image, filename: filename, apiBaseURL: apiBaseURL,
+            payload: payload, filename: filename, apiBaseURL: apiBaseURL,
             modelContext: modelContext, isCropped: isCropped, capturedAt: Date()
         )
         pendingJobs.append(job)
         pendingCount += 1
         drainIfPossible()
+    }
+
+    func enqueue(image: UIImage, isCropped: Bool = false, apiBaseURL: String, modelContext: ModelContext?) {
+        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else {
+            failedCount += 1
+            return
+        }
+        enqueue(payload: payload, isCropped: isCropped, apiBaseURL: apiBaseURL, modelContext: modelContext)
     }
 
     func cancelAll() {
@@ -109,14 +122,16 @@ final class RecognitionQueue {
 
         guard !Task.isCancelled else { return }
 
-        guard let jpeg = await encodeJPEG(job.image) else {
+        let uploadData = job.payload.uploadData
+        let contentType = job.payload.contentType
+        guard !uploadData.isEmpty else {
             pendingCount -= 1
             failedCount += 1
             return
         }
 
         do {
-            let result = try await callAPI(jpeg: jpeg, job: job)
+            let result = try await callAPI(data: uploadData, contentType: contentType, job: job)
             guard !Task.isCancelled else { return }
             persist(result: result, modelContext: job.modelContext, capturedAt: job.capturedAt)
             pendingCount -= 1
@@ -125,12 +140,6 @@ final class RecognitionQueue {
             guard !Task.isCancelled else { return }
             handleFailure(job: job)
         }
-    }
-
-    private nonisolated func encodeJPEG(_ image: UIImage) async -> Data? {
-        await Task.detached(priority: .userInitiated) {
-            image.jpegData(compressionQuality: 0.9)
-        }.value
     }
 
     private func handleFailure(job: Job) {
@@ -145,15 +154,15 @@ final class RecognitionQueue {
         }
     }
 
-    private func callAPI(jpeg: Data, job: Job) async throws -> RecognitionResult {
+    private func callAPI(data: Data, contentType: String, job: Job) async throws -> RecognitionResult {
         if job.isCropped {
             return try await recognizeBatch(
-                [(data: jpeg, filename: job.filename)],
-                "image/jpeg",
+                [(data: data, filename: job.filename)],
+                contentType,
                 job.apiBaseURL
             )
         }
-        return try await recognize(jpeg, job.filename, "image/jpeg", job.apiBaseURL)
+        return try await recognize(data, job.filename, contentType, job.apiBaseURL)
     }
 
     private func persist(result: RecognitionResult, modelContext: ModelContext?, capturedAt: Date) {

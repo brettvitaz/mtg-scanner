@@ -6,6 +6,7 @@ import Vision
 final class RectangleFilterTests: XCTestCase {
 
     private let filter = RectangleFilter()
+    private let cropFilter = RectangleFilter(configuration: .crop)
 
     // MARK: - Constants
 
@@ -47,6 +48,12 @@ final class RectangleFilterTests: XCTestCase {
         let a = CGRect(x: 0.1, y: 0.1, width: 0.0, height: 0.4)
         let b = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.4)
         XCTAssertEqual(RectangleFilter.iou(a, b), 0.0, accuracy: 0.001)
+    }
+
+    func testContainmentRatioOfFullyContainedRectangleIsOne() {
+        let inner = CGRect(x: 0.2, y: 0.2, width: 0.2, height: 0.3)
+        let outer = CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.6)
+        XCTAssertEqual(RectangleFilter.containmentRatio(of: inner, in: outer), 1.0, accuracy: 0.001)
     }
 
     // MARK: - Aspect ratio — portrait device (isLandscape: false)
@@ -106,17 +113,17 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterAcceptsAtLowerToleranceBound() {
-        // Edge ratio at the lower bound of tolerance should be accepted.
-        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)
+        // Use a value just inside the lower bound to avoid floating-point boundary fragility.
+        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
-        let width = height * lower
+        let width = height * (lower + 0.005)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
         let result = filter.filter([obs], isLandscape: false)
         XCTAssertEqual(result.count, 1)
     }
 
     func testFilterRejectsBelowLowerToleranceBound() {
-        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)
+        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (lower - 0.01)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -126,7 +133,7 @@ final class RectangleFilterTests: XCTestCase {
 
     func testFilterAcceptsAtUpperToleranceBound() {
         // Use a value just inside the upper bound to avoid floating-point boundary fragility.
-        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance)
+        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (upper - 0.005)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -135,7 +142,7 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterRejectsAboveUpperToleranceBound() {
-        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance)
+        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (upper + 0.01)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -210,6 +217,48 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
     }
 
+    func testFilterAcceptsPerspectiveDistortedCardNearPortraitLowerBound() {
+        let obs = VNRectangleObservation()
+        obs.setValue(CGRect(x: 0.210, y: 0.664, width: 0.132, height: 0.317), forKey: "boundingBox")
+        obs.setValue(Float(1.0), forKey: "confidence")
+        obs.setValue(CGPoint(x: 0.210, y: 0.929), forKey: "topLeft")
+        obs.setValue(CGPoint(x: 0.324, y: 0.981), forKey: "topRight")
+        obs.setValue(CGPoint(x: 0.342, y: 0.730), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: 0.220, y: 0.664), forKey: "bottomLeft")
+
+        let result = filter.filter([obs], isLandscape: false)
+
+        XCTAssertEqual(result.count, 1)
+    }
+
+    func testCropFilterRejectsPerspectiveDistortedCardNearPortraitLowerBound() {
+        let obs = VNRectangleObservation()
+        obs.setValue(CGRect(x: 0.210, y: 0.664, width: 0.132, height: 0.317), forKey: "boundingBox")
+        obs.setValue(Float(1.0), forKey: "confidence")
+        obs.setValue(CGPoint(x: 0.210, y: 0.929), forKey: "topLeft")
+        obs.setValue(CGPoint(x: 0.324, y: 0.981), forKey: "topRight")
+        obs.setValue(CGPoint(x: 0.342, y: 0.730), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: 0.220, y: 0.664), forKey: "bottomLeft")
+
+        let result = cropFilter.filter([obs], isLandscape: false)
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testFilterRejectsTallAggregateBoxUnderPortraitTolerance() {
+        let obs = VNRectangleObservation()
+        obs.setValue(CGRect(x: 0.475, y: 0.434, width: 0.163, height: 0.451), forKey: "boundingBox")
+        obs.setValue(Float(1.0), forKey: "confidence")
+        obs.setValue(CGPoint(x: 0.475, y: 0.838), forKey: "topLeft")
+        obs.setValue(CGPoint(x: 0.633, y: 0.885), forKey: "topRight")
+        obs.setValue(CGPoint(x: 0.638, y: 0.434), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: 0.480, y: 0.436), forKey: "bottomLeft")
+
+        let result = filter.filter([obs], isLandscape: false)
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
     // MARK: - Vision bounds
 
     func testVisionBoundsIncludePortraitAndLandscape() {
@@ -223,7 +272,7 @@ final class RectangleFilterTests: XCTestCase {
     func testVisionBoundsAreWiderThanEdgeFilter() {
         // Vision bounds must be wider than the edge-based filter because
         // bounding-box aspect ratios distort more than edge ratios for rotated cards.
-        let edgeLower = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance))
+        let edgeLower = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance))
         XCTAssertTrue(RectangleFilter.visionMinAspectRatio < edgeLower)
     }
 
@@ -251,6 +300,205 @@ final class RectangleFilterTests: XCTestCase {
         let left = makeObservation(box: CGRect(x: 0.0, y: 0.1, width: width, height: height), confidence: 0.8)
         let right = makeObservation(box: CGRect(x: 0.6, y: 0.1, width: width, height: height), confidence: 0.7)
         let result = filter.filter([left, right], isLandscape: false)
+        XCTAssertEqual(result.count, 2)
+    }
+
+    func testFilterPrefersEnclosingCardOverHigherConfidenceInnerFeature() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.45
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.75
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.16, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+
+        let result = filter.filter([inner, outer], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
+    }
+
+    func testFilterPrefersEnclosingCardOverHigherConfidenceInnerFeatureRegardlessOfInputOrder() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.45
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.75
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.16, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+
+        let result = filter.filter([outer, inner], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
+    }
+
+    func testFilterSuppressesNestedInnerFeatureWhenOuterCardIsAcceptedFirst() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.45
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.95
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.16, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.75
+        )
+
+        let result = filter.filter([outer, inner], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
+    }
+
+    func testFilterKeepsHigherConfidenceInnerCardWhenOuterBoxIsOnlySlightlyLarger() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let innerHeight: CGFloat = 0.40
+        let innerWidth = innerHeight * ratio
+        let outerHeight: CGFloat = 0.43
+        let outerWidth = outerHeight * ratio
+
+        let inner = makeObservation(
+            box: CGRect(x: 0.12, y: 0.12, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+        let outer = makeObservation(
+            box: CGRect(x: 0.105, y: 0.105, width: outerWidth, height: outerHeight),
+            confidence: 0.45
+        )
+
+        let result = filter.filter([inner, outer], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, inner.boundingBox)
+    }
+
+    func testFilterDoesNotReplaceMultipleContainedInnerBoxesWithSingleOuterBox() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.50
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let leftInner = makeObservation(
+            box: CGRect(x: 0.14, y: 0.16, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+        let rightInner = makeObservation(
+            box: CGRect(x: 0.30, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.90
+        )
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.70
+        )
+
+        let result = filter.filter([leftInner, rightInner, outer], isLandscape: false)
+
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].boundingBox, leftInner.boundingBox)
+        XCTAssertEqual(result[1].boundingBox, rightInner.boundingBox)
+    }
+
+    func testFilterKeepsOutermostSingleCardAcrossContainmentChain() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.52
+        let outerWidth = outerHeight * ratio
+        let middleHeight: CGFloat = 0.34
+        let middleWidth = middleHeight * ratio
+        let innerHeight: CGFloat = 0.20
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.08, y: 0.08, width: outerWidth, height: outerHeight),
+            confidence: 0.70
+        )
+        let middle = makeObservation(
+            box: CGRect(x: 0.14, y: 0.16, width: middleWidth, height: middleHeight),
+            confidence: 0.85
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.20, y: 0.24, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+
+        let result = filter.filter([inner, middle, outer], isLandscape: false)
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
+    }
+
+    func testFilterKeepsPartiallyOverlappingBoxesBelowContainmentThreshold() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let height: CGFloat = 0.32
+        let width = height * ratio
+
+        let first = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: width, height: height),
+            confidence: 0.90
+        )
+        let second = makeObservation(
+            box: CGRect(x: 0.22, y: 0.18, width: width, height: height),
+            confidence: 0.85
+        )
+
+        let result = filter.filter([first, second], isLandscape: false)
+        XCTAssertEqual(result.count, 2)
+    }
+
+    func testFilterKeepsAlmostSameSizeBoxesForNMSInsteadOfContainment() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.40
+        let outerWidth = outerHeight * ratio
+        let innerHeight = outerHeight / sqrt(RectangleFilter.containmentAreaRatioThreshold - 0.05)
+        let innerWidth = innerHeight * ratio
+
+        let larger = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.90
+        )
+        let almostSame = makeObservation(
+            box: CGRect(x: 0.105, y: 0.105, width: innerWidth, height: innerHeight),
+            confidence: 0.80
+        )
+
+        let result = filter.filter([larger, almostSame], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, larger.boundingBox)
+    }
+
+    func testCropFilterDoesNotApplyContainmentSuppression() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.45
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.75
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.16, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+
+        let result = cropFilter.filter([inner, outer], isLandscape: false)
+
         XCTAssertEqual(result.count, 2)
     }
 

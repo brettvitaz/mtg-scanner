@@ -77,6 +77,42 @@ final class RecognitionQueueTests: XCTestCase {
         XCTAssertTrue(singleCalled)
     }
 
+    func testUncroppedPayloadPreservesOriginalBytesAndContentType() async throws {
+        let originalBytes = Data([0x89, 0x50, 0x4E, 0x47, 0x01, 0x02])
+        nonisolated(unsafe) var receivedData: Data?
+        nonisolated(unsafe) var receivedFilename: String?
+        nonisolated(unsafe) var receivedContentType: String?
+
+        let queue = RecognitionQueue(
+            recognize: { data, filename, contentType, _ in
+                receivedData = data
+                receivedFilename = filename
+                receivedContentType = contentType
+                return RecognitionResult(cards: [])
+            },
+            recognizeBatch: { _, _, _ in
+                XCTFail("batch should not be called")
+                return RecognitionResult(cards: [])
+            }
+        )
+
+        queue.enqueue(
+            payload: makePayload(
+                uploadData: originalBytes,
+                contentType: "image/png",
+                preferredFilenameExtension: "png"
+            ),
+            isCropped: false,
+            apiBaseURL: "http://localhost",
+            modelContext: nil
+        )
+
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(receivedData, originalBytes)
+        XCTAssertEqual(receivedContentType, "image/png")
+        XCTAssertEqual(receivedFilename?.suffix(4), ".png")
+    }
+
     func testCroppedJobCallsBatchEndpoint() async throws {
         nonisolated(unsafe) var batchCalled = false
         let queue = RecognitionQueue(
@@ -260,5 +296,18 @@ extension RecognitionQueueTests {
             ctx.cgContext.setFillColor(UIColor.red.cgColor)
             ctx.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
         }
+    }
+
+    private func makePayload(
+        uploadData: Data = Data([0x01, 0x02, 0x03]),
+        contentType: String = "image/jpeg",
+        preferredFilenameExtension: String = "jpg"
+    ) -> RecognitionImagePayload {
+        RecognitionImagePayload(
+            displayImage: makeImage(),
+            uploadData: uploadData,
+            contentType: contentType,
+            preferredFilenameExtension: preferredFilenameExtension
+        )
     }
 }

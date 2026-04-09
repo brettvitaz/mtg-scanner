@@ -79,6 +79,8 @@ These were established through debugging. Do not deviate:
 
 ## Testing
 
+Do not use `swift test` for this iOS package. Use `make ios-test` or run `xcodebuild test` directly against the workspace and the appropriate scheme.
+
 ```bash
 xcodebuild test \
   -workspace apps/ios/MTGScanner.xcworkspace \
@@ -94,6 +96,7 @@ Or via Makefile: `make ios-test`
 - Force unwraps acceptable in test code for brevity.
 - Use `XCTAssertEqual(_:_:accuracy:)` for CGFloat/Double comparisons.
 - Test models (initialization, equality, identifiability) and pure logic (filters, interpolation, decoding).
+- If you need to target the Swift package tests directly, run `xcodebuild test` with the `MTGScannerKitTests` scheme rather than `swift test`.
 
 ## Build verification
 

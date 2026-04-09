@@ -71,7 +71,7 @@ final class CameraViewController: UIViewController {
         previewLayer?.frame = view.bounds
         detectionLayer.frame = view.bounds
         updatePreviewOrientation()
-        engine.isLandscape = view.bounds.width > view.bounds.height
+        engine.updateIsLandscape(view.bounds.width > view.bounds.height)
     }
 
     // MARK: - Orientation
@@ -97,17 +97,11 @@ final class CameraViewController: UIViewController {
     // MARK: - Public API
 
     func updateDetectionMode(_ mode: DetectionMode) {
-        engine.detectionMode = mode
+        engine.updateDetectionMode(mode)
     }
 
-    func capturePhoto(completion: @escaping @Sendable (UIImage?) -> Void) {
-        sessionManager.capturePhoto { data in
-            guard let data, let image = UIImage(data: data) else {
-                DispatchQueue.main.async { completion(nil) }
-                return
-            }
-            DispatchQueue.main.async { completion(image) }
-        }
+    func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
+        sessionManager.capturePhoto(completion: completion)
     }
 
     // MARK: - Torch

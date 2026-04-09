@@ -298,6 +298,19 @@ private func makeImage() -> UIImage {
     }
 }
 
+private func makePayload(
+    uploadData: Data = Data([0x01, 0x02, 0x03]),
+    contentType: String = "image/jpeg",
+    preferredFilenameExtension: String = "jpg"
+) -> RecognitionImagePayload {
+    RecognitionImagePayload(
+        displayImage: makeImage(),
+        uploadData: uploadData,
+        contentType: contentType,
+        preferredFilenameExtension: preferredFilenameExtension
+    )
+}
+
 // MARK: - Retry / Clear Failed
 
 @MainActor
@@ -360,18 +373,5 @@ final class RecognitionQueueRetryTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(callCount, 4)
         XCTAssertEqual(queue.failedCount, 1)
-    }
-
-    private func makePayload(
-        uploadData: Data = Data([0x01, 0x02, 0x03]),
-        contentType: String = "image/jpeg",
-        preferredFilenameExtension: String = "jpg"
-    ) -> RecognitionImagePayload {
-        RecognitionImagePayload(
-            displayImage: makeImage(),
-            uploadData: uploadData,
-            contentType: contentType,
-            preferredFilenameExtension: preferredFilenameExtension
-        )
     }
 }

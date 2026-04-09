@@ -28,7 +28,12 @@ struct AutoScanView: View {
         HStack(alignment: .top) {
             cropPreview
             Spacer()
-            RecognitionBadgeView(recognitionQueue: recognitionQueue, onCancel: viewModel.cancelRecognition)
+            RecognitionBadgeView(
+                recognitionQueue: recognitionQueue,
+                onCancel: viewModel.cancelRecognition,
+                onRetryFailed: recognitionQueue.retryFailed,
+                onClearFailed: recognitionQueue.clearFailed
+            )
         }
     }
 

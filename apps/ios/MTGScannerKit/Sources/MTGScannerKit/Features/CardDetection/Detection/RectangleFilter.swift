@@ -15,10 +15,11 @@ struct RectangleFilter {
     /// Standard MTG card portrait aspect ratio (short side / long side = 63 / 88 ≈ 0.714).
     static let targetAspectRatio: CGFloat = 63.0 / 88.0
 
-    /// Relative tolerance applied to the target ratio on each side.
-    /// Accommodates slight perspective distortion and detection imprecision
-    /// while rejecting square objects (coasters, books, etc.).
-    static let aspectRatioTolerance: CGFloat = 0.30
+    /// Relative tolerance used by the stricter crop-generation path.
+    static let cropAspectRatioTolerance: CGFloat = 0.20
+
+    /// Relative tolerance used by live scan mode where perspective distortion is more common.
+    static let scanAspectRatioTolerance: CGFloat = 0.30
 
     /// The camera buffer is 1920×1080 (16:9) per CameraSessionManager's `.hd1920x1080` preset.
     /// In Vision normalized coordinates (0–1), 1 unit in x = 1920 pixels but 1 unit in y = only
@@ -56,11 +57,31 @@ struct RectangleFilter {
     static let containmentThreshold: CGFloat = 0.90
 
     /// Minimum larger/smaller area ratio required before containment suppression fires.
-    static let containmentAreaRatioThreshold: CGFloat = 1.20
+    static let containmentAreaRatioThreshold: CGFloat = 1.50
 
     /// A later, larger rectangle can replace an earlier contained rectangle only when the size
     /// gap is substantial; this avoids weak enclosing boxes displacing the actual card bounds.
     static let containmentReplacementAreaRatioThreshold: CGFloat = 1.50
+
+    struct Configuration {
+        let aspectRatioTolerance: CGFloat
+        let enablesContainmentSuppression: Bool
+
+        static let scan = Configuration(
+            aspectRatioTolerance: RectangleFilter.scanAspectRatioTolerance,
+            enablesContainmentSuppression: true
+        )
+        static let crop = Configuration(
+            aspectRatioTolerance: RectangleFilter.cropAspectRatioTolerance,
+            enablesContainmentSuppression: false
+        )
+    }
+
+    let configuration: Configuration
+
+    init(configuration: Configuration = .scan) {
+        self.configuration = configuration
+    }
 
     // MARK: - Public API
 
@@ -96,7 +117,15 @@ struct RectangleFilter {
             }
         }
 
-        let containedSuppression = suppressContainedObservations(nmsAccepted)
+        let containedSuppression: ContainmentSuppressionResult
+        if configuration.enablesContainmentSuppression {
+            containedSuppression = suppressContainedObservations(nmsAccepted)
+        } else {
+            containedSuppression = ContainmentSuppressionResult(
+                observations: nmsAccepted,
+                suppressionCount: 0
+            )
+        }
         var accepted = containedSuppression.observations
 
         accepted.sort { a, b in
@@ -135,8 +164,8 @@ struct RectangleFilter {
 
         let ratio = min(avgWidth, avgHeight) / max(avgWidth, avgHeight)
         let center = isLandscape ? Self.portraitInBufferRatio : Self.targetAspectRatio
-        let lower = center * (1 - Self.aspectRatioTolerance)
-        let upper = center * (1 + Self.aspectRatioTolerance)
+        let lower = center * (1 - configuration.aspectRatioTolerance)
+        let upper = center * (1 + configuration.aspectRatioTolerance)
         return ratio >= lower && ratio <= upper
     }
 

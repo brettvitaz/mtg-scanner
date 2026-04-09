@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
@@ -94,7 +95,16 @@ public final class AppModel {
             statusMessage = "Could not decode image for detection."
             return
         }
-        await recognizeImage(image: uiImage, filename: filename)
+        let supportedContentTypes = UTType(mimeType: contentType).map { [$0] } ?? []
+        guard let payload = RecognitionImagePayload.importedPhoto(
+            data: data,
+            image: uiImage,
+            supportedContentTypes: supportedContentTypes
+        ) else {
+            statusMessage = "Failed to prepare image for upload."
+            return
+        }
+        await recognizeImage(payload: payload, filename: filename)
     }
 
     /// Recognise cards from a UIImage directly (avoids Data round-trip for camera captures).
@@ -102,6 +112,14 @@ public final class AppModel {
     /// When `onDeviceCropEnabled` is true, runs on-device detection first and uploads
     /// crops to the batch endpoint. When false, sends the full image to the single-image endpoint.
     func recognizeImage(image: UIImage, filename: String) async {
+        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else {
+            statusMessage = "Failed to encode image."
+            return
+        }
+        await recognizeImage(payload: payload, filename: filename)
+    }
+
+    private func recognizeImage(payload: RecognitionImagePayload, filename: String) async {
         resultsNavigationPath = NavigationPath()
 
         do {
@@ -119,16 +137,16 @@ public final class AppModel {
 
         if onDeviceCropEnabled {
             statusMessage = "Detecting cards…"
-            let cropResult = await cropService.detectAndCrop(image: image)
+            let cropResult = await cropService.detectAndCrop(image: payload.displayImage)
             lastDetectedCrops = cropResult.crops
             if !cropResult.crops.isEmpty {
                 await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
             } else {
-                await uploadFullImage(image: image, filename: filename)
+                await uploadFullImage(payload: payload, filename: filename)
             }
         } else {
             statusMessage = "Uploading full image…"
-            await uploadFullImage(image: image, filename: filename)
+            await uploadFullImage(payload: payload, filename: filename)
         }
 
         isRecognizing = false
@@ -138,20 +156,16 @@ public final class AppModel {
 
     // MARK: - Private recognition helpers
 
-    private func uploadFullImage(image: UIImage, filename: String) async {
-        guard let data = image.jpegData(compressionQuality: 0.9) else {
-            statusMessage = "Failed to encode image."
-            return
-        }
-        await recognizeViaSingleImage(data: data, filename: filename, contentType: "image/jpeg")
+    private func uploadFullImage(payload: RecognitionImagePayload, filename: String) async {
+        await recognizeViaSingleImage(data: payload.uploadData, filename: filename, contentType: payload.contentType)
     }
 
     private func recognizeViaBatch(crops: [UIImage], baseFilename: String) async {
         let stem = (baseFilename as NSString).deletingPathExtension
         var cropPairs: [(data: Data, filename: String)] = []
         for (i, crop) in crops.enumerated() {
-            guard let jpegData = crop.jpegData(compressionQuality: 0.9) else { continue }
-            cropPairs.append((data: jpegData, filename: "\(stem)-crop-\(i).jpg"))
+            guard let payload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
+            cropPairs.append((data: payload.uploadData, filename: "\(stem)-crop-\(i).\(payload.preferredFilenameExtension)"))
         }
 
         guard !cropPairs.isEmpty else {

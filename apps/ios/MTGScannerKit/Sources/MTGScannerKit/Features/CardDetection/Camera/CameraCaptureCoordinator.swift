@@ -6,11 +6,11 @@ import UIKit
 final class CameraCaptureCoordinator {
     weak var controller: CameraViewController?
 
-    func capturePhoto() async -> UIImage? {
+    func capturePhoto() async -> RecognitionImagePayload? {
         guard let controller else { return nil }
         return await withCheckedContinuation { continuation in
-            controller.capturePhoto { image in
-                continuation.resume(returning: image)
+            controller.capturePhoto { payload in
+                continuation.resume(returning: payload)
             }
         }
     }

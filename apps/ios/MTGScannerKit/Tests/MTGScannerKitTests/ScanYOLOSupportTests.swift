@@ -242,6 +242,53 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertEqual(result.observations[0].boundingBox, outer.boundingBox)
     }
 
+    func testValidateKeepsOverlappingRealCardsWhenBothHaveDirectYoloSupport() {
+        let outer = makeObservation(
+            box: CGRect(x: 0.32, y: 0.18, width: 0.24, height: 0.34),
+            confidence: 1.0
+        )
+        let overlapping = makeObservation(
+            box: CGRect(x: 0.37, y: 0.22, width: 0.22, height: 0.32),
+            confidence: 1.0
+        )
+
+        let result = ScanYOLOSupport.validate(
+            [outer, overlapping],
+            with: [outer.boundingBox, overlapping.boundingBox]
+        )
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 2)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [outer, overlapping].map(\.boundingBox))
+    }
+
+    func testValidateTreatsSplitCardFacesAsInternalFeaturesWhenYoloOnlySupportsOuterCard() {
+        let fullCard = makeObservation(
+            box: CGRect(x: 0.20, y: 0.18, width: 0.24, height: 0.34),
+            confidence: 1.0
+        )
+        let topFace = makeObservation(
+            box: CGRect(x: 0.23, y: 0.35, width: 0.18, height: 0.10),
+            confidence: 1.0
+        )
+        let bottomFace = makeObservation(
+            box: CGRect(x: 0.23, y: 0.24, width: 0.18, height: 0.10),
+            confidence: 1.0
+        )
+
+        let result = ScanYOLOSupport.validate(
+            [fullCard, topFace, bottomFace],
+            with: [fullCard.boundingBox]
+        )
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 1)
+        XCTAssertEqual(result.yoloRejectedCount, 2)
+        XCTAssertEqual(result.observations.count, 1)
+        XCTAssertEqual(result.observations[0].boundingBox, fullCard.boundingBox)
+    }
+
     private func makeObservation(box: CGRect, confidence: Float) -> VNRectangleObservation {
         let obs = VNRectangleObservation()
         obs.setValue(box, forKey: "boundingBox")

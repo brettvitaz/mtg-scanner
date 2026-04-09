@@ -6,6 +6,7 @@ import Vision
 final class RectangleFilterTests: XCTestCase {
 
     private let filter = RectangleFilter()
+    private let cropFilter = RectangleFilter(configuration: .crop)
 
     // MARK: - Constants
 
@@ -113,7 +114,7 @@ final class RectangleFilterTests: XCTestCase {
 
     func testFilterAcceptsAtLowerToleranceBound() {
         // Use a value just inside the lower bound to avoid floating-point boundary fragility.
-        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)
+        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (lower + 0.005)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -122,7 +123,7 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterRejectsBelowLowerToleranceBound() {
-        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance)
+        let lower = RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (lower - 0.01)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -132,7 +133,7 @@ final class RectangleFilterTests: XCTestCase {
 
     func testFilterAcceptsAtUpperToleranceBound() {
         // Use a value just inside the upper bound to avoid floating-point boundary fragility.
-        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance)
+        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (upper - 0.005)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -141,7 +142,7 @@ final class RectangleFilterTests: XCTestCase {
     }
 
     func testFilterRejectsAboveUpperToleranceBound() {
-        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.aspectRatioTolerance)
+        let upper = RectangleFilter.targetAspectRatio * (1 + RectangleFilter.scanAspectRatioTolerance)
         let height: CGFloat = 0.4
         let width = height * (upper + 0.01)
         let obs = makeObservation(box: CGRect(x: 0.1, y: 0.1, width: width, height: height), confidence: 0.9)
@@ -230,6 +231,20 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
     }
 
+    func testCropFilterRejectsPerspectiveDistortedCardNearPortraitLowerBound() {
+        let obs = VNRectangleObservation()
+        obs.setValue(CGRect(x: 0.210, y: 0.664, width: 0.132, height: 0.317), forKey: "boundingBox")
+        obs.setValue(Float(1.0), forKey: "confidence")
+        obs.setValue(CGPoint(x: 0.210, y: 0.929), forKey: "topLeft")
+        obs.setValue(CGPoint(x: 0.324, y: 0.981), forKey: "topRight")
+        obs.setValue(CGPoint(x: 0.342, y: 0.730), forKey: "bottomRight")
+        obs.setValue(CGPoint(x: 0.220, y: 0.664), forKey: "bottomLeft")
+
+        let result = cropFilter.filter([obs], isLandscape: false)
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
     func testFilterRejectsTallAggregateBoxUnderPortraitTolerance() {
         let obs = VNRectangleObservation()
         obs.setValue(CGRect(x: 0.475, y: 0.434, width: 0.163, height: 0.451), forKey: "boundingBox")
@@ -257,7 +272,7 @@ final class RectangleFilterTests: XCTestCase {
     func testVisionBoundsAreWiderThanEdgeFilter() {
         // Vision bounds must be wider than the edge-based filter because
         // bounding-box aspect ratios distort more than edge ratios for rotated cards.
-        let edgeLower = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.aspectRatioTolerance))
+        let edgeLower = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance))
         XCTAssertTrue(RectangleFilter.visionMinAspectRatio < edgeLower)
     }
 
@@ -394,6 +409,27 @@ final class RectangleFilterTests: XCTestCase {
         let result = filter.filter([larger, almostSame], isLandscape: false)
         XCTAssertEqual(result.count, 1)
         XCTAssertEqual(result[0].boundingBox, larger.boundingBox)
+    }
+
+    func testCropFilterDoesNotApplyContainmentSuppression() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.45
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.75
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.16, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.95
+        )
+
+        let result = cropFilter.filter([inner, outer], isLandscape: false)
+
+        XCTAssertEqual(result.count, 2)
     }
 
     func testFilterReturnsEmptyForEmptyInput() {

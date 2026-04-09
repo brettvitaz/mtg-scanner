@@ -21,7 +21,7 @@ struct CardCropResult {
 final class CardCropService: @unchecked Sendable {
 
     private static let cropPadding: CGFloat = 0.03
-    private let rectangleFilter = RectangleFilter()
+    private let rectangleFilter = RectangleFilter(configuration: .crop)
     private let ciContext = CIContext()
 
     // MARK: - Public API

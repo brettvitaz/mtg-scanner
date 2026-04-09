@@ -17,12 +17,12 @@ final class CardDetectionEngine: @unchecked Sendable {
 
     // MARK: - Properties
 
-    var detectionMode: DetectionMode = .scan
+    private(set) var detectionMode: DetectionMode = .scan
 
     /// Set to `true` when the device interface orientation is landscape.
     /// Written from the main thread; read on the camera queue in `processFrame` — same
     /// pattern as `detectionMode`. The worst-case race during rotation is one stale frame.
-    var isLandscape: Bool = false
+    private(set) var isLandscape: Bool = false
 
     // Loaded lazily so start-up time is not impacted if Auto Scan is not used.
     private lazy var yoloDetector: YOLOCardDetector? = YOLOCardDetector()
@@ -66,6 +66,18 @@ final class CardDetectionEngine: @unchecked Sendable {
         }
     }
 
+    func updateDetectionMode(_ mode: DetectionMode) {
+        guard detectionMode != mode else { return }
+        detectionMode = mode
+        scheduleScanValidationReset()
+    }
+
+    func updateIsLandscape(_ isLandscape: Bool) {
+        guard self.isLandscape != isLandscape else { return }
+        self.isLandscape = isLandscape
+        scheduleScanValidationReset()
+    }
+
     // MARK: - Private Detection
 
     private func detect(
@@ -79,6 +91,12 @@ final class CardDetectionEngine: @unchecked Sendable {
             return detectScanCards(pixelBuffer: pixelBuffer, timestamp: timestamp, isLandscape: isLandscape)
         case .auto:
             return detectAutoScanCard(pixelBuffer: pixelBuffer, timestamp: timestamp)
+        }
+    }
+
+    private func scheduleScanValidationReset() {
+        visionQueue.async { [weak self] in
+            self?.scanYOLOValidationState.reset()
         }
     }
 
@@ -246,7 +264,11 @@ final class CardDetectionEngine: @unchecked Sendable {
     ) -> [CGRect]? {
         let decision = scanYOLOValidationState.boxesForFrame(timestamp: timestamp)
         if decision.shouldStartRefresh {
-            refreshScanYOLOBoxes(pixelBuffer: pixelBuffer, timestamp: timestamp)
+            refreshScanYOLOBoxes(
+                pixelBuffer: pixelBuffer,
+                timestamp: timestamp,
+                generation: decision.generation
+            )
         }
         return decision.cachedBoxes
     }
@@ -260,7 +282,8 @@ final class CardDetectionEngine: @unchecked Sendable {
 
     private func refreshScanYOLOBoxes(
         pixelBuffer: CVPixelBuffer,
-        timestamp: TimeInterval
+        timestamp: TimeInterval,
+        generation: Int
     ) {
         guard let detector = yoloDetector else {
             scanYOLOValidationState.finishRefreshWithoutResult()
@@ -274,9 +297,17 @@ final class CardDetectionEngine: @unchecked Sendable {
                 .map { ScanYOLOSupport.visionBox(from: $0.rect) }
             self?.visionQueue.async { [weak self] in
                 guard let self else { return }
-                self.scanYOLOValidationState.storeRefresh(boxes: boxes, timestamp: timestamp)
+                self.scanYOLOValidationState.storeRefresh(
+                    boxes: boxes,
+                    timestamp: timestamp,
+                    generation: generation
+                )
             }
         }
+    }
+
+    func scanYOLOValidationStateSnapshot() -> ScanYOLOValidationState {
+        visionQueue.sync { scanYOLOValidationState }
     }
 }
 
@@ -306,6 +337,7 @@ extension CardDetectionEngine {
         var frameCounter = 0
         var hasCachedBoxes = false
         var refreshInFlight = false
+        var generation = 0
 
         mutating func boxesForFrame(timestamp: TimeInterval) -> ScanYOLORefreshDecision {
             frameCounter += 1
@@ -328,11 +360,13 @@ extension CardDetectionEngine {
 
             return ScanYOLORefreshDecision(
                 cachedBoxes: hasCachedBoxes ? boxes : nil,
-                shouldStartRefresh: shouldStartRefresh
+                shouldStartRefresh: shouldStartRefresh,
+                generation: generation
             )
         }
 
-        mutating func storeRefresh(boxes: [CGRect], timestamp: TimeInterval) {
+        mutating func storeRefresh(boxes: [CGRect], timestamp: TimeInterval, generation: Int) {
+            guard generation == self.generation else { return }
             self.boxes = boxes
             lastTimestamp = timestamp
             hasCachedBoxes = true
@@ -342,11 +376,21 @@ extension CardDetectionEngine {
         mutating func finishRefreshWithoutResult() {
             refreshInFlight = false
         }
+
+        mutating func reset() {
+            boxes = []
+            lastTimestamp = nil
+            frameCounter = 0
+            hasCachedBoxes = false
+            refreshInFlight = false
+            generation += 1
+        }
     }
 
     struct ScanYOLORefreshDecision {
         let cachedBoxes: [CGRect]?
         let shouldStartRefresh: Bool
+        let generation: Int
     }
 
     struct ScanYOLOValidationResult {
@@ -460,6 +504,7 @@ enum ScanYOLOSupport {
             let candidateBox = candidate.boundingBox
             let candidateArea = RectangleFilter.area(of: candidateBox)
             guard candidateArea > 0 else { continue }
+            guard supportScores[candidateIndex] < coverageThreshold else { continue }
 
             let shouldReject = observations.enumerated().contains { index, supported in
                 guard index != candidateIndex else { return false }

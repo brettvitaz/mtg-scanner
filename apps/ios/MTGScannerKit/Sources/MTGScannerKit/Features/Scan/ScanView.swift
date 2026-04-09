@@ -208,8 +208,8 @@ struct ScanView: View {
     private func captureCard() {
         triggerShutterFeedback()
         Task {
-            guard let image = await captureCoordinator.capturePhoto() else { return }
-            await enqueueForRecognition(image)
+            guard let payload = await captureCoordinator.capturePhoto() else { return }
+            await enqueueForRecognition(payload)
         }
     }
 }
@@ -236,15 +236,23 @@ private extension ScanView {
                 photoLoadError = "The selected file is not a supported image."
                 return
             }
-            await enqueueForRecognition(uiImage)
+            guard let payload = RecognitionImagePayload.importedPhoto(
+                data: data,
+                image: uiImage,
+                supportedContentTypes: item.supportedContentTypes
+            ) else {
+                photoLoadError = "Failed to prepare the selected image for upload."
+                return
+            }
+            await enqueueForRecognition(payload)
         } catch {
             photoLoadError = "Failed to load the selected photo: \(error.localizedDescription)"
         }
     }
 
     @MainActor
-    func enqueueForRecognition(_ image: UIImage) async {
-        await autoScanViewModel.enqueueCapturedImage(image, cropEnabled: appModel.onDeviceCropEnabled)
+    func enqueueForRecognition(_ payload: RecognitionImagePayload) async {
+        await autoScanViewModel.enqueueCapturedImage(payload, cropEnabled: appModel.onDeviceCropEnabled)
     }
 
     func lockOrientation(_ mask: UIInterfaceOrientationMask) {

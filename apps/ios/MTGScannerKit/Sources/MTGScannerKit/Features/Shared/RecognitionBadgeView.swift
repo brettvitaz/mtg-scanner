@@ -7,6 +7,9 @@ import SwiftUI
 struct RecognitionBadgeView: View {
     @Bindable var recognitionQueue: RecognitionQueue
     var onCancel: (() -> Void)?
+    var onRetryFailed: (() -> Void)?
+    var onClearFailed: (() -> Void)?
+    @State private var showingFailedAlert = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
@@ -21,6 +24,13 @@ struct RecognitionBadgeView: View {
             if recognitionQueue.failedCount > 0 {
                 failedBadge
             }
+        }
+        .alert("Recognition Failures", isPresented: $showingFailedAlert) {
+            Button("Retry") { onRetryFailed?() }
+            Button("Dismiss", role: .destructive) { onClearFailed?() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(recognitionQueue.failedCount) card(s) could not be recognized. Retry or dismiss them.")
         }
     }
 
@@ -54,14 +64,19 @@ struct RecognitionBadgeView: View {
     }
 
     private var failedBadge: some View {
-        Text("\(recognitionQueue.failedCount) failed")
-            .font(.caption.bold())
-            .foregroundStyle(.red)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .accessibilityLabel("Recognition failures")
-            .accessibilityValue("\(recognitionQueue.failedCount) failed")
+        Button {
+            showingFailedAlert = true
+        } label: {
+            Text("\(recognitionQueue.failedCount) failed")
+                .font(.caption.bold())
+                .foregroundStyle(.red)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+        }
+        .accessibilityLabel("Recognition failures")
+        .accessibilityValue("\(recognitionQueue.failedCount) failed")
+        .accessibilityHint("Tap to retry or dismiss failed cards.")
     }
 }

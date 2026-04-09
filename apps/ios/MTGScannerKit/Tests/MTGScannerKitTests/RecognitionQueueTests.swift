@@ -285,17 +285,81 @@ final class RecognitionQueueTests: XCTestCase {
 
 // MARK: - Helpers
 
-extension RecognitionQueueTests {
-    private func makeFailingQueue() -> RecognitionQueue {
-        RecognitionQueue(recognize: { _, _, _, _ in throw URLError(.notConnectedToInternet) })
+@MainActor
+private func makeFailingQueue() -> RecognitionQueue {
+    RecognitionQueue(recognize: { _, _, _, _ in throw URLError(.notConnectedToInternet) })
+}
+
+private func makeImage() -> UIImage {
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10))
+    return renderer.image { ctx in
+        ctx.cgContext.setFillColor(UIColor.red.cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+    }
+}
+
+// MARK: - Retry / Clear Failed
+
+@MainActor
+final class RecognitionQueueRetryTests: XCTestCase {
+
+    func testRetryFailedMovesJobsToPending() async throws {
+        let queue = makeFailingQueue()
+        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(queue.failedCount, 1)
+        XCTAssertEqual(queue.pendingCount, 0)
+
+        queue.retryFailed()
+        XCTAssertEqual(queue.failedCount, 0)
+        XCTAssertEqual(queue.pendingCount, 1)
     }
 
-    private func makeImage() -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10))
-        return renderer.image { ctx in
-            ctx.cgContext.setFillColor(UIColor.red.cgColor)
-            ctx.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+    func testRetryFailedJobsProcessAfterRetry() async throws {
+        nonisolated(unsafe) var callCount = 0
+        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+            callCount += 1
+            if callCount <= 2 { throw URLError(.networkConnectionLost) }
+            return RecognitionResult(cards: [])
+        })
+        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(queue.failedCount, 1)
+
+        queue.retryFailed()
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(queue.failedCount, 0)
+        XCTAssertEqual(queue.completedCount, 1)
+    }
+
+    func testClearFailedRemovesAllFailedJobs() async throws {
+        let queue = makeFailingQueue()
+        for _ in 0..<3 {
+            queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         }
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(queue.failedCount, 3)
+
+        queue.clearFailed()
+        XCTAssertEqual(queue.failedCount, 0)
+        XCTAssertEqual(queue.completedCount, 0)
+    }
+
+    func testRetryFailedResetsRetryCount() async throws {
+        nonisolated(unsafe) var callCount = 0
+        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+            callCount += 1
+            throw URLError(.networkConnectionLost)
+        })
+        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(callCount, 2)
+        XCTAssertEqual(queue.failedCount, 1)
+
+        queue.retryFailed()
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(callCount, 4)
+        XCTAssertEqual(queue.failedCount, 1)
     }
 
     private func makePayload(

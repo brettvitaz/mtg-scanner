@@ -37,6 +37,7 @@ final class RecognitionQueue {
     private let recognizeBatch: RecognizeBatchFunction
     private var activeCount = 0
     private var pendingJobs: [Job] = []
+    private var failedJobs: [Job] = []
     private var activeTasks: [UUID: Task<Void, Never>] = [:]
 
     private struct Job {
@@ -126,6 +127,7 @@ final class RecognitionQueue {
         let contentType = job.payload.contentType
         guard !uploadData.isEmpty else {
             pendingCount -= 1
+            failedJobs.append(job)
             failedCount += 1
             return
         }
@@ -150,8 +152,26 @@ final class RecognitionQueue {
             pendingJobs.insert(retried, at: 0)
         } else {
             pendingCount -= 1
+            failedJobs.append(job)
             failedCount += 1
         }
+    }
+
+    func retryFailed() {
+        let jobs = failedJobs
+        failedJobs.removeAll()
+        failedCount = 0
+        for var job in jobs {
+            job.retryCount = 0
+            pendingJobs.append(job)
+            pendingCount += 1
+        }
+        drainIfPossible()
+    }
+
+    func clearFailed() {
+        failedJobs.removeAll()
+        failedCount = 0
     }
 
     private func callAPI(data: Data, contentType: String, job: Job) async throws -> RecognitionResult {

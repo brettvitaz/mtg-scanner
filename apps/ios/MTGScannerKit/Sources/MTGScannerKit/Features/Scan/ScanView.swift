@@ -132,7 +132,9 @@ struct ScanView: View {
                 Spacer()
                 RecognitionBadgeView(
                     recognitionQueue: autoScanViewModel.recognitionQueue,
-                    onCancel: autoScanViewModel.cancelRecognition
+                    onCancel: autoScanViewModel.cancelRecognition,
+                    onRetryFailed: autoScanViewModel.recognitionQueue.retryFailed,
+                    onClearFailed: autoScanViewModel.recognitionQueue.clearFailed
                 )
             }
             Spacer()

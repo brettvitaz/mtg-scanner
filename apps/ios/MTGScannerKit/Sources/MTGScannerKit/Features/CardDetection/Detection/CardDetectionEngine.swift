@@ -246,6 +246,16 @@ final class CardDetectionEngine: @unchecked Sendable {
         pixelBuffer: CVPixelBuffer,
         timestamp: TimeInterval
     ) -> ScanYOLOValidationResult {
+        guard !observations.isEmpty else {
+            return ScanYOLOValidationResult(
+                observations: [],
+                yoloBoxes: [],
+                yoloAcceptedCount: 0,
+                yoloRejectedCount: 0,
+                usedFallback: false
+            )
+        }
+
         let yoloBoxes = scanYOLOBoxes(pixelBuffer: pixelBuffer, timestamp: timestamp)
         let validation = ScanYOLOSupport.validate(observations, with: yoloBoxes)
 
@@ -309,6 +319,18 @@ final class CardDetectionEngine: @unchecked Sendable {
     func scanYOLOValidationStateSnapshot() -> ScanYOLOValidationState {
         visionQueue.sync { scanYOLOValidationState }
     }
+
+    #if DEBUG
+    func validateScanObservationsForTesting(
+        _ observations: [VNRectangleObservation],
+        pixelBuffer: CVPixelBuffer,
+        timestamp: TimeInterval
+    ) -> ScanYOLOValidationResult {
+        visionQueue.sync {
+            validateScanObservations(observations, pixelBuffer: pixelBuffer, timestamp: timestamp)
+        }
+    }
+    #endif
 }
 
 // MARK: - DetectedCard convenience init from VNRectangleObservation
@@ -483,11 +505,18 @@ enum ScanYOLOSupport {
 
     private static func supportScore(rectangle: CGRect, with yoloBox: CGRect) -> CGFloat {
         let iou = RectangleFilter.iou(rectangle, yoloBox)
+        let areaRatio = largerToSmallerAreaRatio(between: rectangle, and: yoloBox)
         let yoloCoveredByRectangle = coverage(of: yoloBox, by: rectangle)
         let rectangleCoveredByYOLO = coverage(of: rectangle, by: yoloBox)
+        let enclosureCoverage = yoloCoveredByRectangle >= coverageThreshold
+            && areaRatio <= looseCoverageAreaRatioThreshold
         let looseCoverage = rectangleCoveredByYOLO >= coverageThreshold
-            && largerToSmallerAreaRatio(between: rectangle, and: yoloBox) <= looseCoverageAreaRatioThreshold
-        return max(iou, yoloCoveredByRectangle, looseCoverage ? rectangleCoveredByYOLO : 0)
+            && areaRatio <= looseCoverageAreaRatioThreshold
+        return max(
+            iou,
+            enclosureCoverage ? yoloCoveredByRectangle : 0,
+            looseCoverage ? rectangleCoveredByYOLO : 0
+        )
     }
 
     private static func supports(rectangle: CGRect, with yoloBox: CGRect) -> Bool {

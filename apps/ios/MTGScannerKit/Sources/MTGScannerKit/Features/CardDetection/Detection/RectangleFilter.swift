@@ -59,10 +59,6 @@ struct RectangleFilter {
     /// Minimum larger/smaller area ratio required before containment suppression fires.
     static let containmentAreaRatioThreshold: CGFloat = 1.50
 
-    /// A later, larger rectangle can replace an earlier contained rectangle only when the size
-    /// gap is substantial; this avoids weak enclosing boxes displacing the actual card bounds.
-    static let containmentReplacementAreaRatioThreshold: CGFloat = 1.50
-
     struct Configuration {
         let aspectRatioTolerance: CGFloat
         let enablesContainmentSuppression: Bool
@@ -97,7 +93,7 @@ struct RectangleFilter {
     /// 1. Drops observations below `minConfidence`.
     /// 2. Drops observations whose aspect ratio falls outside the active band.
     /// 3. Applies IoU-based NMS (higher-confidence observation wins ties).
-    /// 4. Suppresses nested inner boxes.
+    /// 4. Suppresses nested inner boxes and discards looser late enclosing boxes.
     /// 5. Re-sorts in top-left → bottom-right reading order.
     func filter(_ observations: [VNRectangleObservation], isLandscape: Bool) -> [VNRectangleObservation] {
         filterResult(observations, isLandscape: isLandscape).observations
@@ -196,29 +192,16 @@ struct RectangleFilter {
                 continue
             }
 
-            let replacedIndices = kept.indices.filter { index in
-                let accepted = kept[index]
+            if kept.contains(where: { accepted in
                 let acceptedArea = Self.area(of: accepted.boundingBox)
                 guard acceptedArea > 0 else { return false }
-                guard candidateArea / acceptedArea >= Self.containmentReplacementAreaRatioThreshold else {
+                guard candidateArea / acceptedArea >= Self.containmentAreaRatioThreshold else {
                     return false
                 }
                 return Self.containmentRatio(of: accepted.boundingBox, in: observation.boundingBox) >=
                     Self.containmentThreshold
-            }
-
-            if replacedIndices.count == 1 {
-                for index in replacedIndices.reversed() {
-                    kept.remove(at: index)
-                }
-                kept.append(observation)
-                suppressionCount += replacedIndices.count
-                continue
-            }
-
-            if replacedIndices.count > 1 {
-                // A single enclosing box spanning multiple accepted rectangles is an aggregate
-                // detection, not a better replacement for any one card.
+            }) {
+                // Keep the tighter accepted box instead of promoting a looser enclosing box.
                 suppressionCount += 1
                 continue
             }

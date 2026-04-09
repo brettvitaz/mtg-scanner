@@ -303,7 +303,7 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result.count, 2)
     }
 
-    func testFilterSuppressesNestedInnerBoxEvenWhenItHasHigherConfidence() {
+    func testFilterKeepsTighterInnerCardWhenLooserOuterBoxArrivesLater() {
         let ratio = RectangleFilter.targetAspectRatio
         let outerHeight: CGFloat = 0.45
         let outerWidth = outerHeight * ratio
@@ -320,6 +320,27 @@ final class RectangleFilterTests: XCTestCase {
         )
 
         let result = filter.filter([inner, outer], isLandscape: false)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].boundingBox, inner.boundingBox)
+    }
+
+    func testFilterSuppressesNestedInnerFeatureWhenOuterCardIsAcceptedFirst() {
+        let ratio = RectangleFilter.targetAspectRatio
+        let outerHeight: CGFloat = 0.45
+        let outerWidth = outerHeight * ratio
+        let innerHeight: CGFloat = 0.22
+        let innerWidth = innerHeight * ratio
+
+        let outer = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: outerWidth, height: outerHeight),
+            confidence: 0.95
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.16, y: 0.18, width: innerWidth, height: innerHeight),
+            confidence: 0.75
+        )
+
+        let result = filter.filter([outer, inner], isLandscape: false)
         XCTAssertEqual(result.count, 1)
         XCTAssertEqual(result[0].boundingBox, outer.boundingBox)
     }

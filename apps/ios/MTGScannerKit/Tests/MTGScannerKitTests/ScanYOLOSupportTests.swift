@@ -263,6 +263,24 @@ final class ScanYOLOSupportTests: XCTestCase {
         XCTAssertEqual(result.observations.map(\.boundingBox), [outer, overlapping].map(\.boundingBox))
     }
 
+    func testValidateDoesNotTreatArbitrarilyLargerRectangleAsYoloSupported() {
+        let actualCard = makeObservation(
+            box: CGRect(x: 0.34, y: 0.22, width: 0.20, height: 0.30),
+            confidence: 1.0
+        )
+        let oversized = makeObservation(
+            box: CGRect(x: 0.24, y: 0.12, width: 0.40, height: 0.50),
+            confidence: 1.0
+        )
+
+        let result = ScanYOLOSupport.validate([actualCard, oversized], with: [actualCard.boundingBox])
+
+        XCTAssertFalse(result.usedFallback)
+        XCTAssertEqual(result.yoloAcceptedCount, 1)
+        XCTAssertEqual(result.yoloRejectedCount, 0)
+        XCTAssertEqual(result.observations.map(\.boundingBox), [actualCard, oversized].map(\.boundingBox))
+    }
+
     func testValidateTreatsSplitCardFacesAsInternalFeaturesWhenYoloOnlySupportsOuterCard() {
         let fullCard = makeObservation(
             box: CGRect(x: 0.20, y: 0.18, width: 0.24, height: 0.34),

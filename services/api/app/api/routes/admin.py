@@ -46,5 +46,5 @@ async def refresh_pricing(
         "source_url": result.source_url,
         "fetched_at": result.fetched_at,
         "model_count": result.model_count,
-        "missing_models": result.missing_models,
+        "missing_providers": result.missing_providers,
     }

@@ -15,7 +15,7 @@ FAKE_RESULT = RefreshResult(
     source_url="http://example.com",
     fetched_at="2026-01-01T00:00:00+00:00",
     model_count=8,
-    missing_models=[],
+    missing_providers=[],
 )
 
 

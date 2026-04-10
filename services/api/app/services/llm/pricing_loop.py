@@ -16,9 +16,9 @@ async def pricing_refresh_loop(interval_hours: int) -> None:
         try:
             result = await refresh_prices_from_upstream()
             logger.info(
-                "Pricing refresh: ok, models=%d, missing=%s",
+                "Pricing refresh: ok, models=%d, missing_providers=%s",
                 result.model_count,
-                result.missing_models or "none",
+                result.missing_providers or "none",
             )
         except asyncio.CancelledError:
             raise

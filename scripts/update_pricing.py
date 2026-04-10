@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from app.services.llm.pricing_refresh import MODEL_ALLOWLIST, refresh_prices_from_upstream
+from app.services.llm.pricing_refresh import PROVIDER_ALLOWLIST, refresh_prices_from_upstream
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,12 +21,12 @@ def parse_args() -> argparse.Namespace:
         help="Override the output path (default: services/api/data/pricing/model_prices.json).",
     )
     parser.add_argument(
-        "--model",
+        "--provider",
         action="append",
         default=None,
-        dest="models",
-        metavar="MODEL_ID",
-        help="Only refresh this model id (repeatable). Default: all allowlisted models.",
+        dest="providers",
+        metavar="PROVIDER_ID",
+        help="Only refresh this provider id (repeatable). Default: all allowlisted providers.",
     )
     return parser.parse_args()
 
@@ -34,28 +34,28 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    allowlist = MODEL_ALLOWLIST
-    if args.models:
-        allowlist = {k: v for k, v in MODEL_ALLOWLIST.items() if k in args.models}
-        unknown = set(args.models) - set(MODEL_ALLOWLIST)
+    providers = PROVIDER_ALLOWLIST
+    if args.providers:
+        providers = frozenset(args.providers) & PROVIDER_ALLOWLIST
+        unknown = set(args.providers) - PROVIDER_ALLOWLIST
         if unknown:
             print(
-                f"Warning: unknown model ids ignored: {sorted(unknown)}",
+                f"Warning: unknown provider ids ignored: {sorted(unknown)}",
                 file=sys.stderr,
             )
 
     try:
         result = asyncio.run(
-            refresh_prices_from_upstream(path=args.output, allowlist=allowlist)
+            refresh_prices_from_upstream(path=args.output, providers=providers)
         )
     except Exception as exc:  # noqa: BLE001 — CLI; print any error to stderr
         print(f"Pricing refresh failed: {exc}", file=sys.stderr)
         return 1
 
     print(f"Updated {result.model_count} model(s) at {result.fetched_at}")
-    if result.missing_models:
+    if result.missing_providers:
         print(
-            f"Warning: models not found upstream: {result.missing_models}",
+            f"Warning: providers not found upstream: {result.missing_providers}",
             file=sys.stderr,
         )
     return 0

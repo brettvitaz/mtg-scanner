@@ -31,18 +31,10 @@ UPSTREAM_URL = (
 )
 FETCH_TIMEOUT = 30.0
 
-# Allowlist: models this project supports.
-# {local_model_id: (upstream_provider_id, upstream_model_id)}
-MODEL_ALLOWLIST: dict[str, tuple[str, str]] = {
-    "gpt-4.1": ("openai", "gpt-4.1"),
-    "gpt-4.1-mini": ("openai", "gpt-4.1-mini"),
-    "gpt-4.1-nano": ("openai", "gpt-4.1-nano"),
-    "gpt-4o": ("openai", "gpt-4o"),
-    "gpt-4o-mini": ("openai", "gpt-4o-mini"),
-    "claude-sonnet-4-0": ("anthropic", "claude-sonnet-4-0"),
-    "claude-haiku-3-5": ("anthropic", "claude-haiku-3-5"),
-    "kimi-k2.5": ("moonshotai", "kimi-k2.5"),
-}
+# Provider-level allowlist: every model from these providers is imported automatically.
+# Adding a new provider here is the only code change needed to expand coverage.
+# New models from existing providers flow through on the next daily refresh — no code change.
+PROVIDER_ALLOWLIST: frozenset[str] = frozenset({"openai", "anthropic", "moonshotai"})
 
 
 @dataclass(frozen=True)
@@ -50,7 +42,7 @@ class RefreshResult:
     source_url: str
     fetched_at: str
     model_count: int
-    missing_models: list[str] = field(default_factory=list)
+    missing_providers: list[str] = field(default_factory=list)
 
 
 async def fetch_upstream(url: str = UPSTREAM_URL) -> list[dict[str, Any]]:
@@ -64,52 +56,82 @@ async def fetch_upstream(url: str = UPSTREAM_URL) -> list[dict[str, Any]]:
     return data
 
 
+def _resolve_price(value: Any) -> float | None:
+    """Resolve a price value that may be a plain number or a tiered dict.
+
+    Upstream uses two shapes:
+    - Plain number: {"input_mtok": 2.0}
+    - Tiered dict:  {"input_mtok": {"base": 2.0, "tiers": [...]}}
+
+    Returns the base price as a float, or None if the shape is unrecognised.
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, dict):
+        base = value.get("base")
+        if isinstance(base, (int, float)):
+            return float(base)
+    return None
+
+
+def _resolve_prices_dict(raw: Any) -> dict[str, Any] | None:
+    """Return a plain prices dict from either a dict or a list of price schedules.
+
+    When prices is a list (tiered/date-constrained schedules), prefer the entry
+    without a constraint (the always-applicable base rate).  If all entries have
+    constraints, take the first one.
+    """
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, list) and raw:
+        # Prefer an entry with no constraint (unconditional base rate)
+        for entry in raw:
+            if isinstance(entry, dict) and "constraint" not in entry:
+                return entry.get("prices")
+        # Fall back to first entry
+        first = raw[0]
+        if isinstance(first, dict):
+            return first.get("prices")
+    return None
+
+
 def extract_prices(
     upstream: list[dict[str, Any]],
-    allowlist: dict[str, tuple[str, str]],
+    providers: frozenset[str],
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
-    """Extract allowlisted model prices from the upstream data.
+    """Extract all models from upstream whose provider is in the allowlist.
 
-    Returns (models_dict, missing_model_ids) where models_dict maps local
-    model id to {input_mtok, output_mtok, provider} and missing_model_ids
-    lists allowlisted models not found in the upstream data.
+    Returns (models_dict, missing_providers) where models_dict maps model id
+    to {input_mtok, output_mtok, provider}, and missing_providers lists any
+    allowlisted providers not found in the upstream data.
+
+    Models without both input_mtok and output_mtok (e.g. embedding-only, image,
+    TTS) are skipped silently — they cannot produce a USD cost from a TokenUsage.
     """
-    # Build a lookup: {(provider_id, model_id): prices_dict}
-    upstream_index: dict[tuple[str, str], dict[str, Any]] = {}
+    found_providers: set[str] = set()
+    extracted: dict[str, dict[str, Any]] = {}
     for provider in upstream:
         provider_id = provider.get("id", "")
+        if provider_id not in providers:
+            continue
+        found_providers.add(provider_id)
         for model in provider.get("models", []):
             model_id = model.get("id", "")
-            prices = model.get("prices", {})
-            if provider_id and model_id and isinstance(prices, dict):
-                upstream_index[(provider_id, model_id)] = prices
-
-    extracted: dict[str, dict[str, Any]] = {}
-    missing: list[str] = []
-    for local_id, (provider_id, upstream_model_id) in allowlist.items():
-        prices = upstream_index.get((provider_id, upstream_model_id))
-        if prices is None:
-            logger.warning(
-                "Model %s (%s/%s) not found in upstream pricing data",
-                local_id,
-                provider_id,
-                upstream_model_id,
-            )
-            missing.append(local_id)
-            continue
-        input_mtok = prices.get("input_mtok")
-        output_mtok = prices.get("output_mtok")
-        if input_mtok is None or output_mtok is None:
-            logger.warning(
-                "Model %s is missing input_mtok or output_mtok in upstream data", local_id
-            )
-            missing.append(local_id)
-            continue
-        extracted[local_id] = {
-            "input_mtok": float(input_mtok),
-            "output_mtok": float(output_mtok),
-            "provider": provider_id,
-        }
+            if not model_id:
+                continue
+            prices = _resolve_prices_dict(model.get("prices", {}))
+            if not isinstance(prices, dict):
+                continue
+            input_mtok = _resolve_price(prices.get("input_mtok"))
+            output_mtok = _resolve_price(prices.get("output_mtok"))
+            if input_mtok is None or output_mtok is None:
+                continue
+            extracted[model_id] = {
+                "input_mtok": input_mtok,
+                "output_mtok": output_mtok,
+                "provider": provider_id,
+            }
+    missing = sorted(providers - found_providers)
     return extracted, missing
 
 
@@ -133,18 +155,18 @@ def write_prices(path: Path, data: dict[str, Any]) -> None:
 async def refresh_prices_from_upstream(
     *,
     path: Path | None = None,
-    allowlist: dict[str, tuple[str, str]] | None = None,
+    providers: frozenset[str] | None = None,
 ) -> RefreshResult:
-    """Fetch upstream prices, extract the allowlist, and write to path.
+    """Fetch upstream prices, extract the provider allowlist, and write to path.
 
     Raises httpx.HTTPError, ValueError, or OSError on failure.
     The caller is responsible for error handling.
     """
     dest = path if path is not None else PRICING_FILE_PATH
-    active_allowlist = allowlist if allowlist is not None else MODEL_ALLOWLIST
+    active = providers if providers is not None else PROVIDER_ALLOWLIST
 
     upstream = await fetch_upstream()
-    extracted, missing = extract_prices(upstream, active_allowlist)
+    extracted, missing = extract_prices(upstream, active)
     fetched_at = datetime.now(timezone.utc).isoformat()
     data = {
         "source_url": UPSTREAM_URL,
@@ -153,7 +175,7 @@ async def refresh_prices_from_upstream(
     }
     write_prices(dest, data)
     logger.info(
-        "Pricing file updated: %d models, %d missing, path=%s",
+        "Pricing file updated: %d models, %d missing providers, path=%s",
         len(extracted),
         len(missing),
         dest,
@@ -162,5 +184,5 @@ async def refresh_prices_from_upstream(
         source_url=UPSTREAM_URL,
         fetched_at=fetched_at,
         model_count=len(extracted),
-        missing_models=missing,
+        missing_providers=missing,
     )

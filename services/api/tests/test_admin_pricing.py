@@ -17,7 +17,7 @@ FAKE_RESULT = RefreshResult(
     source_url="https://example.com/prices.json",
     fetched_at="2026-04-10T12:00:00+00:00",
     model_count=8,
-    missing_models=[],
+    missing_providers=[],
 )
 
 
@@ -62,7 +62,7 @@ class TestAdminPricingRefresh:
         assert body["model_count"] == 8
         assert body["fetched_at"] == "2026-04-10T12:00:00+00:00"
         assert body["source_url"] == "https://example.com/prices.json"
-        assert body["missing_models"] == []
+        assert body["missing_providers"] == []
 
     def test_returns_502_on_upstream_failure(self, admin_client):
         with patch(

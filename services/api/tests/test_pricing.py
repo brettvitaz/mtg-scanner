@@ -1,9 +1,89 @@
-"""Tests for LLM pricing and cost estimation."""
+"""Tests for LLM pricing loader and cost estimation."""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from pathlib import Path
 
 import pytest
 
+import app.services.llm.pricing as pricing_module
 from app.models.recognition import TokenUsage
-from app.services.llm.pricing import MODEL_PRICES, estimate_cost
+from app.services.llm.pricing import PRICING_FILE_PATH, estimate_cost, load_prices
+
+
+@pytest.fixture(autouse=True)
+def reset_pricing_cache():
+    """Reset the module-level mtime cache between tests."""
+    pricing_module._cache = {}
+    pricing_module._cache_mtime = None
+    yield
+    pricing_module._cache = {}
+    pricing_module._cache_mtime = None
+
+
+class TestLoadPrices:
+    def test_reads_checked_in_file(self):
+        prices = load_prices()
+        assert isinstance(prices, dict)
+        assert len(prices) > 0
+        # kimi-k2.5 corrected value (was a placeholder at 1.00/4.00)
+        assert "kimi-k2.5" in prices
+        assert prices["kimi-k2.5"] == (0.60, 3.00)
+
+    def test_returns_expected_models(self):
+        prices = load_prices()
+        for model in ["gpt-4.1-mini", "claude-sonnet-4-0", "kimi-k2.5"]:
+            assert model in prices
+
+    def test_missing_file_returns_empty(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(pricing_module, "PRICING_FILE_PATH", tmp_path / "nonexistent.json")
+        prices = load_prices()
+        assert prices == {}
+
+    def test_malformed_file_returns_empty(self, monkeypatch, tmp_path):
+        bad_file = tmp_path / "prices.json"
+        bad_file.write_text("not valid json", encoding="utf-8")
+        monkeypatch.setattr(pricing_module, "PRICING_FILE_PATH", bad_file)
+        prices = load_prices()
+        assert prices == {}
+
+    def test_reloads_on_mtime_change(self, monkeypatch, tmp_path):
+        prices_file = tmp_path / "prices.json"
+
+        def write(data: dict) -> None:
+            prices_file.write_text(json.dumps({"models": data}), encoding="utf-8")
+
+        write({"model-a": {"input_mtok": 1.0, "output_mtok": 2.0}})
+        # ensure initial mtime is in the past
+        past = time.time() - 5
+        os.utime(prices_file, (past, past))
+
+        monkeypatch.setattr(pricing_module, "PRICING_FILE_PATH", prices_file)
+        first = load_prices()
+        assert "model-a" in first
+
+        write({"model-b": {"input_mtok": 3.0, "output_mtok": 6.0}})
+        # bump mtime forward so it differs from cached value
+        os.utime(prices_file, (past + 2, past + 2))
+
+        second = load_prices()
+        assert "model-b" in second
+        assert "model-a" not in second
+
+    def test_cache_used_when_mtime_unchanged(self, monkeypatch, tmp_path):
+        prices_file = tmp_path / "prices.json"
+        prices_file.write_text(
+            json.dumps({"models": {"model-x": {"input_mtok": 1.0, "output_mtok": 2.0}}}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(pricing_module, "PRICING_FILE_PATH", prices_file)
+        first = load_prices()
+        # Second call with same mtime must return the exact same dict object (cached)
+        second = load_prices()
+        assert second is first
 
 
 class TestEstimateCost:
@@ -33,7 +113,7 @@ class TestEstimateCost:
 
     def test_all_known_models_have_valid_prices(self):
         usage = TokenUsage(input_tokens=1000, output_tokens=1000, total_tokens=2000)
-        for model in MODEL_PRICES:
+        for model in load_prices():
             cost = estimate_cost(usage, model)
             assert cost is not None
             assert cost > 0

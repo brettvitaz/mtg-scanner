@@ -1,0 +1,14 @@
+{
+  "source_url": "https://raw.githubusercontent.com/pydantic/genai-prices/main/prices/data_slim.json",
+  "fetched_at": "2026-04-10T00:00:00+00:00",
+  "models": {
+    "gpt-4.1":           {"input_mtok": 2.00,  "output_mtok": 8.00,  "provider": "openai"},
+    "gpt-4.1-mini":      {"input_mtok": 0.40,  "output_mtok": 1.60,  "provider": "openai"},
+    "gpt-4.1-nano":      {"input_mtok": 0.10,  "output_mtok": 0.40,  "provider": "openai"},
+    "gpt-4o":            {"input_mtok": 2.50,  "output_mtok": 10.00, "provider": "openai"},
+    "gpt-4o-mini":       {"input_mtok": 0.15,  "output_mtok": 0.60,  "provider": "openai"},
+    "claude-sonnet-4-0": {"input_mtok": 3.00,  "output_mtok": 15.00, "provider": "anthropic"},
+    "claude-haiku-3-5":  {"input_mtok": 0.80,  "output_mtok": 4.00,  "provider": "anthropic"},
+    "kimi-k2.5":         {"input_mtok": 0.60,  "output_mtok": 3.00,  "provider": "moonshotai"}
+  }
+}

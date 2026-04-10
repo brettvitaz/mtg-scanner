@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     mtg_scanner_enable_llm_correction: bool = Field(default=True)
     mtg_scanner_correction_prompt_version: str = Field(default="card-correction.md")
 
+    # LLM pricing refresh
+    mtg_scanner_pricing_refresh_interval_hours: int = Field(default=0, ge=0)
+    mtg_scanner_admin_token: str | None = Field(default=None)
+
     # Logging
     mtg_scanner_log_level: str = Field(default="INFO")
 

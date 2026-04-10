@@ -7,7 +7,7 @@ IOS_TEST_CURRENT_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_C
 IOS_TEST_TABLET_DEVICE ?= iPad Air 11-inch (M4)
 IOS_TEST_TABLET_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_TABLET_DEVICE)
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint lint security tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint lint security tree
 
 bootstrap: api-bootstrap
 
@@ -55,6 +55,9 @@ api-update-mtgjson:
 
 api-import-ck-prices:
 	PYTHONPATH=services/api .venv/bin/python scripts/import_ck_prices.py
+
+api-update-pricing:
+	PYTHONPATH=services/api .venv/bin/python scripts/update_pricing.py
 
 api-security:
 	./scripts/security-api.sh

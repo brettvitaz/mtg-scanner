@@ -1,6 +1,26 @@
 from pydantic import BaseModel, Field
 
 
+class TokenUsage(BaseModel):
+    """Normalized token counts from an LLM API response."""
+
+    input_tokens: int = Field(..., ge=0)
+    output_tokens: int = Field(..., ge=0)
+    total_tokens: int = Field(..., ge=0)
+
+
+def accumulate_usage(usages: list["TokenUsage | None"]) -> "TokenUsage | None":
+    """Sum token usage across multiple LLM calls. Returns None if all inputs are None."""
+    valid = [u for u in usages if u is not None]
+    if not valid:
+        return None
+    return TokenUsage(
+        input_tokens=sum(u.input_tokens for u in valid),
+        output_tokens=sum(u.output_tokens for u in valid),
+        total_tokens=sum(u.total_tokens for u in valid),
+    )
+
+
 class RecognitionUploadMetadata(BaseModel):
     filename: str = Field(..., description="Uploaded image filename")
     content_type: str = Field(..., description="Uploaded image MIME type")
@@ -36,3 +56,10 @@ class RecognizedCard(BaseModel):
 
 class RecognitionResponse(BaseModel):
     cards: list[RecognizedCard]
+
+
+class RecognitionResult(BaseModel):
+    """Internal result pairing a recognition response with LLM usage metadata."""
+
+    response: RecognitionResponse
+    usage: TokenUsage | None = None

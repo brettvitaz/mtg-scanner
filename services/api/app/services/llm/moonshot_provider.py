@@ -6,11 +6,12 @@ from typing import Any
 
 import httpx
 
-from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.models.recognition import RecognitionResponse, RecognitionResult, RecognitionUploadMetadata
 from app.services.errors import RecognitionProviderError
 from app.services.llm.base import (
     encode_image_to_data_url,
     extract_json_from_text,
+    extract_openai_usage,
     parse_recognition_response,
 )
 
@@ -71,7 +72,7 @@ class MoonshotProvider:
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         prompt_text: str,
-    ) -> RecognitionResponse:
+    ) -> RecognitionResult:
         """Recognize cards in an image using Moonshot API."""
         data_url = encode_image_to_data_url(image_bytes, metadata.content_type)
         request_body = self._build_request(prompt_text, data_url)
@@ -122,7 +123,10 @@ class MoonshotProvider:
                 f"Moonshot provider returned invalid JSON: {exc}"
             ) from exc
 
-        return self._extract_response(payload)
+        return RecognitionResult(
+            response=self._extract_response(payload),
+            usage=extract_openai_usage(payload),
+        )
 
     def _build_request(self, prompt_text: str, data_url: str) -> dict[str, Any]:
         """Build Moonshot API request body (OpenAI-compatible)."""

@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Any, Protocol
 
-from app.models.recognition import RecognitionResponse
+from app.models.recognition import RecognitionResponse, RecognitionResult, TokenUsage
 from app.services.errors import RecognitionProviderError
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,33 @@ class LLMProvider(Protocol):
         image_bytes: bytes,
         metadata: Any,
         prompt_text: str,
-    ) -> RecognitionResponse: ...
+    ) -> RecognitionResult: ...
+
+
+def extract_openai_usage(payload: dict[str, Any]) -> TokenUsage | None:
+    """Extract token usage from an OpenAI-compatible API response."""
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    return TokenUsage(
+        input_tokens=usage.get("prompt_tokens", 0),
+        output_tokens=usage.get("completion_tokens", 0),
+        total_tokens=usage.get("total_tokens", 0),
+    )
+
+
+def extract_anthropic_usage(payload: dict[str, Any]) -> TokenUsage | None:
+    """Extract token usage from an Anthropic API response."""
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    input_t = usage.get("input_tokens", 0)
+    output_t = usage.get("output_tokens", 0)
+    return TokenUsage(
+        input_tokens=input_t,
+        output_tokens=output_t,
+        total_tokens=input_t + output_t,
+    )
 
 
 def encode_image_to_data_url(image_bytes: bytes, content_type: str) -> str:

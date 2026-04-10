@@ -112,3 +112,31 @@ Deviations from plan: none
 Deviations from plan: none
 
 ---
+
+### Step 11: Added pricing refresh system (background loop, admin endpoint, make command)
+
+**Status:** done
+
+Added `pricing_refresh.py` (shared core: `fetch_upstream`, `extract_prices`, `write_prices`, `refresh_prices_from_upstream`), `pricing_loop.py` (async background task), `admin.py` route (`POST /admin/pricing/refresh`, token-gated via `hmac.compare_digest`), and `scripts/update_llm_pricing.py` (CLI wrapper). Rewrote `pricing.py` to load from `services/api/data/pricing/model_prices.json` with mtime-aware caching instead of a hardcoded dict. Added `mtg_scanner_pricing_refresh_interval_hours` and `mtg_scanner_admin_token` settings. Wired startup/shutdown lifecycle in `main.py`. Committed the checked-in fallback JSON with corrected Kimi pricing ($0.60/$3.00 — sourced from pydantic/genai-prices, verified against upstream).
+
+Added: `test_pricing_refresh.py` (13 tests), `test_pricing_loop.py` (3 tests), `test_admin_pricing.py` (6 tests), `test_startup_pricing_refresh.py` (3 tests). Updated `test_pricing.py` with `TestLoadPrices` class (mtime cache, missing file, malformed file). `make api-test`: 208 passing, same 2 pre-existing failures. `make api-lint`: clean.
+
+Deviations from plan: `claude-haiku-3-5` was dropped from the initial allowlist — it does not exist upstream (the correct upstream id is `claude-3-5-haiku-latest`). The refresh system automatically logged it as missing during the first `make api-update-pricing` run, which caught the error.
+
+---
+
+### Step 12: Switched to provider-level allowlist; expanded model coverage to 86 models
+
+**Status:** done
+
+Replaced `MODEL_ALLOWLIST` (a dict of 8 specific model ids) with `PROVIDER_ALLOWLIST = frozenset({"openai", "anthropic", "moonshotai"})`. `extract_prices()` now pulls every model from allowlisted providers automatically. New model releases (e.g., gpt-5, claude-4, future kimi releases) are picked up on the next daily refresh with no code change.
+
+Extended `extract_prices()` to handle two additional upstream price shapes found in practice: tiered dicts `{"base": N, "tiers": [...]}` (uses base price) and list-of-price-schedules (prefers the entry without a `constraint` key). Added `_resolve_price()` and `_resolve_prices_dict()` helpers. Models without `input_mtok`/`output_mtok` (embeddings, TTS, image, realtime) are skipped silently.
+
+Updated `RefreshResult.missing_models` → `missing_providers`, `scripts/update_llm_pricing.py` `--model` flag → `--provider`. Regenerated `model_prices.json`: 86 models across openai, anthropic, moonshotai.
+
+Added `TestExtractPricesTieredShapes` with 2 tests covering tiered dict and list-of-schedules shapes. `make api-test`: 210 passing (added 2 new tests), same 2 pre-existing failures. `make api-lint`: clean.
+
+Deviations from plan: none
+
+---

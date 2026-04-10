@@ -27,6 +27,7 @@ struct LibraryView: View {
             collectionsSection
             decksSection
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Library")
         .toolbar { addMenu }
         .alert("New Collection", isPresented: $showNewCollection) {

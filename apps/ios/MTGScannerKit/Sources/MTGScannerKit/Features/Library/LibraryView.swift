@@ -97,10 +97,12 @@ struct LibraryView: View {
                         Label("Rename", systemImage: "pencil")
                     }
                 }
-            }
-            .onDelete { offsets in
-                for index in offsets {
-                    libraryViewModel.deleteCollection(collections[index])
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        libraryViewModel.deleteCollection(collection)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
         }
@@ -125,10 +127,12 @@ struct LibraryView: View {
                         Label("Rename", systemImage: "pencil")
                     }
                 }
-            }
-            .onDelete { offsets in
-                for index in offsets {
-                    libraryViewModel.deleteDeck(decks[index])
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        libraryViewModel.deleteDeck(deck)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
         }

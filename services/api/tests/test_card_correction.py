@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.models.recognition import RecognizedCard, RecognitionResponse, RecognitionUploadMetadata
+from app.models.recognition import RecognizedCard, RecognitionResponse, RecognitionResult, RecognitionUploadMetadata, TokenUsage
 from app.services.card_validation import CardValidationService
 from app.services.mtgjson_index import CardRecord, MTGJSONIndex, import_all_printings
 from app.services.recognizer import RecognitionService, _build_correction_prompt
@@ -121,24 +121,29 @@ def test_build_correction_prompt_handles_empty_candidates() -> None:
     assert "Set Code" in result
 
 
+def _make_result(cards: list) -> RecognitionResult:
+    return RecognitionResult(
+        response=RecognitionResponse(cards=cards),
+        usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
+    )
+
+
 def test_llm_correction_resolves_needs_correction(validator: CardValidationService, mtgjson_db: Path) -> None:
     # Lightning Bolt is in 2 sets — initial validation returns needs_correction.
     # Mock provider returns the correct printing on the second call.
-    corrected_response = RecognitionResponse(
-        cards=[RecognizedCard(
-            title="Lightning Bolt",
-            edition="Magic 2010",
-            collector_number="146",
-            foil=False,
-            confidence=0.85,
-            notes="Corrected by LLM.",
-        )]
-    )
+    corrected_result = _make_result([RecognizedCard(
+        title="Lightning Bolt",
+        edition="Magic 2010",
+        collector_number="146",
+        foil=False,
+        confidence=0.85,
+        notes="Corrected by LLM.",
+    )])
 
     mock_provider = MagicMock()
     mock_provider.provider_name = "mock"
     mock_provider.model_name = None
-    mock_provider.recognize.return_value = corrected_response
+    mock_provider.recognize.return_value = corrected_result
 
     service = RecognitionService(
         mock_provider,
@@ -151,7 +156,7 @@ def test_llm_correction_resolves_needs_correction(validator: CardValidationServi
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    response, _, _, validation_result = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    response, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
     # The mock's first call returns Lightning Bolt in unknown set
     # which will trigger needs_correction then the correction call
@@ -161,21 +166,19 @@ def test_llm_correction_resolves_needs_correction(validator: CardValidationServi
 
 
 def test_llm_correction_disabled_does_not_retry(validator: CardValidationService) -> None:
-    wrong_set_response = RecognitionResponse(
-        cards=[RecognizedCard(
-            title="Lightning Bolt",
-            edition="Dominaria",
-            collector_number=None,
-            foil=False,
-            confidence=0.80,
-            notes=None,
-        )]
-    )
+    wrong_set_result = _make_result([RecognizedCard(
+        title="Lightning Bolt",
+        edition="Dominaria",
+        collector_number=None,
+        foil=False,
+        confidence=0.80,
+        notes=None,
+    )])
 
     mock_provider = MagicMock()
     mock_provider.provider_name = "mock"
     mock_provider.model_name = None
-    mock_provider.recognize.return_value = wrong_set_response
+    mock_provider.recognize.return_value = wrong_set_result
 
     service = RecognitionService(
         mock_provider,
@@ -188,7 +191,7 @@ def test_llm_correction_disabled_does_not_retry(validator: CardValidationService
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    _, _, _, validation_result = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    _, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
     assert validation_result is not None
     assert validation_result.traces[0].status == "needs_correction"
@@ -199,22 +202,20 @@ def test_llm_correction_disabled_does_not_retry(validator: CardValidationService
 def test_llm_correction_fallback_on_provider_error(validator: CardValidationService) -> None:
     from app.services.errors import RecognitionProviderError
 
-    wrong_set_response = RecognitionResponse(
-        cards=[RecognizedCard(
-            title="Lightning Bolt",
-            edition="Dominaria",
-            collector_number=None,
-            foil=False,
-            confidence=0.80,
-            notes=None,
-        )]
-    )
+    wrong_set_result = _make_result([RecognizedCard(
+        title="Lightning Bolt",
+        edition="Dominaria",
+        collector_number=None,
+        foil=False,
+        confidence=0.80,
+        notes=None,
+    )])
 
     mock_provider = MagicMock()
     mock_provider.provider_name = "mock"
     mock_provider.model_name = None
     mock_provider.recognize.side_effect = [
-        wrong_set_response,
+        wrong_set_result,
         RecognitionProviderError("Connection failed"),
     ]
 
@@ -229,7 +230,7 @@ def test_llm_correction_fallback_on_provider_error(validator: CardValidationServ
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    _, _, _, validation_result = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    _, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
     assert validation_result is not None
     # Correction failed, original needs_correction status retained
@@ -237,31 +238,27 @@ def test_llm_correction_fallback_on_provider_error(validator: CardValidationServ
 
 
 def test_llm_correction_fallback_when_correction_also_fails_validation(validator: CardValidationService) -> None:
-    wrong_set_response = RecognitionResponse(
-        cards=[RecognizedCard(
-            title="Lightning Bolt",
-            edition="Dominaria",
-            collector_number=None,
-            foil=False,
-            confidence=0.80,
-            notes=None,
-        )]
-    )
-    still_wrong_response = RecognitionResponse(
-        cards=[RecognizedCard(
-            title="Lightning Bolt",
-            edition="Dominaria",
-            collector_number=None,
-            foil=False,
-            confidence=0.60,
-            notes="Still wrong.",
-        )]
-    )
+    wrong_set_result = _make_result([RecognizedCard(
+        title="Lightning Bolt",
+        edition="Dominaria",
+        collector_number=None,
+        foil=False,
+        confidence=0.80,
+        notes=None,
+    )])
+    still_wrong_result = _make_result([RecognizedCard(
+        title="Lightning Bolt",
+        edition="Dominaria",
+        collector_number=None,
+        foil=False,
+        confidence=0.60,
+        notes="Still wrong.",
+    )])
 
     mock_provider = MagicMock()
     mock_provider.provider_name = "mock"
     mock_provider.model_name = None
-    mock_provider.recognize.side_effect = [wrong_set_response, still_wrong_response]
+    mock_provider.recognize.side_effect = [wrong_set_result, still_wrong_result]
 
     service = RecognitionService(
         mock_provider,
@@ -274,7 +271,7 @@ def test_llm_correction_fallback_when_correction_also_fails_validation(validator
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    _, _, _, validation_result = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    _, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
     assert validation_result is not None
     # Correction attempt also returned needs_correction, so original retained

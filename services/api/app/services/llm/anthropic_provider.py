@@ -6,10 +6,11 @@ from typing import Any
 
 import httpx
 
-from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.models.recognition import RecognitionResponse, RecognitionResult, RecognitionUploadMetadata
 from app.services.errors import RecognitionProviderError
 from app.services.llm.base import (
     encode_image_to_data_url,
+    extract_anthropic_usage,
     extract_json_from_text,
     parse_recognition_response,
 )
@@ -58,7 +59,7 @@ class AnthropicProvider:
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         prompt_text: str,
-    ) -> RecognitionResponse:
+    ) -> RecognitionResult:
         """Recognize cards in an image using Anthropic Messages API."""
         # For Anthropic, we need base64 data without the data URL prefix
         encoded = encode_image_to_data_url(image_bytes, metadata.content_type)
@@ -115,7 +116,10 @@ class AnthropicProvider:
                 f"Anthropic provider returned invalid JSON: {exc}"
             ) from exc
 
-        return self._extract_response(payload)
+        return RecognitionResult(
+            response=self._extract_response(payload),
+            usage=extract_anthropic_usage(payload),
+        )
 
     def _build_request(
         self, prompt_text: str, base64_data: str, media_type: str

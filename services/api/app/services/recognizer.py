@@ -8,7 +8,10 @@ from app.logging_config import get_logger
 from app.models.recognition import (
     RecognizedCard,
     RecognitionResponse,
+    RecognitionResult,
     RecognitionUploadMetadata,
+    TokenUsage,
+    accumulate_usage,
 )
 from app.services.card_detector import CardDetector, DetectionResult
 from app.services.card_validation import CardValidationService, ValidationBatchResult
@@ -29,7 +32,7 @@ class RecognitionProvider(Protocol):
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         prompt_text: str,
-    ) -> RecognitionResponse: ...
+    ) -> RecognitionResult: ...
 
 
 class MockRecognitionProvider:
@@ -51,7 +54,7 @@ class MockRecognitionProvider:
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         prompt_text: str,
-    ) -> RecognitionResponse:
+    ) -> RecognitionResult:
         del image_bytes
         del prompt_text
         payload = json.loads(self._example_path.read_text())
@@ -59,7 +62,10 @@ class MockRecognitionProvider:
             payload["cards"][0]["notes"] = (
                 f"Mocked recognition result for upload '{metadata.filename}' ({metadata.content_type})."
             )
-        return RecognitionResponse(**payload)
+        return RecognitionResult(
+            response=RecognitionResponse(**payload),
+            usage=TokenUsage(input_tokens=1500, output_tokens=500, total_tokens=2000),
+        )
 
 
 class RecognitionService:
@@ -92,14 +98,14 @@ class RecognitionService:
         validation_result: ValidationBatchResult,
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
-    ) -> ValidationBatchResult:
+    ) -> tuple[ValidationBatchResult, TokenUsage | None]:
         """Re-query the LLM for any cards with needs_correction status.
 
         Builds a constrained correction prompt with valid candidate printings and
         calls the provider again. Falls back to the original result if correction fails.
         """
         if not self._enable_llm_correction or self._validator is None:
-            return validation_result
+            return validation_result, None
 
         needs_correction_indices = [
             i
@@ -107,12 +113,13 @@ class RecognitionService:
             if trace.status == "needs_correction"
         ]
         if not needs_correction_indices:
-            return validation_result
+            return validation_result, None
 
         correction_prompt_text = _load_prompt(self._correction_prompt_version)
         updated_cards = list(validation_result.response.cards)
         updated_traces = list(validation_result.traces)
         updated_candidates = list(validation_result.correction_candidates)
+        correction_usages: list[TokenUsage | None] = []
 
         for idx in needs_correction_indices:
             card = validation_result.response.cards[idx]
@@ -123,7 +130,7 @@ class RecognitionService:
                 correction_prompt_text, card, candidates, reason
             )
             try:
-                corrected_response = self._provider.recognize(
+                corrected_result = self._provider.recognize(
                     image_bytes=image_bytes,
                     metadata=metadata,
                     prompt_text=filled_prompt,
@@ -136,14 +143,16 @@ class RecognitionService:
                 )
                 continue
 
-            if not corrected_response.cards:
+            correction_usages.append(corrected_result.usage)
+
+            if not corrected_result.response.cards:
                 logger.warning(
                     "LLM correction returned no cards for '%s'",
                     card.title or "<unknown>",
                 )
                 continue
 
-            corrected_card = corrected_response.cards[0]
+            corrected_card = corrected_result.response.cards[0]
             re_validated = self._validator.validate_card(corrected_card)
 
             if re_validated.trace.status not in {"no_match", "needs_correction"}:
@@ -157,14 +166,14 @@ class RecognitionService:
             enabled=validation_result.enabled,
             available=validation_result.available,
             correction_candidates=updated_candidates,
-        )
+        ), accumulate_usage(correction_usages)
 
     def _recognize_multiple_crops(
         self,
         *,
         crops: list[tuple[bytes, RecognitionUploadMetadata]],
         prompt_text: str,
-    ) -> list[RecognitionResponse]:
+    ) -> list[RecognitionResult]:
         logger.info(
             "Recognizing %d card crops concurrently (max_workers=%d)",
             len(crops),
@@ -175,9 +184,9 @@ class RecognitionService:
         )
         shutdown_nowait = False
         try:
-            responses: list[RecognitionResponse | None] = [None] * len(crops)
+            results: list[RecognitionResult | None] = [None] * len(crops)
             indexed_crops = iter(enumerate(crops))
-            futures: dict[concurrent.futures.Future[RecognitionResponse], int] = {}
+            futures: dict[concurrent.futures.Future[RecognitionResult], int] = {}
 
             def submit_next_crop() -> bool:
                 try:
@@ -205,7 +214,7 @@ class RecognitionService:
                 for future in done:
                     index = futures.pop(future)
                     try:
-                        responses[index] = future.result()
+                        results[index] = future.result()
                     except Exception:
                         pending_count = len(futures)
                         logger.error(
@@ -220,7 +229,7 @@ class RecognitionService:
                         raise
                     submit_next_crop()
 
-            return [response for response in responses if response is not None]
+            return [r for r in results if r is not None]
         finally:
             if not shutdown_nowait:
                 executor.shutdown(wait=True)
@@ -236,6 +245,7 @@ class RecognitionService:
         RecognitionUploadMetadata,
         DetectionResult | None,
         ValidationBatchResult | None,
+        TokenUsage | None,
     ]:
         """Recognize cards in an image.
 
@@ -278,19 +288,21 @@ class RecognitionService:
                     )
                     crops.append((crop_bytes, crop_metadata))
 
-                crop_responses = self._recognize_multiple_crops(
+                crop_results = self._recognize_multiple_crops(
                     crops=crops,
                     prompt_text=prompt_text,
                 )
 
                 all_cards: list[RecognizedCard] = []
-                for response in crop_responses:
-                    all_cards.extend(response.cards)
+                for result in crop_results:
+                    all_cards.extend(result.response.cards)
+                crop_usages: list[TokenUsage | None] = [r.usage for r in crop_results]
 
                 combined_response = RecognitionResponse(cards=all_cards)
                 validation_result = self._validate_response(combined_response)
+                correction_usage: TokenUsage | None = None
                 if validation_result:
-                    validation_result = self._apply_llm_correction(
+                    validation_result, correction_usage = self._apply_llm_correction(
                         validation_result, image_bytes, enriched_metadata
                     )
                 final_response = (
@@ -299,6 +311,7 @@ class RecognitionService:
                     else combined_response
                 )
                 final_response = _attach_crop_images(final_response, crop_bytes_list)
+                total_usage = accumulate_usage([*crop_usages, correction_usage])
                 logger.info(
                     "Multi-card recognition complete: %d cards detected and recognized from '%s'",
                     len(final_response.cards),
@@ -309,20 +322,23 @@ class RecognitionService:
                     enriched_metadata,
                     detection_result,
                     validation_result,
+                    total_usage,
                 )
 
         # Single card or no detection - use original behavior
-        response = self._provider.recognize(
+        single_result = self._provider.recognize(
             image_bytes=image_bytes,
             metadata=enriched_metadata,
             prompt_text=prompt_text,
         )
-        validation_result = self._validate_response(response)
+        validation_result = self._validate_response(single_result.response)
+        single_correction_usage: TokenUsage | None = None
         if validation_result:
-            validation_result = self._apply_llm_correction(
+            validation_result, single_correction_usage = self._apply_llm_correction(
                 validation_result, image_bytes, enriched_metadata
             )
-        final_response = validation_result.response if validation_result else response
+        final_response = validation_result.response if validation_result else single_result.response
+        total_usage = accumulate_usage([single_result.usage, single_correction_usage])
         logger.info(
             "Recognition complete: %d cards from '%s' via %s",
             len(final_response.cards),
@@ -334,6 +350,7 @@ class RecognitionService:
             enriched_metadata,
             detection_result,
             validation_result,
+            total_usage,
         )
 
 

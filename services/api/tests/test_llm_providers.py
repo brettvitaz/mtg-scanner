@@ -6,7 +6,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.models.recognition import (
+    RecognitionResponse,
+    RecognitionResult,
+    RecognitionUploadMetadata,
+    TokenUsage,
+    accumulate_usage,
+)
 from app.services.errors import RecognitionConfigurationError, RecognitionProviderError
 from app.services.llm import (
     get_llm_provider,
@@ -14,7 +20,12 @@ from app.services.llm import (
     MoonshotProvider,
     AnthropicProvider,
 )
-from app.services.llm.base import extract_json_from_text, parse_recognition_response
+from app.services.llm.base import (
+    extract_anthropic_usage,
+    extract_json_from_text,
+    extract_openai_usage,
+    parse_recognition_response,
+)
 from app.services.recognizer import MockRecognitionProvider
 from app.settings import Settings
 
@@ -120,7 +131,8 @@ class TestOpenAIProvider:
         mock_response.json.return_value = {
             "choices": [
                 {"message": {"content": json.dumps(sample_recognition_response)}}
-            ]
+            ],
+            "usage": {"prompt_tokens": 1200, "completion_tokens": 400, "total_tokens": 1600},
         }
         mock_response.raise_for_status = Mock()
 
@@ -131,9 +143,13 @@ class TestOpenAIProvider:
                 prompt_text="Extract card info",
             )
 
-            assert isinstance(result, RecognitionResponse)
-            assert len(result.cards) == 1
-            assert result.cards[0].title == "Lightning Bolt"
+            assert isinstance(result, RecognitionResult)
+            assert len(result.response.cards) == 1
+            assert result.response.cards[0].title == "Lightning Bolt"
+            assert result.usage is not None
+            assert result.usage.input_tokens == 1200
+            assert result.usage.output_tokens == 400
+            assert result.usage.total_tokens == 1600
 
     def test_recognize_json_mode(
         self, provider, sample_metadata, sample_recognition_response
@@ -145,7 +161,8 @@ class TestOpenAIProvider:
         mock_response.json.return_value = {
             "choices": [
                 {"message": {"content": json.dumps(sample_recognition_response)}}
-            ]
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 300, "total_tokens": 1300},
         }
         mock_response.raise_for_status = Mock()
 
@@ -156,8 +173,10 @@ class TestOpenAIProvider:
                 prompt_text="Extract card info",
             )
 
-            assert isinstance(result, RecognitionResponse)
-            assert result.cards[0].title == "Lightning Bolt"
+            assert isinstance(result, RecognitionResult)
+            assert result.response.cards[0].title == "Lightning Bolt"
+            assert result.usage is not None
+            assert result.usage.input_tokens == 1000
 
     def test_recognize_raw_mode(
         self, provider, sample_metadata, sample_recognition_response
@@ -173,7 +192,8 @@ class TestOpenAIProvider:
                         "content": f"```json\n{json.dumps(sample_recognition_response)}\n```"
                     }
                 }
-            ]
+            ],
+            "usage": {"prompt_tokens": 900, "completion_tokens": 250, "total_tokens": 1150},
         }
         mock_response.raise_for_status = Mock()
 
@@ -184,8 +204,10 @@ class TestOpenAIProvider:
                 prompt_text="Extract card info",
             )
 
-            assert isinstance(result, RecognitionResponse)
-            assert result.cards[0].title == "Lightning Bolt"
+            assert isinstance(result, RecognitionResult)
+            assert result.response.cards[0].title == "Lightning Bolt"
+            assert result.usage is not None
+            assert result.usage.total_tokens == 1150
 
     def test_http_error_raises_provider_error(self, provider, sample_metadata):
         """Test that HTTP errors are converted to RecognitionProviderError."""
@@ -254,7 +276,8 @@ class TestMoonshotProvider:
         mock_response.json.return_value = {
             "choices": [
                 {"message": {"content": json.dumps(sample_recognition_response)}}
-            ]
+            ],
+            "usage": {"prompt_tokens": 800, "completion_tokens": 200, "total_tokens": 1000},
         }
         mock_response.raise_for_status = Mock()
 
@@ -265,8 +288,10 @@ class TestMoonshotProvider:
                 prompt_text="Extract card info",
             )
 
-            assert isinstance(result, RecognitionResponse)
-            assert result.cards[0].title == "Lightning Bolt"
+            assert isinstance(result, RecognitionResult)
+            assert result.response.cards[0].title == "Lightning Bolt"
+            assert result.usage is not None
+            assert result.usage.input_tokens == 800
 
     def test_provider_name(self, provider):
         """Test provider name is set correctly."""
@@ -323,7 +348,8 @@ class TestAnthropicProvider:
                     "name": "card_recognition",
                     "input": sample_recognition_response,
                 }
-            ]
+            ],
+            "usage": {"input_tokens": 2000, "output_tokens": 600},
         }
         mock_response.raise_for_status = Mock()
 
@@ -334,8 +360,12 @@ class TestAnthropicProvider:
                 prompt_text="Extract card info",
             )
 
-            assert isinstance(result, RecognitionResponse)
-            assert result.cards[0].title == "Lightning Bolt"
+            assert isinstance(result, RecognitionResult)
+            assert result.response.cards[0].title == "Lightning Bolt"
+            assert result.usage is not None
+            assert result.usage.input_tokens == 2000
+            assert result.usage.output_tokens == 600
+            assert result.usage.total_tokens == 2600
 
     def test_recognize_raw_mode(
         self, provider, sample_metadata, sample_recognition_response
@@ -350,7 +380,8 @@ class TestAnthropicProvider:
                     "type": "text",
                     "text": json.dumps(sample_recognition_response),
                 }
-            ]
+            ],
+            "usage": {"input_tokens": 1500, "output_tokens": 400},
         }
         mock_response.raise_for_status = Mock()
 
@@ -361,8 +392,10 @@ class TestAnthropicProvider:
                 prompt_text="Extract card info",
             )
 
-            assert isinstance(result, RecognitionResponse)
-            assert result.cards[0].title == "Lightning Bolt"
+            assert isinstance(result, RecognitionResult)
+            assert result.response.cards[0].title == "Lightning Bolt"
+            assert result.usage is not None
+            assert result.usage.total_tokens == 1900
 
     def test_no_tool_use_block_raises_error(self, provider, sample_metadata):
         """Test error when no tool_use block in response."""
@@ -391,7 +424,8 @@ class TestAnthropicProvider:
                     "name": "card_recognition",
                     "input": {"cards": []},
                 }
-            ]
+            ],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
         }
         mock_response.raise_for_status = Mock()
 
@@ -540,3 +574,78 @@ class TestProviderFactory:
         with pytest.raises(RecognitionConfigurationError) as exc_info:
             get_llm_provider(settings)
         assert "Unknown LLM provider" in str(exc_info.value)
+
+
+class TestAccumulateUsage:
+    """Tests for accumulate_usage helper."""
+
+    def test_sums_multiple_usages(self):
+        usages = [
+            TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
+            TokenUsage(input_tokens=200, output_tokens=100, total_tokens=300),
+        ]
+        result = accumulate_usage(usages)
+        assert result is not None
+        assert result.input_tokens == 300
+        assert result.output_tokens == 150
+        assert result.total_tokens == 450
+
+    def test_returns_none_for_all_none_inputs(self):
+        assert accumulate_usage([None, None]) is None
+
+    def test_skips_none_entries(self):
+        usages = [None, TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150), None]
+        result = accumulate_usage(usages)
+        assert result is not None
+        assert result.input_tokens == 100
+
+    def test_returns_none_for_empty_list(self):
+        assert accumulate_usage([]) is None
+
+
+class TestExtractOpenAIUsage:
+    """Tests for extract_openai_usage helper."""
+
+    def test_extracts_token_counts(self):
+        payload = {"usage": {"prompt_tokens": 1200, "completion_tokens": 400, "total_tokens": 1600}}
+        usage = extract_openai_usage(payload)
+        assert usage is not None
+        assert usage.input_tokens == 1200
+        assert usage.output_tokens == 400
+        assert usage.total_tokens == 1600
+
+    def test_returns_none_when_no_usage_key(self):
+        assert extract_openai_usage({"choices": []}) is None
+
+    def test_returns_none_when_usage_not_dict(self):
+        assert extract_openai_usage({"usage": "none"}) is None
+
+    def test_missing_fields_default_to_zero(self):
+        usage = extract_openai_usage({"usage": {}})
+        assert usage is not None
+        assert usage.input_tokens == 0
+        assert usage.output_tokens == 0
+        assert usage.total_tokens == 0
+
+
+class TestExtractAnthropicUsage:
+    """Tests for extract_anthropic_usage helper."""
+
+    def test_extracts_token_counts(self):
+        payload = {"usage": {"input_tokens": 2000, "output_tokens": 600}}
+        usage = extract_anthropic_usage(payload)
+        assert usage is not None
+        assert usage.input_tokens == 2000
+        assert usage.output_tokens == 600
+        assert usage.total_tokens == 2600
+
+    def test_returns_none_when_no_usage_key(self):
+        assert extract_anthropic_usage({"content": []}) is None
+
+    def test_returns_none_when_usage_not_dict(self):
+        assert extract_anthropic_usage({"usage": None}) is None
+
+    def test_computes_total_from_input_and_output(self):
+        usage = extract_anthropic_usage({"usage": {"input_tokens": 100, "output_tokens": 50}})
+        assert usage is not None
+        assert usage.total_tokens == 150

@@ -115,22 +115,25 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
     monkeypatch.setenv("MTG_SCANNER_LLM_API_KEY", "test-key")
     monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
 
-    from app.models.recognition import RecognitionResponse
+    from app.models.recognition import RecognitionResponse, RecognitionResult, TokenUsage
     from app.services.llm import OpenAIProvider
 
     def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
         del self, image_bytes, metadata, prompt_text
-        return RecognitionResponse(
-            cards=[
-                {
-                    "title": "Autarch Mammoth",
-                    "edition": "Outlaws of Thunder Junction",
-                    "collector_number": "166",
-                    "foil": False,
-                    "confidence": 0.92,
-                    "notes": "Model guessed the set from weak packaging context.",
-                }
-            ]
+        return RecognitionResult(
+            response=RecognitionResponse(
+                cards=[
+                    {
+                        "title": "Autarch Mammoth",
+                        "edition": "Outlaws of Thunder Junction",
+                        "collector_number": "166",
+                        "foil": False,
+                        "confidence": 0.92,
+                        "notes": "Model guessed the set from weak packaging context.",
+                    }
+                ]
+            ),
+            usage=TokenUsage(input_tokens=1800, output_tokens=450, total_tokens=2250),
         )
 
     monkeypatch.setattr(
@@ -193,6 +196,10 @@ def test_recognition_upload_saves_artifacts(
     assert saved_metadata["prompt_version"] == "card-recognition.md"
     assert saved_metadata["provider"] == "mock"
     assert saved_metadata["model"] is None
+    assert saved_metadata["file_size_bytes"] == len(b"fake-image-bytes")
+    assert saved_metadata["usage"]["input_tokens"] == 1500
+    assert saved_metadata["usage"]["output_tokens"] == 500
+    assert saved_metadata["usage"]["total_tokens"] == 2000
     assert saved_metadata["validation"]["enabled"] is True
     assert saved_metadata["validation"]["available"] is True
     assert saved_metadata["validation"]["cards"][0]["status"] == "exact_match"
@@ -207,7 +214,7 @@ def test_recognition_can_use_openai_provider_without_live_access(
     monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
 
-    from app.models.recognition import RecognitionResponse
+    from app.models.recognition import RecognitionResponse, RecognitionResult, TokenUsage
     from app.services.llm import OpenAIProvider
 
     def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
@@ -217,17 +224,20 @@ def test_recognition_can_use_openai_provider_without_live_access(
         assert metadata.content_type == "image/jpeg"
         assert image_bytes == b"fake-image-bytes"
         assert "MTG Card Recognition Prompt" in prompt_text
-        return RecognitionResponse(
-            cards=[
-                {
-                    "title": "Black Lotus",
-                    "edition": "Limited Edition Alpha",
-                    "collector_number": None,
-                    "foil": False,
-                    "confidence": 0.98,
-                    "notes": "Title art and frame match clearly.",
-                }
-            ]
+        return RecognitionResult(
+            response=RecognitionResponse(
+                cards=[
+                    {
+                        "title": "Black Lotus",
+                        "edition": "Limited Edition Alpha",
+                        "collector_number": None,
+                        "foil": False,
+                        "confidence": 0.98,
+                        "notes": "Title art and frame match clearly.",
+                    }
+                ]
+            ),
+            usage=TokenUsage(input_tokens=2000, output_tokens=500, total_tokens=2500),
         )
 
     monkeypatch.setattr(

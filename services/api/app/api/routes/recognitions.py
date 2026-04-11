@@ -3,6 +3,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from app.logging_config import get_logger
 from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
 from app.services.artifact_store import get_artifact_store
+from app.services.llm.pricing import estimate_cost
 from app.services.recognizer import (
     RecognitionConfigurationError,
     RecognitionProviderError,
@@ -34,7 +35,7 @@ def create_recognition(
         prompt_version=prompt_version,
     )
     try:
-        response, enriched_metadata, detection_result, validation_result = (
+        response, enriched_metadata, detection_result, validation_result, usage = (
             get_recognition_service().recognize(
                 image_bytes=image_bytes,
                 metadata=metadata,
@@ -63,12 +64,15 @@ def create_recognition(
             detail=str(exc),
         ) from exc
 
+    cost = estimate_cost(usage, enriched_metadata.model) if usage is not None else None
     get_artifact_store().save_recognition(
         image_bytes=image_bytes,
         metadata=enriched_metadata,
         response=response,
         detection_result=detection_result,
         validation_result=validation_result,
+        usage=usage,
+        estimated_cost_usd=cost,
     )
     return response
 
@@ -109,7 +113,7 @@ def create_recognition_batch(
             prompt_version=prompt_version,
         )
         try:
-            response, enriched_metadata, detection_result, validation_result = (
+            response, enriched_metadata, detection_result, validation_result, usage = (
                 service.recognize(
                     image_bytes=image_bytes,
                     metadata=metadata,
@@ -139,12 +143,15 @@ def create_recognition_batch(
                 detail=str(exc),
             ) from exc
 
+        cost = estimate_cost(usage, enriched_metadata.model) if usage is not None else None
         artifact_store.save_recognition(
             image_bytes=image_bytes,
             metadata=enriched_metadata,
             response=response,
             detection_result=detection_result,
             validation_result=validation_result,
+            usage=usage,
+            estimated_cost_usd=cost,
         )
         encoded_crop = _encode_crop_image(image_bytes)
         for card in response.cards:

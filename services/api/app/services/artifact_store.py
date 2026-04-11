@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata
+from app.models.recognition import RecognitionResponse, RecognitionUploadMetadata, TokenUsage
 from app.services.card_validation import ValidationBatchResult
 from app.settings import get_settings
 
@@ -36,6 +36,8 @@ class LocalArtifactStore:
         response: RecognitionResponse,
         detection_result: DetectionResult | None = None,
         validation_result: ValidationBatchResult | None = None,
+        usage: TokenUsage | None = None,
+        estimated_cost_usd: float | None = None,
     ) -> StoredRecognitionArtifacts:
         from app.services.card_detector import DetectionResult
 
@@ -56,8 +58,18 @@ class LocalArtifactStore:
             "prompt_version": metadata.prompt_version,
             "provider": metadata.provider,
             "model": metadata.model,
+            "file_size_bytes": len(image_bytes),
             "saved_at": datetime.now(UTC).isoformat(),
         }
+
+        if usage is not None:
+            metadata_dict["usage"] = {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "total_tokens": usage.total_tokens,
+            }
+        if estimated_cost_usd is not None:
+            metadata_dict["estimated_cost_usd"] = round(estimated_cost_usd, 6)
 
         if validation_result is not None:
             metadata_dict["validation"] = {

@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models.recognition import RecognitionResponse
+from app.models.recognition import RecognitionResponse, RecognitionResult, TokenUsage
 from app.services.card_detector import CardDetector, CardRegion, DetectionResult
 from conftest import ARTIFACTS_DIR, SAMPLES_DIR, requires_sample_images
 
@@ -491,9 +491,10 @@ class TestMultiCardRecognitionAPI:
 
         def fake_recognize(self, image_bytes, metadata, prompt_text):  # type: ignore[no-untyped-def]
             del image_bytes, prompt_text
+            usage = TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150)
             if metadata.filename.endswith("crop-0.jpg"):
-                return RecognitionResponse(cards=[{"title": "Lightning Bolt", "edition": "M10", "collector_number": "146", "foil": False, "confidence": 0.9, "notes": "first crop"}])
-            return RecognitionResponse(cards=[{"title": "Totally Fake Card", "edition": "M10", "collector_number": "999", "foil": False, "confidence": 0.8, "notes": "second crop"}])
+                return RecognitionResult(response=RecognitionResponse(cards=[{"title": "Lightning Bolt", "edition": "M10", "collector_number": "146", "foil": False, "confidence": 0.9, "notes": "first crop"}]), usage=usage)
+            return RecognitionResult(response=RecognitionResponse(cards=[{"title": "Totally Fake Card", "edition": "M10", "collector_number": "999", "foil": False, "confidence": 0.8, "notes": "second crop"}]), usage=usage)
 
         monkeypatch.setattr(CardDetector, "detect", fake_detect)
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
@@ -549,24 +550,27 @@ class TestMultiCardRecognitionAPI:
             del self, image_bytes, prompt_text
             time.sleep(delays[metadata.filename])
             crop_index = int(metadata.filename.split("-crop-")[1].split(".")[0])
-            return RecognitionResponse(
-                cards=[
-                    {
-                        "title": f"Card {crop_index}",
-                        "edition": "Test Set",
-                        "collector_number": str(crop_index),
-                        "foil": False,
-                        "confidence": 0.9,
-                        "notes": metadata.filename,
-                    }
-                ]
+            return RecognitionResult(
+                response=RecognitionResponse(
+                    cards=[
+                        {
+                            "title": f"Card {crop_index}",
+                            "edition": "Test Set",
+                            "collector_number": str(crop_index),
+                            "foil": False,
+                            "confidence": 0.9,
+                            "notes": metadata.filename,
+                        }
+                    ]
+                ),
+                usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
             )
 
         monkeypatch.setattr(CardDetector, "detect", fake_detect)
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
         monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
 
-        response, _, detection_result, validation_result = service.recognize(
+        response, _, detection_result, validation_result, _ = service.recognize(
             image_bytes=b"fake-image-bytes",
             metadata=RecognitionUploadMetadata(
                 filename="upload.jpg",
@@ -618,17 +622,20 @@ class TestMultiCardRecognitionAPI:
                 counters["max"] = max(counters["max"], counters["current"])
             try:
                 time.sleep(0.03)
-                return RecognitionResponse(
-                    cards=[
-                        {
-                            "title": "Bounded Card",
-                            "edition": "Test Set",
-                            "collector_number": None,
-                            "foil": False,
-                            "confidence": 0.9,
-                            "notes": "bounded",
-                        }
-                    ]
+                return RecognitionResult(
+                    response=RecognitionResponse(
+                        cards=[
+                            {
+                                "title": "Bounded Card",
+                                "edition": "Test Set",
+                                "collector_number": None,
+                                "foil": False,
+                                "confidence": 0.9,
+                                "notes": "bounded",
+                            }
+                        ]
+                    ),
+                    usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
                 )
             finally:
                 with lock:
@@ -638,7 +645,7 @@ class TestMultiCardRecognitionAPI:
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
         monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
 
-        response, _, _, _ = service.recognize(
+        response, _, _, _, _ = service.recognize(
             image_bytes=b"fake-image-bytes",
             metadata=RecognitionUploadMetadata(
                 filename="upload.jpg",
@@ -696,17 +703,20 @@ class TestMultiCardRecognitionAPI:
                 release_running.wait(timeout=1.0)
             else:
                 queued_started.set()
-            return RecognitionResponse(
-                cards=[
-                    {
-                        "title": metadata.filename,
-                        "edition": "Test Set",
-                        "collector_number": None,
-                        "foil": False,
-                        "confidence": 0.9,
-                        "notes": "ok",
-                    }
-                ]
+            return RecognitionResult(
+                response=RecognitionResponse(
+                    cards=[
+                        {
+                            "title": metadata.filename,
+                            "edition": "Test Set",
+                            "collector_number": None,
+                            "foil": False,
+                            "confidence": 0.9,
+                            "notes": "ok",
+                        }
+                    ]
+                ),
+                usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
             )
 
         def run_recognition() -> None:
@@ -781,24 +791,27 @@ class TestMultiCardRecognitionAPI:
             del self, prompt_text
             recognize_events.append(metadata.filename)
             assert len(crop_events) == 3
-            return RecognitionResponse(
-                cards=[
-                    {
-                        "title": image_bytes.decode(),
-                        "edition": "Test Set",
-                        "collector_number": None,
-                        "foil": False,
-                        "confidence": 0.9,
-                        "notes": metadata.filename,
-                    }
-                ]
+            return RecognitionResult(
+                response=RecognitionResponse(
+                    cards=[
+                        {
+                            "title": image_bytes.decode(),
+                            "edition": "Test Set",
+                            "collector_number": None,
+                            "foil": False,
+                            "confidence": 0.9,
+                            "notes": metadata.filename,
+                        }
+                    ]
+                ),
+                usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
             )
 
         monkeypatch.setattr(CardDetector, "detect", fake_detect)
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
         monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
 
-        response, _, _, _ = service.recognize(
+        response, _, _, _, _ = service.recognize(
             image_bytes=b"fake-image-bytes",
             metadata=RecognitionUploadMetadata(
                 filename="upload.jpg",

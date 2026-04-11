@@ -5,23 +5,23 @@
 
 ## Summary
 
-**Verdict:** fail, plausible fix but not yet adequately verified.
+**Verdict:** fail, architecture is improved but the fix is still not verified.
 
 **What was requested:** Investigate and fix the delayed/glitchy rounded-corner transition on the top and bottom cells in the iOS Collections list during swipe-to-delete and press-and-hold.
 
 **What was delivered:** Replaced section-level `.onDelete` handling in `LibraryView` with explicit row-level `.swipeActions(edge: .trailing, allowsFullSwipe: true)` for collection and deck rows, while preserving the existing `NavigationLink` and rename context-menu behavior.
 
-**Assessment:** Investigation did not find any custom row clipping, masking, corner radius, or first/last-row-specific background treatment in the Library list. The notable difference from the detail lists, which already animate correctly, was that Library rows used section-level `.onDelete` instead of explicit row-level swipe actions. Aligning the Library list with the detail-list deletion pattern is a narrow, plausible fix for the delayed boundary-row rounding transition. However, the task required reproducing and verifying the interaction on top, middle, and bottom rows during swipe-to-delete and press-and-hold, and that direct visual evidence is still missing from this headless session.
+**Assessment:** Based on the code, this is a better fix than the prior `List` style change. The earlier `.listStyle(.insetGrouped)` adjustment was broad and did not target the interaction path that differed from the working detail lists. This change instead aligns `LibraryView` with `CollectionDetailView` and `DeckDetailView`, which already use row-level swipe actions and are the closest architectural match for the desired behavior. That makes the current fix narrower, easier to justify, and more plausible. However, the task explicitly required reproducing and verifying top, middle, and bottom row behavior during both swipe-to-delete and press-and-hold, and there is still no direct manual validation showing the visual glitch is gone.
 
-**Deferred items:** Verification remains incomplete.
+**Deferred items:** Manual interaction verification remains incomplete.
 
 ## Code Review Checklist
 
 ### 1. Correctness
 
-**Result:** pass
+**Result:** fail
 
-The change targets the most relevant behavioral difference in the Library list itself: deletion is now attached to each row via `.swipeActions`, matching the detail lists that already behave correctly. That keeps navigation and context menus intact while avoiding reliance on section-level `.onDelete` for the affected interaction path.
+The implementation is plausible and better targeted than the prior list-style change, because it moves Library deletion onto the same row-level swipe action pattern used by the working detail lists. That said, correctness is not fully established yet: the request covered both swipe-to-delete and press-and-hold behavior, while this code change only alters the swipe-delete mechanism and does not itself demonstrate that the long-press visual glitch is resolved.
 
 ### 2. Simplicity
 
@@ -76,11 +76,12 @@ The touched file passes targeted linting with `swiftlint lint apps/ios/MTGScanne
 
 ## Issues Found
 
-1. **Manual verification required by the task is missing.** The request explicitly called for reproducing and verifying top, middle, and bottom row behavior during swipe-to-delete and press-and-hold. The current work only shows build, lint, install, and launch evidence, so the claimed fix is still unproven.
-2. **The prior review note understated existing lint failures.** `make ios-lint` currently reports additional pre-existing violations beyond the four files originally listed. This does not block the UI fix itself, but the review record should be accurate.
+1. **Manual verification required by the task is missing.** The request explicitly called for reproducing and verifying top, middle, and bottom row behavior during swipe-to-delete and press-and-hold. The current evidence is still limited to code inspection plus build/lint results, so the claimed visual fix remains unproven.
+2. **Press-and-hold resolution is still only inferred, not demonstrated.** The new implementation changes the swipe-delete path by replacing section-level `.onDelete` with row-level `.swipeActions`, which is a sensible architectural match to the working detail lists. But the long-press interaction path still relies on the existing `contextMenu`, so this commit does not provide direct proof that the press-and-hold rounding glitch is fixed.
 
 ## Notes
 
 - I could not perform a full interactive swipe/long-press visual check from this headless subagent session, so my verdict is based on code inspection plus build/lint verification.
 - The missing `docs/plans/collections-list-rounding-glitch.md` file referenced in the request context was not present in this worktree.
+- Compared with the prior `.listStyle(.insetGrouped)` fix, this row-level swipe action change is the better architectural direction because it targets the differing interaction implementation rather than the list's overall presentation style.
 - If a task agent can run the simulator interactively and confirm the behavior on first, middle, and last rows, this change is otherwise clean and likely sufficient.

@@ -50,11 +50,13 @@ ios-test-matrix: ios-test ios-test-current ios-test-tablet
 ios-lint:
 	./scripts/lint-ios.sh
 
+IOS_SNAPSHOT_ROUTES ?= settings scan
+
 ios-snapshot: ios-build
 	ROUTE=$${ROUTE:-settings} ./scripts/ios-screenshot.sh "$${ROUTE:-settings}"
 
 ios-snapshot-all: ios-build
-	for route in settings scan; do ROUTE=$$route ./scripts/ios-screenshot.sh "$$route"; done
+	for route in $(IOS_SNAPSHOT_ROUTES); do ROUTE=$$route ./scripts/ios-screenshot.sh "$$route"; done
 
 api-update-mtgjson:
 	PYTHONPATH=services/api .venv/bin/python scripts/update_mtgjson.py

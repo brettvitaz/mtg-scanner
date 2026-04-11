@@ -23,8 +23,13 @@
 set -euo pipefail
 
 ROUTE="${1:-${ROUTE:-settings}}"
-WAIT="${IOS_SNAPSHOT_WAIT:-4}"
-BUNDLE_ID="com.brettvitaz.mtgscanner"
+# scan route needs a longer settle time for the detection overlay to appear.
+# Override with IOS_SNAPSHOT_WAIT=<seconds> if needed.
+if [[ "$ROUTE" == "scan" ]]; then
+    WAIT="${IOS_SNAPSHOT_WAIT:-5}"
+else
+    WAIT="${IOS_SNAPSHOT_WAIT:-4}"
+fi
 WORKSPACE="apps/ios/MTGScanner.xcworkspace"
 SCHEME="MTGScanner"
 
@@ -60,17 +65,24 @@ if [[ "$SIM_STATE" != "Booted" ]]; then
     xcrun simctl bootstatus "$SIM_UDID" -b
 fi
 
-# ── Locate the built .app ─────────────────────────────────────────────────────
+# ── Locate the built .app and resolve bundle ID ───────────────────────────────
 
 cd "$REPO_ROOT"
 
-BUILT_PRODUCTS_DIR=$(xcodebuild \
+BUILD_SETTINGS=$(xcodebuild \
     -workspace "$WORKSPACE" \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Debug \
-    -showBuildSettings 2>/dev/null \
-    | awk '/^ *BUILT_PRODUCTS_DIR =/ { sub(/.*= /, ""); print }')
+    -showBuildSettings 2>/dev/null)
+
+BUILT_PRODUCTS_DIR=$(echo "$BUILD_SETTINGS" | awk '/^ *BUILT_PRODUCTS_DIR =/ { sub(/.*= /, ""); print }')
+BUNDLE_ID=$(echo "$BUILD_SETTINGS" | awk '/^ *PRODUCT_BUNDLE_IDENTIFIER =/ { sub(/.*= /, ""); print }')
+
+if [[ -z "${BUNDLE_ID:-}" ]]; then
+    echo "ios-screenshot: could not read PRODUCT_BUNDLE_IDENTIFIER from xcodebuild" >&2
+    exit 1
+fi
 
 APP_PATH="${BUILT_PRODUCTS_DIR}/MTGScanner.app"
 
@@ -100,6 +112,9 @@ OUT_PATH="${OUT_DIR}/${ROUTE}.png"
 xcrun simctl io "$SIM_UDID" screenshot "$OUT_PATH"
 echo "ios-screenshot: saved $OUT_PATH"
 
-# ── Terminate app ─────────────────────────────────────────────────────────────
+# ── Terminate app and clean up UserDefaults ───────────────────────────────────
 
 xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+# Remove the preview-route key so normal (non-snapshot) launches of the app on this
+# simulator are not accidentally routed to the preview host.
+xcrun simctl spawn "$SIM_UDID" defaults delete "$BUNDLE_ID" UI_PREVIEW_ROUTE 2>/dev/null || true

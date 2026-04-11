@@ -30,6 +30,9 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
         "IMG_1610"
     ]
 
+    /// - Parameter frameInterval: Seconds between emitted frames. Default is 0.2s (5 Hz), which is
+    ///   intentionally slower than production 30 Hz — the goal is simulator UI verification, not
+    ///   real-time performance, and the reduced rate keeps CPU overhead minimal during screenshotting.
     init(frameInterval: TimeInterval = 0.2) {
         self.frameInterval = frameInterval
         self.pixelBuffers = Self.loadPixelBuffers()
@@ -69,7 +72,7 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
     }
 
     /// Fallback for common image extensions when the bundle URL lookup needs an explicit extension.
-    private static func findBundleURL(name: String) -> URL? {
+    static func findBundleURL(name: String) -> URL? {
         for ext in ["jpg", "jpeg", "png"] {
             if let url = Bundle.module.url(forResource: name, withExtension: ext) {
                 return url

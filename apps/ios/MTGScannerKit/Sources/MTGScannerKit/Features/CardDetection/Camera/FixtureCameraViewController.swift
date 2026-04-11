@@ -96,22 +96,13 @@ final class FixtureCameraViewController: UIViewController {
     private func loadFixtureImages() {
         currentImages = FixtureFrameSource.fixtureNames.compactMap { name in
             guard let url = Bundle.module.url(forResource: name, withExtension: nil)
-                    ?? Self.findBundleURL(name: name) else { return nil }
+                    ?? FixtureFrameSource.findBundleURL(name: name) else { return nil }
             return UIImage(contentsOfFile: url.path)
         }
         if let first = currentImages.first {
             imageView.image = first
             currentImageSize = first.size
         }
-    }
-
-    private static func findBundleURL(name: String) -> URL? {
-        for ext in ["jpg", "jpeg", "png"] {
-            if let url = Bundle.module.url(forResource: name, withExtension: ext) {
-                return url
-            }
-        }
-        return nil
     }
 
     private func wireDetectionEngine() {
@@ -222,6 +213,18 @@ final class FixtureCameraViewController: UIViewController {
             width: w,
             height: h
         )
+    }
+
+    // MARK: - Test hooks
+
+    /// Exposed for unit tests only — wraps the private `imageRect(for:in:)` method.
+    func imageBoundsForTesting(imageSize: CGSize, in bounds: CGRect) -> CGRect {
+        imageRect(for: imageSize, in: bounds)
+    }
+
+    /// Exposed for unit tests only — wraps the private `visionPoint(_:in:)` method.
+    func visionPointForTesting(_ pt: CGPoint, in bounds: CGRect) -> CGPoint {
+        visionPoint(pt, in: bounds)
     }
 
     // MARK: - CMSampleBuffer factory

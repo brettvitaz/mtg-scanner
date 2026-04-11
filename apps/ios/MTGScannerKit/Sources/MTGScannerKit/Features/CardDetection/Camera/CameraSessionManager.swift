@@ -8,6 +8,7 @@ import UIKit
 /// - Configure the best available back camera for 1080p video output.
 /// - Deliver `CMSampleBuffer` frames to `onFrame` on the session queue.
 /// - Start and stop the session from outside the session queue safely.
+/// Conforms to ``CameraFrameSource`` alongside the simulator-only ``FixtureFrameSource``.
 final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendable {
 
     // MARK: - Public

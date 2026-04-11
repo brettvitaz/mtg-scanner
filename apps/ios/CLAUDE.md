@@ -124,7 +124,7 @@ make ios-snapshot-all              # capture all known routes
 
 PNGs are written to `services/.artifacts/ui-snapshots/<route>.png` (gitignored).
 
-Set `IOS_SNAPSHOT_WAIT=<seconds>` to override the default 4-second settle wait.
+Set `IOS_SNAPSHOT_WAIT=<seconds>` to override the per-route default settle wait (4s for most routes, 5s for `scan`).
 Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 ### How it works
@@ -144,8 +144,9 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 1. Add a `case "<name>":` branch in `apps/ios/MTGScannerKit/Sources/MTGScannerKit/App/PreviewGalleryRootView.swift` returning the view.
 2. Add a `#Preview` block for Xcode canvas support.
-3. Run `make ios-snapshot ROUTE=<name>` to verify the PNG.
-4. Document the new route in the table above.
+3. Add `"<name>"` to the `IOS_SNAPSHOT_ROUTES` variable in `Makefile` so `make ios-snapshot-all` includes it.
+4. Run `make ios-snapshot ROUTE=<name>` to verify the PNG.
+5. Document the new route in the table above.
 
 ### Camera routes and fixture frames
 

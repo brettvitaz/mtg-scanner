@@ -65,6 +65,51 @@ final class FixtureFrameSourceTests: XCTestCase {
         XCTAssertEqual(countAfterStop, 0, "No frames should be emitted after stop()")
     }
 
+    // MARK: - FixtureCameraViewController coordinate mapping
+
+    func testImageRectCentersImageInSquareBounds() {
+        // A 1920×1080 image inside a 200×200 square — height-constrained, width centered.
+        let vc = FixtureCameraViewController()
+        let rect = vc.imageBoundsForTesting(
+            imageSize: CGSize(width: 1920, height: 1080),
+            in: CGRect(origin: .zero, size: CGSize(width: 200, height: 200))
+        )
+        // scale = 200/1920 ≈ 0.1042; h = 1080 * scale ≈ 112.5
+        let expectedScale = 200.0 / 1920.0
+        XCTAssertEqual(rect.width, 1920 * expectedScale, accuracy: 0.01)
+        XCTAssertEqual(rect.height, 1080 * expectedScale, accuracy: 0.01)
+        // x should be 0 (width == bounds.width), y should be centered
+        XCTAssertEqual(rect.minX, 0, accuracy: 0.01)
+        XCTAssertGreaterThan(rect.minY, 0)
+    }
+
+    func testVisionPointCenter() {
+        // Vision (0.5, 0.5) should map to the center of the image bounds.
+        let vc = FixtureCameraViewController()
+        let bounds = CGRect(x: 10, y: 20, width: 100, height: 80)
+        let pt = vc.visionPointForTesting(CGPoint(x: 0.5, y: 0.5), in: bounds)
+        XCTAssertEqual(pt.x, 60, accuracy: 0.01)
+        XCTAssertEqual(pt.y, 60, accuracy: 0.01)
+    }
+
+    func testVisionPointTopLeft() {
+        // Vision (0, 1) is top-left (Y-flipped: 1 - 1.0 = 0).
+        let vc = FixtureCameraViewController()
+        let bounds = CGRect(x: 0, y: 0, width: 100, height: 80)
+        let pt = vc.visionPointForTesting(CGPoint(x: 0, y: 1.0), in: bounds)
+        XCTAssertEqual(pt.x, 0, accuracy: 0.01)
+        XCTAssertEqual(pt.y, 0, accuracy: 0.01)
+    }
+
+    func testVisionPointBottomRight() {
+        // Vision (1, 0) is bottom-right (Y-flipped: 1 - 0 = 1).
+        let vc = FixtureCameraViewController()
+        let bounds = CGRect(x: 0, y: 0, width: 100, height: 80)
+        let pt = vc.visionPointForTesting(CGPoint(x: 1.0, y: 0), in: bounds)
+        XCTAssertEqual(pt.x, 100, accuracy: 0.01)
+        XCTAssertEqual(pt.y, 80, accuracy: 0.01)
+    }
+
     // MARK: - FixtureCameraViewController sample buffer factory
 
     func testMakeSampleBufferReturnsNonNilForValidPixelBuffer() {

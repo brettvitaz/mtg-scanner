@@ -1,39 +1,39 @@
-# Request: Collections list rounding glitch
+# Request: Library list visual glitch
 
 **Date:** 2026-04-10
 **Author:** Brett
 
 ## Goal
 
-Investigate and fix a small visual glitch in the iOS Collections list where the top and bottom cells appear delayed in transitioning to rounded corners during swipe-to-delete and press-and-hold interactions.
+Fix the Library list surfaces so they no longer show the unwanted rounded-row behavior during swipe and press/hold interactions, while keeping the Results page sticky scanned-card count behavior as-is.
 
 ## Requirements
 
-1. Reproduce the issue in the Collections list and identify the cause of the delayed/glitchy rounding transition.
-2. Fix the top and bottom cell transition glitch without broad redesign of list behavior.
-3. Check middle cells as well and confirm they do not have the same issue, or fix them if they do.
-4. Preserve expected iOS-native interaction behavior where possible.
+1. Identify which Library list surfaces are actually rendering the affected rows.
+2. Apply the smallest change set that removes the unwanted rounded-row treatment on the affected Library surfaces.
+3. Preserve expected iOS-native interaction behavior where possible.
+4. Keep the sticky scanned-card count on the Results page.
 5. Do all implementation and review work in a git worktree using native agents, not ACP thread sessions.
 
 ## Scope
 
 **In scope:**
-- Collections list row styling and interactive-state rendering
+- Library top-level list styling
+- collection detail list styling
+- deck detail list styling
 - swipe-to-delete behavior
-- press-and-hold / long-press behavior
-- focused iOS UI bugfix work needed to smooth the rounding transition
+- press-and-hold / long-press behavior where affected by list structure
 
 **Out of scope:**
 - broad app-wide list redesign
-- changing standard iOS interaction behavior just because rounding occurs
-- unrelated visual cleanup outside the touched Collections list surface
+- removing the sticky scanned-card count from Results
+- unrelated visual cleanup outside these Library list surfaces
 
 ## Verification
 
 - Build the iOS app successfully.
-- Verify top, middle, and bottom rows during swipe-to-delete.
-- Verify top, middle, and bottom rows during press-and-hold / long-press.
-- Capture screenshots or screen recordings if useful for review.
+- Verify the affected Library lists on device.
+- Confirm the Results page keeps the sticky scanned-card count behavior.
 
 ## Context
 
@@ -42,12 +42,12 @@ Files or docs the agent should read before starting:
 - `README.md`
 - `CLAUDE.md`
 - `docs/feature-workflow.md`
-- `docs/plans/collections-list-rounding-glitch.md`
-- relevant iOS Collections/list UI files
+- relevant iOS Library and Results UI files
 - `.claude/rules/code-review.md`
 
 ## Notes
 
-- Brett reviewed the iPhone Mail app and found the general behavior is consistent there. The issue is specifically the delayed/glitchy transition on the top and bottom cells, not the fact that rounding exists at all.
+- Early debugging showed that edits to the top-level `LibraryView` alone were not the whole story; the visible affected list also exists in the detail views.
+- Brett ultimately preferred keeping the sticky scanned-card count on the Results page.
 - Important findings and decisions should be recorded in repo docs when the work is completed.
 - Ignore the untracked `.swift-version` file in the main repo while doing this work.

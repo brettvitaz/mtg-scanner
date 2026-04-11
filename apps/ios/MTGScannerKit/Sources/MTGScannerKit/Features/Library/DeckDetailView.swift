@@ -115,7 +115,7 @@ struct DeckDetailView: View {
                     ForEach(items) { cardRowView(for: $0) }
                 } header: { cardListHeader(for: items) }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
@@ -156,6 +156,7 @@ struct DeckDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .background(Color(.systemBackground))
     }
 
     // MARK: - Top Toolbar

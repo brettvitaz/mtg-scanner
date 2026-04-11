@@ -28,7 +28,7 @@ struct LibraryView: View {
                 collectionsSection
                 decksSection
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
             .environment(\.editMode, .constant(.inactive))
         }
         .navigationTitle("Library")
@@ -86,33 +86,13 @@ struct LibraryView: View {
             if collections.isEmpty {
                 Text("No collections yet")
                     .foregroundStyle(.secondary)
-            }
-            ForEach(collections) { collection in
-                NavigationLink(value: collection) {
-                    CollectionRow(
-                        name: collection.name,
-                        count: collection.items.totalQuantity
-                    )
+            } else {
+                ForEach(collections) { collection in
+                    collectionRow(for: collection)
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        libraryViewModel.deleteCollection(collection)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-                .listRowBackground(
-                    RoundedRectangle(cornerRadius: 0)
-                        .fill(Color(.systemBackground))
-                )
             }
         } header: {
-            HStack {
-                Text("Collections")
-                Spacer()
-                Text("\(collections.count) item(s)")
-                    .foregroundStyle(.secondary)
-            }
+            sectionHeader(title: "Collections", count: collections.count)
         }
     }
 
@@ -121,34 +101,76 @@ struct LibraryView: View {
             if decks.isEmpty {
                 Text("No decks yet")
                     .foregroundStyle(.secondary)
-            }
-            ForEach(decks) { deck in
-                NavigationLink(value: deck) {
-                    CollectionRow(
-                        name: deck.name,
-                        count: deck.items.totalQuantity
-                    )
+            } else {
+                ForEach(decks) { deck in
+                    deckRow(for: deck)
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        libraryViewModel.deleteDeck(deck)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-                .listRowBackground(
-                    RoundedRectangle(cornerRadius: 0)
-                        .fill(Color(.systemBackground))
-                )
             }
         } header: {
-            HStack {
-                Text("Decks")
-                Spacer()
-                Text("\(decks.count) item(s)")
-                    .foregroundStyle(.secondary)
+            sectionHeader(title: "Decks", count: decks.count)
+        }
+    }
+
+    @ViewBuilder
+    private func collectionRow(for collection: CardCollection) -> some View {
+        NavigationLink(value: collection) {
+            CollectionRow(
+                name: collection.name,
+                count: collection.items.totalQuantity
+            )
+        }
+        .contextMenu {
+            Button {
+                renamingCollection = collection
+                editingName = collection.name
+                showRenameCollection = true
+            } label: {
+                Label("Rename", systemImage: "pencil")
             }
         }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                libraryViewModel.deleteCollection(collection)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func deckRow(for deck: Deck) -> some View {
+        NavigationLink(value: deck) {
+            CollectionRow(
+                name: deck.name,
+                count: deck.items.totalQuantity
+            )
+        }
+        .contextMenu {
+            Button {
+                renamingDeck = deck
+                editingName = deck.name
+                showRenameDeck = true
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                libraryViewModel.deleteDeck(deck)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func sectionHeader(title: String, count: Int) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text("\(count) item(s)")
+                .foregroundStyle(.secondary)
+        }
+        .background(Color(.systemBackground))
     }
 
     // MARK: - Actions
@@ -176,6 +198,7 @@ struct LibraryView: View {
         libraryViewModel.renameDeck(deck, to: editingName)
         renamingDeck = nil
     }
+
 }
 
 // MARK: - Row

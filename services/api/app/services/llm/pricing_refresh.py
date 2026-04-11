@@ -3,7 +3,7 @@
 Used by:
 - the background refresh loop (pricing_loop.py)
 - the admin HTTP endpoint (api/routes/admin.py)
-- the CLI script (scripts/update_pricing.py)
+- the CLI script (scripts/update_llm_pricing.py)
 
 Pricing data sourced from pydantic/genai-prices (MIT):
   https://github.com/pydantic/genai-prices

@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from app.services.llm.pricing_refresh import PROVIDER_ALLOWLIST, refresh_prices_from_upstream
+from app.services.llm.pricing_refresh import refresh_prices_from_upstream
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,34 +20,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override the output path (default: services/api/data/pricing/model_prices.json).",
     )
-    parser.add_argument(
-        "--provider",
-        action="append",
-        default=None,
-        dest="providers",
-        metavar="PROVIDER_ID",
-        help="Only refresh this provider id (repeatable). Default: all allowlisted providers.",
-    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
 
-    providers = PROVIDER_ALLOWLIST
-    if args.providers:
-        providers = frozenset(args.providers) & PROVIDER_ALLOWLIST
-        unknown = set(args.providers) - PROVIDER_ALLOWLIST
-        if unknown:
-            print(
-                f"Warning: unknown provider ids ignored: {sorted(unknown)}",
-                file=sys.stderr,
-            )
-
     try:
-        result = asyncio.run(
-            refresh_prices_from_upstream(path=args.output, providers=providers)
-        )
+        result = asyncio.run(refresh_prices_from_upstream(path=args.output))
     except Exception as exc:  # noqa: BLE001 — CLI; print any error to stderr
         print(f"Pricing refresh failed: {exc}", file=sys.stderr)
         return 1

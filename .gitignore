@@ -35,4 +35,4 @@ evals/results/
 tmp/
 services/api/data/mtgjson/
 services/api/data/ck_prices/
-services/api/data/pricing/
+!services/api/data/pricing/model_prices.json

@@ -56,7 +56,7 @@ api-update-mtgjson:
 api-import-ck-prices:
 	PYTHONPATH=services/api .venv/bin/python scripts/import_ck_prices.py
 
-api-update-llm-pricing:
+api-update-pricing:
 	PYTHONPATH=services/api .venv/bin/python scripts/update_llm_pricing.py
 
 api-security:

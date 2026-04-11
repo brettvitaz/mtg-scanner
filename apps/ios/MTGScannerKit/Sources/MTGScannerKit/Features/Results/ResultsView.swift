@@ -112,6 +112,7 @@ struct ResultsView: View {
             cardListHeader
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: -8, leading: 0, bottom: 0, trailing: 0))
                 .disabled(true)
             
             ForEach(displayedItems) { cardRowView(for: $0) }
@@ -163,8 +164,6 @@ struct ResultsView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground))
     }
 
     // MARK: - Top Toolbar

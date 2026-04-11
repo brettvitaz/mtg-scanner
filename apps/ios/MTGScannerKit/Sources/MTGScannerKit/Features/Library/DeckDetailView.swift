@@ -114,6 +114,7 @@ struct DeckDetailView: View {
             cardListHeader(for: items)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: -8, leading: 0, bottom: 0, trailing: 0))
                 .disabled(true)
             
             ForEach(items) { cardRowView(for: $0) }
@@ -161,8 +162,6 @@ struct DeckDetailView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground))
     }
 
     // MARK: - Top Toolbar

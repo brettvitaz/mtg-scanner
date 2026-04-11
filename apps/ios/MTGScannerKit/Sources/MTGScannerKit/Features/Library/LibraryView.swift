@@ -23,11 +23,14 @@ struct LibraryView: View {
     }
 
     private var libraryList: some View {
-        List {
-            collectionsSection
-            decksSection
+        VStack(spacing: 0) {
+            List {
+                collectionsSection
+                decksSection
+            }
+            .listStyle(.insetGrouped)
+            .environment(\.editMode, .constant(.inactive))
         }
-        .listStyle(.insetGrouped)
         .navigationTitle("Library")
         .toolbar { addMenu }
         .alert("New Collection", isPresented: $showNewCollection) {
@@ -79,23 +82,17 @@ struct LibraryView: View {
     // MARK: - Sections
 
     private var collectionsSection: some View {
-        Section("Collections") {
+        Section {
             if collections.isEmpty {
                 Text("No collections yet")
                     .foregroundStyle(.secondary)
             }
             ForEach(collections) { collection in
                 NavigationLink(value: collection) {
-                    CollectionRow(name: collection.name, count: collection.items.totalQuantity)
-                }
-                .contextMenu {
-                    Button {
-                        renamingCollection = collection
-                        editingName = collection.name
-                        showRenameCollection = true
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
+                    CollectionRow(
+                        name: collection.name,
+                        count: collection.items.totalQuantity
+                    )
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
@@ -104,28 +101,33 @@ struct LibraryView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color(.systemBackground))
+                )
+            }
+        } header: {
+            HStack {
+                Text("Collections")
+                Spacer()
+                Text("\(collections.count) item(s)")
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
     private var decksSection: some View {
-        Section("Decks") {
+        Section {
             if decks.isEmpty {
                 Text("No decks yet")
                     .foregroundStyle(.secondary)
             }
             ForEach(decks) { deck in
                 NavigationLink(value: deck) {
-                    CollectionRow(name: deck.name, count: deck.items.totalQuantity)
-                }
-                .contextMenu {
-                    Button {
-                        renamingDeck = deck
-                        editingName = deck.name
-                        showRenameDeck = true
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
+                    CollectionRow(
+                        name: deck.name,
+                        count: deck.items.totalQuantity
+                    )
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
@@ -134,6 +136,17 @@ struct LibraryView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color(.systemBackground))
+                )
+            }
+        } header: {
+            HStack {
+                Text("Decks")
+                Spacer()
+                Text("\(decks.count) item(s)")
+                    .foregroundStyle(.secondary)
             }
         }
     }

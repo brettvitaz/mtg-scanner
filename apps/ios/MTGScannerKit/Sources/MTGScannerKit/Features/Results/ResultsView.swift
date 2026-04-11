@@ -113,7 +113,7 @@ struct ResultsView: View {
                     ForEach(displayedItems) { cardRowView(for: $0) }
                 } header: { cardListHeader }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
@@ -158,6 +158,7 @@ struct ResultsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .background(Color(.systemBackground))
     }
 
     // MARK: - Top Toolbar

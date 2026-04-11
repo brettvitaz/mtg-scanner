@@ -158,6 +158,7 @@ struct ResultsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemBackground))
     }
 

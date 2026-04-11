@@ -170,6 +170,7 @@ struct LibraryView: View {
             Text("\(count) item(s)")
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemBackground))
     }
 

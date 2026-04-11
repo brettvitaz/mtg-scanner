@@ -99,6 +99,8 @@ open apps/ios/MTGScanner.xcworkspace
 make ios-build              # build the app via xcodebuild (uses workspace)
 make ios-test               # run tests via xcodebuild
 make ios-lint               # run SwiftLint
+make ios-snapshot ROUTE=settings  # capture a PNG of a named UI route (see apps/ios/CLAUDE.md)
+make ios-snapshot-all       # capture all known routes
 
 # Static analysis
 make lint                   # run all static analysis (mypy + SwiftLint)

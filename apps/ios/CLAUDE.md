@@ -108,3 +108,51 @@ xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
 ```
 
 Or: `make ios-build`
+
+## UI iteration for agents
+
+Agents can capture PNG screenshots of any named UI route from the command line without opening Xcode.
+
+### How to take a screenshot
+
+```bash
+make ios-build              # build first (or skip if already built)
+make ios-snapshot ROUTE=settings   # capture SettingsView
+make ios-snapshot ROUTE=scan       # capture ScanView with fixture card images
+make ios-snapshot-all              # capture all known routes
+```
+
+PNGs are written to `services/.artifacts/ui-snapshots/<route>.png` (gitignored).
+
+Set `IOS_SNAPSHOT_WAIT=<seconds>` to override the default 4-second settle wait.
+Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
+
+### How it works
+
+- `scripts/ios-screenshot.sh` boots a simulator (prefers any already-booted device), installs the built `.app`, launches it with a `-UI_PREVIEW_ROUTE <route>` argument, waits, captures via `xcrun simctl io screenshot`, and terminates the app.
+- In `#if DEBUG` builds, `MTGScannerApp` reads the `UI_PREVIEW_ROUTE` UserDefaults key (set by the launch arg) and swaps `RootTabView` for `PreviewGalleryRootView(route:)`.
+- Production builds are completely unaffected — the `#if DEBUG` guard ensures no preview code reaches release.
+
+### Available routes
+
+| Route | View | Notes |
+|-------|------|-------|
+| `settings` | `SettingsView` | Full settings form with real `AppModel` |
+| `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
+
+### Adding a new route
+
+1. Add a `case "<name>":` branch in `apps/ios/MTGScannerKit/Sources/MTGScannerKit/App/PreviewGalleryRootView.swift` returning the view.
+2. Add a `#Preview` block for Xcode canvas support.
+3. Run `make ios-snapshot ROUTE=<name>` to verify the PNG.
+4. Document the new route in the table above.
+
+### Camera routes and fixture frames
+
+The Simulator has no camera. The `scan` route uses `FixtureCameraViewController`, which:
+- Displays fixture card images from `Resources/FixtureFrames/` in a `UIImageView`.
+- Feeds the same images as `CVPixelBuffer`s to the real `CardDetectionEngine`.
+- Draws detection overlays using Vision's normalized coordinates mapped to the image bounds.
+- Cycles through images on a timer (default: 5 Hz) — overlays appear within a few seconds.
+
+To add more fixture images: copy images to `apps/ios/MTGScannerKit/Sources/MTGScannerKit/Resources/FixtureFrames/` and add the filename (without extension) to `FixtureFrameSource.fixtureNames`.

@@ -8,7 +8,7 @@ import UIKit
 /// - Configure the best available back camera for 1080p video output.
 /// - Deliver `CMSampleBuffer` frames to `onFrame` on the session queue.
 /// - Start and stop the session from outside the session queue safely.
-final class CameraSessionManager: NSObject, @unchecked Sendable {
+final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendable {
 
     // MARK: - Public
 
@@ -16,6 +16,9 @@ final class CameraSessionManager: NSObject, @unchecked Sendable {
 
     /// Called on the session queue for each delivered video frame.
     var onFrame: ((CMSampleBuffer) -> Void)?
+
+    /// Called on the session queue for each delivered pixel buffer (CameraFrameSource).
+    var onPixelBuffer: ((CVPixelBuffer, CMTime) -> Void)?
 
     static let preferredBackCameraTypes: [AVCaptureDevice.DeviceType] = [
         .builtInTripleCamera,
@@ -316,6 +319,9 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         from connection: AVCaptureConnection
     ) {
         onFrame?(sampleBuffer)
+        if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            onPixelBuffer?(pixelBuffer, sampleBuffer.presentationTimeStamp)
+        }
     }
 }
 

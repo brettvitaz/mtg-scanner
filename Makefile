@@ -7,7 +7,7 @@ IOS_TEST_CURRENT_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_C
 IOS_TEST_TABLET_DEVICE ?= iPad Air 11-inch (M4)
 IOS_TEST_TABLET_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_TABLET_DEVICE)
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint lint security tree
+.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
 
 bootstrap: api-bootstrap
 
@@ -49,6 +49,12 @@ ios-test-matrix: ios-test ios-test-current ios-test-tablet
 
 ios-lint:
 	./scripts/lint-ios.sh
+
+ios-snapshot: ios-build
+	ROUTE=$${ROUTE:-settings} ./scripts/ios-screenshot.sh "$${ROUTE:-settings}"
+
+ios-snapshot-all: ios-build
+	for route in settings scan; do ROUTE=$$route ./scripts/ios-screenshot.sh "$$route"; done
 
 api-update-mtgjson:
 	PYTHONPATH=services/api .venv/bin/python scripts/update_mtgjson.py

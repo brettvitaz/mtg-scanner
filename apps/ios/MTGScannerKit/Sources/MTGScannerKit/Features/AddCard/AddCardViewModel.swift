@@ -28,6 +28,7 @@ final class AddCardViewModel {
     // MARK: - Private
 
     private var searchTask: Task<Void, Never>?
+    private var lastSearchedQuery: String = ""
 
     // MARK: - Computed
 
@@ -51,12 +52,16 @@ final class AddCardViewModel {
             isSearching = false
             return
         }
+        if query == lastSearchedQuery && !searchResults.isEmpty {
+            return
+        }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             isSearching = true
             do {
                 searchResults = try await appModel.searchCardNames(query: query)
+                lastSearchedQuery = query
             } catch {
                 searchResults = []
             }

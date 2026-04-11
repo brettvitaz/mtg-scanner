@@ -218,6 +218,7 @@ struct CardPrinting: Codable, Identifiable, Equatable, Hashable {
     let cardKingdomUrl: String?
     let cardKingdomFoilUrl: String?
     let colorIdentity: String?
+    let finishes: String?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -238,7 +239,17 @@ struct CardPrinting: Codable, Identifiable, Equatable, Hashable {
         case cardKingdomUrl = "card_kingdom_url"
         case cardKingdomFoilUrl = "card_kingdom_foil_url"
         case colorIdentity = "color_identity"
+        case finishes
     }
+
+    /// True if this printing is available in foil. Defaults to true when finishes data is absent.
+    var hasFoil: Bool { finishes.map { $0.split(separator: ",").contains("foil") } ?? true }
+    /// True if this printing is available in non-foil. Defaults to true when finishes data is absent.
+    var hasNonFoil: Bool { finishes.map { $0.split(separator: ",").contains("nonfoil") } ?? true }
+    /// True if this printing is available only in foil (no non-foil option).
+    var isFoilOnly: Bool { hasFoil && !hasNonFoil }
+    /// True if this printing is available only in non-foil (no foil option).
+    var isNonFoilOnly: Bool { hasNonFoil && !hasFoil }
 }
 
 /// Data model for a card identification toast notification.

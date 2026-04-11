@@ -81,6 +81,9 @@ struct CollectionDetailView: View {
                 collection.updatedAt = Date()
             }
         }
+        .task(id: collection.items.map(\.id)) {
+            await fetchMissingPrices(for: collection.items)
+        }
     }
 
     // MARK: - Card List
@@ -295,6 +298,16 @@ private extension CollectionDetailView {
                 $0.deck = deck
             }
             deck.updatedAt = Date()
+        }
+    }
+
+    func fetchMissingPrices(for items: [CollectionItem]) async {
+        for item in items where item.priceRetail == nil && item.priceBuy == nil {
+            guard let price = try? await appModel.fetchPrice(
+                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
+            ) else { continue }
+            item.priceRetail = price.priceRetail
+            item.priceBuy = price.priceBuy
         }
     }
 

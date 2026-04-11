@@ -61,10 +61,10 @@ struct AddCardView: View {
                 Button("Cancel") { dismiss() }
             }
         }
-        .searchable(text: Binding(
-            get: { viewModel.searchText },
-            set: { viewModel.searchText = $0; viewModel.updateSearch(using: appModel) }
-        ), prompt: "Card name")
+        .searchable(text: $viewModel.searchText, prompt: "Card name")
+        .onChange(of: viewModel.searchText) { _, _ in
+            viewModel.updateSearch(using: appModel)
+        }
     }
 
     // MARK: - Stage 2: Printing Selection
@@ -110,7 +110,7 @@ struct AddCardView: View {
             cardIdentitySection(printing: printing)
             Section("Options") {
                 Stepper("Quantity: \(viewModel.quantity)", value: $vm.quantity, in: 1...99)
-                Toggle("Foil", isOn: $vm.isFoil)
+                foilToggle(for: printing, isFoil: $vm.isFoil)
             }
         }
         .navigationTitle("Add to Collection")
@@ -124,6 +124,24 @@ struct AddCardView: View {
                 }
                 .fontWeight(.semibold)
             }
+        }
+        .onAppear {
+            if printing.isFoilOnly {
+                viewModel.isFoil = true
+            } else if printing.isNonFoilOnly {
+                viewModel.isFoil = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func foilToggle(for printing: CardPrinting, isFoil: Binding<Bool>) -> some View {
+        if printing.isFoilOnly {
+            Toggle("Foil", isOn: .constant(true)).disabled(true)
+        } else if printing.isNonFoilOnly {
+            Toggle("Foil", isOn: .constant(false)).disabled(true)
+        } else {
+            Toggle("Foil", isOn: isFoil)
         }
     }
 

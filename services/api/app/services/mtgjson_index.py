@@ -256,15 +256,30 @@ class MTGJSONIndex:
         return self._fetch_cards("\n".join(query), tuple(params))
 
     def search_names_by_prefix(self, *, query: str, limit: int = 20) -> list[str]:
-        """Return distinct card names whose normalized name starts with the query prefix."""
+        """Return distinct card names matching the query.
+
+        Single token: prefix match (uses index).
+        Multiple tokens: each token must appear as a substring in the normalized name.
+        """
         normalized = normalize_title(query)
         if not normalized or not self.is_available():
             return []
+        tokens = normalized.split()
+        if not tokens:
+            return []
+        if len(tokens) == 1:
+            sql = "SELECT DISTINCT name FROM cards WHERE normalized_name LIKE ? ORDER BY name LIMIT ?"
+            params: tuple = (tokens[0] + "%", limit)
+        else:
+            conditions = " AND ".join("normalized_name LIKE ?" for _ in tokens)
+            # Sort: names starting with the first token appear before mid-word matches.
+            sql = (
+                f"SELECT DISTINCT name FROM cards WHERE {conditions}"
+                " ORDER BY CASE WHEN normalized_name LIKE ? THEN 0 ELSE 1 END, name LIMIT ?"
+            )
+            params = tuple(f"%{token}%" for token in tokens) + (tokens[0] + "%", limit)
         with sqlite3.connect(self._db_path) as conn:
-            rows = conn.execute(
-                "SELECT DISTINCT name FROM cards WHERE normalized_name LIKE ? ORDER BY name LIMIT ?",
-                (normalized + "%", limit),
-            ).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return [row[0] for row in rows]
 
     def lookup_by_set_and_number(

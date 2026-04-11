@@ -16,7 +16,8 @@ final class CollectionItemFromPrintingTests: XCTestCase {
         setSymbolUrl: String? = "https://example.com/m10.svg",
         cardKingdomUrl: String? = "https://ck.com/bolt",
         cardKingdomFoilUrl: String? = "https://ck.com/bolt-foil",
-        colorIdentity: String? = "R"
+        colorIdentity: String? = "R",
+        finishes: String? = nil
     ) -> CardPrinting {
         CardPrinting(
             name: name,
@@ -36,7 +37,8 @@ final class CollectionItemFromPrintingTests: XCTestCase {
             setSymbolUrl: setSymbolUrl,
             cardKingdomUrl: cardKingdomUrl,
             cardKingdomFoilUrl: cardKingdomFoilUrl,
-            colorIdentity: colorIdentity
+            colorIdentity: colorIdentity,
+            finishes: finishes
         )
     }
 

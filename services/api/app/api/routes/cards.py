@@ -29,6 +29,7 @@ class CardPrinting(BaseModel):
     card_kingdom_url: str | None = None
     card_kingdom_foil_url: str | None = None
     color_identity: str | None = None
+    finishes: str | None = None
 
 
 class CardPrintingsResponse(BaseModel):
@@ -82,6 +83,7 @@ async def get_card_printings(
             card_kingdom_url=r.card_kingdom_url,
             card_kingdom_foil_url=r.card_kingdom_foil_url,
             color_identity=r.color_identity,
+            finishes=r.finishes,
         )
         for r in records
     ]

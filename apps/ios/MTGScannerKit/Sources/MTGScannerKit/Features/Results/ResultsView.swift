@@ -107,15 +107,18 @@ struct ResultsView: View {
     // MARK: - Card List
 
     private var cardListWithToolbar: some View {
-        VStack(spacing: 0) {
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(displayedItems) { cardRowView(for: $0) }
-                } header: { cardListHeader }
-            }
-            .listStyle(.plain)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
+        List(selection: $selectedItems) {
+            // Fake header as first row
+            cardListHeader
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .disabled(true)
+            
+            ForEach(displayedItems) { cardRowView(for: $0) }
+        }
+        .listStyle(.plain)
+        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .safeAreaInset(edge: .bottom) {
             if isSelecting {
                 bottomActionBar
             }
@@ -149,6 +152,7 @@ struct ResultsView: View {
     private var cardListHeader: some View {
         HStack {
             Text("Scanned Cards")
+                .font(.body.weight(.semibold))
             Spacer()
             if filterState.isFilterActive {
                 Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
@@ -158,7 +162,8 @@ struct ResultsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
         .background(Color(.systemBackground))
     }
 

@@ -109,15 +109,18 @@ struct DeckDetailView: View {
 
     private var cardListWithToolbar: some View {
         let items = displayedItems
-        return VStack(spacing: 0) {
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(items) { cardRowView(for: $0) }
-                } header: { cardListHeader(for: items) }
-            }
-            .listStyle(.plain)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
+        return List(selection: $selectedItems) {
+            // Fake header as first row
+            cardListHeader(for: items)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .disabled(true)
+            
+            ForEach(items) { cardRowView(for: $0) }
+        }
+        .listStyle(.plain)
+        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .safeAreaInset(edge: .bottom) {
             if isSelecting {
                 bottomActionBar
             }
@@ -147,6 +150,7 @@ struct DeckDetailView: View {
     private func cardListHeader(for items: [CollectionItem]) -> some View {
         HStack {
             Text("Cards")
+                .font(.body.weight(.semibold))
             Spacer()
             if filterState.isFilterActive {
                 Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
@@ -156,7 +160,8 @@ struct DeckDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
         .background(Color(.systemBackground))
     }
 

@@ -84,17 +84,4 @@ final class AddCardViewModel {
         CollectionItem(from: printing, foil: isFoil, quantity: quantity)
     }
 
-    func reset() {
-        searchTask?.cancel()
-        searchText = ""
-        searchResults = []
-        isSearching = false
-        selectedName = nil
-        printings = []
-        printingFilterText = ""
-        isLoadingPrintings = false
-        quantity = 1
-        isFoil = false
-        errorMessage = nil
-    }
 }

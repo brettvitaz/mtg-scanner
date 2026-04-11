@@ -75,7 +75,9 @@ struct AddCardView: View {
                 ProgressView("Loading editions…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.filteredPrintings.isEmpty {
-                Text(viewModel.printings.isEmpty ? "No printings found." : "No printings match the filter.")
+                let message = viewModel.errorMessage
+                    ?? (viewModel.printings.isEmpty ? "No printings found." : "No printings match the filter.")
+                Text(message)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

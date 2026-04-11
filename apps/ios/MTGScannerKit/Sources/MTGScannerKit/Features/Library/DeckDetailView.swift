@@ -18,6 +18,7 @@ struct DeckDetailView: View {
     @State private var contextCopyItem: CollectionItem?
     @State private var contextMoveItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
+    @State private var showAddCard = false
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: deck.items)
@@ -85,6 +86,14 @@ struct DeckDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: deck.items)
         }
+        .sheet(isPresented: $showAddCard) {
+            AddCardView { item in
+                mergeOrInsert(item, into: deck.items, context: modelContext) {
+                    $0.deck = deck
+                }
+                deck.updatedAt = Date()
+            }
+        }
     }
 
     // MARK: - Empty State
@@ -96,10 +105,12 @@ struct DeckDetailView: View {
                 .foregroundStyle(.secondary)
             Text("No cards in this deck")
                 .font(.title3.bold())
-            Text("Move cards here from the Results tab or a collection.")
+            Text("Add cards using the + button, or move cards here from the Results tab or a collection.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            Button("Add Card") { showAddCard = true }
+                .buttonStyle(.borderedProminent)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -188,6 +199,10 @@ struct DeckDetailView: View {
                 .accessibilityLabel("Export deck")
                 Button("Select") { enterSelecting() }
                 FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
+                Button { showAddCard = true } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add card manually")
             }
         }
     }

@@ -255,6 +255,43 @@ class MTGJSONIndex:
         params.append(limit)
         return self._fetch_cards("\n".join(query), tuple(params))
 
+    def search_names_by_prefix(self, *, query: str, limit: int = 20) -> list[str]:
+        """Return distinct card names whose normalized name starts with the query prefix."""
+        normalized = normalize_title(query)
+        if not normalized or not self.is_available():
+            return []
+        with sqlite3.connect(self._db_path) as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT name FROM cards WHERE normalized_name LIKE ? ORDER BY name LIMIT ?",
+                (normalized + "%", limit),
+            ).fetchall()
+        return [row[0] for row in rows]
+
+    def lookup_by_set_and_number(
+        self,
+        *,
+        set_code: str,
+        collector_number: str,
+    ) -> CardRecord | None:
+        """Return a card matching set_code and collector_number, or None if not found.
+
+        Uses the idx_cards_set_number index for efficient lookup without requiring a card name.
+        Intended for future CSV/JSON import where rows may carry set+number but not the card name.
+        """
+        rows = self._fetch_cards(
+            f"""
+            SELECT {_CARD_COLUMNS}
+            FROM cards
+            WHERE set_code = ?
+              AND normalized_collector_number = ?
+            LIMIT 2
+            """,
+            (normalize_set_code(set_code), normalize_collector_number(collector_number)),
+        )
+        if len(rows) == 1:
+            return rows[0]
+        return None
+
     def _fetch_cards(self, sql: str, params: tuple[Any, ...]) -> list[CardRecord]:
         if not self.is_available():
             return []

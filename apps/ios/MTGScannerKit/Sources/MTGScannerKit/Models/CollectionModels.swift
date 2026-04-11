@@ -86,33 +86,6 @@ public final class CollectionItem {
         self.deck = deck
     }
 
-    /// Create a CollectionItem from a recognized card, applying corrections if present.
-    /// When a correction includes a `selectedPrintingSnapshot`, its fields take priority
-    /// for image URL, Card Kingdom link, and other printing-specific metadata.
-    convenience init(from card: RecognizedCard, correction: CardCorrection? = nil) {
-        let printing = correction?.selectedPrintingSnapshot
-        self.init(
-            title: correction?.title.nonEmpty ?? card.title ?? "Unknown",
-            edition: correction?.edition.nonEmpty ?? card.edition ?? "Unknown",
-            setCode: printing?.setCode ?? card.setCode,
-            collectorNumber: correction?.collectorNumber.nonEmpty ?? card.collectorNumber,
-            foil: correction?.foil ?? card.foil ?? false,
-            rarity: printing?.rarity ?? card.rarity,
-            typeLine: printing?.typeLine ?? card.typeLine,
-            oracleText: printing?.oracleText ?? card.oracleText,
-            manaCost: printing?.manaCost ?? card.manaCost,
-            power: printing?.power ?? card.power,
-            toughness: printing?.toughness ?? card.toughness,
-            loyalty: printing?.loyalty ?? card.loyalty,
-            defense: printing?.defense ?? card.defense,
-            scryfallId: printing?.scryfallId ?? card.scryfallId,
-            imageUrl: printing?.imageUrl ?? card.imageUrl,
-            setSymbolUrl: printing?.setSymbolUrl ?? card.setSymbolUrl,
-            cardKingdomUrl: printing?.cardKingdomUrl ?? card.cardKingdomUrl,
-            colorIdentity: printing?.colorIdentity ?? card.colorIdentity
-        )
-    }
-
     /// Convert to a RecognizedCard for use with CardDetailView.
     func toRecognizedCard() -> RecognizedCard {
         RecognizedCard(
@@ -247,6 +220,64 @@ public final class Deck {
         self.updatedAt = Date()
     }
 }
+
+// MARK: - Convenience Initializers
+
+extension CollectionItem {
+    /// Create a CollectionItem from a recognized card, applying corrections if present.
+    /// When a correction includes a `selectedPrintingSnapshot`, its fields take priority
+    /// for image URL, Card Kingdom link, and other printing-specific metadata.
+    convenience init(from card: RecognizedCard, correction: CardCorrection? = nil) {
+        let printing = correction?.selectedPrintingSnapshot
+        self.init(
+            title: correction?.title.nonEmpty ?? card.title ?? "Unknown",
+            edition: correction?.edition.nonEmpty ?? card.edition ?? "Unknown",
+            setCode: printing?.setCode ?? card.setCode,
+            collectorNumber: correction?.collectorNumber.nonEmpty ?? card.collectorNumber,
+            foil: correction?.foil ?? card.foil ?? false,
+            rarity: printing?.rarity ?? card.rarity,
+            typeLine: printing?.typeLine ?? card.typeLine,
+            oracleText: printing?.oracleText ?? card.oracleText,
+            manaCost: printing?.manaCost ?? card.manaCost,
+            power: printing?.power ?? card.power,
+            toughness: printing?.toughness ?? card.toughness,
+            loyalty: printing?.loyalty ?? card.loyalty,
+            defense: printing?.defense ?? card.defense,
+            scryfallId: printing?.scryfallId ?? card.scryfallId,
+            imageUrl: printing?.imageUrl ?? card.imageUrl,
+            setSymbolUrl: printing?.setSymbolUrl ?? card.setSymbolUrl,
+            cardKingdomUrl: printing?.cardKingdomUrl ?? card.cardKingdomUrl,
+            colorIdentity: printing?.colorIdentity ?? card.colorIdentity
+        )
+    }
+
+    /// Create a CollectionItem from a specific card printing selected manually by the user.
+    convenience init(from printing: CardPrinting, foil: Bool, quantity: Int) {
+        self.init(
+            title: printing.name,
+            edition: printing.setName ?? printing.setCode,
+            setCode: printing.setCode,
+            collectorNumber: printing.collectorNumber,
+            foil: foil,
+            rarity: printing.rarity,
+            typeLine: printing.typeLine,
+            oracleText: printing.oracleText,
+            manaCost: printing.manaCost,
+            power: printing.power,
+            toughness: printing.toughness,
+            loyalty: printing.loyalty,
+            defense: printing.defense,
+            scryfallId: printing.scryfallId,
+            imageUrl: printing.imageUrl,
+            setSymbolUrl: printing.setSymbolUrl,
+            cardKingdomUrl: foil ? (printing.cardKingdomFoilUrl ?? printing.cardKingdomUrl) : printing.cardKingdomUrl,
+            colorIdentity: printing.colorIdentity,
+            quantity: quantity
+        )
+    }
+}
+
+// MARK: - Array Helpers
 
 extension Array where Element == CollectionItem {
     /// Sum of quantities across all items. Treats a stored quantity of 0 as 1 for migration safety.

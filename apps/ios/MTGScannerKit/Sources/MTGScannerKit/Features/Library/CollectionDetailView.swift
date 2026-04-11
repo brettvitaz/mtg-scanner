@@ -16,6 +16,7 @@ struct CollectionDetailView: View {
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
+    @State private var showAddCard = false
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
@@ -72,24 +73,14 @@ struct CollectionDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: collection.items)
         }
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "folder")
-                .font(.system(size: 52))
-                .foregroundStyle(.secondary)
-            Text("No cards in this collection")
-                .font(.title3.bold())
-            Text("Move cards here from the Results tab.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        .sheet(isPresented: $showAddCard) {
+            AddCardView { item in
+                mergeOrInsert(item, into: collection.items, context: modelContext) {
+                    $0.collection = collection
+                }
+                collection.updatedAt = Date()
+            }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Card List
@@ -176,6 +167,10 @@ struct CollectionDetailView: View {
                 .accessibilityLabel("Export collection")
                 Button("Select") { enterSelecting() }
                 FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
+                Button { showAddCard = true } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add card manually")
             }
         }
     }
@@ -215,6 +210,24 @@ struct CollectionDetailView: View {
 }
 
 private extension CollectionDetailView {
+    var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "folder")
+                .font(.system(size: 52))
+                .foregroundStyle(.secondary)
+            Text("No cards in this collection")
+                .font(.title3.bold())
+            Text("Add cards using the + button, or move cards here from the Results tab.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Add Card") { showAddCard = true }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     func enterSelecting() {
         selectedItems = []
         isSelecting = true

@@ -229,6 +229,12 @@ public final class AppModel {
         }
     }
 
+    // MARK: - Card name search
+
+    func searchCardNames(query: String) async throws -> [String] {
+        return try await apiClient.searchCardNames(query: query, baseURL: apiBaseURL)
+    }
+
     // MARK: - Printings
 
     func fetchPrintings(name: String) async throws -> [CardPrinting] {

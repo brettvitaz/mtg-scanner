@@ -198,7 +198,7 @@ struct CardCorrection: Identifiable, Codable {
 }
 
 /// A printing of a card from the printings endpoint.
-struct CardPrinting: Codable, Identifiable, Equatable {
+struct CardPrinting: Codable, Identifiable, Equatable, Hashable {
     var id: String { "\(setCode)-\(collectorNumber ?? "unknown")" }
     let name: String
     let setCode: String
@@ -280,6 +280,11 @@ struct IdentifiedCard: Identifiable {
 /// Response from the printings endpoint.
 struct CardPrintingsResponse: Codable {
     let printings: [CardPrinting]
+}
+
+/// Response from the card name search endpoint.
+struct CardSearchResponse: Codable {
+    let names: [String]
 }
 
 /// Card Kingdom price data from the price endpoint.

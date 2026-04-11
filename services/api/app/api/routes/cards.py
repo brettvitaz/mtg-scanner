@@ -89,6 +89,28 @@ async def get_card_printings(
     return CardPrintingsResponse(printings=printings)
 
 
+class CardSearchResponse(BaseModel):
+    names: list[str]
+
+
+@router.get("/cards/search", response_model=CardSearchResponse)
+async def search_card_names(
+    q: str = Query(..., min_length=2, description="Card name search query (prefix match)"),
+    limit: int = Query(default=20, ge=1, le=50, description="Maximum results"),
+) -> CardSearchResponse:
+    settings = get_settings()
+    index = MTGJSONIndex(Path(settings.mtg_scanner_mtgjson_db_path))
+
+    if not index.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MTGJSON database is not available.",
+        )
+
+    names = index.search_names_by_prefix(query=q, limit=limit)
+    return CardSearchResponse(names=names)
+
+
 class CardPriceResponse(BaseModel):
     price_retail: str | None = None
     qty_retail: int | None = None

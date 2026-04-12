@@ -11,19 +11,28 @@ let package = Package(
         .library(
             name: "MTGScannerKit",
             targets: ["MTGScannerKit"]
+        ),
+        .library(
+            name: "MTGScannerFixtures",
+            targets: ["MTGScannerFixtures"]
         )
     ],
     targets: [
         .target(
             name: "MTGScannerKit",
-            path: "Sources/MTGScannerKit",
+            path: "Sources/MTGScannerKit"
+        ),
+        .target(
+            name: "MTGScannerFixtures",
+            dependencies: ["MTGScannerKit"],
+            path: "Sources/MTGScannerFixtures",
             resources: [
                 .process("Resources/FixtureFrames")
             ]
         ),
         .testTarget(
             name: "MTGScannerKitTests",
-            dependencies: ["MTGScannerKit"],
+            dependencies: ["MTGScannerKit", "MTGScannerFixtures"],
             path: "Tests/MTGScannerKitTests"
         )
     ]

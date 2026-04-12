@@ -1,4 +1,5 @@
 import AVFoundation
+import MTGScannerKit
 import UIKit
 
 /// A `UIViewController` that simulates the camera preview in preview/simulator builds.
@@ -16,11 +17,11 @@ import UIKit
 /// Coordinate mapping: Vision returns normalized corners in native image space
 /// (origin bottom-left). We apply a Y-flip then scale to the imageView's aspect-fit
 /// rect to match how the overlay appears over the displayed image.
-final class FixtureCameraViewController: UIViewController {
+public final class FixtureCameraViewController: UIViewController {
 
     // MARK: - Public
 
-    var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
+    public var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
 
     // MARK: - Private
 
@@ -33,14 +34,9 @@ final class FixtureCameraViewController: UIViewController {
     private var currentImages: [UIImage] = []
     private var imageIndex = 0
 
-    private let frameQueue = DispatchQueue(
-        label: "com.mtgscanner.fixture-camera-vc",
-        qos: .userInitiated
-    )
-
     // MARK: - Init
 
-    init(frameSource: FixtureFrameSource = FixtureFrameSource()) {
+    public init(frameSource: FixtureFrameSource = FixtureFrameSource()) {
         self.frameSource = frameSource
         super.init(nibName: nil, bundle: nil)
     }
@@ -49,7 +45,7 @@ final class FixtureCameraViewController: UIViewController {
 
     // MARK: - Lifecycle
 
-    override func viewDidLoad() {
+    override public func viewDidLoad() {
         super.viewDidLoad()
         setupImageView()
         setupOverlayView()
@@ -57,18 +53,18 @@ final class FixtureCameraViewController: UIViewController {
         wireDetectionEngine()
     }
 
-    override func viewDidAppear(_ animated: Bool) {
+    override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         frameSource.start()
     }
 
-    override func viewWillDisappear(_ animated: Bool) {
+    override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         frameSource.stop()
         clearOverlays()
     }
 
-    override func viewDidLayoutSubviews() {
+    override public func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         imageView.frame = view.bounds
         overlayView.frame = view.bounds
@@ -218,18 +214,18 @@ final class FixtureCameraViewController: UIViewController {
     // MARK: - Test hooks
 
     /// Exposed for unit tests only — wraps the private `imageRect(for:in:)` method.
-    func imageBoundsForTesting(imageSize: CGSize, in bounds: CGRect) -> CGRect {
+    public func imageBoundsForTesting(imageSize: CGSize, in bounds: CGRect) -> CGRect {
         imageRect(for: imageSize, in: bounds)
     }
 
     /// Exposed for unit tests only — wraps the private `visionPoint(_:in:)` method.
-    func visionPointForTesting(_ pt: CGPoint, in bounds: CGRect) -> CGPoint {
+    public func visionPointForTesting(_ pt: CGPoint, in bounds: CGRect) -> CGPoint {
         visionPoint(pt, in: bounds)
     }
 
     // MARK: - CMSampleBuffer factory
 
-    nonisolated static func makeSampleBuffer(from pixelBuffer: CVPixelBuffer) -> CMSampleBuffer? {
+    public nonisolated static func makeSampleBuffer(from pixelBuffer: CVPixelBuffer) -> CMSampleBuffer? {
         var sampleBuffer: CMSampleBuffer?
         var formatDescription: CMFormatDescription?
         CMVideoFormatDescriptionCreateForImageBuffer(

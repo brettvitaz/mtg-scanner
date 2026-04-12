@@ -1,5 +1,6 @@
 import CoreMedia
 import CoreVideo
+import MTGScannerKit
 import UIKit
 
 /// A ``CameraFrameSource`` that emits ``CVPixelBuffer``s decoded from bundled fixture images.
@@ -10,9 +11,9 @@ import UIKit
 ///
 /// - Note: Images are resized to `targetSize` (default 1920×1080, matching the production
 ///   session preset) so Vision receives correctly-sized input.
-final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
+public final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
 
-    var onPixelBuffer: ((CVPixelBuffer, CMTime) -> Void)?
+    public var onPixelBuffer: ((CVPixelBuffer, CMTime) -> Void)?
 
     private let pixelBuffers: [CVPixelBuffer]
     private let frameInterval: TimeInterval
@@ -21,10 +22,10 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
     private var index = 0
 
     // 1920×1080 matches CameraSessionManager's `.hd1920x1080` session preset.
-    static let targetSize = CGSize(width: 1920, height: 1080)
+    public static let targetSize = CGSize(width: 1920, height: 1080)
 
     /// Fixture image filenames bundled under `Resources/FixtureFrames/`.
-    static let fixtureNames: [String] = [
+    public static let fixtureNames: [String] = [
         "hand_held_card",
         "IMG_1609",
         "IMG_1610"
@@ -33,12 +34,12 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
     /// - Parameter frameInterval: Seconds between emitted frames. Default is 0.2s (5 Hz), which is
     ///   intentionally slower than production 30 Hz — the goal is simulator UI verification, not
     ///   real-time performance, and the reduced rate keeps CPU overhead minimal during screenshotting.
-    init(frameInterval: TimeInterval = 0.2) {
+    public init(frameInterval: TimeInterval = 0.2) {
         self.frameInterval = frameInterval
         self.pixelBuffers = Self.loadPixelBuffers()
     }
 
-    func start() {
+    public func start() {
         guard !pixelBuffers.isEmpty else { return }
         let t = DispatchSource.makeTimerSource(queue: queue)
         t.schedule(deadline: .now(), repeating: frameInterval)
@@ -47,7 +48,7 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
         timer = t
     }
 
-    func stop() {
+    public func stop() {
         timer?.cancel()
         timer = nil
     }
@@ -72,7 +73,7 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
     }
 
     /// Fallback for common image extensions when the bundle URL lookup needs an explicit extension.
-    static func findBundleURL(name: String) -> URL? {
+    public static func findBundleURL(name: String) -> URL? {
         for ext in ["jpg", "jpeg", "png"] {
             if let url = Bundle.module.url(forResource: name, withExtension: ext) {
                 return url
@@ -81,7 +82,7 @@ final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
         return nil
     }
 
-    static func pixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
+    public static func pixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
         let attrs: [CFString: Any] = [
             kCVPixelBufferCGImageCompatibilityKey: true,
             kCVPixelBufferCGBitmapContextCompatibilityKey: true

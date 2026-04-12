@@ -7,7 +7,7 @@ SwiftUI app for iPhone-first MTG card scanning with on-device detection and crop
 The iOS code is split into two parts:
 
 - **`MTGScanner/`** — Xcode app shell: `@main` entry point, `Info.plist`, `Assets.xcassets`, `MTGCardDetector.mlpackage`. This is the Xcode target that produces the `.app`.
-- **`MTGScannerKit/`** — Swift Package containing all production source and tests. SourceKit-LSP indexes this package for IDE tooling (autocomplete, go-to-definition).
+- **`MTGScannerKit/`** — Swift Package with two targets: `MTGScannerKit` (production source + tests) and `MTGScannerFixtures` (debug/simulator fixture code + images). SourceKit-LSP indexes this package for IDE tooling (autocomplete, go-to-definition).
 - **`MTGScanner.xcworkspace`** — Workspace that references both. **Always open the workspace, not the xcodeproj.**
 
 ## Architecture
@@ -142,7 +142,7 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 ### Adding a new route
 
-1. Add a `case "<name>":` branch in `apps/ios/MTGScannerKit/Sources/MTGScannerKit/App/PreviewGalleryRootView.swift` returning the view.
+1. Add a `case "<name>":` branch in `apps/ios/MTGScannerKit/Sources/MTGScannerFixtures/PreviewGalleryRootView.swift` returning the view.
 2. Add a `#Preview` block for Xcode canvas support.
 3. Add `"<name>"` to the `IOS_SNAPSHOT_ROUTES` variable in `Makefile` so `make ios-snapshot-all` includes it.
 4. Run `make ios-snapshot ROUTE=<name>` to verify the PNG.
@@ -156,4 +156,6 @@ The Simulator has no camera. The `scan` route uses `FixtureCameraViewController`
 - Draws detection overlays using Vision's normalized coordinates mapped to the image bounds.
 - Cycles through images on a timer (default: 5 Hz) — overlays appear within a few seconds.
 
-To add more fixture images: copy images to `apps/ios/MTGScannerKit/Sources/MTGScannerKit/Resources/FixtureFrames/` and add the filename (without extension) to `FixtureFrameSource.fixtureNames`.
+Fixture code lives in the `MTGScannerFixtures` SPM target (`Sources/MTGScannerFixtures/`), which keeps debug assets out of release builds.
+
+To add more fixture images: copy images to `apps/ios/MTGScannerKit/Sources/MTGScannerFixtures/Resources/FixtureFrames/` and add the filename (without extension) to `FixtureFrameSource.fixtureNames`.

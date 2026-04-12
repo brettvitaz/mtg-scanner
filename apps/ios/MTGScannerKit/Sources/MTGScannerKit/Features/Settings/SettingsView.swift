@@ -1,10 +1,12 @@
 import SwiftUI
 
-struct SettingsView: View {
+public struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
     @State private var connectionStatus: ConnectionStatus = .idle
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         @Bindable var appModel = appModel
         NavigationStack {
             SettingsForm(appModel: appModel, connectionStatus: $connectionStatus)

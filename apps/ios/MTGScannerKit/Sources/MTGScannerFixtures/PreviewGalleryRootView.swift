@@ -1,6 +1,5 @@
-#if DEBUG
+import MTGScannerKit
 import SwiftUI
-import SwiftData
 
 /// Debug-only root view that renders a single named route in full-screen.
 ///
@@ -13,7 +12,6 @@ import SwiftData
 public struct PreviewGalleryRootView: View {
     let route: String
     @State private var appModel = AppModel()
-    @State private var libraryViewModel = LibraryViewModel()
 
     public init(route: String) {
         self.route = route
@@ -61,4 +59,3 @@ public struct PreviewGalleryRootView: View {
 #Preview("Scan (fixture camera)") {
     PreviewGalleryRootView(route: "scan")
 }
-#endif

@@ -1,4 +1,5 @@
 import XCTest
+@testable import MTGScannerFixtures
 @testable import MTGScannerKit
 
 @MainActor

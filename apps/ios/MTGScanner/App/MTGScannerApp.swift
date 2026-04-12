@@ -1,6 +1,9 @@
 import MTGScannerKit
 import SwiftData
 import SwiftUI
+#if DEBUG
+import MTGScannerFixtures
+#endif
 
 @main
 struct MTGScannerApp: App {

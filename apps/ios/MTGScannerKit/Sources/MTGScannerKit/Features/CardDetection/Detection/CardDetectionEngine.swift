@@ -13,7 +13,7 @@ import Vision
 /// Detection paths:
 /// - Scan mode: VNDetectRectanglesRequest filtered by RectangleFilter and validated by YOLO.
 /// - Auto mode: YOLO card detection for the scanning-station flow.
-final class CardDetectionEngine: @unchecked Sendable {
+public final class CardDetectionEngine: @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -27,7 +27,7 @@ final class CardDetectionEngine: @unchecked Sendable {
     private lazy var yoloDetector: YOLOCardDetector? = YOLOCardDetector()
 
     /// Called on the main queue with the latest detected cards after each processed frame.
-    var onDetection: (([DetectedCard]) -> Void)?
+    public var onDetection: (([DetectedCard]) -> Void)?
 
     private let visionQueue = DispatchQueue(label: "com.mtgscanner.vision", qos: .userInitiated)
     private let visionQueueKey = DispatchSpecificKey<Void>()
@@ -39,13 +39,13 @@ final class CardDetectionEngine: @unchecked Sendable {
     /// Guarded by visionQueue — caches throttled YOLO validation for scan mode.
     private var scanYOLOValidationState = ScanYOLOValidationState()
 
-    init() {
+    public init() {
         visionQueue.setSpecific(key: visionQueueKey, value: ())
     }
 
     // MARK: - Frame Processing
 
-    func processFrame(_ sampleBuffer: CMSampleBuffer) {
+    public func processFrame(_ sampleBuffer: CMSampleBuffer) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
@@ -68,7 +68,7 @@ final class CardDetectionEngine: @unchecked Sendable {
         }
     }
 
-    func updateDetectionMode(_ mode: DetectionMode) {
+    public func updateDetectionMode(_ mode: DetectionMode) {
         syncOnVisionQueue {
             guard detectionMode != mode else { return }
             detectionMode = mode

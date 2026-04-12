@@ -2,21 +2,21 @@ import CoreGraphics
 import Foundation
 
 /// A single card-shaped region detected in a camera frame.
-struct DetectedCard: Identifiable, Equatable {
-    let id: UUID
+public struct DetectedCard: Identifiable, Equatable {
+    public let id: UUID
     /// Bounding box in Vision normalized coordinates (origin bottom-left, values 0...1).
-    let boundingBox: CGRect
+    public let boundingBox: CGRect
     /// Four corners in Vision normalized coordinates (origin bottom-left).
-    let topLeft: CGPoint
-    let topRight: CGPoint
-    let bottomRight: CGPoint
-    let bottomLeft: CGPoint
+    public let topLeft: CGPoint
+    public let topRight: CGPoint
+    public let bottomRight: CGPoint
+    public let bottomLeft: CGPoint
     /// Vision confidence score (0...1).
-    let confidence: Float
+    public let confidence: Float
     /// Presentation timestamp of the source frame.
-    let timestamp: TimeInterval
+    public let timestamp: TimeInterval
 
-    init(
+    public init(
         id: UUID = UUID(),
         boundingBox: CGRect,
         topLeft: CGPoint,

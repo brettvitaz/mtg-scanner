@@ -83,7 +83,7 @@ post_create() {
 	./scripts/new-work-effort.sh "$effort_name"
 
 	echo "Bootstrapping API..."
-	make api-bootstrap && make api-import-ck-prices && make api-update-mtgjson
+	make api-setup
 
 	echo ""
 	echo "Worktree ready: $wt_dir"

@@ -288,7 +288,7 @@ def test_openai_provider_timeout_defaults_to_thirty_seconds(monkeypatch) -> None
     monkeypatch.setenv("MTG_SCANNER_LLM_MODEL", "gpt-4.1-mini")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MULTI_CARD", "false")
     monkeypatch.setenv("MTG_SCANNER_ENABLE_MTG_VALIDATION", "false")
-    monkeypatch.setenv("MTG_SCANNER_LLM_TIMEOUT_SECONDS", "30")
+    monkeypatch.delenv("MTG_SCANNER_LLM_TIMEOUT_SECONDS", raising=False)
 
     service = get_recognition_service()
 

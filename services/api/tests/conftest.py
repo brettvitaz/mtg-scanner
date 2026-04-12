@@ -19,5 +19,24 @@ requires_sample_images = pytest.mark.skipif(
 
 @pytest.fixture(autouse=True)
 def isolate_settings_from_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Prevent .env file values from leaking into unit tests."""
+    """Prevent process and .env configuration from leaking into unit tests."""
     monkeypatch.setitem(Settings.model_config, "env_file", ())
+    for env_var in (
+        "MTG_SCANNER_RECOGNIZER_PROVIDER",
+        "MTG_SCANNER_LLM_PROVIDER",
+        "MTG_SCANNER_LLM_API_KEY",
+        "MTG_SCANNER_LLM_MODEL",
+        "MTG_SCANNER_LLM_BASE_URL",
+        "MTG_SCANNER_LLM_TIMEOUT_SECONDS",
+        "MTG_SCANNER_LLM_RESPONSE_MODE",
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL",
+        "OPENAI_BASE_URL",
+        "MOONSHOT_API_KEY",
+        "MOONSHOT_MODEL",
+        "MOONSHOT_BASE_URL",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_MODEL",
+        "ANTHROPIC_BASE_URL",
+    ):
+        monkeypatch.delenv(env_var, raising=False)

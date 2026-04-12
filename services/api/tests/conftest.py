@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from app.settings import Settings
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.settings import Settings
 
 SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples" / "test"
 ARTIFACTS_DIR = SAMPLES_DIR / "artifacts"

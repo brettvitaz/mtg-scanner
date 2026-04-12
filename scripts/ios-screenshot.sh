@@ -8,7 +8,7 @@
 # The script:
 #   1. Resolves a simulator UDID (prefers IOS_SNAPSHOT_SIMULATOR_ID env var).
 #   2. Boots the simulator if not already running.
-#   3. Builds the app (via 'make ios-snapshot-build' or directly with xcodebuild).
+#   3. Locates the pre-built .app produced by a prior build.
 #   4. Installs the built .app on the simulator.
 #   5. Launches the app with -UI_PREVIEW_ROUTE <route>.
 #   6. Waits for the UI to settle, then captures a screenshot.
@@ -23,6 +23,10 @@
 set -euo pipefail
 
 ROUTE="${1:-${ROUTE:-settings}}"
+if [[ ! "$ROUTE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "ios-screenshot: invalid route name '$ROUTE' — only alphanumeric, hyphens, and underscores allowed" >&2
+    exit 1
+fi
 # scan route needs a longer settle time for the detection overlay to appear.
 # Override with IOS_SNAPSHOT_WAIT=<seconds> if needed.
 if [[ "$ROUTE" == "scan" ]]; then
@@ -76,15 +80,26 @@ BUILD_SETTINGS=$(xcodebuild \
     -configuration Debug \
     -showBuildSettings 2>/dev/null)
 
-BUILT_PRODUCTS_DIR=$(echo "$BUILD_SETTINGS" | awk '/^ *BUILT_PRODUCTS_DIR =/ { sub(/.*= /, ""); print }')
-BUNDLE_ID=$(echo "$BUILD_SETTINGS" | awk '/^ *PRODUCT_BUNDLE_IDENTIFIER =/ { sub(/.*= /, ""); print }')
+BUILT_PRODUCTS_DIR=$(echo "$BUILD_SETTINGS" | awk '/^ *BUILT_PRODUCTS_DIR =/ { sub(/.*= /, ""); print; exit }')
+FULL_PRODUCT_NAME=$(echo "$BUILD_SETTINGS" | awk '/^ *FULL_PRODUCT_NAME =/ { sub(/.*= /, ""); print; exit }')
+BUNDLE_ID=$(echo "$BUILD_SETTINGS" | awk '/^ *PRODUCT_BUNDLE_IDENTIFIER =/ { sub(/.*= /, ""); print; exit }')
+
+if [[ -z "${BUILT_PRODUCTS_DIR:-}" ]]; then
+    echo "ios-screenshot: could not read BUILT_PRODUCTS_DIR from xcodebuild" >&2
+    exit 1
+fi
+
+if [[ -z "${FULL_PRODUCT_NAME:-}" ]]; then
+    echo "ios-screenshot: could not read FULL_PRODUCT_NAME from xcodebuild" >&2
+    exit 1
+fi
 
 if [[ -z "${BUNDLE_ID:-}" ]]; then
     echo "ios-screenshot: could not read PRODUCT_BUNDLE_IDENTIFIER from xcodebuild" >&2
     exit 1
 fi
 
-APP_PATH="${BUILT_PRODUCTS_DIR}/MTGScanner.app"
+APP_PATH="${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}"
 
 if [[ ! -d "$APP_PATH" ]]; then
     echo "ios-screenshot: app not found at $APP_PATH — run 'make ios-build' first" >&2

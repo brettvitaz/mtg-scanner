@@ -56,7 +56,7 @@ ios-snapshot: ios-build
 	ROUTE=$${ROUTE:-settings} ./scripts/ios-screenshot.sh "$${ROUTE:-settings}"
 
 ios-snapshot-all: ios-build
-	for route in $(IOS_SNAPSHOT_ROUTES); do ROUTE=$$route ./scripts/ios-screenshot.sh "$$route"; done
+	set -e; for route in $(IOS_SNAPSHOT_ROUTES); do ROUTE=$$route ./scripts/ios-screenshot.sh "$$route"; done
 
 api-update-mtgjson:
 	PYTHONPATH=services/api .venv/bin/python scripts/update_mtgjson.py

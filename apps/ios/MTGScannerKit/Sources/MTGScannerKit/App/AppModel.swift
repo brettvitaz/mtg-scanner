@@ -249,6 +249,16 @@ public final class AppModel {
         )
     }
 
+    func fetchMissingPrices(for items: [CollectionItem]) async {
+        for item in items where item.priceRetail == nil && item.priceBuy == nil {
+            guard let price = try? await fetchPrice(
+                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
+            ) else { continue }
+            item.priceRetail = price.priceRetail
+            item.priceBuy = price.priceBuy
+        }
+    }
+
     // MARK: - Corrections
 
     func saveCorrection(_ correction: CardCorrection) {

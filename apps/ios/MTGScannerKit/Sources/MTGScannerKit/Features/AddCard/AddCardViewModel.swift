@@ -27,8 +27,8 @@ final class AddCardViewModel {
 
     // MARK: - Private
 
-    private var searchTask: Task<Void, Never>?
-    private var lastSearchedQuery: String = ""
+    var searchTask: Task<Void, Never>?
+    var lastSearchedQuery: String = ""
 
     // MARK: - Computed
 
@@ -57,13 +57,18 @@ final class AddCardViewModel {
         }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, query == searchText else { return }
             isSearching = true
             do {
-                searchResults = try await appModel.searchCardNames(query: query)
+                let results = try await appModel.searchCardNames(query: query)
+                guard !Task.isCancelled, query == searchText else {
+                    isSearching = false
+                    return
+                }
+                searchResults = results
                 lastSearchedQuery = query
             } catch {
-                searchResults = []
+                if !Task.isCancelled, query == searchText { searchResults = [] }
             }
             isSearching = false
         }

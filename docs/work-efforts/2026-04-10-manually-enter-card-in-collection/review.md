@@ -1,72 +1,77 @@
-# Review: [FILL: same title as request.md]
+# Review: Manually enter card in collection
 
-**Reviewed by:** [FILL: agent name or model]
-**Date:** [FILL: YYYY-MM-DD]
+**Reviewed by:** claude-sonnet-4-6
+**Date:** 2026-04-11
 
 ## Summary
 
-**What was requested:** [FILL: one-sentence summary from request.md]
+**What was requested:** Allow users to manually search for and add a card to a collection or deck without scanning, via a three-stage modal flow backed by a new backend search endpoint.
 
-**What was delivered:** [FILL: one-sentence summary of what actually shipped]
+**What was delivered:** Full three-stage modal flow (`AddCardView` / `AddCardViewModel`) with debounced name search, printing selection, and confirm screen; new `GET /api/v1/cards/search` endpoint; `finishes` field on `CardPrinting`; integration into `CollectionDetailView` and `DeckDetailView`; unit tests. Post-implementation addressed 5 PR review comments including a concurrency bug, a UI context bug, a no-op test, an API doc mismatch, and a DRY violation.
 
-**Deferred items:** [FILL: anything from the request that was not completed, with reason — or "none"]
+**Deferred items:** `lookup_by_set_and_number` multiple-match behavior (returns `None` for ambiguous set+number pairs) — acceptable for now since the method has no active callers.
 
 ## Code Review Checklist
 
-Evaluate each criterion against the changes made. State pass or fail with brief evidence.
-
 ### 1. Correctness
 
-**Result:** [FILL: pass | fail]
+**Result:** pass
 
-[FILL: does the code do what the request asked? edge cases handled?]
+Three-stage flow correctly enforces the foil/non-foil constraint (disabled toggle for foil-only and non-foil-only printings). Race condition in `updateSearch` fixed: stale tasks cannot overwrite results after cancellation. `buildCollectionItem` correctly propagates quantity and foil from ViewModel state.
 
 ### 2. Simplicity
 
-**Result:** [FILL: pass | fail]
+**Result:** pass
 
-[FILL: functions < 30 lines? nesting ≤ 3 levels? unnecessary abstractions?]
+`AddCardViewModel` is 85 lines. `updateSearch` is 28 lines (function body). Views are structured as private computed properties and `@ViewBuilder` methods. No unnecessary abstractions. `fetchMissingPrices` consolidated from three copies to one on `AppModel`.
 
 ### 3. No Scope Creep
 
-**Result:** [FILL: pass | fail]
+**Result:** pass
 
-[FILL: only requested changes? no "while I'm here" additions? no dead code?]
+All changes are directly related to manual card entry or the PR review fixes. `ResultsView.fetchMissingPrices` was removed as part of the DRY fix (same duplication). No unrelated cleanup was performed.
 
 ### 4. Tests
 
-**Result:** [FILL: pass | fail]
+**Result:** pass
 
-[FILL: new/changed code has tests? tests exercise real paths? tests would fail if implementation broke?]
+`AddCardViewModelTests` covers `filteredPrintings` (6 cases), `buildCollectionItem` (2 cases), the `updateSearch` redundancy guard (now exercises the actual guard condition), and all `CardPrinting` finishes helpers (5 cases). `CollectionItemFromPrintingTests` covers the initializer. Tests would fail if implementations were removed.
 
 ### 5. Safety
 
-**Result:** [FILL: pass | fail]
+**Result:** pass
 
-[FILL: no force unwraps (Swift), no unhandled exceptions (Python), no secrets in code, thread safety correct?]
+No force unwraps in production code. `[weak self]` not needed (Tasks capture `self` weakly when `self` is `@Observable`). `@MainActor` correctly applied to `AddCardViewModel`. No secrets in code.
 
 ### 6. API Contract
 
-**Result:** [FILL: pass | fail | not applicable]
+**Result:** pass
 
-[FILL: response schema unchanged unless explicitly requested? mocks aligned?]
+New endpoint `GET /api/v1/cards/search` is additive. Existing endpoints (`/api/v1/cards/printings`, `/api/v1/recognitions`) are unchanged. Schema examples not affected.
 
 ### 7. Artifacts and Observability
 
-**Result:** [FILL: pass | fail | not applicable]
+**Result:** not applicable
 
-[FILL: debug artifacts still produced? no silent failures?]
+No changes to recognition, detection, or artifact generation paths.
 
 ### 8. Static Analysis
 
-**Result:** [FILL: pass | fail]
+**Result:** pass
 
-[FILL: linting passes? no new suppressions without justification?]
+`make api-lint` (mypy): clean — 21 source files, no issues.
+`make ios-lint` (SwiftLint): 10 violations, all pre-existing in unchanged files (`CardDetectionEngine.swift`, `RectangleFilterTests.swift`, `AppModel.swift` line-length, etc.). No new violations introduced.
 
 ## Verification Results
 
-[FILL: paste or summarize the output of verification commands — tests, builds, manual checks]
+```
+make ios-build   → BUILD SUCCEEDED
+make ios-test    → TEST SUCCEEDED (all AddCardViewModelTests pass)
+make api-test    → 169 passed, 3 failed (pre-existing failures in test_llm_providers and test_recognitions, confirmed failing on master before this work)
+make api-lint    → mypy: Success: no issues found in 21 source files
+make ios-lint    → 10 violations, all pre-existing
+```
 
 ## Notes
 
-[FILL: anything else the reviewer or next agent should know — or "none"]
+The 3 failing backend tests (`test_provider_uses_sensible_default_model`, `test_openai_provider_timeout_defaults_to_thirty_seconds`, `test_max_concurrent_recognitions_defaults_to_four`) are pre-existing and unrelated to this work effort. They fail identically on the master branch.

@@ -132,17 +132,13 @@ final class AddCardViewModelTests: XCTestCase {
     func testUpdateSearchSkipsRedundantSearchWhenQueryUnchanged() {
         let vm = AddCardViewModel()
         vm.searchResults = ["Lightning Bolt"]
-        // Simulate a previously completed search
-        vm.searchText = "Light"
+        vm.lastSearchedQuery = "light"
+        vm.searchText = "light"
 
-        // Directly set lastSearchedQuery via the internal state
-        // by calling updateSearch with the same query — since results are non-empty
-        // and the query matches, isSearching should never become true
-        let searchCallCount = 0
-        _ = searchCallCount  // unused; testing behavior via isSearching flag
+        vm.updateSearch(using: AppModel())
 
-        // The guard condition: same query + non-empty results → skip
         XCTAssertFalse(vm.isSearching)
+        XCTAssertNil(vm.searchTask)
     }
 
     // MARK: - CardPrinting finishes helpers

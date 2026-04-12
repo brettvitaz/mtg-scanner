@@ -9,7 +9,13 @@ struct AddCardView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
 
+    let confirmTitle: String
     let onAdd: (CollectionItem) -> Void
+
+    init(confirmTitle: String = "Add to Collection", onAdd: @escaping (CollectionItem) -> Void) {
+        self.confirmTitle = confirmTitle
+        self.onAdd = onAdd
+    }
 
     @State private var viewModel = AddCardViewModel()
     @State private var navigationPath: [AddCardRoute] = []
@@ -113,7 +119,7 @@ struct AddCardView: View {
                 foilToggle(for: printing, isFoil: $vm.isFoil)
             }
         }
-        .navigationTitle("Add to Collection")
+        .navigationTitle(confirmTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {

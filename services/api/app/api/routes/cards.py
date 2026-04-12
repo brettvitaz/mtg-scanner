@@ -97,7 +97,7 @@ class CardSearchResponse(BaseModel):
 
 @router.get("/cards/search", response_model=CardSearchResponse)
 async def search_card_names(
-    q: str = Query(..., min_length=2, description="Card name search query (prefix match)"),
+    q: str = Query(..., min_length=2, description="Card name search query (prefix match for single term, substring match for multiple terms)"),
     limit: int = Query(default=20, ge=1, le=50, description="Maximum results"),
 ) -> CardSearchResponse:
     settings = get_settings()

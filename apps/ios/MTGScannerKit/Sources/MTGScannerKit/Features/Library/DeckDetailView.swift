@@ -87,7 +87,7 @@ struct DeckDetailView: View {
             FilterSheet(filterState: filterState, items: deck.items)
         }
         .sheet(isPresented: $showAddCard) {
-            AddCardView { item in
+            AddCardView(confirmTitle: "Add to Deck") { item in
                 mergeOrInsert(item, into: deck.items, context: modelContext) {
                     $0.deck = deck
                 }
@@ -95,7 +95,7 @@ struct DeckDetailView: View {
             }
         }
         .task(id: deck.items.map(\.id)) {
-            await fetchMissingPrices(for: deck.items)
+            await appModel.fetchMissingPrices(for: deck.items)
         }
     }
 
@@ -349,16 +349,6 @@ extension DeckDetailView {
             targetDeck.updatedAt = Date()
         }
         deck.updatedAt = Date()
-    }
-
-    func fetchMissingPrices(for items: [CollectionItem]) async {
-        for item in items where item.priceRetail == nil && item.priceBuy == nil {
-            guard let price = try? await appModel.fetchPrice(
-                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
-            ) else { continue }
-            item.priceRetail = price.priceRetail
-            item.priceBuy = price.priceBuy
-        }
     }
 
     func registerUndo(for items: [CollectionItem]) {

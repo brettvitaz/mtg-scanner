@@ -114,6 +114,34 @@ struct APIClient {
         return decoded.printings
     }
 
+    // MARK: - Card name search route
+
+    func searchCardNames(query: String, limit: Int = 20, baseURL: String) async throws -> [String] {
+        guard var components = URLComponents(string: baseURL) else {
+            throw APIError.invalidBaseURL
+        }
+        components.path += "/api/v1/cards/search"
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        guard let url = components.url else {
+            throw APIError.invalidBaseURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        let decoded = try JSONDecoder().decode(CardSearchResponse.self, from: responseData)
+        return decoded.names
+    }
+
     // MARK: - Price route
 
     func fetchPrice(

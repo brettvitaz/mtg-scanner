@@ -29,6 +29,7 @@ class CardPrinting(BaseModel):
     card_kingdom_url: str | None = None
     card_kingdom_foil_url: str | None = None
     color_identity: str | None = None
+    finishes: str | None = None
 
 
 class CardPrintingsResponse(BaseModel):
@@ -82,11 +83,34 @@ async def get_card_printings(
             card_kingdom_url=r.card_kingdom_url,
             card_kingdom_foil_url=r.card_kingdom_foil_url,
             color_identity=r.color_identity,
+            finishes=r.finishes,
         )
         for r in records
     ]
 
     return CardPrintingsResponse(printings=printings)
+
+
+class CardSearchResponse(BaseModel):
+    names: list[str]
+
+
+@router.get("/cards/search", response_model=CardSearchResponse)
+async def search_card_names(
+    q: str = Query(..., min_length=2, description="Card name search query (prefix match for single term, substring match for multiple terms)"),
+    limit: int = Query(default=20, ge=1, le=50, description="Maximum results"),
+) -> CardSearchResponse:
+    settings = get_settings()
+    index = MTGJSONIndex(Path(settings.mtg_scanner_mtgjson_db_path))
+
+    if not index.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MTGJSON database is not available.",
+        )
+
+    names = index.search_names_by_prefix(query=q, limit=limit)
+    return CardSearchResponse(names=names)
 
 
 class CardPriceResponse(BaseModel):

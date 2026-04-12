@@ -229,6 +229,12 @@ public final class AppModel {
         }
     }
 
+    // MARK: - Card name search
+
+    func searchCardNames(query: String) async throws -> [String] {
+        return try await apiClient.searchCardNames(query: query, baseURL: apiBaseURL)
+    }
+
     // MARK: - Printings
 
     func fetchPrintings(name: String) async throws -> [CardPrinting] {
@@ -241,6 +247,16 @@ public final class AppModel {
         return try await apiClient.fetchPrice(
             name: name, scryfallId: scryfallId, isFoil: isFoil, baseURL: apiBaseURL
         )
+    }
+
+    func fetchMissingPrices(for items: [CollectionItem]) async {
+        for item in items where item.priceRetail == nil && item.priceBuy == nil {
+            guard let price = try? await fetchPrice(
+                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
+            ) else { continue }
+            item.priceRetail = price.priceRetail
+            item.priceBuy = price.priceBuy
+        }
     }
 
     // MARK: - Corrections

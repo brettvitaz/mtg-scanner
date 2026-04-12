@@ -82,7 +82,7 @@ struct ResultsView: View {
             FilterSheet(filterState: filterState, items: inboxItems)
         }
         .task(id: inboxItems.map(\.id)) {
-            await fetchMissingPrices(for: inboxItems)
+            await appModel.fetchMissingPrices(for: inboxItems)
         }
     }
 
@@ -231,19 +231,6 @@ private extension ResultsView {
 // MARK: - Actions
 
 private extension ResultsView {
-    func fetchMissingPrices(for items: [CollectionItem]) async {
-        for item in items where item.priceRetail == nil && item.priceBuy == nil {
-            guard let price = try? await appModel.fetchPrice(
-                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
-            ) else {
-                print("[ResultsView] fetchPrice failed for \(item.title)")
-                continue
-            }
-            item.priceRetail = price.priceRetail
-            item.priceBuy = price.priceBuy
-        }
-    }
-
     func refetchPrice(for item: CollectionItem) async {
         let requestedFoil = item.foil
         guard let price = try? await appModel.fetchPrice(

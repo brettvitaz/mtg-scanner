@@ -198,7 +198,7 @@ struct CardCorrection: Identifiable, Codable {
 }
 
 /// A printing of a card from the printings endpoint.
-struct CardPrinting: Codable, Identifiable, Equatable {
+struct CardPrinting: Codable, Identifiable, Equatable, Hashable {
     var id: String { "\(setCode)-\(collectorNumber ?? "unknown")" }
     let name: String
     let setCode: String
@@ -218,6 +218,7 @@ struct CardPrinting: Codable, Identifiable, Equatable {
     let cardKingdomUrl: String?
     let cardKingdomFoilUrl: String?
     let colorIdentity: String?
+    let finishes: String?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -238,7 +239,17 @@ struct CardPrinting: Codable, Identifiable, Equatable {
         case cardKingdomUrl = "card_kingdom_url"
         case cardKingdomFoilUrl = "card_kingdom_foil_url"
         case colorIdentity = "color_identity"
+        case finishes
     }
+
+    /// True if this printing is available in foil. Defaults to true when finishes data is absent.
+    var hasFoil: Bool { finishes.map { $0.split(separator: ",").contains("foil") } ?? true }
+    /// True if this printing is available in non-foil. Defaults to true when finishes data is absent.
+    var hasNonFoil: Bool { finishes.map { $0.split(separator: ",").contains("nonfoil") } ?? true }
+    /// True if this printing is available only in foil (no non-foil option).
+    var isFoilOnly: Bool { hasFoil && !hasNonFoil }
+    /// True if this printing is available only in non-foil (no foil option).
+    var isNonFoilOnly: Bool { hasNonFoil && !hasFoil }
 }
 
 /// Data model for a card identification toast notification.
@@ -280,6 +291,11 @@ struct IdentifiedCard: Identifiable {
 /// Response from the printings endpoint.
 struct CardPrintingsResponse: Codable {
     let printings: [CardPrinting]
+}
+
+/// Response from the card name search endpoint.
+struct CardSearchResponse: Codable {
+    let names: [String]
 }
 
 /// Card Kingdom price data from the price endpoint.

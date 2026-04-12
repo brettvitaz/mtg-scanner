@@ -66,6 +66,26 @@ Deviations from plan: none.
 
 ---
 
+### Step 8: Resolve PR #66 review comments
+
+**Status:** done
+
+Addressed all 11 review comments from PR #66 across 4 commits:
+
+1. **refactor: move fixture code and resources into MTGScannerFixtures SPM target** — Created a new `MTGScannerFixtures` library target in Package.swift. Moved `FixtureFrameSource`, `FixtureCameraViewController`, `FixtureCameraPreviewRepresentable`, `PreviewGalleryRootView`, and `Resources/FixtureFrames/` (8.3MB) from `MTGScannerKit` to the new target. Made `CameraFrameSource`, `DetectedCard`, `CardDetectionEngine`, `DetectionMode`, and `SettingsView` public so the new target can reference them. Added `MTGScannerFixtures` to the app's `#if DEBUG` import block and Xcode project framework dependencies. Updated test target to depend on `MTGScannerFixtures`. Removed unused `import SwiftData` and `libraryViewModel` from `PreviewGalleryRootView` (reviewer comment #10). Removed unused `frameQueue` from `FixtureCameraViewController` (reviewer comment #7).
+
+2. **fix: make FixtureFrameSource.start() and stop() thread-safe** — Added `running` flag; wrapped `start()` and `stop()` in `queue.sync` so callers get strong guarantees (no duplicate timers, no frames after stop).
+
+3. **fix: eliminate data race and flaky Thread.sleep in FixtureFrameSourceTests** — Replaced `received` Bool (mutated from background queue) with `XCTestExpectation.fulfill()` (thread-safe). Replaced `Thread.sleep` + GCD cancel assumption with an inverted expectation.
+
+4. **fix: harden ios-snapshot-all loop and ios-screenshot.sh robustness** — Added `set -e;` to Makefile loop. Validated `ROUTE` against `^[a-zA-Z0-9_-]+$`. Added `exit` to awk patterns. Read `FULL_PRODUCT_NAME` from build settings instead of hardcoding `MTGScanner.app`. Fixed misleading "builds the app" comment.
+
+`make ios-build` → BUILD SUCCEEDED. `make ios-test` → TEST SUCCEEDED. No new lint violations.
+
+Deviations from plan: dead code removal (comments #7 and #10) was folded into commit 1 (the file rewrite) rather than a separate commit — cleaner than a standalone one-line diff.
+
+---
+
 ### Step 2: Screenshot harness (scripts/ios-screenshot.sh + Makefile)
 
 **Status:** done

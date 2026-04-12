@@ -99,3 +99,21 @@ make ios-snapshot ROUTE=scan     → services/.artifacts/ui-snapshots/scan.png
 - `FixtureCameraViewController` uses its own coordinate-mapping logic (Vision normalized → aspect-fit image bounds) instead of `DetectionOverlayRenderer`, which is tightly coupled to `AVCaptureVideoPreviewLayer`. This is the right call — no production code modified for this constraint.
 - Pre-existing lint violations (10 total) are tracked as a separate scope item. They are not regressions from this effort.
 - Follow-up: add routes for ResultsView, LibraryView, CardDetailView, CorrectionView, AutoScanView, and shared components. Pattern is established — each new route is 3–5 lines in `PreviewGalleryRootView.swift`.
+
+## PR #66 Review Comment Resolution (2026-04-11)
+
+All 11 reviewer comments addressed in 4 follow-up commits:
+
+| # | File | Issue | Resolution |
+|---|------|-------|------------|
+| 1 | Makefile:59 | for-loop masks failures | Added `set -e;` prefix |
+| 2 | ios-screenshot.sh:12 | Misleading "builds the app" comment | Fixed comment to say "Locates the pre-built .app" |
+| 3 | ios-screenshot.sh:87 | BUILT_PRODUCTS_DIR multi-line; hardcoded app name | Added `exit` to awk; read FULL_PRODUCT_NAME from build settings |
+| 4 | ios-screenshot.sh:112 | ROUTE not sanitized (path traversal) | Validate against `^[a-zA-Z0-9_-]+$` |
+| 5 | FixtureFrameSource.swift:41 | start() creates duplicate timers | guard `!running, timer == nil` in queue.sync |
+| 6 | FixtureFrameSource.swift:50 | stop() has no sync barrier | queue.sync sets running=false before returning |
+| 7 | FixtureCameraViewController.swift:36 | frameQueue unused | Removed |
+| 8 | FixtureFrameSourceTests.swift:43 | Data race on received var | Removed var; XCTestExpectation.fulfill() is thread-safe |
+| 9 | FixtureFrameSourceTests.swift:56 | Flaky Thread.sleep test | Replaced with inverted expectation |
+| 10 | PreviewGalleryRootView.swift:17 | Unused import SwiftData + libraryViewModel | Removed |
+| 11 | Package.swift:21 | Fixture images ship in release builds | Moved to new MTGScannerFixtures SPM target |

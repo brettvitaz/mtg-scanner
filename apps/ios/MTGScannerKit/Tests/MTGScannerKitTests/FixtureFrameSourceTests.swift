@@ -38,32 +38,25 @@ final class FixtureFrameSourceTests: XCTestCase {
 
     func testFrameSourceEmitsAtLeastOneFrame() {
         let source = FixtureFrameSource(frameInterval: 0.05)
-        var received = false
-        let expectation = expectation(description: "frame received")
+        let frameReceived = expectation(description: "frame received")
+        frameReceived.assertForOverFulfill = false
 
-        source.onPixelBuffer = { _, _ in
-            if !received {
-                received = true
-                expectation.fulfill()
-            }
-        }
+        source.onPixelBuffer = { _, _ in frameReceived.fulfill() }
         source.start()
         waitForExpectations(timeout: 2.0)
         source.stop()
-
-        XCTAssertTrue(received, "FixtureFrameSource must emit at least one frame after start()")
     }
 
     func testFrameSourceStopsEmittingAfterStop() {
         let source = FixtureFrameSource(frameInterval: 0.05)
-        var countAfterStop = 0
         source.start()
         source.stop()
 
-        source.onPixelBuffer = { _, _ in countAfterStop += 1 }
-        Thread.sleep(forTimeInterval: 0.2)
+        let noFrames = expectation(description: "no frames after stop")
+        noFrames.isInverted = true
+        source.onPixelBuffer = { _, _ in noFrames.fulfill() }
 
-        XCTAssertEqual(countAfterStop, 0, "No frames should be emitted after stop()")
+        waitForExpectations(timeout: 0.3)
     }
 
     // MARK: - FixtureCameraViewController coordinate mapping

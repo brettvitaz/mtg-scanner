@@ -19,6 +19,7 @@ public final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
     private let frameInterval: TimeInterval
     private let queue = DispatchQueue(label: "com.mtgscanner.fixture-frames", qos: .userInitiated)
     private var timer: DispatchSourceTimer?
+    private var running = false
     private var index = 0
 
     // 1920×1080 matches CameraSessionManager's `.hd1920x1080` session preset.
@@ -40,21 +41,27 @@ public final class FixtureFrameSource: CameraFrameSource, @unchecked Sendable {
     }
 
     public func start() {
-        guard !pixelBuffers.isEmpty else { return }
-        let t = DispatchSource.makeTimerSource(queue: queue)
-        t.schedule(deadline: .now(), repeating: frameInterval)
-        t.setEventHandler { [weak self] in self?.emitNextFrame() }
-        t.resume()
-        timer = t
+        queue.sync {
+            guard !self.pixelBuffers.isEmpty, !self.running, self.timer == nil else { return }
+            self.running = true
+            let t = DispatchSource.makeTimerSource(queue: self.queue)
+            t.schedule(deadline: .now(), repeating: self.frameInterval)
+            t.setEventHandler { [weak self] in self?.emitNextFrame() }
+            t.resume()
+            self.timer = t
+        }
     }
 
     public func stop() {
-        timer?.cancel()
-        timer = nil
+        queue.sync {
+            self.running = false
+            self.timer?.cancel()
+            self.timer = nil
+        }
     }
 
     private func emitNextFrame() {
-        guard !pixelBuffers.isEmpty else { return }
+        guard running, !pixelBuffers.isEmpty else { return }
         let buffer = pixelBuffers[index % pixelBuffers.count]
         index &+= 1
         let time = CMTime(seconds: CACurrentMediaTime(), preferredTimescale: 600)

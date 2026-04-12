@@ -1,4 +1,29 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(bash -n scripts/ios-screenshot.sh)",
+      "Bash(bash scripts/*)",
+      "Bash(bash scripts/bootstrap-api.sh)",
+      "Bash(gh api:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh:*)",
+      "Bash(git:*)",
+      "Bash(make api-bootstrap:*)",
+      "Bash(make api-lint:*)",
+      "Bash(make api-test:*)",
+      "Bash(make ios-build:*)",
+      "Bash(make ios-lint:*)",
+      "Bash(make ios-test:*)",
+      "Bash(sqlite3:*)",
+      "Bash(swiftlint lint:*)",
+      "Bash(xcodebuild -workspace MTGScanner.xcworkspace -scheme MTGScanner -sdk iphonesimulator -configuration Debug build)",
+      "Bash(xcodebuild:*)",
+      "mcp__context7__query-docs",
+      "mcp__context7__resolve-library-id",
+      "Read(//Users/brettvitaz/Development/mtg-scanner-worktrees/**)",
+      "Read(//Users/brettvitaz/Development/mtg-scanner/**)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

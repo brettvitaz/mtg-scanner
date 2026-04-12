@@ -1,6 +1,9 @@
 import MTGScannerKit
 import SwiftData
 import SwiftUI
+#if DEBUG
+import MTGScannerFixtures
+#endif
 
 @main
 struct MTGScannerApp: App {
@@ -28,14 +31,26 @@ struct MTGScannerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
-                .environment(appModel)
-                .environment(libraryViewModel)
-                .modelContainer(modelContainer)
-                .onAppear {
-                    appModel.modelContext = modelContainer.mainContext
-                    libraryViewModel.modelContext = modelContainer.mainContext
-                }
+            #if DEBUG
+            if let route = UserDefaults.standard.string(forKey: "UI_PREVIEW_ROUTE") {
+                PreviewGalleryRootView(route: route)
+            } else {
+                rootTabView
+            }
+            #else
+            rootTabView
+            #endif
         }
+    }
+
+    private var rootTabView: some View {
+        RootTabView()
+            .environment(appModel)
+            .environment(libraryViewModel)
+            .modelContainer(modelContainer)
+            .onAppear {
+                appModel.modelContext = modelContainer.mainContext
+                libraryViewModel.modelContext = modelContainer.mainContext
+            }
     }
 }

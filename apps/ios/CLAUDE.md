@@ -7,7 +7,7 @@ SwiftUI app for iPhone-first MTG card scanning with on-device detection and crop
 The iOS code is split into two parts:
 
 - **`MTGScanner/`** — Xcode app shell: `@main` entry point, `Info.plist`, `Assets.xcassets`, `MTGCardDetector.mlpackage`. This is the Xcode target that produces the `.app`.
-- **`MTGScannerKit/`** — Swift Package containing all production source and tests. SourceKit-LSP indexes this package for IDE tooling (autocomplete, go-to-definition).
+- **`MTGScannerKit/`** — Swift Package with two targets: `MTGScannerKit` (production source + tests) and `MTGScannerFixtures` (debug/simulator fixture code + images). SourceKit-LSP indexes this package for IDE tooling (autocomplete, go-to-definition).
 - **`MTGScanner.xcworkspace`** — Workspace that references both. **Always open the workspace, not the xcodeproj.**
 
 ## Architecture
@@ -108,3 +108,54 @@ xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
 ```
 
 Or: `make ios-build`
+
+## UI iteration for agents
+
+Agents can capture PNG screenshots of any named UI route from the command line without opening Xcode.
+
+### How to take a screenshot
+
+```bash
+make ios-build              # build first (or skip if already built)
+make ios-snapshot ROUTE=settings   # capture SettingsView
+make ios-snapshot ROUTE=scan       # capture ScanView with fixture card images
+make ios-snapshot-all              # capture all known routes
+```
+
+PNGs are written to `services/.artifacts/ui-snapshots/<route>.png` (gitignored).
+
+Set `IOS_SNAPSHOT_WAIT=<seconds>` to override the per-route default settle wait (4s for most routes, 5s for `scan`).
+Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
+
+### How it works
+
+- `scripts/ios-screenshot.sh` boots a simulator (prefers any already-booted device), installs the built `.app`, launches it with a `-UI_PREVIEW_ROUTE <route>` argument, waits, captures via `xcrun simctl io screenshot`, and terminates the app.
+- In `#if DEBUG` builds, `MTGScannerApp` reads the `UI_PREVIEW_ROUTE` UserDefaults key (set by the launch arg) and swaps `RootTabView` for `PreviewGalleryRootView(route:)`.
+- Production builds are completely unaffected — the `#if DEBUG` guard ensures no preview code reaches release.
+
+### Available routes
+
+| Route | View | Notes |
+|-------|------|-------|
+| `settings` | `SettingsView` | Full settings form with real `AppModel` |
+| `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
+
+### Adding a new route
+
+1. Add a `case "<name>":` branch in `apps/ios/MTGScannerKit/Sources/MTGScannerFixtures/PreviewGalleryRootView.swift` returning the view.
+2. Add a `#Preview` block for Xcode canvas support.
+3. Add `"<name>"` to the `IOS_SNAPSHOT_ROUTES` variable in `Makefile` so `make ios-snapshot-all` includes it.
+4. Run `make ios-snapshot ROUTE=<name>` to verify the PNG.
+5. Document the new route in the table above.
+
+### Camera routes and fixture frames
+
+The Simulator has no camera. The `scan` route uses `FixtureCameraViewController`, which:
+- Displays fixture card images from `Resources/FixtureFrames/` in a `UIImageView`.
+- Feeds the same images as `CVPixelBuffer`s to the real `CardDetectionEngine`.
+- Draws detection overlays using Vision's normalized coordinates mapped to the image bounds.
+- Cycles through images on a timer (default: 5 Hz) — overlays appear within a few seconds.
+
+Fixture code lives in the `MTGScannerFixtures` SPM target (`Sources/MTGScannerFixtures/`), which keeps debug assets out of release builds.
+
+To add more fixture images: copy images to `apps/ios/MTGScannerKit/Sources/MTGScannerFixtures/Resources/FixtureFrames/` and add the filename (without extension) to `FixtureFrameSource.fixtureNames`.

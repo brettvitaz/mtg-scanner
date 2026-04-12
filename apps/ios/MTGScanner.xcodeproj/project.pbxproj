@@ -84,6 +84,7 @@
 		C000000000000000000001B5 /* FlashlightButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* FlashlightButtonTests.swift */; };
 		C000000000000000000001B6 /* AutoScanCropHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B6 /* AutoScanCropHelperTests.swift */; };
 		SPM0000000000000000000004 /* MTGScannerKit in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000003 /* MTGScannerKit */; };
+		SPM0000000000000000000006 /* MTGScannerFixtures in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000005 /* MTGScannerFixtures */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -185,6 +186,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				SPM0000000000000000000004 /* MTGScannerKit in Frameworks */,
+				SPM0000000000000000000006 /* MTGScannerFixtures in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,6 +476,7 @@
 			buildConfigurationList = A00000000000000000000009 /* Build configuration list for PBXNativeTarget "MTGScanner" */;
 			packageProductDependencies = (
 				SPM0000000000000000000003 /* MTGScannerKit */,
+				SPM0000000000000000000005 /* MTGScannerFixtures */,
 			);
 			buildPhases = (
 				A00000000000000000000007 /* Sources */,
@@ -596,6 +599,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = SPM0000000000000000000002 /* XCLocalSwiftPackageReference "MTGScannerKit" */;
 			productName = MTGScannerKit;
+		};
+		SPM0000000000000000000005 /* MTGScannerFixtures */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = SPM0000000000000000000002 /* XCLocalSwiftPackageReference "MTGScannerKit" */;
+			productName = MTGScannerFixtures;
 		};
 /* End XCSwiftPackageProductDependency section */
 /* Begin XCBuildConfiguration section */

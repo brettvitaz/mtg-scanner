@@ -30,6 +30,7 @@ services/api/logs/
 
 # Local sample artifacts
 .artifacts/
+services/.artifacts/
 samples/tmp/
 evals/results/
 tmp/

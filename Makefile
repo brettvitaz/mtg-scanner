@@ -7,7 +7,7 @@ IOS_TEST_CURRENT_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_C
 IOS_TEST_TABLET_DEVICE ?= iPad Air 11-inch (M4)
 IOS_TEST_TABLET_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_TABLET_DEVICE)
 
-.PHONY: bootstrap api-bootstrap api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
+.PHONY: bootstrap api-bootstrap api-setup api-clean api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
 
 bootstrap: api-bootstrap
 
@@ -16,6 +16,14 @@ api-bootstrap:
 
 api-run:
 	./scripts/run-api.sh
+
+api-setup: api-bootstrap api-import-ck-prices api-update-mtgjson api-update-pricing
+
+api-clean:
+	rm -f services/api/data/ck_prices/ck_prices.sqlite
+	rm -f services/api/data/mtgjson/mtgjson.sqlite
+	rm -f services/api/data/pricing/model_prices.json
+	rm -f services/api/data/mtgjson/manifest.json
 
 api-test:
 	./scripts/test-api.sh

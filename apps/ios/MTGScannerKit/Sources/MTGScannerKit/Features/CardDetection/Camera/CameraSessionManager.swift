@@ -1,7 +1,6 @@
 import AVFoundation
 import UIKit
 
-// swiftlint:disable type_body_length
 /// Manages the `AVCaptureSession` lifecycle for real-time card detection.
 ///
 /// Responsibilities:
@@ -116,30 +115,6 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
         }
     }
 
-    private func configureFocus(_ device: AVCaptureDevice) {
-        guard (try? device.lockForConfiguration()) != nil else { return }
-        configurePointsOfInterest(device)
-        if device.isFocusModeSupported(.continuousAutoFocus) {
-            device.focusMode = .continuousAutoFocus
-        }
-        if device.isAutoFocusRangeRestrictionSupported {
-            device.autoFocusRangeRestriction = .near
-        }
-        if device.isExposureModeSupported(.continuousAutoExposure) {
-            device.exposureMode = .continuousAutoExposure
-        }
-        device.unlockForConfiguration()
-    }
-
-    private func configurePointsOfInterest(_ device: AVCaptureDevice) {
-        if device.isFocusPointOfInterestSupported {
-            device.focusPointOfInterest = Self.capturePointOfInterest
-        }
-        if device.isExposurePointOfInterestSupported {
-            device.exposurePointOfInterest = Self.capturePointOfInterest
-        }
-    }
-
     // MARK: - Photo Capture
 
     /// Triggers a still photo capture and returns the captured upload payload via `completion`.
@@ -175,7 +150,56 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
         restoreContinuousAutoFocus()
     }
 
-    private func lockFocusThenCapture(handler: PhotoCaptureHandler) {
+    /// Test-only accessor for queue-confined capture state.
+    func activeHandlerForTesting() -> AnyObject? {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return _activeHandler
+    }
+
+    /// Test-only accessor for queue-confined capture state.
+    func isCaptureInFlightForTesting() -> Bool {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return isCaptureInFlight
+    }
+
+    /// Test-only hook that exercises the same stale-handler guard used by AVFoundation callbacks.
+    func finishCaptureForTesting(handler: AnyObject?) {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        guard let handler = handler as? PhotoCaptureHandler else { return }
+        captureDidFinish(handler: handler)
+    }
+
+}
+
+// MARK: - Focus helpers
+
+private extension CameraSessionManager {
+
+    func configureFocus(_ device: AVCaptureDevice) {
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        configurePointsOfInterest(device)
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        if device.isAutoFocusRangeRestrictionSupported {
+            device.autoFocusRangeRestriction = .near
+        }
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+        }
+        device.unlockForConfiguration()
+    }
+
+    func configurePointsOfInterest(_ device: AVCaptureDevice) {
+        if device.isFocusPointOfInterestSupported {
+            device.focusPointOfInterest = Self.capturePointOfInterest
+        }
+        if device.isExposurePointOfInterestSupported {
+            device.exposurePointOfInterest = Self.capturePointOfInterest
+        }
+    }
+
+    func lockFocusThenCapture(handler: PhotoCaptureHandler) {
         guard !suppressCaptureForTesting else { return }
         guard let device = captureDevice else {
             handler.issueCapture(to: photoOutput)
@@ -198,35 +222,31 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
             handler.issueCapture(to: photoOutput)
             return
         }
-
         guard shouldWaitForSettle else {
             handler.issueCapture(to: photoOutput)
             return
         }
-
         waitForFocusAndExposureToSettle(handler: handler, startedAt: Date())
     }
 
-    private func waitForFocusAndExposureToSettle(handler: PhotoCaptureHandler, startedAt: Date) {
+    func waitForFocusAndExposureToSettle(handler: PhotoCaptureHandler, startedAt: Date) {
         guard handler.generation == captureGeneration, _activeHandler === handler else { return }
         guard let device = captureDevice else {
             handler.issueCapture(to: photoOutput)
             return
         }
-
         let didSettle = !device.isAdjustingFocus && !device.isAdjustingExposure
         let didTimeOut = Date().timeIntervalSince(startedAt) >= Self.captureSettleTimeout
         guard !didSettle, !didTimeOut else {
             handler.issueCapture(to: photoOutput)
             return
         }
-
         sessionQueue.asyncAfter(deadline: .now() + Self.captureSettlePollInterval) { [weak self] in
             self?.waitForFocusAndExposureToSettle(handler: handler, startedAt: startedAt)
         }
     }
 
-    private func restoreContinuousAutoFocus() {
+    func restoreContinuousAutoFocus() {
         guard let device = captureDevice,
               (try? device.lockForConfiguration()) != nil else { return }
         if device.isFocusModeSupported(.continuousAutoFocus) {
@@ -237,27 +257,11 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
         }
         device.unlockForConfiguration()
     }
+}
 
-    /// Test-only accessor for queue-confined capture state.
-    func activeHandlerForTesting() -> AnyObject? {
-        dispatchPrecondition(condition: .onQueue(sessionQueue))
-        return _activeHandler
-    }
+// MARK: - Torch
 
-    /// Test-only accessor for queue-confined capture state.
-    func isCaptureInFlightForTesting() -> Bool {
-        dispatchPrecondition(condition: .onQueue(sessionQueue))
-        return isCaptureInFlight
-    }
-
-    /// Test-only hook that exercises the same stale-handler guard used by AVFoundation callbacks.
-    func finishCaptureForTesting(handler: AnyObject?) {
-        dispatchPrecondition(condition: .onQueue(sessionQueue))
-        guard let handler = handler as? PhotoCaptureHandler else { return }
-        captureDidFinish(handler: handler)
-    }
-
-    // MARK: - Torch
+extension CameraSessionManager {
 
     /// Sets the back-camera torch to `level` (0 = off, 0.1–1.0 = on at that brightness).
     ///
@@ -282,8 +286,11 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
             } catch { return }
         }
     }
+}
 
-    // MARK: - Lifecycle
+// MARK: - Lifecycle
+
+extension CameraSessionManager {
 
     func start() {
         sessionQueue.async { [weak self] in
@@ -309,7 +316,6 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
         }
     }
 }
-// swiftlint:enable type_body_length
 
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
 
@@ -322,79 +328,6 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         onFrame?(sampleBuffer)
         if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
             onPixelBuffer?(pixelBuffer, sampleBuffer.presentationTimeStamp)
-        }
-    }
-}
-
-// MARK: - Per-capture delegate
-
-/// Owns the completion and AVCapturePhotoCaptureDelegate for exactly one photo capture.
-///
-/// By making each capture its own delegate, a stale AVFoundation callback can never
-/// reach a different capture's completion — it only talks to the object it was given.
-///
-/// Both `cancel()` and `photoOutput(_:didFinishProcessingPhoto:)` are serialized through
-/// `sessionQueue` so the `completion` slot has a single writer at a time.
-private final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
-
-    let generation: Int
-    private let maxPhotoDimensions: CMVideoDimensions
-    private var completion: (@Sendable (RecognitionImagePayload?) -> Void)?
-    private let sessionQueue: DispatchQueue
-    private let onDone: @Sendable (PhotoCaptureHandler) -> Void
-
-    init(
-        generation: Int,
-        maxPhotoDimensions: CMVideoDimensions,
-        completion: @escaping @Sendable (RecognitionImagePayload?) -> Void,
-        sessionQueue: DispatchQueue,
-        onDone: @escaping @Sendable (PhotoCaptureHandler) -> Void
-    ) {
-        self.generation = generation
-        self.maxPhotoDimensions = maxPhotoDimensions
-        self.completion = completion
-        self.sessionQueue = sessionQueue
-        self.onDone = onDone
-    }
-
-    func issueCapture(to output: AVCapturePhotoOutput) {
-        let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
-        if maxPhotoDimensions.width > 0 {
-            settings.maxPhotoDimensions = maxPhotoDimensions
-        }
-        let supportsQuality = output.maxPhotoQualityPrioritization.rawValue >=
-            AVCapturePhotoOutput.QualityPrioritization.quality.rawValue
-        if supportsQuality {
-            settings.photoQualityPrioritization = .quality
-        }
-        output.capturePhoto(with: settings, delegate: self)
-    }
-
-    /// Called by `stop()` (on sessionQueue) to resolve the pending continuation with nil.
-    func cancel() {
-        let pending = completion
-        completion = nil
-        DispatchQueue.main.async { pending?(nil) }
-    }
-
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        // Serialize completion mutation onto sessionQueue so cancel() and this delegate
-        // callback cannot race — only one of them will find a non-nil completion.
-        let payload: RecognitionImagePayload?
-        if error == nil,
-           let photoData = photo.fileDataRepresentation(),
-           let image = UIImage(data: photoData) {
-            payload = .cameraCapture(image: image, data: photoData)
-        } else {
-            payload = nil
-        }
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            let pending = self.completion
-            self.completion = nil
-            self.onDone(self)
-            guard let pending else { return }
-            DispatchQueue.main.async { pending(payload) }
         }
     }
 }

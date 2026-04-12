@@ -30,8 +30,8 @@ final class RecognitionQueue {
     // MARK: - Private
 
     typealias RecognizeFunction = @Sendable (Data, String, String, String) async throws -> RecognitionResult
-    // swiftlint:disable:next line_length
-    typealias RecognizeBatchFunction = @Sendable ([(data: Data, filename: String)], String, String) async throws -> RecognitionResult
+    typealias CroppedBatch = [(data: Data, filename: String)]
+    typealias RecognizeBatchFunction = @Sendable (CroppedBatch, String, String) async throws -> RecognitionResult
 
     private let recognize: RecognizeFunction
     private let recognizeBatch: RecognizeBatchFunction

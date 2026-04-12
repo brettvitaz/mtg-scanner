@@ -165,7 +165,8 @@ public final class AppModel {
         var cropPairs: [(data: Data, filename: String)] = []
         for (i, crop) in crops.enumerated() {
             guard let payload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
-            cropPairs.append((data: payload.uploadData, filename: "\(stem)-crop-\(i).\(payload.preferredFilenameExtension)"))
+            let ext = payload.preferredFilenameExtension
+            cropPairs.append((data: payload.uploadData, filename: "\(stem)-crop-\(i).\(ext)"))
         }
 
         guard !cropPairs.isEmpty else {
@@ -229,20 +230,23 @@ public final class AppModel {
         }
     }
 
-    // MARK: - Card name search
+}
 
+// MARK: - Card Search and Printings
+
+extension AppModel {
     func searchCardNames(query: String) async throws -> [String] {
         return try await apiClient.searchCardNames(query: query, baseURL: apiBaseURL)
     }
 
-    // MARK: - Printings
-
     func fetchPrintings(name: String) async throws -> [CardPrinting] {
         return try await apiClient.fetchPrintings(name: name, baseURL: apiBaseURL)
     }
+}
 
-    // MARK: - Prices
+// MARK: - Prices
 
+extension AppModel {
     func fetchPrice(name: String, scryfallId: String?, isFoil: Bool) async throws -> CardPrice {
         return try await apiClient.fetchPrice(
             name: name, scryfallId: scryfallId, isFoil: isFoil, baseURL: apiBaseURL
@@ -258,9 +262,11 @@ public final class AppModel {
             item.priceBuy = price.priceBuy
         }
     }
+}
 
-    // MARK: - Corrections
+// MARK: - Corrections
 
+extension AppModel {
     func saveCorrection(_ correction: CardCorrection) {
         corrections[correction.id] = correction
         persistCorrections()
@@ -268,6 +274,10 @@ public final class AppModel {
 
     func correction(for card: RecognizedCard) -> CardCorrection {
         corrections[card.id] ?? CardCorrection(from: card)
+    }
+
+    func resetAPIBaseURL() {
+        apiBaseURL = AppConfig.defaultAPIBaseURL
     }
 
     private func persistCorrections() {
@@ -283,10 +293,6 @@ public final class AppModel {
         UserDefaults.standard.set(onDeviceCropEnabled, forKey: onDeviceCropStoreKey)
     }
 
-    func resetAPIBaseURL() {
-        apiBaseURL = AppConfig.defaultAPIBaseURL
-    }
-
     private func loadCorrections() {
         guard
             let data = UserDefaults.standard.data(forKey: correctionsStoreKey),
@@ -294,7 +300,6 @@ public final class AppModel {
         else { return }
         corrections = stored
     }
-
 }
 
 // MARK: - Undo

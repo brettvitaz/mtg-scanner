@@ -186,7 +186,12 @@ final class RecognitionQueueTests: XCTestCase {
         XCTAssertLessThanOrEqual(peak, 2)
     }
 
-    // MARK: - Cancel
+}
+
+// MARK: - Cancel and Capture Time
+
+@MainActor
+final class RecognitionQueueCancelTests: XCTestCase {
 
     func testCancelAllClearsPendingCount() async throws {
         let queue = RecognitionQueue(recognize: { _, _, _, _ in
@@ -197,14 +202,11 @@ final class RecognitionQueueTests: XCTestCase {
         for _ in 0..<4 {
             queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         }
-        // 1 active, 3 pending
         queue.cancelAll()
         XCTAssertEqual(queue.pendingCount, 0)
     }
 
     func testCancelAllAllowsNewJobsAfterCancel() async throws {
-        // After cancelAll, new enqueues on the same queue should complete normally,
-        // verifying that activeCount does not go negative and drainIfPossible works.
         nonisolated(unsafe) var isCancelled = false
         let queue = RecognitionQueue(recognize: { _, _, _, _ in
             if !isCancelled {
@@ -212,14 +214,10 @@ final class RecognitionQueueTests: XCTestCase {
             }
             return RecognitionResult(cards: [])
         })
-
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         isCancelled = true
         queue.cancelAll()
-        // Allow the cancelled task's defer block to run and decrement activeCount.
         try await Task.sleep(for: .milliseconds(100))
-
-        // Re-enqueue on the same instance — should complete normally.
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(queue.completedCount, 1)
@@ -227,9 +225,7 @@ final class RecognitionQueueTests: XCTestCase {
     }
 
     func testCancelAllPreservesCompletedCount() async throws {
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
-            RecognitionResult(cards: [])
-        })
+        let queue = RecognitionQueue(recognize: { _, _, _, _ in RecognitionResult(cards: []) })
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(queue.completedCount, 1)
@@ -240,9 +236,7 @@ final class RecognitionQueueTests: XCTestCase {
         })
         longQueue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         longQueue.cancelAll()
-        // completedCount was 0 before cancel; confirm it stays 0 (not reset to something wrong)
         XCTAssertEqual(longQueue.completedCount, 0)
-        // Original queue's completed count is unaffected by separate queue cancellation
         XCTAssertEqual(queue.completedCount, 1)
     }
 
@@ -251,32 +245,20 @@ final class RecognitionQueueTests: XCTestCase {
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(queue.failedCount, 1)
-
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         queue.cancelAll()
-        // Failed count from before cancel is preserved
         XCTAssertEqual(queue.failedCount, 1)
     }
 
-    // MARK: - Capture Time Ordering
-
     func testCapturedAtPreservedOnRetry() async throws {
-        // Verify that a retried job uses the original capture timestamp, not a new one.
-        // We test this indirectly: enqueue a job that fails once then succeeds,
-        // verify it retried (callCount == 2) and completed. The retry uses the same
-        // Job struct, so capturedAt is set at enqueue time, not retry time.
         nonisolated(unsafe) var callCount = 0
         let queue = RecognitionQueue(recognize: { _, _, _, _ in
             callCount += 1
-            if callCount == 1 {
-                throw URLError(.networkConnectionLost)
-            }
+            if callCount == 1 { throw URLError(.networkConnectionLost) }
             return RecognitionResult(cards: [])
         })
-
         queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
-
         XCTAssertEqual(callCount, 2, "Should have been called twice (original + retry)")
         XCTAssertEqual(queue.completedCount, 1)
         XCTAssertEqual(queue.failedCount, 0)

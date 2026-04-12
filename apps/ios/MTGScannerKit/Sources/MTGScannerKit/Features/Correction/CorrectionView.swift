@@ -14,47 +14,47 @@ struct CorrectionView: View {
     @State private var saved = false
 
     var body: some View {
-        // swiftlint:disable:next closure_body_length
         NavigationStack {
-            Form {
-                Section("Card Identity") {
-                    LabeledContent("Confidence") {
-                        ConfidenceBadge(value: card.confidence)
+            correctionForm
+                .navigationTitle("Edit Card")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
                     }
-
-                    LabeledTextField("Title", text: $title, placeholder: "e.g. Lightning Bolt")
-                    LabeledTextField("Edition", text: $edition, placeholder: "e.g. Magic 2010")
-                    LabeledTextField("Collector #", text: $collectorNumber, placeholder: "e.g. 146")
-                }
-
-                Section("Attributes") {
-                    Toggle("Foil", isOn: $foil)
-                }
-
-                if let notes = card.notes {
-                    Section("Recognition Notes") {
-                        Text(notes)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { saveAndDismiss() }
+                            .fontWeight(.semibold)
                     }
                 }
-            }
-            .navigationTitle("Edit Card")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                .onAppear { populateFields() }
+                .overlay {
+                    if saved {
+                        SavedBanner()
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveAndDismiss() }
-                        .fontWeight(.semibold)
+        }
+    }
+
+    private var correctionForm: some View {
+        Form {
+            Section("Card Identity") {
+                LabeledContent("Confidence") {
+                    ConfidenceBadge(value: card.confidence)
                 }
+                LabeledTextField("Title", text: $title, placeholder: "e.g. Lightning Bolt")
+                LabeledTextField("Edition", text: $edition, placeholder: "e.g. Magic 2010")
+                LabeledTextField("Collector #", text: $collectorNumber, placeholder: "e.g. 146")
             }
-            .onAppear { populateFields() }
-            .overlay {
-                if saved {
-                    SavedBanner()
-                        .transition(.move(edge: .top).combined(with: .opacity))
+            Section("Attributes") {
+                Toggle("Foil", isOn: $foil)
+            }
+            if let notes = card.notes {
+                Section("Recognition Notes") {
+                    Text(notes)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

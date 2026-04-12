@@ -106,23 +106,8 @@ struct RectangleFilter {
             .filter { isCardAspectRatio($0, isLandscape: isLandscape) }
             .sorted { $0.confidence > $1.confidence }
 
-        var nmsAccepted: [VNRectangleObservation] = []
-        for obs in candidates {
-            let isDuplicate = nmsAccepted.contains { Self.iou(obs.boundingBox, $0.boundingBox) > Self.iouThreshold }
-            if !isDuplicate {
-                nmsAccepted.append(obs)
-            }
-        }
-
-        let containedSuppression: ContainmentSuppressionResult
-        if configuration.enablesContainmentSuppression {
-            containedSuppression = suppressContainedObservations(nmsAccepted)
-        } else {
-            containedSuppression = ContainmentSuppressionResult(
-                observations: nmsAccepted,
-                suppressionCount: 0
-            )
-        }
+        let nmsAccepted = applyNMS(to: candidates)
+        let containedSuppression = applyContainmentSuppression(to: nmsAccepted)
         var accepted = containedSuppression.observations
 
         accepted.sort { a, b in
@@ -136,6 +121,26 @@ struct RectangleFilter {
             observations: accepted,
             containmentSuppressionCount: containedSuppression.suppressionCount
         )
+    }
+
+    private func applyNMS(to candidates: [VNRectangleObservation]) -> [VNRectangleObservation] {
+        var accepted: [VNRectangleObservation] = []
+        for obs in candidates {
+            let isDuplicate = accepted.contains { Self.iou(obs.boundingBox, $0.boundingBox) > Self.iouThreshold }
+            if !isDuplicate {
+                accepted.append(obs)
+            }
+        }
+        return accepted
+    }
+
+    private func applyContainmentSuppression(
+        to observations: [VNRectangleObservation]
+    ) -> ContainmentSuppressionResult {
+        guard configuration.enablesContainmentSuppression else {
+            return ContainmentSuppressionResult(observations: observations, suppressionCount: 0)
+        }
+        return suppressContainedObservations(observations)
     }
 
     // MARK: - Helpers

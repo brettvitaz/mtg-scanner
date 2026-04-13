@@ -10,43 +10,6 @@ The iOS code is split into two parts:
 - **`MTGScannerKit/`** — Swift Package with two targets: `MTGScannerKit` (production source + tests) and `MTGScannerFixtures` (debug/simulator fixture code + images). SourceKit-LSP indexes this package for IDE tooling (autocomplete, go-to-definition).
 - **`MTGScanner.xcworkspace`** — Workspace that references both. **Always open the workspace, not the xcodeproj.**
 
-## Architecture
-
-```
-MTGScannerKit/Sources/MTGScannerKit/
-  App/
-    MTGScannerApp (entry point — stays in MTGScanner/ app target)
-    AppModel.swift                   Root @MainActor ObservableObject — app-wide state
-    RootTabView.swift                Tab navigation
-  Features/
-    CardDetection/                   Live camera card detection with overlays
-      Detection/
-        CardDetectionEngine.swift    Scan rectangle detection + Auto Scan YOLO dispatch
-        CardTracker.swift            EMA smoothing + presence hysteresis
-        RectangleFilter.swift        Edge-based aspect ratio validation + NMS
-        GridInterpolator.swift       Bilinear interpolation for quadrilateral grids
-      Camera/
-        CameraSessionManager.swift   AVCaptureSession lifecycle
-        CameraViewController.swift   UIKit controller: session + preview + overlays
-        CameraCaptureCoordinator.swift Photo capture delegate
-        CameraPreviewRepresentable.swift UIViewControllerRepresentable bridge
-      Overlay/
-        DetectionOverlayRenderer.swift  CAShapeLayer pool, coordinate transforms
-      Models/
-        DetectedCard.swift           Struct: corners, boundingBox, confidence
-        DetectionMode.swift          Enum: .scan, .auto
-      ViewModels/
-        CardDetectionViewModel.swift ObservableObject bridging detection → SwiftUI
-    Scan/                            Camera capture and upload flow
-    Results/                         Recognition results list with card thumbnails
-    CardDetail/                      Card detail view with metadata, edition picker, purchase links
-    Correction/                      Legacy manual correction UI
-    Settings/                        App configuration
-  Services/
-    APIClient.swift                  Network client for backend communication
-    CardCropService.swift            On-device perspective-corrected cropping
-```
-
 ## Detection pipeline
 
 1. `CameraSessionManager` delivers `CMSampleBuffer` frames on a dedicated serial queue.
@@ -104,10 +67,13 @@ Minimum check that the app compiles:
 
 ```bash
 xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
-  -sdk iphonesimulator -configuration Debug build
+  -sdk iphonesimulator -configuration Debug \
+  -resultBundlePath tmp/ios-build-result.xcresult build
 ```
 
 Or: `make ios-build`
+
+`make ios-build` also refreshes the package-local `buildServer.json` used by SourceKit-LSP and writes an Xcode result bundle so VS Code can keep Swift compile flags in sync.
 
 ## UI iteration for agents
 

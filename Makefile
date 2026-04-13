@@ -1,4 +1,7 @@
 SHELL := /bin/bash
+XCODE_BUILD_SERVER ?= $(shell command -v xcode-build-server 2>/dev/null)
+IOS_SOURCEKIT_PACKAGE_DIR := apps/ios/MTGScannerKit
+IOS_SOURCEKIT_RESULT_BUNDLE := tmp/ios-build-result.xcresult
 IOS_TEST_SIMULATOR_ID ?= $(shell xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $$2 ~ /^[0-9A-F-]+$$/ { print $$2; exit }')
 IOS_TEST_SCHEME ?= MTGScannerKitTests
 IOS_TEST_DESTINATION ?= id=$(IOS_TEST_SIMULATOR_ID)
@@ -32,8 +35,13 @@ api-lint:
 	./scripts/lint-api.sh
 
 ios-build:
+	@if [ -n "$(XCODE_BUILD_SERVER)" ]; then \
+	  (cd $(IOS_SOURCEKIT_PACKAGE_DIR) && "$(XCODE_BUILD_SERVER)" config -workspace ../MTGScanner.xcworkspace -scheme MTGScanner); \
+	fi
+	rm -rf $(IOS_SOURCEKIT_RESULT_BUNDLE)
 	xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner \
-	  -sdk iphonesimulator -configuration Debug build
+	  -sdk iphonesimulator -configuration Debug \
+	  -resultBundlePath $(IOS_SOURCEKIT_RESULT_BUNDLE) build
 
 ios-test:
 	xcodebuild test \

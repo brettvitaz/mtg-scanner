@@ -42,6 +42,7 @@ struct ScanView: View {
             storeAndTurnOffTorch()
             autoScanViewModel.stop()
         }
+        .environment(\.cardDetectionZoneReset, { autoScanViewModel.resetDetectionZone() })
         .onChange(of: appModel.apiBaseURL) { _, url in
             autoScanViewModel.apiBaseURL = url
         }
@@ -166,7 +167,8 @@ struct ScanView: View {
                     }
                 }
                 : nil,
-            torchLevel: detectionViewModel.torchLevel
+            torchLevel: detectionViewModel.torchLevel,
+            detectionZone: isAutoScanMode ? (autoScanViewModel.detectionZone ?? .fullFrame) : nil
         )
         .accessibilityHidden(true)
     }

@@ -1,17 +1,57 @@
-# Log: [FILL: same title as request.md]
+# Log: Improve Auto-Scan Accuracy with Adaptive Detection Window
 
 ## Progress
 
-Append a new step section each time you complete a meaningful unit of work.
-Use the format below. Do not use tables — headings and paragraphs are easier to maintain.
+### Step 1: Core detection zone implementation
 
-### Step 1: [FILL: short description of what you did]
+**Status:** done
 
-**Status:** [FILL: done | in-progress | blocked | skipped]
+Implemented the core detection zone filtering system:
 
-[FILL: one to three sentences — what happened, what changed, any commands you ran]
+- Created `DetectionZone.swift` with containment, size (≥40% area), and portrait aspect ratio filtering
+- Updated `CardPresenceTracker.swift` to add `detectionZone` property and filtering logic
+- Added `calibrate(from:)` and `resetZone()` methods to `CardPresenceTracker`
 
-Deviations from plan: [FILL: "none" or describe what changed and why]
+### Step 2: Zone overlay and UI wiring
+
+**Status:** done
+
+- Added zone boundary overlay to `DetectionOverlayRenderer` with dashed blue line style
+- Updated `CameraViewController` with `detectionZone` property and `updateZoneOverlay()` method
+- Updated `CameraPreviewRepresentable` to pass `detectionZone`
+- Added `isCalibrated` state to `AutoScanViewModel`
+
+### Step 3: Settings UI and state management
+
+**Status:** done
+
+- Added "Reset Detection Zone" button to SettingsView
+- Wired zone reset through Environment key (`cardDetectionZoneReset`)
+- Updated `AutoScanViewModel.stop()` to reset zone and `isCalibrated` state
+- Added `resetDetectionZone()` public method
+
+### Step 4: Tests and build verification
+
+**Status:** done
+
+- Created `DetectionZoneTests.swift` with comprehensive unit tests
+- Updated `DetectionOverlayRendererTests.swift` to account for new zone overlay layer
+- Build passes: `make ios-build` ✓
+- SwiftLint passes: `make ios-lint` ✓
 
 ---
+
+### Step 5: Test fixes and final verification
+
+**Status:** done
+
+Fixed two failing `DetectionZoneTests` with incorrect test data:
+- `testCombinedFilterFailsOnAspect`: Changed box from 0.6×0.6 (area 0.36) to 0.75×0.75 (area 0.5625) — the smaller box failed `isLargeEnough` instead of `isPortraitAspect`
+- `testCombinedFilterFailsOnSize`: Changed box from (0.45, 0.45, 0.3, 0.5) to (0.25, 0.25, 0.35, 0.55) — the original box was outside the effective zone, not just too small
+
+All 22 `DetectionZoneTests` now pass. Full test suite passes. SwiftLint passes with 0 violations.
+
+**Deviations from plan:** 
+- The settings reset button works through Environment key instead of callback parameter (cleaner SwiftUI pattern)
+- Zone overlay layer added as first sublayer, affecting existing test expectations
 

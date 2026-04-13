@@ -1,6 +1,17 @@
 import SwiftUI
 import UIKit
 
+private struct CardDetectionZoneResetKey: EnvironmentKey {
+    static let defaultValue: (@MainActor () -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var cardDetectionZoneReset: (@MainActor () -> Void)? {
+        get { self[CardDetectionZoneResetKey.self] }
+        set { self[CardDetectionZoneResetKey.self] = newValue }
+    }
+}
+
 public struct RootTabView: View {
     @Environment(AppModel.self) private var appModel
     @State private var selectedTab = 0

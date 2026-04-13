@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.cardDetectionZoneReset) private var onResetDetectionZone
     @State private var connectionStatus: ConnectionStatus = .idle
 
     public init() {}
@@ -9,8 +10,12 @@ public struct SettingsView: View {
     public var body: some View {
         @Bindable var appModel = appModel
         NavigationStack {
-            SettingsForm(appModel: appModel, connectionStatus: $connectionStatus)
-                .navigationTitle("Settings")
+            SettingsForm(
+                appModel: appModel,
+                connectionStatus: $connectionStatus,
+                onResetDetectionZone: onResetDetectionZone
+            )
+            .navigationTitle("Settings")
         }
     }
 }
@@ -34,6 +39,7 @@ private enum ConnectionStatus {
 private struct SettingsForm: View {
     @Bindable var appModel: AppModel
     @Binding var connectionStatus: ConnectionStatus
+    var onResetDetectionZone: (() -> Void)?
 
     var body: some View {
         Form {
@@ -99,12 +105,19 @@ private struct SettingsForm: View {
             captureDelayRow
             confidenceRow
             concurrentUploadsRow
+            calibrationRow
             Text(
                 "Place your phone above a scanning station and drop cards in — "
                 + "each card is automatically captured and recognized."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    private var calibrationRow: some View {
+        Button("Reset Detection Zone") {
+            onResetDetectionZone?()
         }
     }
 

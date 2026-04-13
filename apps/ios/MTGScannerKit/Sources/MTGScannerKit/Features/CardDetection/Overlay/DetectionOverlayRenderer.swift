@@ -14,11 +14,57 @@ final class DetectionOverlayRenderer {
     private weak var detectionLayer: CALayer?
     private var layerPool: [CAShapeLayer] = []
     private var lastDetectionCount: Int = -1
+    private var zoneOverlayLayer: CAShapeLayer?
 
     // MARK: - Init
 
     init(detectionLayer: CALayer) {
         self.detectionLayer = detectionLayer
+        setupZoneOverlay(in: detectionLayer)
+    }
+
+    // MARK: - Zone Overlay
+
+    private func setupZoneOverlay(in parent: CALayer?) {
+        let layer = CAShapeLayer()
+        layer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
+        layer.fillColor = UIColor.clear.cgColor
+        layer.lineWidth = 1.5
+        layer.lineDashPattern = [6, 4]
+        layer.isHidden = true
+        layer.actions = [
+            "path": NSNull(),
+            "hidden": NSNull(),
+            "opacity": NSNull()
+        ]
+        parent?.addSublayer(layer)
+        zoneOverlayLayer = layer
+    }
+
+    /// Updates the detection zone overlay.
+    ///
+    /// The zone coordinates are in Vision bottom-left origin space (matching card detections),
+    /// converted to layer coordinates for rendering.
+    ///
+    /// Must be called on the main thread.
+    func updateZoneOverlay(zone: DetectionZone?, previewLayer: AVCaptureVideoPreviewLayer) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
+        guard let zone, let layer = zoneOverlayLayer else {
+            zoneOverlayLayer?.isHidden = true
+            return
+        }
+
+        let path = UIBezierPath(rect: rectToLayer(zone.effectiveRect, previewLayer: previewLayer))
+        layer.path = path.cgPath
+        layer.isHidden = false
+    }
+
+    /// Hides the zone overlay.
+    func hideZoneOverlay() {
+        zoneOverlayLayer?.isHidden = true
     }
 
     // MARK: - Public Update
@@ -116,5 +162,25 @@ final class DetectionOverlayRenderer {
             "bounds": NSNull()
         ]
         return layer
+    }
+
+    private func yoloRectToVision(_ rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.minX,
+            y: 1.0 - rect.maxY,
+            width: rect.width,
+            height: rect.height
+        )
+    }
+
+    private func rectToLayer(_ rect: CGRect, previewLayer: AVCaptureVideoPreviewLayer) -> CGRect {
+        let origin = Self.visionPointToLayer(CGPoint(x: rect.minX, y: rect.minY), previewLayer: previewLayer)
+        let topRight = Self.visionPointToLayer(CGPoint(x: rect.maxX, y: rect.maxY), previewLayer: previewLayer)
+        return CGRect(
+            x: origin.x,
+            y: topRight.y,
+            width: topRight.x - origin.x,
+            height: origin.y - topRight.y
+        )
     }
 }

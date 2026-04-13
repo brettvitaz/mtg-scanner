@@ -80,6 +80,8 @@
 		C000000000000000000001B4 /* RecognitionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B4 /* RecognitionQueueTests.swift */; };
 		C000000000000000000001B5 /* FlashlightButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B5 /* FlashlightButtonTests.swift */; };
 		C000000000000000000001B6 /* AutoScanCropHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B6 /* AutoScanCropHelperTests.swift */; };
+		C000000000000000000001B7 /* DetectionZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B7 /* DetectionZone.swift */; };
+		C000000000000000000001B8 /* DetectionZoneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C000000000000000000002B8 /* DetectionZoneTests.swift */; };
 		SPM0000000000000000000004 /* MTGScannerKit in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000003 /* MTGScannerKit */; };
 		SPM0000000000000000000006 /* MTGScannerFixtures in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000005 /* MTGScannerFixtures */; };
 /* End PBXBuildFile section */
@@ -171,6 +173,8 @@
 		C000000000000000000002B4 /* RecognitionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionQueueTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B5 /* FlashlightButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashlightButtonTests.swift; sourceTree = "<group>"; };
 		C000000000000000000002B6 /* AutoScanCropHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScanCropHelperTests.swift; sourceTree = "<group>"; };
+		C000000000000000000002B7 /* DetectionZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionZone.swift; sourceTree = "<group>"; };
+		C000000000000000000002B8 /* DetectionZoneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionZoneTests.swift; sourceTree = "<group>"; };
 		SPM0000000000000000000001 /* MTGScannerKit */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; name = MTGScannerKit; path = MTGScannerKit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -351,6 +355,7 @@
 				C000000000000000000002A1 /* YOLOCardDetector.swift */,
 				C000000000000000000002A2 /* FrameDifferenceAnalyzer.swift */,
 				C000000000000000000002A3 /* CardPresenceTracker.swift */,
+				C000000000000000000002B7 /* DetectionZone.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -436,6 +441,7 @@
 				C000000000000000000002B4 /* RecognitionQueueTests.swift */,
 				C000000000000000000002B5 /* FlashlightButtonTests.swift */,
 				C000000000000000000002B6 /* AutoScanCropHelperTests.swift */,
+				C000000000000000000002B8 /* DetectionZoneTests.swift */,
 			);
 			path = MTGScannerTests;
 			sourceTree = "<group>";

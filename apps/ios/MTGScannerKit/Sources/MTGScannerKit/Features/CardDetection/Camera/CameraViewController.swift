@@ -26,6 +26,10 @@ final class CameraViewController: UIViewController {
     /// Used by `AutoScanViewModel` to feed frames into `CardPresenceTracker`.
     /// Set to `nil` when not in Auto Scan mode to avoid unnecessary overhead.
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
+    /// Detection zone for filtering card detections in auto-scan mode.
+    var detectionZone: DetectionZone? {
+        didSet { updateZoneOverlay() }
+    }
 
     // MARK: - Private
 
@@ -115,6 +119,13 @@ final class CameraViewController: UIViewController {
 
     private func applyTorchLevel(_ level: Float) {
         sessionManager.setTorchLevel(level)
+    }
+
+    // MARK: - Zone Overlay
+
+    private func updateZoneOverlay() {
+        guard let previewLayer else { return }
+        renderer?.updateZoneOverlay(zone: detectionZone, previewLayer: previewLayer)
     }
 
     // MARK: - Zoom

@@ -8,8 +8,13 @@ import CoreVideo
 /// 2. **Frame differencing** — confirms the scene changed significantly relative to
 ///    the last captured frame (i.e., a new card was placed, not the same card).
 ///
-/// A "new card" event fires only when both signals agree.  After a capture, call
+/// A "new card" event fires only when both signals agree. After a capture, call
 /// `markCaptured()` so the next card drop is measured relative to the new reference.
+///
+/// When a `detectionZone` is set, detections are filtered to require:
+/// - Full containment within the zone
+/// - Minimum area coverage (≥40% of frame by default)
+/// - Portrait aspect ratio
 ///
 /// Threading: `processFrame(_:)` is safe to call from any queue.  Internal work runs
 /// on a dedicated serial queue.  `onNewCardSignal` is always called on the main queue.
@@ -24,6 +29,12 @@ final class CardPresenceTracker: @unchecked Sendable {
     var confidenceThreshold: Float = 0.5 {
         didSet { detector?.confidenceThreshold = confidenceThreshold }
     }
+
+    /// Detection zone for filtering card detections.
+    ///
+    /// When set, only cards meeting the zone's constraints are accepted:
+    /// containment, minimum area, and portrait aspect ratio.
+    var detectionZone: DetectionZone?
 
     // MARK: - Callbacks
 
@@ -87,6 +98,25 @@ final class CardPresenceTracker: @unchecked Sendable {
         }
     }
 
+    // MARK: - Zone Calibration
+
+    /// Calibrates the detection zone from a captured card's bounding box.
+    ///
+    /// The zone is set to the detected card's position, allowing future detections
+    /// to be filtered to cards in a similar location.
+    func calibrate(from boundingBox: CGRect) {
+        presenceQueue.async { [weak self] in
+            self?.detectionZone = DetectionZone.calibrated(from: boundingBox)
+        }
+    }
+
+    /// Resets the detection zone to nil (full frame detection).
+    func resetZone() {
+        presenceQueue.async { [weak self] in
+            self?.detectionZone = nil
+        }
+    }
+
     // MARK: - Frame Processing
 
     /// Process a camera frame. Drops the frame if a previous frame is still being processed.
@@ -113,11 +143,23 @@ final class CardPresenceTracker: @unchecked Sendable {
         let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
         guard !boxes.isEmpty else { return }
 
-        let bestBox = boxes.max(by: { $0.confidence < $1.confidence })?.rect
+        let bestBox = filterBoxes(boxes)
 
         DispatchQueue.main.async { [weak self] in
             self?.onNewCardSignal?(bestBox)
         }
+    }
+
+    private func filterBoxes(_ boxes: [CardBoundingBox]) -> CGRect? {
+        let filtered = boxes.filter { box in
+            passesZoneFilter(box.rect)
+        }
+        return filtered.max(by: { $0.confidence < $1.confidence })?.rect
+    }
+
+    private func passesZoneFilter(_ box: CGRect) -> Bool {
+        guard let zone = detectionZone else { return true }
+        return zone.contains(box) && zone.isLargeEnough(box) && zone.isPortraitAspect(box)
     }
 
     private func loadDetector() -> YOLOCardDetector? {

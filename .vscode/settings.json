@@ -1,5 +1,7 @@
 {
-    "sweetpad.build.xcodeWorkspacePath": "apps/ios/MTGScanner.xcworkspace",
-    "swift.path": "/usr/bin",
-    "sourcekit-lsp.serverPath": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/sourcekit-lsp"
+  "sweetpad.build.xcodeWorkspacePath": "apps/ios/MTGScanner.xcworkspace",
+  "swift.path": "/usr/bin",
+  "swift.swiftEnvironmentVariables": {
+    "SDKROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
+  }
 }

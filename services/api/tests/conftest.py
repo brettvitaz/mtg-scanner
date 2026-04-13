@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -17,10 +18,9 @@ requires_sample_images = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(autouse=True)
-def isolate_settings_from_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Prevent process and .env configuration from leaking into unit tests."""
-    monkeypatch.setitem(Settings.model_config, "env_file", ())
+def _isolate_settings_from_dotenv() -> None:
+    """Disable ambient dotenv/process config before pytest imports test modules."""
+    Settings.model_config["env_file"] = ()
     for env_var in (
         "MTG_SCANNER_RECOGNIZER_PROVIDER",
         "MTG_SCANNER_LLM_PROVIDER",
@@ -39,4 +39,7 @@ def isolate_settings_from_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
         "ANTHROPIC_MODEL",
         "ANTHROPIC_BASE_URL",
     ):
-        monkeypatch.delenv(env_var, raising=False)
+        os.environ.pop(env_var, None)
+
+
+_isolate_settings_from_dotenv()

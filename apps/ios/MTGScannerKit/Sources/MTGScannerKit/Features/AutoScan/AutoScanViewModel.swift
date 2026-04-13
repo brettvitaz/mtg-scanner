@@ -205,17 +205,22 @@ final class AutoScanViewModel {
             return
         }
 
-        let image = payload.displayImage
-        let uprightImage = AutoScanCropHelper.normalizedImage(image)
-        let cropped: UIImage?
-        if let cgImage = uprightImage.cgImage,
-           let box = await presenceTracker.detectBestBox(in: cgImage) {
-            cropped = AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
-        } else {
-            cropped = nil
-        }
+        let cropped = await cropCapturedPayload(payload)
         lastCroppedImage = cropped
         presenceTracker.markCaptured()
+        enqueueAfterCapture(payload: payload, cropped: cropped)
+        captureState = .watching
+        statusMessage = "Captured! Watching for next card…"
+    }
+
+    private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> UIImage? {
+        let uprightImage = AutoScanCropHelper.normalizedImage(payload.displayImage)
+        guard let cgImage = uprightImage.cgImage,
+              let box = await presenceTracker.detectBestBox(in: cgImage) else { return nil }
+        return AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+    }
+
+    private func enqueueAfterCapture(payload: RecognitionImagePayload, cropped: UIImage?) {
         if let cropped,
            let cropPayload = RecognitionImagePayload.generatedJPEG(from: cropped) {
             recognitionQueue.enqueue(
@@ -226,8 +231,6 @@ final class AutoScanViewModel {
                 payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
             )
         }
-        captureState = .watching
-        statusMessage = "Captured! Watching for next card…"
     }
 }
 

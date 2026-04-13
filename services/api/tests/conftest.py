@@ -1,9 +1,12 @@
+import os
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.settings import Settings
 
 SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples" / "test"
 ARTIFACTS_DIR = SAMPLES_DIR / "artifacts"
@@ -15,14 +18,17 @@ requires_sample_images = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(autouse=True)
-def isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep committed dotenv provider settings from leaking into unit tests."""
+def _isolate_settings_from_dotenv() -> None:
+    """Disable ambient dotenv/process config before pytest imports test modules."""
+    Settings.model_config["env_file"] = ()
     for env_var in (
+        "MTG_SCANNER_RECOGNIZER_PROVIDER",
         "MTG_SCANNER_LLM_PROVIDER",
         "MTG_SCANNER_LLM_API_KEY",
         "MTG_SCANNER_LLM_MODEL",
         "MTG_SCANNER_LLM_BASE_URL",
+        "MTG_SCANNER_LLM_TIMEOUT_SECONDS",
+        "MTG_SCANNER_LLM_RESPONSE_MODE",
         "OPENAI_API_KEY",
         "OPENAI_MODEL",
         "OPENAI_BASE_URL",
@@ -33,4 +39,7 @@ def isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "ANTHROPIC_MODEL",
         "ANTHROPIC_BASE_URL",
     ):
-        monkeypatch.setenv(env_var, "")
+        os.environ.pop(env_var, None)
+
+
+_isolate_settings_from_dotenv()

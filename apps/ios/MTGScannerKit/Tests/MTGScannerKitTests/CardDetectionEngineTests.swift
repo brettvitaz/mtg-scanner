@@ -31,10 +31,10 @@ final class CardDetectionEngineTests: XCTestCase {
         XCTAssertFalse(updated.hasCachedBoxes)
     }
 
-    func testValidateScanObservationsSkipsYOLOStateChangesWhenNoRectanglesRemain() {
+    func testValidateScanObservationsSkipsYOLOStateChangesWhenNoRectanglesRemain() throws {
         let engine = CardDetectionEngine()
         let initial = engine.scanYOLOValidationStateSnapshot()
-        let pixelBuffer = makePixelBuffer()
+        let pixelBuffer = try makePixelBuffer()
 
         let result = engine.validateScanObservationsForTesting([], pixelBuffer: pixelBuffer, timestamp: 1.0)
 
@@ -49,7 +49,7 @@ final class CardDetectionEngineTests: XCTestCase {
         XCTAssertEqual(updated.generation, initial.generation)
     }
 
-    func testUpdateDetectionModeClearsCachedYOLOBoxesBeforeNextValidation() {
+    func testUpdateDetectionModeClearsCachedYOLOBoxesBeforeNextValidation() throws {
         let engine = CardDetectionEngine()
         var state = CardDetectionEngine.ScanYOLOValidationState()
         let cachedBoxes = [CGRect(x: 0.10, y: 0.10, width: 0.20, height: 0.30)]
@@ -59,7 +59,7 @@ final class CardDetectionEngineTests: XCTestCase {
         engine.updateDetectionMode(.auto)
         let result = engine.validateScanObservationsForTesting(
             [makeObservation(box: cachedBoxes[0], confidence: 0.9)],
-            pixelBuffer: makePixelBuffer(),
+            pixelBuffer: try makePixelBuffer(),
             timestamp: 1.1
         )
 
@@ -68,7 +68,7 @@ final class CardDetectionEngineTests: XCTestCase {
         XCTAssertEqual(engine.scanYOLOValidationStateSnapshot().boxes, [])
     }
 
-    func testUpdateIsLandscapeClearsCachedYOLOBoxesBeforeNextValidation() {
+    func testUpdateIsLandscapeClearsCachedYOLOBoxesBeforeNextValidation() throws {
         let engine = CardDetectionEngine()
         var state = CardDetectionEngine.ScanYOLOValidationState()
         let cachedBoxes = [CGRect(x: 0.12, y: 0.14, width: 0.18, height: 0.28)]
@@ -78,7 +78,7 @@ final class CardDetectionEngineTests: XCTestCase {
         engine.updateIsLandscape(true)
         let result = engine.validateScanObservationsForTesting(
             [makeObservation(box: cachedBoxes[0], confidence: 0.9)],
-            pixelBuffer: makePixelBuffer(),
+            pixelBuffer: try makePixelBuffer(),
             timestamp: 1.1
         )
 
@@ -105,7 +105,7 @@ final class CardDetectionEngineTests: XCTestCase {
         XCTAssertEqual(updated.generation, staleGeneration + 1)
     }
 
-    private func makePixelBuffer() -> CVPixelBuffer {
+    private func makePixelBuffer() throws -> CVPixelBuffer {
         var pixelBuffer: CVPixelBuffer?
         let status = CVPixelBufferCreate(
             kCFAllocatorDefault,
@@ -116,8 +116,7 @@ final class CardDetectionEngineTests: XCTestCase {
             &pixelBuffer
         )
         XCTAssertEqual(status, kCVReturnSuccess)
-        // swiftlint:disable:next force_unwrapping
-        return pixelBuffer!
+        return try XCTUnwrap(pixelBuffer)
     }
 
     private func makeObservation(box: CGRect, confidence: Float) -> VNRectangleObservation {

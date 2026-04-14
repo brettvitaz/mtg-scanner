@@ -57,6 +57,15 @@ final class AutoScanViewModel {
     private var settleTask: Task<Void, Never>?
     private let cropImage: @Sendable (UIImage) async -> CardCropResult
 
+    private struct CropResult {
+        let image: UIImage?
+        let boundingBox: CGRect?
+        let sourceSize: CGSize?
+    }
+
+    /// Video dimensions from session preset .hd1920x1080
+    private static let videoSize = CGSize(width: 1920, height: 1080)
+
     // MARK: - Init
 
     init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
@@ -217,26 +226,35 @@ final class AutoScanViewModel {
             return
         }
 
-        let (cropped, boundingBox) = await cropCapturedPayload(payload)
-        lastCroppedImage = cropped
+        let result = await cropCapturedPayload(payload)
+        lastCroppedImage = result.image
         presenceTracker.markCaptured()
-        if let box = boundingBox, !isCalibrated {
-            let calibratedZone = DetectionZone.calibrated(fromYOLO: box)
+        if let box = result.boundingBox, let sourceSize = result.sourceSize, !isCalibrated {
+            let calibratedZone = DetectionZone.calibrated(
+                fromYOLO: box,
+                sourceSize: sourceSize,
+                videoSize: Self.videoSize
+            )
             presenceTracker.detectionZone = calibratedZone
             detectionZone = calibratedZone
             isCalibrated = true
         }
-        enqueueAfterCapture(payload: payload, cropped: cropped)
+        enqueueAfterCapture(payload: payload, cropped: result.image)
         captureState = .watching
         statusMessage = "Captured! Watching for next card…"
     }
 
-    private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> (UIImage?, CGRect?) {
+    private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> CropResult {
         let uprightImage = AutoScanCropHelper.normalizedImage(payload.displayImage)
-        guard let cgImage = uprightImage.cgImage else { return (nil, nil) }
-        guard let box = await presenceTracker.detectBestBox(in: cgImage) else { return (nil, nil) }
+        guard let cgImage = uprightImage.cgImage else {
+            return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
+        }
+        let sourceSize = CGSize(width: cgImage.width, height: cgImage.height)
+        guard let box = await presenceTracker.detectBestBox(in: cgImage) else {
+            return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
+        }
         let cropped = AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
-        return (cropped, box)
+        return CropResult(image: cropped, boundingBox: box, sourceSize: sourceSize)
     }
 
     private func enqueueAfterCapture(payload: RecognitionImagePayload, cropped: UIImage?) {

@@ -7,7 +7,7 @@ final class DetectionOverlayRendererTests: XCTestCase {
     // MARK: - Layer pool
 
     private var detectionLayerPoolCount: Int {
-        1 // zone overlay layer
+        2 // zone overlay layer + YOLO debug overlay layer
     }
 
     func testUpdateWithNoDetectionsClearsAllLayers() {

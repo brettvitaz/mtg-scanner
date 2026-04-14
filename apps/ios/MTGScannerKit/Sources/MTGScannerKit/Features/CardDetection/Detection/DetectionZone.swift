@@ -78,17 +78,93 @@ struct DetectionZone: Sendable {
         DetectionZone(referenceRect: box, tolerance: tolerance)
     }
 
-    /// Creates a new zone calibrated from a YOLO bounding box.
+    /// Creates a new zone calibrated from a YOLO bounding box in normalized coordinates.
     ///
-    /// YOLOCardDetector uses top-left origin coordinates, so this converts
-    /// to Vision bottom-left coordinates before storing.
-    static func calibrated(fromYOLO box: CGRect, tolerance: CGFloat = 0.15) -> DetectionZone {
-        let visionRect = CGRect(
-            x: box.minX,
-            y: 1.0 - box.maxY,
-            width: box.width,
-            height: box.height
+    /// YOLOCardDetector returns boxes in normalized coordinates (0-1, top-left origin) from the captured photo.
+    /// This method maps those coordinates to the video preview coordinate space.
+    ///
+    /// The key insight is that both photo and video come from the same camera. The video buffer is
+    /// delivered in landscape orientation (1920x1080) but Vision processing treats it as the native
+    /// sensor orientation. The preview layer handles the rotation for display.
+    ///
+    /// - Parameters:
+    ///   - box: Bounding box in normalized coordinates from photo (top-left origin, 0-1 range)
+    ///   - sourceSize: Size of the source photo image
+    ///   - videoSize: Size of the video preview frame (landscape, e.g., 1920x1080)
+    ///   - tolerance: Fractional margin around the reference rect
+    static func calibrated(
+        fromYOLO box: CGRect,
+        sourceSize: CGSize,
+        videoSize: CGSize,
+        tolerance: CGFloat = 0.15
+    ) -> DetectionZone {
+        // The photo is captured in portrait orientation (e.g., 3024x4032)
+        // The video is delivered in landscape orientation (1920x1080)
+        //
+        // Vision processes the video buffer in its native landscape orientation.
+        // The preview layer rotates it for display.
+        //
+        // To map from photo coordinates to video/Vision coordinates:
+        // We need to account for the 90-degree rotation between photo and video.
+        //
+        // Photo (portrait):     Video (landscape):
+        // +----+----+----+      +----+----+----+----+----+----+----+
+        // |    |    |    |      |    |    |    |    |    |    |    |
+        // |    |CARD|    |      |    |    |    |CARD|    |    |    |
+        // |    |    |    |      |    |    |    |    |    |    |    |
+        // +----+----+----+      +----+----+----+----+----+----+----+
+        //
+        // The card appears in different positions due to rotation.
+        // Photo X maps to Video Y (with flip), Photo Y maps to Video X.
+
+        // For a direct mapping, we can use the fact that normalized coordinates
+        // in the center region map approximately when accounting for aspect ratio difference.
+        //
+        // The video aspect ratio (16:9 = 1.78) is wider than photo (3:4 = 0.75).
+        // When the video is displayed with resizeAspectFill on a portrait screen,
+        // the video fills the height and crops the sides.
+        //
+        // For coordinate mapping:
+        // - Photo X (0-1 left to right) -> maps to Video X' position
+        // - Photo Y (0-1 top to bottom) -> maps to Video Y' position
+        //
+        // Since the video is landscape, when rotated for display:
+        // - Photo left-right becomes display top-bottom (reversed)
+        // - Photo top-bottom becomes display left-right
+
+        // Calculate the center point of the box
+        let centerX = box.midX
+        let centerY = box.midY
+
+        // Map from photo portrait to video landscape coordinates
+        // Photo center X (left-right) -> Video Y position (accounting for rotation)
+        // Photo center Y (top-bottom) -> Video X position
+        //
+        // With 90-degree rotation: X' = Y, Y' = 1-X
+        let videoNormX = centerY
+        let videoNormY = 1.0 - centerX
+
+        // Width and height also swap with rotation
+        let videoWidth = box.height
+        let videoHeight = box.width
+
+        // Calculate the box in video normalized coordinates (top-left origin)
+        let videoBox = CGRect(
+            x: videoNormX - videoWidth / 2,
+            y: videoNormY - videoHeight / 2,
+            width: videoWidth,
+            height: videoHeight
         )
+
+        // Convert to Vision coordinates (bottom-left origin)
+        let visionRect = CGRect(
+            x: videoBox.minX,
+            y: 1.0 - videoBox.maxY,
+            width: videoBox.width,
+            height: videoBox.height
+        )
+
         return DetectionZone(referenceRect: visionRect, tolerance: tolerance)
     }
+
 }

@@ -28,7 +28,9 @@ final class CameraViewController: UIViewController {
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
     /// Detection zone for filtering card detections in auto-scan mode.
     var detectionZone: DetectionZone? {
-        didSet { updateZoneOverlay() }
+        didSet {
+            updateZoneOverlay()
+        }
     }
 
     // MARK: - Private
@@ -76,6 +78,7 @@ final class CameraViewController: UIViewController {
         detectionLayer.frame = view.bounds
         updatePreviewOrientation()
         engine.updateIsLandscape(view.bounds.width > view.bounds.height)
+        updateZoneOverlay()
     }
 
     // MARK: - Orientation
@@ -102,6 +105,10 @@ final class CameraViewController: UIViewController {
 
     func updateDetectionMode(_ mode: DetectionMode) {
         engine.updateDetectionMode(mode)
+        if mode == .auto {
+            renderer?.clear()
+        }
+        updateZoneOverlay()
     }
 
     func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
@@ -125,7 +132,8 @@ final class CameraViewController: UIViewController {
 
     private func updateZoneOverlay() {
         guard let previewLayer else { return }
-        renderer?.updateZoneOverlay(zone: detectionZone, previewLayer: previewLayer)
+        let zoneToShow = detectionZone ?? .fullFrame
+        renderer?.updateZoneOverlay(zone: zoneToShow, previewLayer: previewLayer)
     }
 
     // MARK: - Zoom
@@ -187,6 +195,7 @@ final class CameraViewController: UIViewController {
     private func setupDetectionLayer() {
         detectionLayer.frame = view.bounds
         view.layer.addSublayer(detectionLayer)
+        view.layer.insertSublayer(detectionLayer, at: 999)
         renderer = DetectionOverlayRenderer(detectionLayer: detectionLayer)
     }
 
@@ -198,7 +207,10 @@ final class CameraViewController: UIViewController {
 
         engine.onDetection = { [weak self] cards in
             guard let self, let previewLayer = self.previewLayer else { return }
-            self.renderer?.update(detections: cards, previewLayer: previewLayer)
+            // Only show green detection overlay in scan mode, not auto mode (which uses YOLO)
+            if self.engine.currentDetectionMode == .scan {
+                self.renderer?.update(detections: cards, previewLayer: previewLayer)
+            }
             self.onDetectedCardsChanged?(cards)
         }
     }

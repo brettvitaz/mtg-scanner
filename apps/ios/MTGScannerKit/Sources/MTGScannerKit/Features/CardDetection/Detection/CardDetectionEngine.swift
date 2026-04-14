@@ -88,6 +88,11 @@ public final class CardDetectionEngine: @unchecked Sendable {
         }
     }
 
+    /// Current detection mode (scan or auto).
+    var currentDetectionMode: DetectionMode {
+        syncOnVisionQueue { detectionMode }
+    }
+
     // MARK: - Private Detection
 
     private func detect(

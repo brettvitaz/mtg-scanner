@@ -55,3 +55,35 @@ All 22 `DetectionZoneTests` now pass. Full test suite passes. SwiftLint passes w
 - The settings reset button works through Environment key instead of callback parameter (cleaner SwiftUI pattern)
 - Zone overlay layer added as first sublayer, affecting existing test expectations
 
+---
+
+### Step 6: Detection zone coordinate normalization fix
+
+**Status:** done
+
+Fixed the detection zone overlay being incorrectly positioned (too tall and offset to the left):
+
+- **Root cause:** `DetectionZone.calibrated(fromYOLO:)` incorrectly treated YOLO's pixel coordinates (e.g., 540×675) as normalized (0-1), resulting in a zone ~540×675 times larger than intended.
+
+- **Fix applied:**
+  - Added new `calibrated(fromYOLO:sourceSize:tolerance:)` method to `DetectionZone.swift` that properly normalizes YOLO pixel coordinates before converting to Vision coordinates
+  - Marked old `calibrated(fromYOLO:tolerance:)` as deprecated
+  - Updated `AutoScanViewModel.cropCapturedPayload()` to pass source image size to calibration
+
+- **Debug enhancements:**
+  - Added YOLO debug overlay to `DetectionOverlayRenderer` (yellow dashed rectangles showing raw YOLO detections)
+  - Disabled green detection overlay in auto-scan mode since it shows Vision rectangles, not YOLO detections
+
+- **Files modified:**
+  - `DetectionZone.swift` — new calibration method with sourceSize parameter
+  - `AutoScanViewModel.swift` — pass source size to calibration, use struct instead of tuple
+  - `DetectionOverlayRenderer.swift` — added YOLO debug overlay layer
+  - `CardDetectionEngine.swift` — added `currentDetectionMode` property
+  - `CameraViewController.swift` — only show green overlay in scan mode
+  - `DetectionOverlayRendererTests.swift` — updated layer count expectation
+
+- **Verification:**
+  - `make ios-build` ✓
+  - `make ios-test` ✓ (all 238 tests pass)
+  - `make ios-lint` ✓ (0 violations)
+

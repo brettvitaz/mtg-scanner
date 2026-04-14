@@ -138,9 +138,8 @@ final class CameraViewController: UIViewController {
     // MARK: - Zone Overlay
 
     private func updateZoneOverlay() {
-        guard let previewLayer else { return }
-        let zoneToShow = detectionZone ?? .fullFrame
-        renderer?.updateZoneOverlay(zone: zoneToShow, previewLayer: previewLayer)
+        guard let previewLayer, let detectionZone else { return }
+        renderer?.updateZoneOverlay(zone: detectionZone, previewLayer: previewLayer)
     }
 
     // MARK: - Zoom

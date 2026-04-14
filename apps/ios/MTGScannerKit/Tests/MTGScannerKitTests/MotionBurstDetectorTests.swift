@@ -14,6 +14,7 @@ final class MotionBurstDetectorTests: XCTestCase {
         XCTAssertEqual(detector.configuration.settlementFrames, 2)
         XCTAssertEqual(detector.configuration.motionThreshold, 0.015, accuracy: 0.001)
         XCTAssertEqual(detector.configuration.maxHoverDuration, 10)
+        XCTAssertEqual(detector.configuration.minPeakThreshold, 0.05, accuracy: 0.001)
     }
 
     func testCustomConfiguration() {
@@ -22,7 +23,8 @@ final class MotionBurstDetectorTests: XCTestCase {
             burstWindowSize: 5,
             settlementFrames: 2,
             motionThreshold: 0.05,
-            maxHoverDuration: 8
+            maxHoverDuration: 8,
+            minPeakThreshold: 0.06
         )
         let detector = MotionBurstDetector(configuration: config)
 
@@ -31,6 +33,7 @@ final class MotionBurstDetectorTests: XCTestCase {
         XCTAssertEqual(detector.configuration.settlementFrames, 2)
         XCTAssertEqual(detector.configuration.motionThreshold, 0.05, accuracy: 0.001)
         XCTAssertEqual(detector.configuration.maxHoverDuration, 8)
+        XCTAssertEqual(detector.configuration.minPeakThreshold, 0.06, accuracy: 0.001)
     }
 
     // MARK: - State Transitions
@@ -111,7 +114,8 @@ final class MotionBurstDetectorTests: XCTestCase {
             burstWindowSize: 4,
             settlementFrames: 3,
             motionThreshold: 0.3,
-            maxHoverDuration: 5
+            maxHoverDuration: 5,
+            minPeakThreshold: 0.1  // Lower peak threshold for this test
         ))
 
         // Warm up (4 frames)

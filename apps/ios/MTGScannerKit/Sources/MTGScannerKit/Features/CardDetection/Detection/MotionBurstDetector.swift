@@ -34,6 +34,9 @@ struct MotionBurstDetector: Sendable {
     /// Frame index when current burst/hover started.
     private var burstStartFrame: Int?
 
+    /// Maximum diff observed during current burst (for peak detection).
+    private var burstMaxDiff: Float = 0
+
     /// Timestamp of last reference frame update.
     private var lastReferenceUpdate: Date = Date()
 
@@ -89,6 +92,11 @@ struct MotionBurstDetector: Sendable {
         }
         previousDiff = diff
 
+        // Track max diff during active states
+        if state.isActive {
+            burstMaxDiff = max(burstMaxDiff, diff)
+        }
+
         // State machine transitions
         switch state {
         case .idle:
@@ -133,6 +141,7 @@ struct MotionBurstDetector: Sendable {
         consecutiveLowFrames = 0
         consecutiveStableFrames = 0
         burstStartFrame = nil
+        burstMaxDiff = 0
         lastRejectionReason = nil
         shouldUpdateReference = true
     }
@@ -170,6 +179,7 @@ struct MotionBurstDetector: Sendable {
         // Burst detected
         state = .burstDetected(burstStartFrame: frameIndex)
         burstStartFrame = frameIndex
+        burstMaxDiff = diff
         consecutiveLowFrames = 0
     }
 
@@ -182,6 +192,14 @@ struct MotionBurstDetector: Sendable {
         let settled = consecutiveLowFrames >= configuration.settlementFrames ||
                      consecutiveStableFrames >= configuration.settlementFrames
         if settled {
+            // Require sharp peak to distinguish card from shadow/light change
+            guard burstMaxDiff >= configuration.minPeakThreshold else {
+                let maxStr = String(format: "%.3f", burstMaxDiff)
+                let threshStr = String(format: "%.3f", configuration.minPeakThreshold)
+                lastRejectionReason = "No sharp peak: \(maxStr) < \(threshStr)"
+                reset()
+                return
+            }
             state = .settled
             return
         }

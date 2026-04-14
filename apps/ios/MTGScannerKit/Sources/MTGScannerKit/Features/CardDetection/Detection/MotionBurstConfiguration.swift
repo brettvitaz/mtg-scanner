@@ -35,13 +35,19 @@ struct MotionBurstConfiguration: Sendable, Equatable {
     /// Range: 5-20
     var maxHoverDuration: Int
 
+    /// Minimum peak diff required to qualify as a "sharp" burst.
+    /// Shadows and gradual light changes don't have sharp peaks.
+    /// Range: 0.03-0.20
+    var minPeakThreshold: Float
+
     init(
         burstFrameCount: Int = 3,
         burstWindowSize: Int = 5,
         settlementFrames: Int = 2,
         motionThreshold: Float = 0.015,
         referenceDecayTimeout: TimeInterval = 5.0,
-        maxHoverDuration: Int = 10
+        maxHoverDuration: Int = 10,
+        minPeakThreshold: Float = 0.05
     ) {
         self.burstFrameCount = max(2, min(8, burstFrameCount))
         self.burstWindowSize = max(4, min(12, burstWindowSize))
@@ -49,6 +55,7 @@ struct MotionBurstConfiguration: Sendable, Equatable {
         self.motionThreshold = max(0.01, min(0.10, motionThreshold))
         self.referenceDecayTimeout = max(2.0, min(10.0, referenceDecayTimeout))
         self.maxHoverDuration = max(5, min(20, maxHoverDuration))
+        self.minPeakThreshold = max(0.03, min(0.20, minPeakThreshold))
     }
 
     /// Balanced preset - works for most fixture setups.
@@ -61,7 +68,8 @@ struct MotionBurstConfiguration: Sendable, Equatable {
         settlementFrames: 2,
         motionThreshold: 0.02,
         referenceDecayTimeout: 5.0,
-        maxHoverDuration: 10
+        maxHoverDuration: 10,
+        minPeakThreshold: 0.04
     )
 
     /// Conservative preset - strict rejection of shadows.
@@ -71,7 +79,8 @@ struct MotionBurstConfiguration: Sendable, Equatable {
         settlementFrames: 3,
         motionThreshold: 0.01,
         referenceDecayTimeout: 5.0,
-        maxHoverDuration: 15
+        maxHoverDuration: 15,
+        minPeakThreshold: 0.08
     )
 }
 

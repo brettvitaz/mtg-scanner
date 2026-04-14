@@ -10,6 +10,7 @@ final class MotionBurstConfigurationTests: XCTestCase {
         XCTAssertEqual(config.burstWindowSize, 5)
         XCTAssertEqual(config.settlementFrames, 2)
         XCTAssertEqual(config.motionThreshold, 0.015, accuracy: 0.001)
+        XCTAssertEqual(config.minPeakThreshold, 0.05, accuracy: 0.001)
     }
 
     func testFastPreset() {
@@ -18,6 +19,7 @@ final class MotionBurstConfigurationTests: XCTestCase {
         XCTAssertEqual(config.burstWindowSize, 4)
         XCTAssertEqual(config.settlementFrames, 2)
         XCTAssertEqual(config.motionThreshold, 0.02, accuracy: 0.001)
+        XCTAssertEqual(config.minPeakThreshold, 0.04, accuracy: 0.001)
     }
 
     func testConservativePreset() {
@@ -26,6 +28,7 @@ final class MotionBurstConfigurationTests: XCTestCase {
         XCTAssertEqual(config.burstWindowSize, 6)
         XCTAssertEqual(config.settlementFrames, 3)
         XCTAssertEqual(config.motionThreshold, 0.01, accuracy: 0.001)
+        XCTAssertEqual(config.minPeakThreshold, 0.08, accuracy: 0.001)
     }
 
     func testConfigurationValidationAdjustsWindowSize() {
@@ -43,7 +46,8 @@ final class MotionBurstConfigurationTests: XCTestCase {
             burstWindowSize: 1,    // Should clamp to 4
             settlementFrames: 100, // Should clamp to 6
             motionThreshold: 5.0,  // Should clamp to 0.10
-            maxHoverDuration: 1    // Should clamp to 5
+            maxHoverDuration: 1,   // Should clamp to 5
+            minPeakThreshold: 0.5  // Should clamp to 0.20
         )
 
         XCTAssertEqual(config.burstFrameCount, 8)
@@ -51,5 +55,6 @@ final class MotionBurstConfigurationTests: XCTestCase {
         XCTAssertEqual(config.settlementFrames, 6)
         XCTAssertEqual(config.motionThreshold, 0.10, accuracy: 0.001)
         XCTAssertEqual(config.maxHoverDuration, 5)
+        XCTAssertEqual(config.minPeakThreshold, 0.20, accuracy: 0.001)
     }
 }

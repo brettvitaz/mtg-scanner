@@ -46,6 +46,7 @@ private struct SettingsForm: View {
             apiSection
             recognitionSection
             autoScanSection
+            motionBurstSection
         }
     }
 
@@ -112,6 +113,75 @@ private struct SettingsForm: View {
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Motion Burst Section
+
+    @ViewBuilder
+    private var motionBurstSection: some View {
+        Section("Motion Detection") {
+            presetPicker
+            if appModel.motionBurstPreset == .custom {
+                motionThresholdRow
+                minPeakThresholdRow
+            }
+            resetMotionBurstButton
+            Text(
+                "Detection sensitivity for card drops. "
+                + "Lower motion threshold = more sensitive. "
+                + "Higher peak threshold = fewer false triggers from shadows."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var presetPicker: some View {
+        Picker("Preset", selection: $appModel.motionBurstPreset) {
+            ForEach(MotionBurstPreset.allCases, id: \.self) { preset in
+                Text(preset.displayName).tag(preset)
+            }
+        }
+    }
+
+    private var motionThresholdRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Motion Threshold")
+                Spacer()
+                Text(String(format: "%.3f", appModel.motionBurstMotionThreshold))
+                    .foregroundStyle(.secondary)
+            }
+            Slider(
+                value: $appModel.motionBurstMotionThreshold,
+                in: 0.005...0.050,
+                step: 0.005
+            )
+            .accessibilityLabel("Motion threshold")
+        }
+    }
+
+    private var minPeakThresholdRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Peak Threshold")
+                Spacer()
+                Text(String(format: "%.3f", appModel.motionBurstMinPeakThreshold))
+                    .foregroundStyle(.secondary)
+            }
+            Slider(
+                value: $appModel.motionBurstMinPeakThreshold,
+                in: 0.020...0.100,
+                step: 0.005
+            )
+            .accessibilityLabel("Peak threshold")
+        }
+    }
+
+    private var resetMotionBurstButton: some View {
+        Button("Reset to Defaults") {
+            appModel.resetMotionBurstSettings()
         }
     }
 

@@ -92,6 +92,10 @@ final class CardPresenceTracker: @unchecked Sendable {
     private var lastSamples: [UInt8] = []
     private var burstDetector: MotionBurstDetector
     private var debugMode: Bool = false
+    /// True after a successful card signal, until `markCaptured()` is called.
+    /// Prevents the burst detector from re-triggering on the same card before
+    /// the VM has acknowledged the capture.
+    private var pendingCapture: Bool = false
 
     // MARK: - Init
 
@@ -149,9 +153,7 @@ final class CardPresenceTracker: @unchecked Sendable {
         presenceQueue.async { [weak self] in
             guard let self else { return }
             self.applyMarkCaptured()
-            // Zone change clears samples — rebuild from the freshly captured reference.
             self.detectionZone = zone
-            self.referenceSamples = self.lastSamples
         }
     }
 
@@ -171,12 +173,16 @@ final class CardPresenceTracker: @unchecked Sendable {
 
     private func applyMarkCaptured() {
         let motionZone = detectionZone?.effectiveRect
-        referenceSamples = lastSamples
+        // Clear reference so the first live frame after capture establishes a fresh baseline.
+        // lastSamples is stale (2+ seconds old, from before the settle window), so reusing it
+        // would cause a diff spike on the settled-card frames that follow, re-triggering a burst.
+        // burstDetector.reset() leaves shouldUpdateReference=true, so checkReferenceDecay
+        // populates the reference automatically on the first new frame.
+        referenceSamples = []
         burstDetector.reset()
-        burstDetector.markReferenceUpdated()
+        pendingCapture = false
         #if DEBUG
-        print("\(logTimestamp()) [CardPresence] markCaptured - Zone: \(String(describing: motionZone)), " +
-              "Samples: \(referenceSamples.count)")
+        print("\(logTimestamp()) [CardPresence] markCaptured - Zone: \(String(describing: motionZone))")
         #endif
     }
 
@@ -239,7 +245,11 @@ final class CardPresenceTracker: @unchecked Sendable {
     }
 
     private func calculateFrameDiff(samples: [UInt8]) -> Float {
-        referenceSamples.isEmpty ? 1.0 : analyzer.difference(from: referenceSamples, to: samples)
+        // Return 0.0 when no reference is established yet.
+        // An empty reference means "no baseline" — returning 1.0 would cause every
+        // frame to look like extreme motion, triggering a spurious burst immediately
+        // after a zone change clears the reference (e.g. after the first capture).
+        referenceSamples.isEmpty ? 0.0 : analyzer.difference(from: referenceSamples, to: samples)
     }
 
     private func checkReferenceDecay() {
@@ -274,37 +284,41 @@ final class CardPresenceTracker: @unchecked Sendable {
     }
 
     private func processTriggeredFrame(pixelBuffer: CVPixelBuffer) {
-        let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
+        guard !pendingCapture else {
+            resetDetectionState()
+            return
+        }
+        guard let bestBox = detectBestFilteredBox(in: pixelBuffer) else { return }
+        pendingCapture = true
+        resetDetectionState()
+        DispatchQueue.main.async { [weak self] in
+            self?.onNewCardSignal?(bestBox)
+        }
+    }
 
+    private func detectBestFilteredBox(in pixelBuffer: CVPixelBuffer) -> CGRect? {
+        let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
         #if DEBUG
         print("\(logTimestamp()) [CardPresence] YOLO boxes: \(boxes.count)")
         #endif
-
         guard !boxes.isEmpty else {
             resetDetectionState()
             #if DEBUG
             print("\(logTimestamp()) [CardPresence] No YOLO boxes, updated reference to prevent re-trigger")
             #endif
-            return
+            return nil
         }
-
         guard let bestBox = filterBoxes(boxes) else {
             resetDetectionState()
             #if DEBUG
             print("\(logTimestamp()) [CardPresence] All \(boxes.count) boxes filtered out by zone constraints")
             #endif
-            return
+            return nil
         }
-
-        resetDetectionState()
-
         #if DEBUG
         print("\(logTimestamp()) [CardPresence] Filtered best box: \(bestBox)")
         #endif
-
-        DispatchQueue.main.async { [weak self] in
-            self?.onNewCardSignal?(bestBox)
-        }
+        return bestBox
     }
 
 }
@@ -361,7 +375,17 @@ private extension CardPresenceTracker {
             width: box.width,
             height: box.height
         )
-        return zone.contains(visionBox) && zone.isLargeEnough(visionBox) && zone.isPortraitAspect(visionBox)
+        let contained = zone.contains(visionBox)
+        let largeEnough = zone.isLargeEnough(visionBox)
+        let portrait = zone.isPortraitAspect(visionBox)
+        #if DEBUG
+        if !contained || !largeEnough || !portrait {
+            let zoneRect = zone.effectiveRect
+            print("\(logTimestamp()) [CardPresence] Box rejected: yolo=\(box) vision=\(visionBox) " +
+                  "zone=\(zoneRect) contained=\(contained) largeEnough=\(largeEnough) portrait=\(portrait)")
+        }
+        #endif
+        return contained && largeEnough && portrait
     }
 
     func loadDetector() -> YOLOCardDetector? {

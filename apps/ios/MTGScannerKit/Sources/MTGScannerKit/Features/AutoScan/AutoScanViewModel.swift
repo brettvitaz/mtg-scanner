@@ -194,8 +194,12 @@ final class AutoScanViewModel {
     // MARK: - Frame Forwarding
 
     /// Forward camera frames to the presence tracker while active.
+    ///
+    /// Frames are dropped during `.settling` and `.capturing` — there is no value in
+    /// processing motion while a capture is imminent or in progress, and doing so
+    /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, captureState != .capturing else { return }
+        guard isActive, captureState == .watching else { return }
         presenceTracker.processFrame(sampleBuffer)
     }
 

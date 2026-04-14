@@ -128,6 +128,13 @@ final class CameraViewController: UIViewController {
         sessionManager.setTorchLevel(level)
     }
 
+    // MARK: - Exposure
+
+    /// Sets the exposure bias (EV offset). Positive = brighter, negative = darker.
+    func setExposureBias(_ bias: Float) {
+        sessionManager.setExposureBias(bias)
+    }
+
     // MARK: - Zone Overlay
 
     private func updateZoneOverlay() {

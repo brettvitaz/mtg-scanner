@@ -106,13 +106,8 @@ private struct SettingsForm: View {
             captureDelayRow
             confidenceRow
             concurrentUploadsRow
+            exposureBiasRow
             calibrationRow
-            Text(
-                "Place your phone above a scanning station and drop cards in — "
-                + "each card is automatically captured and recognized."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
     }
 
@@ -120,68 +115,20 @@ private struct SettingsForm: View {
 
     @ViewBuilder
     private var motionBurstSection: some View {
-        Section("Motion Detection") {
-            presetPicker
-            if appModel.motionBurstPreset == .custom {
-                motionThresholdRow
-                minPeakThresholdRow
-            }
-            resetMotionBurstButton
-            Text(
-                "Detection sensitivity for card drops. "
-                + "Lower motion threshold = more sensitive. "
-                + "Higher peak threshold = fewer false triggers from shadows."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
+        MotionBurstSectionView(appModel: appModel)
     }
 
-    private var presetPicker: some View {
-        Picker("Preset", selection: $appModel.motionBurstPreset) {
-            ForEach(MotionBurstPreset.allCases, id: \.self) { preset in
-                Text(preset.displayName).tag(preset)
-            }
-        }
-    }
-
-    private var motionThresholdRow: some View {
+    private var exposureBiasRow: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Motion Threshold")
+                Text("Exposure Bias")
                 Spacer()
-                Text(String(format: "%.3f", appModel.motionBurstMotionThreshold))
+                Text(String(format: "%+.1f EV", appModel.exposureBias))
                     .foregroundStyle(.secondary)
             }
-            Slider(
-                value: $appModel.motionBurstMotionThreshold,
-                in: 0.005...0.050,
-                step: 0.005
-            )
-            .accessibilityLabel("Motion threshold")
-        }
-    }
-
-    private var minPeakThresholdRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Peak Threshold")
-                Spacer()
-                Text(String(format: "%.3f", appModel.motionBurstMinPeakThreshold))
-                    .foregroundStyle(.secondary)
-            }
-            Slider(
-                value: $appModel.motionBurstMinPeakThreshold,
-                in: 0.020...0.100,
-                step: 0.005
-            )
-            .accessibilityLabel("Peak threshold")
-        }
-    }
-
-    private var resetMotionBurstButton: some View {
-        Button("Reset to Defaults") {
-            appModel.resetMotionBurstSettings()
+            Slider(value: $appModel.exposureBias, in: -3.0...3.0, step: 0.5)
+                .accessibilityLabel("Exposure bias")
+                .accessibilityValue(String(format: "%+.1f EV", appModel.exposureBias))
         }
     }
 
@@ -263,6 +210,62 @@ private struct SettingsForm: View {
             } catch {
                 connectionStatus = .failure(error.localizedDescription)
             }
+        }
+    }
+}
+
+// MARK: - Motion Burst Section
+
+private struct MotionBurstSectionView: View {
+    @Bindable var appModel: AppModel
+
+    var body: some View {
+        Section("Motion Detection") {
+            presetPicker
+            if appModel.motionBurstPreset == .custom {
+                motionThresholdRow
+                minPeakThresholdRow
+            }
+            Button("Reset to Defaults") { appModel.resetMotionBurstSettings() }
+            Text(
+                "Detection sensitivity for card drops. "
+                + "Lower motion threshold = more sensitive. "
+                + "Higher peak threshold = fewer false triggers from shadows."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var presetPicker: some View {
+        Picker("Preset", selection: $appModel.motionBurstPreset) {
+            ForEach(MotionBurstPreset.allCases, id: \.self) { preset in
+                Text(preset.displayName).tag(preset)
+            }
+        }
+    }
+
+    private var motionThresholdRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Motion Threshold")
+                Spacer()
+                Text(String(format: "%.3f", appModel.motionBurstMotionThreshold)).foregroundStyle(.secondary)
+            }
+            Slider(value: $appModel.motionBurstMotionThreshold, in: 0.005...0.050, step: 0.005)
+                .accessibilityLabel("Motion threshold")
+        }
+    }
+
+    private var minPeakThresholdRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Peak Threshold")
+                Spacer()
+                Text(String(format: "%.3f", appModel.motionBurstMinPeakThreshold)).foregroundStyle(.secondary)
+            }
+            Slider(value: $appModel.motionBurstMinPeakThreshold, in: 0.020...0.100, step: 0.005)
+                .accessibilityLabel("Peak threshold")
         }
     }
 }

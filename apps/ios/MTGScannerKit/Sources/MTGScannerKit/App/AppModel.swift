@@ -36,6 +36,9 @@ public final class AppModel {
     var motionBurstMinPeakThreshold: Double {
         didSet { UserDefaults.standard.set(motionBurstMinPeakThreshold, forKey: motionBurstMinPeakThresholdKey) }
     }
+    var exposureBias: Double {
+        didSet { UserDefaults.standard.set(exposureBias, forKey: exposureBiasKey) }
+    }
     var isRecognizing = false
     var statusMessage = "Point camera at cards to scan."
     var lastUploadedFilename: String?
@@ -66,6 +69,7 @@ public final class AppModel {
     private let motionBurstPresetKey = "motion_burst_preset"
     private let motionBurstMotionThresholdKey = "motion_burst_motion_threshold"
     private let motionBurstMinPeakThresholdKey = "motion_burst_min_peak_threshold"
+    private let exposureBiasKey = "exposure_bias"
 
     public init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
@@ -82,6 +86,8 @@ public final class AppModel {
         self.motionBurstMotionThreshold = storedMotionThreshold > 0 ? storedMotionThreshold : 0.015
         let storedMinPeak = UserDefaults.standard.double(forKey: motionBurstMinPeakThresholdKey)
         self.motionBurstMinPeakThreshold = storedMinPeak > 0 ? storedMinPeak : 0.05
+        let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
+        self.exposureBias = storedBias ?? 0.0
         loadCorrections()
     }
 

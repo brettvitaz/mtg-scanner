@@ -7,7 +7,7 @@ final class CardPresenceTrackerTests: XCTestCase {
 
     func testInitialDefaultThreshold() {
         let tracker = CardPresenceTracker(detector: nil)
-        XCTAssertEqual(tracker.sceneChangeThreshold, 0.03, accuracy: 0.001)
+        XCTAssertEqual(tracker.sceneChangeThreshold, 0.015, accuracy: 0.001)
     }
 
     func testConfidenceThresholdIsForwarded() {

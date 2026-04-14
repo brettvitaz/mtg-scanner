@@ -202,7 +202,6 @@ final class CameraViewController: UIViewController {
     private func setupDetectionLayer() {
         detectionLayer.frame = view.bounds
         view.layer.addSublayer(detectionLayer)
-        view.layer.insertSublayer(detectionLayer, at: 999)
         renderer = DetectionOverlayRenderer(detectionLayer: detectionLayer)
     }
 

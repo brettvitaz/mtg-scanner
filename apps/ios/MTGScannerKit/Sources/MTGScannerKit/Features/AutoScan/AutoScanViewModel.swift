@@ -133,6 +133,7 @@ final class AutoScanViewModel {
         statusMessage = "Tap Start to begin."
         identifiedCardsViewModel.clearAll()
         presenceTracker.resetZone()
+        detectionZone = nil
         isCalibrated = false
     }
 

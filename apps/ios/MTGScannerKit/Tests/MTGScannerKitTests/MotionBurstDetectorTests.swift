@@ -9,10 +9,10 @@ final class MotionBurstDetectorTests: XCTestCase {
     func testDefaultConfiguration() {
         let detector = MotionBurstDetector()
 
-        XCTAssertEqual(detector.configuration.burstFrameCount, 3)
-        XCTAssertEqual(detector.configuration.burstWindowSize, 5)
+        XCTAssertEqual(detector.configuration.burstFrameCount, 2)
+        XCTAssertEqual(detector.configuration.burstWindowSize, 8)
         XCTAssertEqual(detector.configuration.settlementFrames, 2)
-        XCTAssertEqual(detector.configuration.motionThreshold, 0.015, accuracy: 0.001)
+        XCTAssertEqual(detector.configuration.motionThreshold, 0.010, accuracy: 0.001)
         XCTAssertEqual(detector.configuration.maxHoverDuration, 10)
         XCTAssertEqual(detector.configuration.minPeakThreshold, 0.05, accuracy: 0.001)
     }
@@ -62,7 +62,8 @@ final class MotionBurstDetectorTests: XCTestCase {
         var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
             burstFrameCount: 2,
             burstWindowSize: 4,
-            settlementFrames: 2
+            settlementFrames: 2,
+            motionThreshold: 0.3
         ))
 
         // Warm up with low diffs (4 frames, frameIndex goes 0->1->2->3->4)
@@ -74,7 +75,7 @@ final class MotionBurstDetectorTests: XCTestCase {
         // Frame 4: diff=0.5 (1st high frame, not enough for burst)
         // Frame 5: diff=0.5 (2nd high frame, burst detected at frameIndex=6)
         _ = detector.process(diff: 0.5)
-        XCTAssertEqual(detector.state, .idle)  // Still warming/not enough frames
+        XCTAssertEqual(detector.state, .idle)  // Only 1 high frame so far, need 2
 
         let triggered = detector.process(diff: 0.5)
         XCTAssertFalse(triggered)

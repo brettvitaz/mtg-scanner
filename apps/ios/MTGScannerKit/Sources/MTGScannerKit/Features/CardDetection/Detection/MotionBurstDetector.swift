@@ -37,6 +37,9 @@ struct MotionBurstDetector: Sendable {
     /// Maximum diff observed during current burst (for peak detection).
     private var burstMaxDiff: Float = 0
 
+    /// Exponential moving average of idle diff values (ambient noise baseline).
+    private var idleBaseline: Float = 0
+
     /// Timestamp of last reference frame update.
     private var lastReferenceUpdate: Date = Date()
 
@@ -50,6 +53,7 @@ struct MotionBurstDetector: Sendable {
         let framesSinceBurstStart: Int?
         let rejectionReason: String?
         let shouldUpdateReference: Bool
+        let idleBaseline: Float
     }
 
     private(set) var lastRejectionReason: String?
@@ -149,14 +153,16 @@ struct MotionBurstDetector: Sendable {
     /// Returns current metrics for debug overlay.
     func currentMetrics() -> Metrics {
         let framesSinceBurst: Int? = burstStartFrame.map { frameIndex - $0 }
+        let lastDiffIndex = frameIndex == 0 ? 0 : (frameIndex - 1) % configuration.burstWindowSize
         return Metrics(
-            currentDiff: diffHistory[(frameIndex - 1) % configuration.burstWindowSize],
+            currentDiff: diffHistory[lastDiffIndex],
             recentDiffs: Array(diffHistory.suffix(min(configuration.burstWindowSize, frameIndex))),
             state: state,
             consecutiveLowFrames: consecutiveLowFrames,
             framesSinceBurstStart: framesSinceBurst,
             rejectionReason: lastRejectionReason,
-            shouldUpdateReference: shouldUpdateReference
+            shouldUpdateReference: shouldUpdateReference,
+            idleBaseline: idleBaseline
         )
     }
 
@@ -164,6 +170,13 @@ struct MotionBurstDetector: Sendable {
 
     private mutating func handleIdleState(diff: Float) {
         lastRejectionReason = nil
+
+        // Update idle baseline EMA with low-motion frames only.
+        // Excluding above-threshold frames prevents card arrival frames (which are
+        // processed in idle before burst is detected) from inflating the baseline.
+        if diff < configuration.motionThreshold {
+            idleBaseline = idleBaseline == 0 ? diff : idleBaseline * 0.95 + diff * 0.05
+        }
 
         guard frameIndex >= configuration.burstWindowSize else {
             lastRejectionReason = "Warming up (\(frameIndex)/\(configuration.burstWindowSize))"
@@ -192,11 +205,18 @@ struct MotionBurstDetector: Sendable {
         let settled = consecutiveLowFrames >= configuration.settlementFrames ||
                      consecutiveStableFrames >= configuration.settlementFrames
         if settled {
-            // Require sharp peak to distinguish card from shadow/light change
-            guard burstMaxDiff >= configuration.minPeakThreshold else {
+            // Require the burst peak to be a meaningful spike above ambient noise.
+            // Use 3× the idle baseline so detection adapts to ambient lighting:
+            // dark scenes produce compressed diffs, but a card arrival still creates
+            // a spike several times larger than the noise floor.
+            // The absolute floor (minPeakThreshold / 5) is a sanity minimum only —
+            // the ratio check is the primary discriminator.
+            let adaptiveThreshold = max(configuration.minPeakThreshold / 5.0, idleBaseline * 3.0)
+            guard burstMaxDiff >= adaptiveThreshold else {
                 let maxStr = String(format: "%.3f", burstMaxDiff)
-                let threshStr = String(format: "%.3f", configuration.minPeakThreshold)
-                lastRejectionReason = "No sharp peak: \(maxStr) < \(threshStr)"
+                let threshStr = String(format: "%.3f", adaptiveThreshold)
+                let baseStr = String(format: "%.3f", idleBaseline)
+                lastRejectionReason = "No sharp peak: \(maxStr) < \(threshStr) (baseline=\(baseStr))"
                 reset()
                 return
             }

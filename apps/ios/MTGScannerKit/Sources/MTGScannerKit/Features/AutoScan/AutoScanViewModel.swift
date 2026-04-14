@@ -33,7 +33,7 @@ final class AutoScanViewModel {
     private(set) var lastCroppedImage: UIImage?
     private(set) var isCalibrated = false
     var detectionZone: DetectionZone? {
-        didSet { presenceTracker.detectionZone = detectionZone }
+        didSet { presenceTracker.setZone(detectionZone) }
     }
 
     // MARK: - Child Objects
@@ -202,7 +202,7 @@ final class AutoScanViewModel {
     // MARK: - State Machine
 
     private func handleNewCardSignal(boundingBox: CGRect?) {
-        guard isActive else { return }
+        guard isActive, boundingBox != nil else { return }
         switch captureState {
         case .watching:
             startSettleTimer()
@@ -237,16 +237,19 @@ final class AutoScanViewModel {
 
         let result = await cropCapturedPayload(payload)
         lastCroppedImage = result.image
-        presenceTracker.markCaptured()
         if let box = result.boundingBox, let sourceSize = result.sourceSize, !isCalibrated {
             let calibratedZone = DetectionZone.calibrated(
                 fromYOLO: box,
                 sourceSize: sourceSize,
                 videoSize: Self.videoSize
             )
-            presenceTracker.detectionZone = calibratedZone
+            // Set zone on the tracker directly via presenceQueue so the
+            // reference update from markCaptured runs BEFORE the zone change.
+            presenceTracker.markCapturedAndSetZone(calibratedZone)
             detectionZone = calibratedZone
             isCalibrated = true
+        } else {
+            presenceTracker.markCaptured()
         }
         enqueueAfterCapture(payload: payload, cropped: result.image)
         captureState = .watching

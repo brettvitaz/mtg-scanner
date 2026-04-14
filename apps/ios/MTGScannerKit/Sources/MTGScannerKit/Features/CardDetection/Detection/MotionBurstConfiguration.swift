@@ -41,10 +41,10 @@ struct MotionBurstConfiguration: Sendable, Equatable {
     var minPeakThreshold: Float
 
     init(
-        burstFrameCount: Int = 3,
-        burstWindowSize: Int = 5,
+        burstFrameCount: Int = 2,
+        burstWindowSize: Int = 8,
         settlementFrames: Int = 2,
-        motionThreshold: Float = 0.015,
+        motionThreshold: Float = 0.010,
         referenceDecayTimeout: TimeInterval = 5.0,
         maxHoverDuration: Int = 10,
         minPeakThreshold: Float = 0.05
@@ -64,9 +64,9 @@ struct MotionBurstConfiguration: Sendable, Equatable {
     /// Fast preset - aggressive detection for quick scanning.
     static let fast = MotionBurstConfiguration(
         burstFrameCount: 2,
-        burstWindowSize: 4,
+        burstWindowSize: 6,
         settlementFrames: 2,
-        motionThreshold: 0.02,
+        motionThreshold: 0.010,
         referenceDecayTimeout: 5.0,
         maxHoverDuration: 10,
         minPeakThreshold: 0.04
@@ -74,10 +74,10 @@ struct MotionBurstConfiguration: Sendable, Equatable {
 
     /// Conservative preset - strict rejection of shadows.
     static let conservative = MotionBurstConfiguration(
-        burstFrameCount: 4,
-        burstWindowSize: 6,
+        burstFrameCount: 3,
+        burstWindowSize: 10,
         settlementFrames: 3,
-        motionThreshold: 0.01,
+        motionThreshold: 0.012,
         referenceDecayTimeout: 5.0,
         maxHoverDuration: 15,
         minPeakThreshold: 0.08

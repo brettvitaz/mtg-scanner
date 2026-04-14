@@ -219,4 +219,47 @@ final class DetectionZoneTests: XCTestCase {
         XCTAssertFalse(zone.isLargeEnough(box))
         XCTAssertTrue(zone.isPortraitAspect(box))
     }
+
+    // MARK: - Uncalibrated Zone
+
+    func testUncalibratedZoneDefaults() {
+        let zone = DetectionZone.uncalibrated
+        XCTAssertEqual(zone.referenceRect, CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8))
+        XCTAssertEqual(zone.tolerance, 0)
+        XCTAssertEqual(zone.minAreaFraction, 0)       // no size constraint before calibration
+        XCTAssertEqual(zone.maxPortraitAspectRatio, 0.8)
+    }
+
+    func testUncalibratedZoneRejectsEdgeBox() {
+        // Box at top-left corner — fails containment
+        let zone = DetectionZone.uncalibrated
+        let box = CGRect(x: 0.0, y: 0.85, width: 0.15, height: 0.25)  // Vision coords (bottom-left origin)
+        XCTAssertFalse(zone.contains(box))
+    }
+
+    func testUncalibratedZoneAcceptsSmallCenteredBox() {
+        // Box centered but small — passes because size is not constrained pre-calibration
+        let zone = DetectionZone.uncalibrated
+        let box = CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.42)  // aspect = 0.71, area = 0.126
+        XCTAssertTrue(zone.contains(box))
+        XCTAssertTrue(zone.isLargeEnough(box))   // minAreaFraction = 0
+        XCTAssertTrue(zone.isPortraitAspect(box))
+    }
+
+    func testUncalibratedZoneRejectsLandscapeBox() {
+        // Landscape aspect ratio — fails portrait check
+        let zone = DetectionZone.uncalibrated
+        let box = CGRect(x: 0.15, y: 0.25, width: 0.7, height: 0.5)  // aspect = 1.4
+        XCTAssertTrue(zone.contains(box))
+        XCTAssertFalse(zone.isPortraitAspect(box))
+    }
+
+    func testUncalibratedZoneAcceptsGoodCenteredCard() {
+        // Portrait card near center — passes containment and aspect ratio
+        let zone = DetectionZone.uncalibrated
+        let box = CGRect(x: 0.25, y: 0.15, width: 0.5, height: 0.7)  // aspect = 0.71
+        XCTAssertTrue(zone.contains(box))
+        XCTAssertTrue(zone.isLargeEnough(box))
+        XCTAssertTrue(zone.isPortraitAspect(box))
+    }
 }

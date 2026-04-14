@@ -9,12 +9,27 @@ import CoreGraphics
 /// 1. **Containment** — cards must be fully within the zone (with tolerance margin)
 /// 2. **Size** — cards must cover at least `minAreaFraction` of the frame
 /// 3. **Aspect ratio** — cards must be in portrait orientation
-struct DetectionZone: Sendable {
+struct DetectionZone: Sendable, Equatable {
     /// Default detection zone covering the full frame with standard tolerance.
     static let fullFrame = DetectionZone(
         referenceRect: CGRect(x: 0, y: 0, width: 1, height: 1),
         tolerance: 0
     )
+
+    /// Default zone for uncalibrated state (before first capture).
+    ///
+    /// Covers the center 80% of the frame (10% inset on each edge), rejecting
+    /// extreme-edge detections while remaining generous for varied mounting setups.
+    /// Only enforces portrait aspect ratio — size is not constrained because the
+    /// correct card size is unknown until calibration.
+    static var uncalibrated: DetectionZone {
+        var zone = DetectionZone(
+            referenceRect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8),
+            tolerance: 0
+        )
+        zone.minAreaFraction = 0
+        return zone
+    }
 
     /// Normalized rectangle defining the center of the detection zone.
     /// Must be in Vision coordinates (bottom-left origin).
@@ -74,8 +89,12 @@ struct DetectionZone: Sendable {
     ///
     /// The box is expected to be in Vision coordinates (bottom-left origin).
     /// The tolerance provides flexibility for cards that are slightly offset from center.
+    /// Size filtering is disabled (minAreaFraction = 0) because the card size in the frame
+    /// varies with camera distance — containment and aspect ratio are the meaningful filters.
     static func calibrated(from box: CGRect, tolerance: CGFloat = 0.15) -> DetectionZone {
-        DetectionZone(referenceRect: box, tolerance: tolerance)
+        var zone = DetectionZone(referenceRect: box, tolerance: tolerance)
+        zone.minAreaFraction = 0
+        return zone
     }
 
     /// Creates a new zone calibrated from a YOLO bounding box in normalized coordinates.
@@ -164,7 +183,9 @@ struct DetectionZone: Sendable {
             height: videoBox.height
         )
 
-        return DetectionZone(referenceRect: visionRect, tolerance: tolerance)
+        var zone = DetectionZone(referenceRect: visionRect, tolerance: tolerance)
+        zone.minAreaFraction = 0
+        return zone
     }
 
 }

@@ -49,7 +49,7 @@ final class AutoScanViewModelTests: XCTestCase {
 
         // Simulate a new-card signal by calling the internal signal handler directly
         // via the presenceTracker callback.
-        vm.presenceTracker.onNewCardSignal?(nil)
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
 
         // Give main loop time to process the async dispatch.
         try await Task.sleep(for: .milliseconds(50))
@@ -60,7 +60,7 @@ final class AutoScanViewModelTests: XCTestCase {
         let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
-        vm.presenceTracker.onNewCardSignal?(nil)
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(vm.captureState, .settling)
 
@@ -76,13 +76,13 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.captureDelay = 60
         vm.start()
 
-        vm.presenceTracker.onNewCardSignal?(nil)
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, .settling)
 
         // Subsequent signals should be ignored — state stays .settling.
-        vm.presenceTracker.onNewCardSignal?(nil)
-        vm.presenceTracker.onNewCardSignal?(nil)
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, .settling)
     }
@@ -94,11 +94,12 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.captureDelay = 0.1  // short timer for the test
         vm.start()
 
-        vm.presenceTracker.onNewCardSignal?(nil)
+        let box = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7)
+        vm.presenceTracker.onNewCardSignal?(box)
         // Keep firing signals — they must NOT reset the timer.
         for _ in 0..<5 {
             try await Task.sleep(for: .milliseconds(20))
-            vm.presenceTracker.onNewCardSignal?(nil)
+            vm.presenceTracker.onNewCardSignal?(box)
         }
 
         // Allow the 0.1 s timer to expire (plus a small buffer).
@@ -111,7 +112,7 @@ final class AutoScanViewModelTests: XCTestCase {
 
     func testSignalIgnoredWhenInactive() async throws {
         let vm = AutoScanViewModel(detector: nil)
-        vm.presenceTracker.onNewCardSignal?(nil)
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(vm.captureState, .watching)
         XCTAssertFalse(vm.isActive)
@@ -149,14 +150,14 @@ final class AutoScanViewModelTests: XCTestCase {
         XCTAssertNil(capturedIsCropped)
     }
 
-    func testNewCardSignalWithNilBoundingBoxTransitionsToSettling() async throws {
+    func testNilBoundingBoxSignalIsIgnored() async throws {
         let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
 
         vm.presenceTracker.onNewCardSignal?(nil)
         try await Task.sleep(for: .milliseconds(50))
-        XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.settling)
+        XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.watching)
     }
 
     func testBoundingBoxIgnoredWhenAlreadySettling() async throws {

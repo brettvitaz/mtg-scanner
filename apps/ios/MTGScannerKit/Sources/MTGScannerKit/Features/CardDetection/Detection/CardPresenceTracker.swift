@@ -28,26 +28,31 @@ final class CardPresenceTracker: @unchecked Sendable {
     /// Use `.balanced`, `.fast`, or `.conservative` presets, or customize individually.
     var burstConfiguration: MotionBurstConfiguration {
         didSet {
-            burstDetector = MotionBurstDetector(configuration: burstConfiguration)
+            let newDetector = MotionBurstDetector(configuration: burstConfiguration)
+            presenceQueue.async { [weak self] in
+                self?.burstDetector = newDetector
+            }
         }
     }
 
     /// Minimum YOLO confidence for a card to be considered present.
     var confidenceThreshold: Float = 0.5 {
-        didSet { detector?.confidenceThreshold = confidenceThreshold }
+        didSet {
+            let threshold = confidenceThreshold
+            presenceQueue.async { [weak self] in
+                self?.detector?.confidenceThreshold = threshold
+            }
+        }
     }
 
     /// Detection zone for filtering card detections.
     ///
     /// When set, only cards meeting the zone's constraints are accepted:
     /// containment, minimum area, and portrait aspect ratio.
-    var detectionZone: DetectionZone? {
-        didSet {
-            // Clear reference samples when zone changes to ensure sample counts match
-            // (samples from full frame have different count than samples from zone)
-            referenceSamples = []
-        }
-    }
+    ///
+    /// Always mutate via `setZone(_:)` or `markCapturedAndSetZone(_:)` —
+    /// never assign directly, as those methods dispatch to the presenceQueue.
+    private(set) var detectionZone: DetectionZone?
 
     /// Whether to enable legacy single-threshold mode (for debugging).
     /// When true, ignores motion burst detection and uses simple threshold.
@@ -132,17 +137,47 @@ final class CardPresenceTracker: @unchecked Sendable {
     func markCaptured() {
         presenceQueue.async { [weak self] in
             guard let self else { return }
-            // Use the same zone for reference samples that we'll use for future samples
-            // to ensure sample counts match during comparison
-            let motionZone = self.detectionZone?.effectiveRect
-            self.referenceSamples = self.lastSamples
-            self.burstDetector.reset()
-            self.burstDetector.markReferenceUpdated()
-            #if DEBUG
-            print("\(self.logTimestamp()) [CardPresence] markCaptured - Zone: \(String(describing: motionZone)), " +
-                  "Samples: \(self.referenceSamples.count)")
-            #endif
+            self.applyMarkCaptured()
         }
+    }
+
+    /// Atomically marks capture and sets a new detection zone on the presenceQueue.
+    ///
+    /// Use instead of calling `markCaptured()` followed by `setZone(_:)` to guarantee
+    /// the zone change never races with or undoes the reference update.
+    func markCapturedAndSetZone(_ zone: DetectionZone) {
+        presenceQueue.async { [weak self] in
+            guard let self else { return }
+            self.applyMarkCaptured()
+            // Zone change clears samples — rebuild from the freshly captured reference.
+            self.detectionZone = zone
+            self.referenceSamples = self.lastSamples
+        }
+    }
+
+    /// Sets the detection zone, clearing stale reference samples.
+    ///
+    /// Dispatches to the presenceQueue so it serialises with frame processing.
+    /// No-ops if the zone is already equal to the requested value (idempotent).
+    func setZone(_ zone: DetectionZone?) {
+        presenceQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.detectionZone != zone else { return }
+            self.detectionZone = zone
+            self.referenceSamples = []
+            self.burstDetector.reset()
+        }
+    }
+
+    private func applyMarkCaptured() {
+        let motionZone = detectionZone?.effectiveRect
+        referenceSamples = lastSamples
+        burstDetector.reset()
+        burstDetector.markReferenceUpdated()
+        #if DEBUG
+        print("\(logTimestamp()) [CardPresence] markCaptured - Zone: \(String(describing: motionZone)), " +
+              "Samples: \(referenceSamples.count)")
+        #endif
     }
 
     /// Enables or disables debug mode for metrics collection.
@@ -159,20 +194,12 @@ final class CardPresenceTracker: @unchecked Sendable {
     /// The zone is set to the detected card's position, allowing future detections
     /// to be filtered to cards in a similar location.
     func calibrate(from boundingBox: CGRect) {
-        presenceQueue.async { [weak self] in
-            self?.detectionZone = DetectionZone.calibrated(from: boundingBox)
-            // Clear reference samples so next frame establishes new reference with zone
-            self?.referenceSamples = []
-        }
+        setZone(DetectionZone.calibrated(from: boundingBox))
     }
 
     /// Resets the detection zone to nil (full frame detection).
     func resetZone() {
-        presenceQueue.async { [weak self] in
-            self?.detectionZone = nil
-            // Clear reference samples so next frame establishes new reference without zone
-            self?.referenceSamples = []
-        }
+        setZone(nil)
     }
 
     // MARK: - Frame Processing
@@ -240,6 +267,12 @@ final class CardPresenceTracker: @unchecked Sendable {
         }
     }
 
+    private func resetDetectionState() {
+        referenceSamples = lastSamples
+        burstDetector.reset()
+        burstDetector.markReferenceUpdated()
+    }
+
     private func processTriggeredFrame(pixelBuffer: CVPixelBuffer) {
         let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
 
@@ -247,23 +280,26 @@ final class CardPresenceTracker: @unchecked Sendable {
         print("\(logTimestamp()) [CardPresence] YOLO boxes: \(boxes.count)")
         #endif
 
-        // Update reference immediately to prevent re-triggering on same card
-        // The capture process takes time; we don't want to trigger again
-        referenceSamples = lastSamples
-        burstDetector.reset()
-        burstDetector.markReferenceUpdated()
-
         guard !boxes.isEmpty else {
+            resetDetectionState()
             #if DEBUG
             print("\(logTimestamp()) [CardPresence] No YOLO boxes, updated reference to prevent re-trigger")
             #endif
             return
         }
 
-        let bestBox = filterBoxes(boxes)
+        guard let bestBox = filterBoxes(boxes) else {
+            resetDetectionState()
+            #if DEBUG
+            print("\(logTimestamp()) [CardPresence] All \(boxes.count) boxes filtered out by zone constraints")
+            #endif
+            return
+        }
+
+        resetDetectionState()
 
         #if DEBUG
-        print("\(logTimestamp()) [CardPresence] Filtered best box: \(String(describing: bestBox))")
+        print("\(logTimestamp()) [CardPresence] Filtered best box: \(bestBox)")
         #endif
 
         DispatchQueue.main.async { [weak self] in
@@ -271,18 +307,22 @@ final class CardPresenceTracker: @unchecked Sendable {
         }
     }
 
-    #if DEBUG
-    private var logDateFormatter: DateFormatter {
+}
+
+// MARK: - Debug Logging
+#if DEBUG
+private extension CardPresenceTracker {
+    var logDateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
         return formatter
     }
 
-    private func logTimestamp() -> String {
+    func logTimestamp() -> String {
         "[\(logDateFormatter.string(from: Date()))]"
     }
 
-    private func logFrameInfo(pixelBuffer: CVPixelBuffer, samples: [UInt8], motionZone: CGRect?) {
+    func logFrameInfo(pixelBuffer: CVPixelBuffer, samples: [UInt8], motionZone: CGRect?) {
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         print("\(logTimestamp()) [CardPresence] Zone: \(String(describing: motionZone)), " +
@@ -290,7 +330,7 @@ final class CardPresenceTracker: @unchecked Sendable {
         print("\(logTimestamp()) [CardPresence] Reference samples: \(referenceSamples.count)")
     }
 
-    private func logDetectionState(diff: Float, shouldTrigger: Bool) {
+    func logDetectionState(diff: Float, shouldTrigger: Bool) {
         let metrics = burstDetector.currentMetrics()
         print("\(logTimestamp()) [CardPresence] Diff: \(diff), State: \(metrics.state.displayName), " +
               "Trigger: \(shouldTrigger)")
@@ -298,8 +338,8 @@ final class CardPresenceTracker: @unchecked Sendable {
             print("\(logTimestamp()) [CardPresence] Rejection: \(reason)")
         }
     }
-    #endif
 }
+#endif
 
 // MARK: - Box Filtering
 private extension CardPresenceTracker {
@@ -311,7 +351,7 @@ private extension CardPresenceTracker {
     }
 
     func passesZoneFilter(_ box: CGRect) -> Bool {
-        guard let zone = detectionZone else { return true }
+        let zone = detectionZone ?? .uncalibrated
         // YOLO returns boxes in top-left origin coordinates
         // Zone uses Vision coordinates (bottom-left origin)
         // Convert YOLO box to Vision coordinates for comparison

@@ -138,6 +138,7 @@ final class AutoScanViewModelTests: XCTestCase {
         let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue2)
         vm.captureDelay = 0.05
         vm.start()
+        await vm.presenceTracker.test_setPendingCapture(true)
 
         let box = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
         vm.presenceTracker.onNewCardSignal?(box)
@@ -148,6 +149,7 @@ final class AutoScanViewModelTests: XCTestCase {
         // captureCoordinator is nil → triggerCapture returns before enqueue.
         XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.watching)
         XCTAssertNil(capturedIsCropped)
+        XCTAssertFalse(await vm.presenceTracker.test_isPendingCapture())
     }
 
     func testNilBoundingBoxSignalIsIgnored() async throws {

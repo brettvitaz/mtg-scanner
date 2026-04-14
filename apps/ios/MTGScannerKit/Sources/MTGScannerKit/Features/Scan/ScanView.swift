@@ -32,7 +32,6 @@ struct ScanView: View {
         }
         .onAppear(perform: onAppearHandler)
         .onDisappear(perform: onDisappearHandler)
-        .environment(\.cardDetectionZoneReset, { autoScanViewModel.resetDetectionZone() })
         .onChange(of: appModel.apiBaseURL) { _, url in
             autoScanViewModel.apiBaseURL = url
         }

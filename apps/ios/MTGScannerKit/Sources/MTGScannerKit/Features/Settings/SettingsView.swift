@@ -2,7 +2,6 @@ import SwiftUI
 
 public struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
-    @Environment(\.cardDetectionZoneReset) private var onResetDetectionZone
     @State private var connectionStatus: ConnectionStatus = .idle
 
     public init() {}
@@ -12,8 +11,7 @@ public struct SettingsView: View {
         NavigationStack {
             SettingsForm(
                 appModel: appModel,
-                connectionStatus: $connectionStatus,
-                onResetDetectionZone: onResetDetectionZone
+                connectionStatus: $connectionStatus
             )
             .navigationTitle("Settings")
         }
@@ -39,7 +37,6 @@ private enum ConnectionStatus {
 private struct SettingsForm: View {
     @Bindable var appModel: AppModel
     @Binding var connectionStatus: ConnectionStatus
-    var onResetDetectionZone: (() -> Void)?
 
     var body: some View {
         Form {
@@ -107,7 +104,6 @@ private struct SettingsForm: View {
             confidenceRow
             concurrentUploadsRow
             exposureBiasRow
-            calibrationRow
         }
     }
 
@@ -129,12 +125,6 @@ private struct SettingsForm: View {
             Slider(value: $appModel.exposureBias, in: -3.0...3.0, step: 0.5)
                 .accessibilityLabel("Exposure bias")
                 .accessibilityValue(String(format: "%+.1f EV", appModel.exposureBias))
-        }
-    }
-
-    private var calibrationRow: some View {
-        Button("Reset Detection Zone") {
-            onResetDetectionZone?()
         }
     }
 

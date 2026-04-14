@@ -235,7 +235,6 @@ final class AutoScanViewModel {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         guard let payload = await captureCoordinator?.capturePhoto() else {
-            presenceTracker.recoverFromCaptureFailure()
             captureState = .watching
             statusMessage = "Capture failed — watching…"
             return

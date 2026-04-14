@@ -126,7 +126,7 @@ final class CardPresenceTracker: @unchecked Sendable {
             presenceQueue.async { [weak self] in
                 guard let self else { continuation.resume(returning: nil); return }
                 let boxes = self.loadDetector()?.detect(in: cgImage) ?? []
-                let best = self.filterBoxes(boxes)
+                let best = boxes.max(by: { $0.confidence < $1.confidence })?.rect
                 continuation.resume(returning: best)
             }
         }
@@ -139,17 +139,6 @@ final class CardPresenceTracker: @unchecked Sendable {
     /// Call this immediately after each successful capture so the next card drop
     /// is evaluated relative to the newly captured card's appearance.
     func markCaptured() {
-        presenceQueue.async { [weak self] in
-            guard let self else { return }
-            self.applyMarkCaptured()
-        }
-    }
-
-    /// Clears any pending capture gate after a capture attempt fails.
-    ///
-    /// This re-establishes the next reference frame from the live scene so
-    /// auto-scan can resume without re-triggering on the same card.
-    func recoverFromCaptureFailure() {
         presenceQueue.async { [weak self] in
             guard let self else { return }
             self.applyMarkCaptured()
@@ -256,15 +245,11 @@ final class CardPresenceTracker: @unchecked Sendable {
     }
 
     private func calculateFrameDiff(samples: [UInt8]) -> Float {
-        // Seed the baseline immediately on the first frame of a fresh session.
-        // That allows the very next frame to measure real motion instead of waiting
-        // for the decay timer to populate `referenceSamples`.
-        if referenceSamples.isEmpty {
-            referenceSamples = samples
-            burstDetector.markReferenceUpdated()
-            return 0.0
-        }
-        return analyzer.difference(from: referenceSamples, to: samples)
+        // Return 0.0 when no reference is established yet.
+        // An empty reference means "no baseline" — returning 1.0 would cause every
+        // frame to look like extreme motion, triggering a spurious burst immediately
+        // after a zone change clears the reference (e.g. after the first capture).
+        referenceSamples.isEmpty ? 0.0 : analyzer.difference(from: referenceSamples, to: samples)
     }
 
     private func checkReferenceDecay() {
@@ -365,52 +350,6 @@ private extension CardPresenceTracker {
               "Trigger: \(shouldTrigger)")
         if let reason = metrics.rejectionReason {
             print("\(logTimestamp()) [CardPresence] Rejection: \(reason)")
-        }
-    }
-}
-#endif
-
-#if DEBUG
-extension CardPresenceTracker {
-    func test_calculateFrameDiff(samples: [UInt8]) async -> Float {
-        await withCheckedContinuation { continuation in
-            presenceQueue.async { [weak self] in
-                guard let self else {
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-                self.lastSamples = samples
-                continuation.resume(returning: self.calculateFrameDiff(samples: samples))
-            }
-        }
-    }
-
-    func test_bestBox(from boxes: [CardBoundingBox]) async -> CGRect? {
-        await withCheckedContinuation { continuation in
-            presenceQueue.async { [weak self] in
-                guard let self else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                continuation.resume(returning: self.filterBoxes(boxes))
-            }
-        }
-    }
-
-    func test_setPendingCapture(_ pending: Bool) async {
-        await withCheckedContinuation { continuation in
-            presenceQueue.async { [weak self] in
-                self?.pendingCapture = pending
-                continuation.resume()
-            }
-        }
-    }
-
-    func test_isPendingCapture() async -> Bool {
-        await withCheckedContinuation { continuation in
-            presenceQueue.async { [weak self] in
-                continuation.resume(returning: self?.pendingCapture ?? false)
-            }
         }
     }
 }

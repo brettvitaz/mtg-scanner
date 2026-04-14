@@ -34,7 +34,13 @@ final class CardPresenceTracker: @unchecked Sendable {
     ///
     /// When set, only cards meeting the zone's constraints are accepted:
     /// containment, minimum area, and portrait aspect ratio.
-    var detectionZone: DetectionZone?
+    var detectionZone: DetectionZone? {
+        didSet {
+            // Clear reference samples when zone changes to ensure sample counts match
+            // (samples from full frame have different count than samples from zone)
+            referenceSamples = []
+        }
+    }
 
     // MARK: - Callbacks
 
@@ -94,7 +100,14 @@ final class CardPresenceTracker: @unchecked Sendable {
     func markCaptured() {
         presenceQueue.async { [weak self] in
             guard let self else { return }
+            // Use the same zone for reference samples that we'll use for future samples
+            // to ensure sample counts match during comparison
+            let motionZone = self.detectionZone?.effectiveRect
             self.referenceSamples = self.lastSamples
+            #if DEBUG
+            print("[CardPresence] markCaptured - Zone: \(String(describing: motionZone)), " +
+                  "Samples: \(self.referenceSamples.count)")
+            #endif
         }
     }
 
@@ -107,6 +120,8 @@ final class CardPresenceTracker: @unchecked Sendable {
     func calibrate(from boundingBox: CGRect) {
         presenceQueue.async { [weak self] in
             self?.detectionZone = DetectionZone.calibrated(from: boundingBox)
+            // Clear reference samples so next frame establishes new reference with zone
+            self?.referenceSamples = []
         }
     }
 
@@ -114,6 +129,8 @@ final class CardPresenceTracker: @unchecked Sendable {
     func resetZone() {
         presenceQueue.async { [weak self] in
             self?.detectionZone = nil
+            // Clear reference samples so next frame establishes new reference without zone
+            self?.referenceSamples = []
         }
     }
 
@@ -131,19 +148,43 @@ final class CardPresenceTracker: @unchecked Sendable {
     }
 
     private func process(pixelBuffer: CVPixelBuffer) {
-        let samples = analyzer.sample(pixelBuffer)
+        // Get the zone for motion detection (use effectiveRect for the full detection area)
+        let motionZone = detectionZone?.effectiveRect
+
+        let samples = analyzer.sample(pixelBuffer, zone: motionZone)
         lastSamples = samples
+
+        #if DEBUG
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        print("[CardPresence] Zone: \(String(describing: motionZone)), " +
+              "Buffer: \(width)x\(height), Samples: \(samples.count)")
+        print("[CardPresence] Reference samples: \(referenceSamples.count)")
+        #endif
 
         let diff = referenceSamples.isEmpty
             ? 1.0  // no reference yet — always treat as changed
             : analyzer.difference(from: referenceSamples, to: samples)
 
+        #if DEBUG
+        print("[CardPresence] Diff: \(diff), Threshold: \(sceneChangeThreshold)")
+        #endif
+
         guard diff >= sceneChangeThreshold else { return }
 
         let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
+
+        #if DEBUG
+        print("[CardPresence] YOLO boxes: \(boxes.count)")
+        #endif
+
         guard !boxes.isEmpty else { return }
 
         let bestBox = filterBoxes(boxes)
+
+        #if DEBUG
+        print("[CardPresence] Filtered best box: \(String(describing: bestBox))")
+        #endif
 
         DispatchQueue.main.async { [weak self] in
             self?.onNewCardSignal?(bestBox)
@@ -159,7 +200,16 @@ final class CardPresenceTracker: @unchecked Sendable {
 
     private func passesZoneFilter(_ box: CGRect) -> Bool {
         guard let zone = detectionZone else { return true }
-        return zone.contains(box) && zone.isLargeEnough(box) && zone.isPortraitAspect(box)
+        // YOLO returns boxes in top-left origin coordinates
+        // Zone uses Vision coordinates (bottom-left origin)
+        // Convert YOLO box to Vision coordinates for comparison
+        let visionBox = CGRect(
+            x: box.minX,
+            y: 1.0 - box.maxY,
+            width: box.width,
+            height: box.height
+        )
+        return zone.contains(visionBox) && zone.isLargeEnough(visionBox) && zone.isPortraitAspect(visionBox)
     }
 
     private func loadDetector() -> YOLOCardDetector? {

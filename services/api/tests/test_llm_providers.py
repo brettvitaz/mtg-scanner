@@ -32,7 +32,7 @@ from app.settings import Settings
 
 @pytest.fixture
 def sample_recognition_response():
-    """Sample valid recognition response."""
+    """Sample valid recognition response including v2 LLM fields."""
     return {
         "cards": [
             {
@@ -41,6 +41,14 @@ def sample_recognition_response():
                 "collector_number": "1",
                 "foil": False,
                 "confidence": 0.95,
+                "edition_notes": "LEA set code inferred from black border and art style.",
+                "foil_type": "none",
+                "foil_evidence": ["no rainbow sheen visible"],
+                "list_reprint": "no",
+                "list_symbol_visible": False,
+                "border_color": "black",
+                "copyright_line": "Illus. © Christopher Rush",
+                "promo_text": None,
                 "set_code": "LEA",
                 "rarity": "common",
             }

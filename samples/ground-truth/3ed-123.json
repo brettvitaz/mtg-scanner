@@ -1,0 +1,18 @@
+{
+  "pass_criteria": ["title"],
+  "notes": "Copyright year line not visible in photo — edition and collector_number cannot be reliably determined from image alone",
+  "cards": [
+    {
+      "title": "Plague Rats",
+      "edition": "Revised Edition",
+      "collector_number": "123",
+      "foil": false,
+      "foil_type": "none",
+      "list_reprint": "no",
+      "list_symbol_visible": false,
+      "border_color": "black",
+      "copyright_line": "Illus. ©Anson Maddocks",
+      "promo_text": null
+    }
+  ]
+}

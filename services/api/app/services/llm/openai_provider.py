@@ -50,7 +50,7 @@ class OpenAIProvider:
             / "packages"
             / "schemas"
             / "v1"
-            / "recognition-response.schema.json"
+            / "llm-output.schema.json"
         )
         return json.loads(schema_path.read_text())
 

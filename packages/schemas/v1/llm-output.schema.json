@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/mtg-scanner/recognition-response.schema.json",
-  "title": "RecognitionResponse",
+  "$id": "https://example.com/mtg-scanner/llm-output.schema.json",
+  "title": "LLMOutput",
+  "description": "Fields produced by the LLM during card recognition. Does not include server-side enrichment fields.",
   "type": "object",
   "required": ["cards"],
   "properties": {

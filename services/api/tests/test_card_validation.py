@@ -511,3 +511,33 @@ def test_validate_response_exposes_correction_candidates(validation_service: Car
 
     assert batch.traces[0].status == "needs_correction"
     assert len(batch.correction_candidates[0]) == 2
+
+
+def test_validate_card_preserves_v2_llm_fields(validation_service: CardValidationService) -> None:
+    """V2 LLM fields (foil_type, border_color, etc.) survive validation enrichment unchanged."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="Magic 2010",
+        collector_number="146",
+        foil=False,
+        confidence=0.95,
+        edition_notes="M10 set code visible in bottom strip.",
+        foil_type="none",
+        foil_evidence=["bullet separator visible — non-foil confirmed"],
+        list_reprint="no",
+        list_symbol_visible=False,
+        border_color="black",
+        copyright_line="146 C\nM10 • EN   Adam Rex",
+        promo_text=None,
+    )
+    result = validation_service.validate_card(card)
+    enriched = result.card
+
+    assert enriched.edition_notes == card.edition_notes
+    assert enriched.foil_type == card.foil_type
+    assert enriched.foil_evidence == card.foil_evidence
+    assert enriched.list_reprint == card.list_reprint
+    assert enriched.list_symbol_visible == card.list_symbol_visible
+    assert enriched.border_color == card.border_color
+    assert enriched.copyright_line == card.copyright_line
+    assert enriched.promo_text == card.promo_text

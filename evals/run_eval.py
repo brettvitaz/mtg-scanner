@@ -66,16 +66,18 @@ def main() -> int:
             print(f"Skipping {fixture_path.name}: missing ground truth {gt_path.name}")
             continue
 
+        expected = json.loads(gt_path.read_text())
         metadata = RecognitionUploadMetadata(
             filename=fixture_path.name,
             content_type=mimetypes.guess_type(fixture_path.name)[0] or "image/jpeg",
             prompt_version=args.prompt_version,
         )
+        skip_detection = bool(expected.get("skip_detection", False))
         response, enriched_metadata, _detection, _validation, _usage = service.recognize(
             image_bytes=fixture_path.read_bytes(),
             metadata=metadata,
+            skip_detection=skip_detection,
         )
-        expected = json.loads(gt_path.read_text())
         actual = response.model_dump()
         if args.verbose:
             actual_path = RESULTS_DIR / f"{fixture_path.stem}.actual.json"

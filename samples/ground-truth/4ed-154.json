@@ -1,4 +1,6 @@
 {
+  "skip_detection": true,
+  "pass_criteria": ["title"],
   "notes": "Copyright year line not visible in photo — edition and collector_number cannot be reliably determined from image alone",
   "cards": [
     {

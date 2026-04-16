@@ -79,7 +79,7 @@ For modern sets (M15 era and later), border color is almost always black unless 
 ## Step 3: Identify the Printing Variant
 
 ### The List / Mystery Booster Symbol
-A second image (close-up of the bottom-left corner) is provided alongside the full card image. **Use the close-up to make the List/Mystery Booster determination.** The full card image does not have sufficient resolution for this icon.
+If a second image (close-up of the bottom-left corner) is provided alongside the full card image, **use the close-up to make the List/Mystery Booster determination.** The full card image often does not have sufficient resolution for this icon. If no close-up is provided, do not assume the icon is absent; only identify The List / Mystery Booster when the visible evidence is sufficient, otherwise leave the determination uncertain.
 
 **How to identify the icon in the close up:**
 

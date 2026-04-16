@@ -17,6 +17,49 @@
           "foil": { "type": ["boolean", "null"] },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
           "notes": { "type": ["string", "null"] },
+          "edition_notes": { "type": ["string", "null"] },
+          "foil_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "rainbow_traditional",
+                  "pre_modern_shootingstar",
+                  "etched",
+                  "textured",
+                  "confetti",
+                  "ripple",
+                  "galaxy",
+                  "halo",
+                  "raised",
+                  "unknown"
+                ]
+              },
+              { "type": "null" }
+            ]
+          },
+          "foil_evidence": {
+            "anyOf": [
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "null" }
+            ]
+          },
+          "list_reprint": {
+            "anyOf": [
+              { "type": "string", "enum": ["yes", "no", "possible"] },
+              { "type": "null" }
+            ]
+          },
+          "list_symbol_visible": { "type": ["boolean", "null"] },
+          "border_color": {
+            "anyOf": [
+              { "type": "string", "enum": ["white", "black", "unknown"] },
+              { "type": "null" }
+            ]
+          },
+          "copyright_line": { "type": ["string", "null"] },
+          "promo_text": { "type": ["string", "null"] },
           "set_code": { "type": ["string", "null"] },
           "rarity": { "type": ["string", "null"] },
           "type_line": { "type": ["string", "null"] },

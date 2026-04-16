@@ -293,44 +293,22 @@ class CardValidationService:
         confidence_after = _adjust_confidence(card.confidence, status)
         notes = _merge_notes(card.notes, f"Validated against MTGJSON ({status}).")
 
-        foil_note, foil_penalty = _check_foil_mismatch(card.foil, match)
+        effective_match = match
+        if card.list_reprint == "yes" and match.collector_number:
+            plst_number = f"{match.set_code}-{match.collector_number}"
+            plst_record = self._index.lookup_by_set_and_number(
+                set_code="PLST", collector_number=plst_number
+            )
+            if plst_record is not None:
+                effective_match = plst_record
+
+        foil_note, foil_penalty = _check_foil_mismatch(card.foil, effective_match)
         if foil_note:
             notes = _merge_notes(notes, foil_note)
         confidence_after = max(0.0, round(confidence_after - foil_penalty, 4))
 
-        image_url = (
-            f"https://api.scryfall.com/cards/{match.scryfall_id}?format=image&version=normal"
-            if match.scryfall_id
-            else None
-        )
-        set_symbol_url = (
-            f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg"
-            if match.set_code
-            else None
-        )
         validated_card = card.model_copy(
-            update={
-                "title": match.name,
-                "edition": match.set_name or card.edition,
-                "collector_number": match.collector_number or card.collector_number,
-                "confidence": confidence_after,
-                "notes": notes,
-                "set_code": match.set_code,
-                "rarity": match.rarity,
-                "type_line": match.type_line,
-                "oracle_text": match.oracle_text,
-                "mana_cost": match.mana_cost,
-                "power": match.power,
-                "toughness": match.toughness,
-                "loyalty": match.loyalty,
-                "defense": match.defense,
-                "scryfall_id": match.scryfall_id,
-                "image_url": image_url,
-                "set_symbol_url": set_symbol_url,
-                "card_kingdom_url": match.card_kingdom_url,
-                "card_kingdom_foil_url": match.card_kingdom_foil_url,
-                "color_identity": match.color_identity,
-            }
+            update=_build_match_update(card, effective_match, confidence_after, notes, card.list_reprint, card.list_symbol_visible)
         )
         return ValidatedCardResult(
             card=validated_card,
@@ -340,9 +318,9 @@ class CardValidationService:
                     dict[str, object], trace_base["normalized_inputs"]
                 ),
                 status=status,
-                matched_uuid=match.uuid,
-                matched_set_code=match.set_code,
-                matched_collector_number=match.collector_number,
+                matched_uuid=effective_match.uuid,
+                matched_set_code=effective_match.set_code,
+                matched_collector_number=effective_match.collector_number,
                 confidence_before=card.confidence,
                 confidence_after=confidence_after,
                 reason=reason,
@@ -361,6 +339,10 @@ class CardValidationService:
         update: dict[str, object] = {"confidence": confidence_after}
         if status in {"ambiguous_match", "no_match"}:
             update["notes"] = _merge_notes(card.notes, reason)
+            # Normalize collector number even when no match found
+            normalized_number = normalize_collector_number(card.collector_number)
+            if normalized_number and normalized_number != card.collector_number:
+                update["collector_number"] = normalized_number
         validated_card = card.model_copy(update=update)
         return ValidatedCardResult(
             card=validated_card,
@@ -433,6 +415,51 @@ class CardValidationService:
             confidence_after=card.confidence,
             reason=reason,
         )
+
+
+def _build_match_update(
+    card: RecognizedCard,
+    match: CardRecord,
+    confidence_after: float,
+    notes: str | None,
+    list_reprint: str | None,
+    list_symbol_visible: bool | None,
+) -> dict[str, object]:
+    """Build the field update dict for a successfully matched card."""
+    image_url = (
+        f"https://api.scryfall.com/cards/{match.scryfall_id}?format=image&version=normal"
+        if match.scryfall_id
+        else None
+    )
+    set_symbol_url = (
+        f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg"
+        if match.set_code
+        else None
+    )
+    return {
+        "title": match.name,
+        "edition": match.set_name or card.edition,
+        "collector_number": match.collector_number or card.collector_number,
+        "confidence": confidence_after,
+        "notes": notes,
+        "set_code": match.set_code,
+        "rarity": match.rarity,
+        "type_line": match.type_line,
+        "oracle_text": match.oracle_text,
+        "mana_cost": match.mana_cost,
+        "power": match.power,
+        "toughness": match.toughness,
+        "loyalty": match.loyalty,
+        "defense": match.defense,
+        "scryfall_id": match.scryfall_id,
+        "image_url": image_url,
+        "set_symbol_url": set_symbol_url,
+        "card_kingdom_url": match.card_kingdom_url,
+        "card_kingdom_foil_url": match.card_kingdom_foil_url,
+        "color_identity": match.color_identity,
+        "list_reprint": list_reprint,
+        "list_symbol_visible": list_symbol_visible,
+    }
 
 
 def _check_foil_mismatch(

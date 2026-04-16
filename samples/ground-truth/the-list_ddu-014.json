@@ -1,0 +1,17 @@
+{
+  "skip_detection": true,
+  "cards": [
+    {
+      "title": "Krosan Tusker",
+      "edition": "Duel Decks: Elves vs. Inventors",
+      "collector_number": "014",
+      "foil": false,
+      "foil_type": "none",
+      "list_reprint": "possible",
+      "list_symbol_visible": false,
+      "border_color": "black",
+      "copyright_line": "014/076 C\nDDU \u2022 EN \u2022 KEV WALKER\nTM & \u00a9 2018 Wizards of the Coast",
+      "promo_text": null
+    }
+  ]
+}

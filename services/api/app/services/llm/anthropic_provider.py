@@ -1,5 +1,6 @@
 """Anthropic (Claude) LLM Provider implementation."""
 
+import base64
 import json
 import logging
 from typing import Any
@@ -9,9 +10,12 @@ import httpx
 from app.models.recognition import RecognitionResponse, RecognitionResult, RecognitionUploadMetadata
 from app.services.errors import RecognitionProviderError
 from app.services.llm.base import (
+    CORNER_CROP_ABSENT_TEXT,
+    CORNER_CROP_PRESENT_TEXT,
     encode_image_to_data_url,
     extract_anthropic_usage,
     extract_json_from_text,
+    maybe_corner_crop,
     parse_recognition_response,
 )
 
@@ -31,12 +35,14 @@ class AnthropicProvider:
         base_url: str = "https://api.anthropic.com/v1",
         timeout: float = 30.0,
         response_mode: str = "json_schema",
+        enable_corner_crop: bool = True,
     ) -> None:
         self.model_name: str | None = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._response_mode = response_mode
+        self._enable_corner_crop = enable_corner_crop
         self._schema = self._load_schema()
 
     def _load_schema(self) -> dict[str, Any]:
@@ -50,7 +56,7 @@ class AnthropicProvider:
             / "packages"
             / "schemas"
             / "v1"
-            / "recognition-response.schema.json"
+            / "llm-output.schema.json"
         )
         return json.loads(schema_path.read_text())
 
@@ -67,7 +73,8 @@ class AnthropicProvider:
         base64_data = encoded.split(",")[1]
         media_type = metadata.content_type
 
-        request_body = self._build_request(prompt_text, base64_data, media_type)
+        corner_bytes = maybe_corner_crop(image_bytes, self._enable_corner_crop)
+        request_body = self._build_request(prompt_text, base64_data, media_type, corner_bytes)
 
         url = f"{self._base_url}/messages"
         logger.info(
@@ -122,32 +129,47 @@ class AnthropicProvider:
         )
 
     def _build_request(
-        self, prompt_text: str, base64_data: str, media_type: str
+        self,
+        prompt_text: str,
+        base64_data: str,
+        media_type: str,
+        corner_bytes: bytes | None = None,
     ) -> dict[str, Any]:
         """Build Anthropic Messages API request body."""
+        user_content: list[dict[str, Any]] = [
+            {
+                "type": "text",
+                "text": "Analyze this Magic: The Gathering card image and extract the card information.",
+            },
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": base64_data,
+                },
+            },
+        ]
+        if corner_bytes:
+            user_content.extend([
+                {"type": "text", "text": CORNER_CROP_PRESENT_TEXT},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": base64.b64encode(corner_bytes).decode("ascii"),
+                    },
+                },
+            ])
+        else:
+            user_content.append({"type": "text", "text": CORNER_CROP_ABSENT_TEXT})
+
         body: dict[str, Any] = {
             "model": self.model_name,
             "max_tokens": 4096,
             "system": prompt_text,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze this Magic: The Gathering card image and extract the card information.",
-                        },
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": base64_data,
-                            },
-                        },
-                    ],
-                }
-            ],
+            "messages": [{"role": "user", "content": user_content}],
         }
 
         if self._response_mode == "json_schema":

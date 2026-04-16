@@ -10,7 +10,7 @@ IOS_TEST_CURRENT_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_C
 IOS_TEST_TABLET_DEVICE ?= iPad Air 11-inch (M4)
 IOS_TEST_TABLET_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_TABLET_DEVICE)
 
-.PHONY: bootstrap api-bootstrap api-setup api-clean api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
+.PHONY: bootstrap api-bootstrap api-setup api-clean api-run api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing api-eval ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
 
 bootstrap: api-bootstrap
 
@@ -33,6 +33,9 @@ api-test:
 
 api-lint:
 	./scripts/lint-api.sh
+
+api-eval:
+	./scripts/run-evals.sh $(EVAL_ARGS)
 
 ios-build:
 	@if [ -n "$(XCODE_BUILD_SERVER)" ]; then \

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -29,6 +31,21 @@ class RecognitionUploadMetadata(BaseModel):
     model: str | None = Field(default=None, description="Recognizer model used")
 
 
+FoilType = Literal[
+    "none",
+    "rainbow_traditional",
+    "pre_modern_shootingstar",
+    "etched",
+    "textured",
+    "confetti",
+    "ripple",
+    "galaxy",
+    "halo",
+    "raised",
+    "unknown",
+]
+
+
 class RecognizedCard(BaseModel):
     title: str | None = None
     edition: str | None = None
@@ -36,6 +53,14 @@ class RecognizedCard(BaseModel):
     foil: bool | None = None
     confidence: float = Field(..., ge=0.0, le=1.0)
     notes: str | None = None
+    edition_notes: str | None = None
+    foil_type: FoilType | None = None
+    foil_evidence: list[str] | None = None
+    list_reprint: Literal["yes", "no", "possible"] | None = None
+    list_symbol_visible: bool | None = None
+    border_color: Literal["white", "black", "unknown"] | None = None
+    copyright_line: str | None = None
+    promo_text: str | None = None
     set_code: str | None = None
     rarity: str | None = None
     type_line: str | None = None

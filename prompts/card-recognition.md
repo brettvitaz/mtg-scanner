@@ -83,9 +83,15 @@ A second image (close-up of the bottom-left corner) is provided alongside the fu
 
 **How to identify the icon in the close up:**
 
-To the left of the collector number and set code can exist a Planeswalker Icon. When the Planeswalker icon is present, the card is a reprint and belongs to a class of cards called The List / Mystery Booster.
+The bottom-left info strip has two lines of text:
+- **Top line:** `<collector number> / <total>  <rarity letter>`
+- **Bottom line:** `<set code>  •  <language>  <artist name>`
 
-For detection, look for a solid, handprint-like / crown-like glyph with five tines at the top and a shape that narrows to a single point at the bottom. In practice it looks like a stylized five-pronged flame or splayed hand: a compact vertical silhouette, wider across the top, with distinct upward spikes and a tapered lower stem. That combination, especially five top prongs + pointed bottom, is the key signature. When in this location, this icon is **always** the indicator that the card is a list reprint and is **never** a set symbol.
+The List/Mystery Booster icon, when present, is a tall white glyph that sits at the **far left edge** of the info strip, spanning the full height of both lines. Its top half (five upward tines) aligns with the collector number; its bottom half (a pointed stem) reaches into the set code line.
+
+**Critical distinction:** The set code text (e.g., `M19`, `BBD`) appears in the **middle of the bottom line**, after the bullet `•`. It is text, not an icon, and it is not at the far left. Do not confuse the set code with the List icon — they are in completely different positions.
+
+The List icon shape: a solid, handprint-like / crown-like glyph with five tines at the top narrowing to a single point at the bottom — a stylized five-pronged flame or splayed hand. Always white.
 
 - **When the icon is present** → List/Mystery Booster reprint → `list_reprint: "yes"`, `list_symbol_visible: true`
 - **No icon present** → original printing → `list_reprint: "no"`, `list_symbol_visible: false`

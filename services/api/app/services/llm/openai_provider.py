@@ -159,13 +159,13 @@ class OpenAIProvider:
             }
         elif self._response_mode == "json_mode":
             body["response_format"] = {"type": "json_object"}
-        elif self._response_mode == "raw":
+        elif self._response_mode in ["raw", "text"]:
             # No response_format, extract JSON from text
             pass
         else:
             raise RecognitionProviderError(
                 f"Invalid response_mode: {self._response_mode}. "
-                "Must be one of: json_schema, json_mode, raw"
+                "Must be one of: json_schema, json_mode, raw, text"
             )
 
         return body

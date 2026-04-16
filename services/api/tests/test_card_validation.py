@@ -544,12 +544,12 @@ def test_validate_card_preserves_v2_llm_fields(validation_service: CardValidatio
 
 
 # ---------------------------------------------------------------------------
-# List reprint verification via MTGJSON
+# list_reprint — LLM verdict is authoritative; identity fields follow it
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def list_validation_service(tmp_path: Path) -> CardValidationService:
-    """Validation service with M10 + PLST data for List reprint testing."""
+def list_plst_service(tmp_path: Path) -> CardValidationService:
+    """Validation service with M10 + PLST data for list_reprint identity tests."""
     import json
 
     payload = {
@@ -570,15 +570,6 @@ def list_validation_service(tmp_path: Path) -> CardValidationService:
                         "type": "Instant",
                         "finishes": ["nonfoil", "foil"],
                         "identifiers": {"scryfallId": "e3285e6b-0000-0000-0000-000000000000"},
-                    },
-                    {
-                        "uuid": "forest-m10-247",
-                        "name": "Forest",
-                        "number": "247",
-                        "language": "English",
-                        "layout": "normal",
-                        "rarity": "common",
-                        "finishes": ["nonfoil"],
                     },
                 ],
             },
@@ -606,9 +597,10 @@ def list_validation_service(tmp_path: Path) -> CardValidationService:
     return CardValidationService(index=MTGJSONIndex(db_path))
 
 
-def test_list_reprint_overridden_when_confirmed_by_mtgjson(
-    list_validation_service: CardValidationService,
+def test_list_reprint_no_preserves_originating_set(
+    list_plst_service: CardValidationService,
 ) -> None:
+    """When LLM says list_reprint='no', identity fields stay on the originating set."""
     card = RecognizedCard(
         title="Lightning Bolt",
         edition="M10",
@@ -618,37 +610,18 @@ def test_list_reprint_overridden_when_confirmed_by_mtgjson(
         list_reprint="no",
         list_symbol_visible=False,
     )
-    result = list_validation_service.validate_card(card)
-
-    assert result.card.list_reprint == "yes"
-    assert result.card.list_symbol_visible is True
-    assert "MTGJSON confirms List reprint" in (result.card.notes or "")
-
-
-def test_list_reprint_not_overridden_when_not_in_list(
-    list_validation_service: CardValidationService,
-) -> None:
-    # Forest is in M10 but NOT in PLST or MB1 in this fixture
-    card = RecognizedCard(
-        title="Forest",
-        edition="M10",
-        collector_number="247",
-        foil=False,
-        confidence=0.90,
-        list_reprint="no",
-        list_symbol_visible=False,
-    )
-    result = list_validation_service.validate_card(card)
+    result = list_plst_service.validate_card(card)
 
     assert result.card.list_reprint == "no"
-    assert result.card.list_symbol_visible is False
-    assert "MTGJSON confirms List reprint" not in (result.card.notes or "")
+    assert result.card.set_code == "M10"
+    assert result.card.edition == "Magic 2010"
+    assert result.card.collector_number == "146"
 
 
-def test_list_reprint_already_yes_preserved_when_confirmed(
-    list_validation_service: CardValidationService,
+def test_list_reprint_yes_rewrites_identity_to_plst(
+    list_plst_service: CardValidationService,
 ) -> None:
-    """When the LLM already returned list_reprint=yes, MTGJSON confirmation leaves it unchanged."""
+    """When LLM says list_reprint='yes', edition/set_code/collector_number are rewritten to PLST."""
     card = RecognizedCard(
         title="Lightning Bolt",
         edition="M10",
@@ -658,39 +631,21 @@ def test_list_reprint_already_yes_preserved_when_confirmed(
         list_reprint="yes",
         list_symbol_visible=True,
     )
-    result = list_validation_service.validate_card(card)
+    result = list_plst_service.validate_card(card)
 
     assert result.card.list_reprint == "yes"
-    assert result.card.list_symbol_visible is True
+    assert result.card.set_code == "PLST"
+    assert result.card.edition == "The List"
+    assert result.card.collector_number == "M10-146"
 
 
-def test_list_reprint_skipped_for_cards_already_in_list_set(
-    list_validation_service: CardValidationService,
+def test_validator_passes_through_llm_list_reprint_unchanged(
+    validation_service: CardValidationService,
 ) -> None:
-    """Cards already matched to a List set are not re-checked against PLST."""
-    card = RecognizedCard(
-        title="Lightning Bolt",
-        edition="PLST",
-        collector_number="M10-146",
-        foil=False,
-        confidence=0.90,
-        list_reprint="yes",
-        list_symbol_visible=True,
-    )
-    result = list_validation_service.validate_card(card)
+    """The validator never flips list_reprint from 'no' to 'yes' on its own.
 
-    # Should not add a duplicate "MTGJSON confirms List reprint" note
-    assert result.card.list_reprint == "yes"
-    assert "MTGJSON-PLST-PLST" not in (result.card.notes or "")
-
-
-def test_list_reprint_edition_overridden_to_list_set(
-    list_validation_service: CardValidationService,
-) -> None:
-    """edition and set_code are updated to the List set when MTGJSON confirms a PLST reprint.
-
-    Regression: previously edition was set to the originating set name (e.g. "Magic 2010")
-    even when the physical card is from The List, causing the iOS app to display the wrong set.
+    The existing validation_service fixture has no PLST data, confirming that
+    the validator does not inject list_reprint overrides when the LLM says 'no'.
     """
     card = RecognizedCard(
         title="Lightning Bolt",
@@ -698,11 +653,12 @@ def test_list_reprint_edition_overridden_to_list_set(
         collector_number="146",
         foil=False,
         confidence=0.90,
-        list_reprint="yes",
-        list_symbol_visible=True,
+        list_reprint="no",
+        list_symbol_visible=False,
     )
-    result = list_validation_service.validate_card(card)
+    result = validation_service.validate_card(card)
 
-    assert result.card.edition == "The List"
-    assert result.card.set_code == "PLST"
-    assert result.card.collector_number == "M10-146"
+    assert result.card.list_reprint == "no"
+    assert result.card.list_symbol_visible is False
+    assert result.card.set_code == "M10"
+    assert result.card.edition == "Magic 2010"

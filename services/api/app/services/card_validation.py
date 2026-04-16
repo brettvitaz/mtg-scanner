@@ -298,19 +298,17 @@ class CardValidationService:
             notes = _merge_notes(notes, foil_note)
         confidence_after = max(0.0, round(confidence_after - foil_penalty, 4))
 
-        list_reprint, list_symbol_visible, confirmed_list_record = _resolve_list_reprint(
-            card, match, self._index
-        )
         effective_match = match
-        if confirmed_list_record is not None:
-            notes = _merge_notes(
-                notes,
-                f"MTGJSON confirms List reprint ({confirmed_list_record.set_code} {match.set_code}-{match.collector_number}).",
+        if card.list_reprint == "yes" and match.collector_number:
+            plst_number = f"{match.set_code}-{match.collector_number}"
+            plst_record = self._index.lookup_by_set_and_number(
+                set_code="PLST", collector_number=plst_number
             )
-            effective_match = confirmed_list_record
+            if plst_record is not None:
+                effective_match = plst_record
 
         validated_card = card.model_copy(
-            update=_build_match_update(card, effective_match, confidence_after, notes, list_reprint, list_symbol_visible)
+            update=_build_match_update(card, effective_match, confidence_after, notes, card.list_reprint, card.list_symbol_visible)
         )
         return ValidatedCardResult(
             card=validated_card,
@@ -415,9 +413,6 @@ class CardValidationService:
         )
 
 
-_LIST_SET_CODES = frozenset({"PLST", "MB1", "MB2", "ULST"})
-
-
 def _build_match_update(
     card: RecognizedCard,
     match: CardRecord,
@@ -461,33 +456,6 @@ def _build_match_update(
         "list_reprint": list_reprint,
         "list_symbol_visible": list_symbol_visible,
     }
-
-
-def _resolve_list_reprint(
-    card: RecognizedCard,
-    match: CardRecord,
-    index: MTGJSONIndex,
-) -> tuple[str | None, bool | None, CardRecord | None]:
-    """Determine list_reprint and list_symbol_visible after a successful MTGJSON match.
-
-    If the matched card is already from a List set, preserve the card's existing values.
-    If the matched card exists in a List set (MTGJSON lookup), override to "yes"/True.
-    Otherwise, leave the card's original values unchanged.
-
-    Returns (list_reprint, list_symbol_visible, confirmed_list_record) where
-    confirmed_list_record is the PLST/MB1/MB2 CardRecord when MTGJSON confirmed a new List reprint.
-    """
-    if match.set_code in _LIST_SET_CODES:
-        return card.list_reprint, card.list_symbol_visible, None
-
-    if match.collector_number:
-        confirmed_record = index.check_list_reprint(
-            set_code=match.set_code, collector_number=match.collector_number
-        )
-        if confirmed_record is not None:
-            return "yes", True, confirmed_record
-
-    return card.list_reprint, card.list_symbol_visible, None
 
 
 def _check_foil_mismatch(

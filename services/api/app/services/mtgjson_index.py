@@ -307,26 +307,6 @@ class MTGJSONIndex:
             return rows[0]
         return None
 
-    def check_list_reprint(self, *, set_code: str, collector_number: str) -> CardRecord | None:
-        """Check if a card identified by set_code and collector_number exists in a List set.
-
-        PLST uses compound collector numbers like "C16-78" (original_set-original_number).
-        MB1 and MB2 use the original collector number directly.
-
-        Returns the matching List CardRecord ("PLST", "MB1", or "MB2") if found, else None.
-        """
-        plst_number = f"{set_code}-{collector_number}"
-        plst_record = self.lookup_by_set_and_number(set_code="PLST", collector_number=plst_number)
-        if plst_record is not None:
-            return plst_record
-        mb1_record = self.lookup_by_set_and_number(set_code="MB1", collector_number=collector_number)
-        if mb1_record is not None:
-            return mb1_record
-        mb2_record = self.lookup_by_set_and_number(set_code="MB2", collector_number=collector_number)
-        if mb2_record is not None:
-            return mb2_record
-        return None
-
     def _fetch_cards(self, sql: str, params: tuple[Any, ...]) -> list[CardRecord]:
         if not self.is_available():
             return []

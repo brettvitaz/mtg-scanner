@@ -88,6 +88,7 @@ class RecognitionService:
         max_concurrent_recognitions: int = 4,
         enable_llm_correction: bool = True,
         correction_prompt_version: str = "card-correction.md",
+        enable_corner_crop: bool = True,
     ) -> None:
         self._provider = provider
         self._card_detector = card_detector
@@ -95,6 +96,7 @@ class RecognitionService:
         self._max_concurrent_recognitions = max(1, max_concurrent_recognitions)
         self._enable_llm_correction = enable_llm_correction
         self._correction_prompt_version = correction_prompt_version
+        self._enable_corner_crop = enable_corner_crop
 
     def _validate_response(
         self,
@@ -268,7 +270,7 @@ class RecognitionService:
                 "model": self._provider.model_name,
             }
         )
-        debug_images = _generate_debug_images(image_bytes)
+        debug_images = _generate_debug_images(image_bytes) if self._enable_corner_crop else {}
 
         # Try multi-card detection if detector is available
         detection_result: DetectionResult | None = None
@@ -386,6 +388,7 @@ def get_recognition_service() -> RecognitionService:
         max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
         enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
         correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
+        enable_corner_crop=settings.mtg_scanner_enable_corner_crop,
     )
 
 

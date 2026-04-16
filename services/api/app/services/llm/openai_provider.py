@@ -9,10 +9,12 @@ import httpx
 from app.models.recognition import RecognitionResponse, RecognitionResult, RecognitionUploadMetadata
 from app.services.errors import RecognitionProviderError
 from app.services.llm.base import (
-    crop_bottom_left_corner,
+    CORNER_CROP_ABSENT_TEXT,
+    CORNER_CROP_PRESENT_TEXT,
     encode_image_to_data_url,
     extract_json_from_text,
     extract_openai_usage,
+    maybe_corner_crop,
     parse_recognition_response,
 )
 
@@ -32,12 +34,14 @@ class OpenAIProvider:
         base_url: str = "https://api.openai.com/v1",
         timeout: float = 30.0,
         response_mode: str = "json_schema",
+        enable_corner_crop: bool = True,
     ) -> None:
         self.model_name: str | None = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._response_mode = response_mode
+        self._enable_corner_crop = enable_corner_crop
         self._schema = self._load_schema()
 
     def _load_schema(self) -> dict[str, Any]:
@@ -63,7 +67,7 @@ class OpenAIProvider:
     ) -> RecognitionResult:
         """Recognize cards in an image using OpenAI API."""
         data_url = encode_image_to_data_url(image_bytes, metadata.content_type)
-        corner_bytes = crop_bottom_left_corner(image_bytes)
+        corner_bytes = maybe_corner_crop(image_bytes, self._enable_corner_crop)
         corner_url = encode_image_to_data_url(corner_bytes, "image/jpeg") if corner_bytes else None
         request_body = self._build_request(prompt_text, data_url, corner_url)
 
@@ -131,17 +135,11 @@ class OpenAIProvider:
         ]
         if corner_url:
             user_content.extend([
-                {
-                    "type": "text",
-                    "text": (
-                        "Close-up of the bottom-left corner of the same card. "
-                        "Look carefully at the left side of the info strip: "
-                        "is there a small white icon to the LEFT of the collector number? "
-                        "Use this to determine list_reprint."
-                    ),
-                },
+                {"type": "text", "text": CORNER_CROP_PRESENT_TEXT},
                 {"type": "image_url", "image_url": {"url": corner_url, "detail": "high"}},
             ])
+        else:
+            user_content.append({"type": "text", "text": CORNER_CROP_ABSENT_TEXT})
 
         body: dict[str, Any] = {
             "model": self.model_name,

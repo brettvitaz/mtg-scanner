@@ -73,17 +73,17 @@ def main() -> int:
             prompt_version=args.prompt_version,
         )
         skip_detection = bool(expected.get("skip_detection", False))
-        response, enriched_metadata, _detection, _validation, _usage = service.recognize(
+        result = service.recognize(
             image_bytes=fixture_path.read_bytes(),
             metadata=metadata,
             skip_detection=skip_detection,
         )
-        actual = response.model_dump()
+        actual = result.response.model_dump()
         if args.verbose:
             actual_path = RESULTS_DIR / f"{fixture_path.stem}.actual.json"
             actual_path.write_text(json.dumps(actual, indent=2) + "\n")
         case_results.append(
-            compare_case(fixture_path.name, args.prompt_version, enriched_metadata, expected, actual)
+            compare_case(fixture_path.name, args.prompt_version, result.metadata, expected, actual)
         )
 
     summary = {

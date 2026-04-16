@@ -58,6 +58,29 @@ def encode_image_to_data_url(image_bytes: bytes, content_type: str) -> str:
     return f"data:{content_type};base64,{encoded}"
 
 
+CORNER_CROP_PRESENT_TEXT = (
+    "Close-up of the bottom-left corner of the same card. "
+    "Look carefully at the left side of the info strip: "
+    "is there a small white icon to the LEFT of the collector number? "
+    "Use this to determine list_reprint."
+)
+
+CORNER_CROP_ABSENT_TEXT = (
+    "No close-up image is provided. Make the List/Mystery Booster "
+    "determination from the full card image alone. If the planeswalker "
+    "icon is not clearly visible at that resolution, set list_reprint "
+    'to "possible" rather than guessing.'
+)
+
+
+def maybe_corner_crop(image_bytes: bytes, enabled: bool) -> bytes | None:
+    """Return corner crop bytes when enabled and crop succeeds, else None."""
+    if not enabled:
+        return None
+    corner = crop_bottom_left_corner(image_bytes)
+    return corner or None
+
+
 def crop_bottom_left_corner(image_bytes: bytes) -> bytes:
     """Crop the bottom-left corner of a card image (List symbol area).
 

@@ -81,18 +81,15 @@ For modern sets (M15 era and later), border color is almost always black unless 
 ### The List / Mystery Booster Symbol
 A second image (close-up of the bottom-left corner) is provided alongside the full card image. **Use the close-up to make the List/Mystery Booster determination.** The full card image does not have sufficient resolution for this icon.
 
-**How to count icons in the close-up:**
+**How to identify the icon in the close up:**
 
-The bottom-left info strip of a modern MTG card has exactly **two lines**, each with one white icon on the far left:
-- **Line 2 (bottom line):** Always has the **MTG hourglass** icon. This is always present on modern cards.
-- **Line 1 (top line):** Has a **second distinct white icon** ONLY on List/Mystery Booster reprints. On original printings, this line has NO icon — only the collector number text.
+To the left of the collector number and set code can exist a Planeswalker Icon. When the Planeswalker icon is present, the card is a reprint and belongs to a class of cards called The List / Mystery Booster.
 
-**The rule is purely about counting icons:**
-- **Two white icons stacked on the left** → List/Mystery Booster reprint → `list_reprint: "yes"`, `list_symbol_visible: true`
-- **One white icon on the left (the hourglass only)** → original printing → `list_reprint: "no"`, `list_symbol_visible: false`
-- **Cannot clearly count icons** (dark, blurry, cropped) → `list_reprint: "possible"`, `list_symbol_visible: false`
+For detection, look for a solid, handprint-like / crown-like glyph with five tines at the top and a shape that narrows to a single point at the bottom. In practice it looks like a stylized five-pronged flame or splayed hand: a compact vertical silhouette, wider across the top, with distinct upward spikes and a tapered lower stem. That combination, especially five top prongs + pointed bottom, is the key signature. When in this location, this icon is **always** the indicator that the card is a list reprint and is **never** a set symbol.
 
-Do not try to identify the shape of the top icon — any white icon above the hourglass line is the List/Mystery Booster symbol, regardless of what it looks like.
+- **When the icon is present** → List/Mystery Booster reprint → `list_reprint: "yes"`, `list_symbol_visible: true`
+- **No icon present** → original printing → `list_reprint: "no"`, `list_symbol_visible: false`
+- **Cannot clearly identify icons** (dark, blurry, cropped) → `list_reprint: "possible"`, `list_symbol_visible: false`
 
 - List/Mystery Booster reprints retain the original set code, collector number, and art. The icon count is the only indicator.
 - On foil cards or very dark borders, both icons may be hard to see — default to `"possible"` if uncertain.

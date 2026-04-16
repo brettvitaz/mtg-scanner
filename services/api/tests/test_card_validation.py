@@ -682,3 +682,27 @@ def test_list_reprint_skipped_for_cards_already_in_list_set(
     # Should not add a duplicate "MTGJSON confirms List reprint" note
     assert result.card.list_reprint == "yes"
     assert "MTGJSON-PLST-PLST" not in (result.card.notes or "")
+
+
+def test_list_reprint_edition_overridden_to_list_set(
+    list_validation_service: CardValidationService,
+) -> None:
+    """edition and set_code are updated to the List set when MTGJSON confirms a PLST reprint.
+
+    Regression: previously edition was set to the originating set name (e.g. "Magic 2010")
+    even when the physical card is from The List, causing the iOS app to display the wrong set.
+    """
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="yes",
+        list_symbol_visible=True,
+    )
+    result = list_validation_service.validate_card(card)
+
+    assert result.card.edition == "The List"
+    assert result.card.set_code == "PLST"
+    assert result.card.collector_number == "M10-146"

@@ -112,6 +112,7 @@ def _create_openai_provider(settings: Settings) -> OpenAIProvider:
         base_url=base_url,
         timeout=settings.mtg_scanner_llm_timeout_seconds,
         response_mode=settings.mtg_scanner_llm_response_mode,
+        enable_corner_crop=settings.mtg_scanner_enable_corner_crop,
     )
 
 
@@ -147,6 +148,7 @@ def _create_moonshot_provider(settings: Settings) -> MoonshotProvider:
         base_url=base_url,
         timeout=settings.mtg_scanner_llm_timeout_seconds,
         response_mode=settings.mtg_scanner_llm_response_mode,
+        enable_corner_crop=settings.mtg_scanner_enable_corner_crop,
     )
 
 
@@ -186,4 +188,5 @@ def _create_anthropic_provider(settings: Settings) -> AnthropicProvider:
         base_url=base_url,
         timeout=settings.mtg_scanner_llm_timeout_seconds,
         response_mode=settings.mtg_scanner_llm_response_mode,
+        enable_corner_crop=settings.mtg_scanner_enable_corner_crop,
     )

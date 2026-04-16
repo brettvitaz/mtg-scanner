@@ -380,14 +380,16 @@ def list_reprint_db(tmp_path: Path) -> Path:
 def test_check_list_reprint_plst_found(list_reprint_db: Path) -> None:
     index = MTGJSONIndex(list_reprint_db)
     result = index.check_list_reprint(set_code="M10", collector_number="146")
-    assert result == "PLST"
+    assert result is not None
+    assert result.set_code == "PLST"
 
 
 def test_check_list_reprint_mb1_found(list_reprint_db: Path) -> None:
     index = MTGJSONIndex(list_reprint_db)
     # Forest number 247 exists in MB1 directly (MB1 uses simple collector numbers)
     result = index.check_list_reprint(set_code="M10", collector_number="247")
-    assert result == "MB1"
+    assert result is not None
+    assert result.set_code == "MB1"
 
 
 def test_check_list_reprint_not_a_list_card(list_reprint_db: Path) -> None:

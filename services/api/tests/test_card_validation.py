@@ -541,3 +541,144 @@ def test_validate_card_preserves_v2_llm_fields(validation_service: CardValidatio
     assert enriched.border_color == card.border_color
     assert enriched.copyright_line == card.copyright_line
     assert enriched.promo_text == card.promo_text
+
+
+# ---------------------------------------------------------------------------
+# List reprint verification via MTGJSON
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def list_validation_service(tmp_path: Path) -> CardValidationService:
+    """Validation service with M10 + PLST data for List reprint testing."""
+    import json
+
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "M10": {
+                "code": "M10",
+                "name": "Magic 2010",
+                "releaseDate": "2009-07-17",
+                "cards": [
+                    {
+                        "uuid": "bolt-m10-146",
+                        "name": "Lightning Bolt",
+                        "number": "146",
+                        "language": "English",
+                        "layout": "normal",
+                        "rarity": "common",
+                        "type": "Instant",
+                        "finishes": ["nonfoil", "foil"],
+                        "identifiers": {"scryfallId": "e3285e6b-0000-0000-0000-000000000000"},
+                    },
+                    {
+                        "uuid": "forest-m10-247",
+                        "name": "Forest",
+                        "number": "247",
+                        "language": "English",
+                        "layout": "normal",
+                        "rarity": "common",
+                        "finishes": ["nonfoil"],
+                    },
+                ],
+            },
+            "PLST": {
+                "code": "PLST",
+                "name": "The List",
+                "releaseDate": "2020-09-25",
+                "cards": [
+                    {
+                        "uuid": "bolt-plst-m10-146",
+                        "name": "Lightning Bolt",
+                        "number": "M10-146",
+                        "language": "English",
+                        "layout": "normal",
+                        "finishes": ["nonfoil"],
+                    },
+                ],
+            },
+        },
+    }
+    source_path = tmp_path / "AllPrintings.list.json"
+    source_path.write_text(json.dumps(payload))
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=source_path, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+    return CardValidationService(index=MTGJSONIndex(db_path))
+
+
+def test_list_reprint_overridden_when_confirmed_by_mtgjson(
+    list_validation_service: CardValidationService,
+) -> None:
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="no",
+        list_symbol_visible=False,
+    )
+    result = list_validation_service.validate_card(card)
+
+    assert result.card.list_reprint == "yes"
+    assert result.card.list_symbol_visible is True
+    assert "MTGJSON confirms List reprint" in (result.card.notes or "")
+
+
+def test_list_reprint_not_overridden_when_not_in_list(
+    list_validation_service: CardValidationService,
+) -> None:
+    # Forest is in M10 but NOT in PLST or MB1 in this fixture
+    card = RecognizedCard(
+        title="Forest",
+        edition="M10",
+        collector_number="247",
+        foil=False,
+        confidence=0.90,
+        list_reprint="no",
+        list_symbol_visible=False,
+    )
+    result = list_validation_service.validate_card(card)
+
+    assert result.card.list_reprint == "no"
+    assert result.card.list_symbol_visible is False
+    assert "MTGJSON confirms List reprint" not in (result.card.notes or "")
+
+
+def test_list_reprint_already_yes_preserved_when_confirmed(
+    list_validation_service: CardValidationService,
+) -> None:
+    """When the LLM already returned list_reprint=yes, MTGJSON confirmation leaves it unchanged."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="yes",
+        list_symbol_visible=True,
+    )
+    result = list_validation_service.validate_card(card)
+
+    assert result.card.list_reprint == "yes"
+    assert result.card.list_symbol_visible is True
+
+
+def test_list_reprint_skipped_for_cards_already_in_list_set(
+    list_validation_service: CardValidationService,
+) -> None:
+    """Cards already matched to a List set are not re-checked against PLST."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="PLST",
+        collector_number="M10-146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="yes",
+        list_symbol_visible=True,
+    )
+    result = list_validation_service.validate_card(card)
+
+    # Should not add a duplicate "MTGJSON confirms List reprint" note
+    assert result.card.list_reprint == "yes"
+    assert "MTGJSON-PLST-PLST" not in (result.card.notes or "")

@@ -9,6 +9,7 @@ import httpx
 from app.models.recognition import RecognitionResponse, RecognitionResult, RecognitionUploadMetadata
 from app.services.errors import RecognitionProviderError
 from app.services.llm.base import (
+    crop_bottom_left_corner,
     encode_image_to_data_url,
     extract_json_from_text,
     extract_openai_usage,
@@ -62,7 +63,9 @@ class OpenAIProvider:
     ) -> RecognitionResult:
         """Recognize cards in an image using OpenAI API."""
         data_url = encode_image_to_data_url(image_bytes, metadata.content_type)
-        request_body = self._build_request(prompt_text, data_url)
+        corner_bytes = crop_bottom_left_corner(image_bytes)
+        corner_url = encode_image_to_data_url(corner_bytes, "image/jpeg") if corner_bytes else None
+        request_body = self._build_request(prompt_text, data_url, corner_url)
 
         url = f"{self._base_url}/chat/completions"
         logger.info(
@@ -115,22 +118,36 @@ class OpenAIProvider:
             usage=extract_openai_usage(payload),
         )
 
-    def _build_request(self, prompt_text: str, data_url: str) -> dict[str, Any]:
+    def _build_request(
+        self, prompt_text: str, data_url: str, corner_url: str | None = None
+    ) -> dict[str, Any]:
         """Build OpenAI API request body."""
+        user_content: list[dict[str, Any]] = [
+            {
+                "type": "text",
+                "text": "Analyze this Magic: The Gathering card image.",
+            },
+            {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
+        ]
+        if corner_url:
+            user_content.extend([
+                {
+                    "type": "text",
+                    "text": (
+                        "Close-up of the bottom-left corner of the same card. "
+                        "Look carefully at the left side of the info strip: "
+                        "is there a small white icon to the LEFT of the collector number? "
+                        "Use this to determine list_reprint."
+                    ),
+                },
+                {"type": "image_url", "image_url": {"url": corner_url, "detail": "high"}},
+            ])
+
         body: dict[str, Any] = {
             "model": self.model_name,
             "messages": [
                 {"role": "system", "content": prompt_text},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze this Magic: The Gathering card image.",
-                        },
-                        {"type": "image_url", "image_url": {"url": data_url}},
-                    ],
-                },
+                {"role": "user", "content": user_content},
             ],
         }
 

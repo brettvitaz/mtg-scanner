@@ -156,11 +156,11 @@ def test_llm_correction_resolves_needs_correction(validator: CardValidationServi
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    response, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    result = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
     # The mock's first call returns Lightning Bolt in unknown set
     # which will trigger needs_correction then the correction call
-    assert validation_result is not None
+    assert result.validation_result is not None
     # The correction provider was called for the needs_correction card
     assert mock_provider.recognize.call_count >= 1
 
@@ -191,10 +191,10 @@ def test_llm_correction_disabled_does_not_retry(validator: CardValidationService
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    _, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    result = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
-    assert validation_result is not None
-    assert validation_result.traces[0].status == "needs_correction"
+    assert result.validation_result is not None
+    assert result.validation_result.traces[0].status == "needs_correction"
     # Only the initial recognition call, no correction retry
     assert mock_provider.recognize.call_count == 1
 
@@ -230,11 +230,11 @@ def test_llm_correction_fallback_on_provider_error(validator: CardValidationServ
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    _, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    result = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
-    assert validation_result is not None
+    assert result.validation_result is not None
     # Correction failed, original needs_correction status retained
-    assert validation_result.traces[0].status == "needs_correction"
+    assert result.validation_result.traces[0].status == "needs_correction"
 
 
 def test_llm_correction_fallback_when_correction_also_fails_validation(validator: CardValidationService) -> None:
@@ -271,8 +271,8 @@ def test_llm_correction_fallback_when_correction_also_fails_validation(validator
     image_bytes = b"fake-image-data"
     metadata = _make_metadata()
 
-    _, _, _, validation_result, _ = service.recognize(image_bytes=image_bytes, metadata=metadata)
+    result = service.recognize(image_bytes=image_bytes, metadata=metadata)
 
-    assert validation_result is not None
+    assert result.validation_result is not None
     # Correction attempt also returned needs_correction, so original retained
-    assert validation_result.traces[0].status == "needs_correction"
+    assert result.validation_result.traces[0].status == "needs_correction"

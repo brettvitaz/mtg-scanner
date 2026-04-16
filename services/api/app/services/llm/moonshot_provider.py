@@ -141,7 +141,7 @@ class MoonshotProvider:
                             "type": "text",
                             "text": "Analyze this Magic: The Gathering card image.",
                         },
-                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
                     ],
                 },
             ],

@@ -298,39 +298,17 @@ class CardValidationService:
             notes = _merge_notes(notes, foil_note)
         confidence_after = max(0.0, round(confidence_after - foil_penalty, 4))
 
-        image_url = (
-            f"https://api.scryfall.com/cards/{match.scryfall_id}?format=image&version=normal"
-            if match.scryfall_id
-            else None
+        list_reprint, list_symbol_visible, confirmed_list_set = _resolve_list_reprint(
+            card, match, self._index
         )
-        set_symbol_url = (
-            f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg"
-            if match.set_code
-            else None
-        )
+        if confirmed_list_set is not None:
+            notes = _merge_notes(
+                notes,
+                f"MTGJSON confirms List reprint ({confirmed_list_set} {match.set_code}-{match.collector_number}).",
+            )
+
         validated_card = card.model_copy(
-            update={
-                "title": match.name,
-                "edition": match.set_name or card.edition,
-                "collector_number": match.collector_number or card.collector_number,
-                "confidence": confidence_after,
-                "notes": notes,
-                "set_code": match.set_code,
-                "rarity": match.rarity,
-                "type_line": match.type_line,
-                "oracle_text": match.oracle_text,
-                "mana_cost": match.mana_cost,
-                "power": match.power,
-                "toughness": match.toughness,
-                "loyalty": match.loyalty,
-                "defense": match.defense,
-                "scryfall_id": match.scryfall_id,
-                "image_url": image_url,
-                "set_symbol_url": set_symbol_url,
-                "card_kingdom_url": match.card_kingdom_url,
-                "card_kingdom_foil_url": match.card_kingdom_foil_url,
-                "color_identity": match.color_identity,
-            }
+            update=_build_match_update(card, match, confidence_after, notes, list_reprint, list_symbol_visible)
         )
         return ValidatedCardResult(
             card=validated_card,
@@ -433,6 +411,81 @@ class CardValidationService:
             confidence_after=card.confidence,
             reason=reason,
         )
+
+
+_LIST_SET_CODES = frozenset({"PLST", "MB1", "MB2", "ULST"})
+
+
+def _build_match_update(
+    card: RecognizedCard,
+    match: CardRecord,
+    confidence_after: float,
+    notes: str | None,
+    list_reprint: str | None,
+    list_symbol_visible: bool | None,
+) -> dict[str, object]:
+    """Build the field update dict for a successfully matched card."""
+    image_url = (
+        f"https://api.scryfall.com/cards/{match.scryfall_id}?format=image&version=normal"
+        if match.scryfall_id
+        else None
+    )
+    set_symbol_url = (
+        f"https://svgs.scryfall.io/sets/{match.set_code.lower()}.svg"
+        if match.set_code
+        else None
+    )
+    return {
+        "title": match.name,
+        "edition": match.set_name or card.edition,
+        "collector_number": match.collector_number or card.collector_number,
+        "confidence": confidence_after,
+        "notes": notes,
+        "set_code": match.set_code,
+        "rarity": match.rarity,
+        "type_line": match.type_line,
+        "oracle_text": match.oracle_text,
+        "mana_cost": match.mana_cost,
+        "power": match.power,
+        "toughness": match.toughness,
+        "loyalty": match.loyalty,
+        "defense": match.defense,
+        "scryfall_id": match.scryfall_id,
+        "image_url": image_url,
+        "set_symbol_url": set_symbol_url,
+        "card_kingdom_url": match.card_kingdom_url,
+        "card_kingdom_foil_url": match.card_kingdom_foil_url,
+        "color_identity": match.color_identity,
+        "list_reprint": list_reprint,
+        "list_symbol_visible": list_symbol_visible,
+    }
+
+
+def _resolve_list_reprint(
+    card: RecognizedCard,
+    match: CardRecord,
+    index: MTGJSONIndex,
+) -> tuple[str | None, bool | None, str | None]:
+    """Determine list_reprint and list_symbol_visible after a successful MTGJSON match.
+
+    If the matched card is already from a List set, preserve the card's existing values.
+    If the matched card exists in a List set (MTGJSON lookup), override to "yes"/True.
+    Otherwise, leave the card's original values unchanged.
+
+    Returns (list_reprint, list_symbol_visible, confirmed_list_set_code) where
+    confirmed_list_set_code is set only when MTGJSON confirmed a new List reprint.
+    """
+    if match.set_code in _LIST_SET_CODES:
+        return card.list_reprint, card.list_symbol_visible, None
+
+    if match.collector_number:
+        confirmed_set = index.check_list_reprint(
+            set_code=match.set_code, collector_number=match.collector_number
+        )
+        if confirmed_set is not None:
+            return "yes", True, confirmed_set
+
+    return card.list_reprint, card.list_symbol_visible, None
 
 
 def _check_foil_mismatch(

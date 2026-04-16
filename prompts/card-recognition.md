@@ -28,7 +28,8 @@ The bottom-left contains a stacked two-line block:
   - A star `★` → **foil (premium)**
 - Transcribe this separator character exactly. It is the most reliable foil indicator when legible.
 - A holofoil oval security stamp on the power/toughness box is present on ALL rares and mythics from this era regardless of foil status. It is NOT a foil indicator.
-- **Collector number**: transcribe exactly as printed, including leading zeros (e.g., `050` not `50`, `007` not `7`).
+- **Set code**: The three-letter code (e.g., WAR, M10, 40K) appears after the separator. Output ONLY this code for the "edition" field, not the full set name.
+- **Collector number**: extract ONLY the numeric portion (and any suffix like 'e' for etched or '★' for promos). Do NOT include the rarity letter (C, U, R, M) or the total card count. Examples: "166" from "166 C", "145" from "145/264 C", "050e" from "050e".
 
 ### Pre-M15 format (pre-2014, post-Exodus)
 Format varies but typically:
@@ -78,8 +79,12 @@ For modern sets (M15 era and later), border color is almost always black unless 
 
 ## Step 3: Identify the Printing Variant
 
-### The List / Mystery Booster Symbol
-If a second image (close-up of the bottom-left corner) is provided alongside the full card image, **use the close-up to make the List/Mystery Booster determination.** The full card image often does not have sufficient resolution for this icon. If no close-up is provided, do not assume the icon is absent; only identify The List / Mystery Booster when the visible evidence is sufficient, otherwise leave the determination uncertain.
+### The List / Mystery Booster Symbol (Planeswalker Icon)
+If a second image (close-up of the bottom-left corner) is provided alongside the full card image, **use the close-up for:**
+1. **List/Mystery Booster determination** — the Planeswalker icon at the far left edge
+2. **Foil detection** — reading the separator character (• or ★) between the set code and language code
+
+The full card image often does not have sufficient resolution for these small details. If no close-up is provided, do not assume the icon is absent; only identify The List / Mystery Booster when the visible evidence is sufficient, otherwise leave the determination uncertain.
 
 **How to identify the icon in the close up:**
 
@@ -87,27 +92,36 @@ The bottom-left info strip has two lines of text:
 - **Top line:** `<collector number> / <total>  <rarity letter>`
 - **Bottom line:** `<set code>  •  <language>  <artist name>`
 
-The List/Mystery Booster icon, when present, is a tall white glyph that sits at the **far left edge** of the info strip, spanning the full height of both lines. Its top half (five upward tines) aligns with the collector number; its bottom half (a pointed stem) reaches into the set code line.
+The List/Mystery Booster icon (also known as the Planeswalker icon), when present, is a tall white glyph that sits at the **far left edge** of the info strip, spanning the full height of both lines. Its top half (five upward tines) aligns with the collector number; its bottom half (a pointed stem) reaches into the set code line.
 
 **Critical distinction:** The set code text (e.g., `M19`, `BBD`) appears in the **middle of the bottom line**, after the bullet `•`. It is text, not an icon, and it is not at the far left. Do not confuse the set code with the List icon — they are in completely different positions.
 
-The List icon shape: a solid, handprint-like / crown-like glyph with five tines at the top narrowing to a single point at the bottom — a stylized five-pronged flame or splayed hand. Always white.
+The Planeswalker icon shape: a solid, handprint-like / crown-like glyph with five tines at the top narrowing to a single point at the bottom — a stylized five-pronged flame or splayed hand. Always white.
 
-- **When the icon is present** → List/Mystery Booster reprint → `list_reprint: "yes"`, `list_symbol_visible: true`
-- **No icon present** → original printing → `list_reprint: "no"`, `list_symbol_visible: false`
-- **Cannot clearly identify icons** (dark, blurry, cropped) → `list_reprint: "possible"`, `list_symbol_visible: false`
+**IMPORTANT - Do NOT confuse with Artist Brush Icon:**
+Near the artist name on the right side of the bottom line, there may be a small paint brush icon. This is the **artist credit icon**, NOT the List/Mystery Booster icon. The artist brush:
+- Appears on the RIGHT side near the artist name
+- Does NOT span both lines
+- Is NOT at the far left edge
+- Is a standard element on many cards and does NOT indicate a List reprint
 
-- List/Mystery Booster reprints retain the original set code, collector number, and art. The icon count is the only indicator.
-- On foil cards or very dark borders, both icons may be hard to see — default to `"possible"` if uncertain.
+Only the Planeswalker icon (five-tined glyph) at the FAR LEFT EDGE indicates a List/Mystery Booster reprint.
 
-**The default is `"possible"`, not `"no"`.** You need positive visual confirmation that the top line has NO icon to return `"no"`. Dark, shadowed, or ambiguous → `"possible"`.
+- **When the Planeswalker icon is present at the far left edge** → List/Mystery Booster reprint → `list_reprint: "yes"`, `list_symbol_visible: true`
+- **No Planeswalker icon present at the far left edge** → original printing → `list_reprint: "no"`, `list_symbol_visible: false`
+- **Cannot clearly identify the Planeswalker icon** (dark, blurry, cropped) → `list_reprint: "possible"`, `list_symbol_visible: false`
+
+- List/Mystery Booster reprints retain the original set code, collector number, and art. The Planeswalker icon at the far left edge is the only indicator.
+- On foil cards or very dark borders, the Planeswalker icon may be hard to see — default to `"possible"` if uncertain.
+
+**The default is `"possible"`, not `"no"`.** You need positive visual confirmation that there is NO Planeswalker icon at the far left edge to return `"no"`. Dark, shadowed, or ambiguous → `"possible"`.
 
 **Consistency rule:** `list_symbol_visible: true` and `list_reprint: "no"` is a contradiction. If you set `list_symbol_visible: true`, you MUST set `list_reprint: "yes"`.
 
 ### Other Printing Variant Markers
 - **Promo indicator text** (e.g., "Prerelease", "Buy-a-Box", "FNMP", "Judge Gift") — appears near the bottom of the card. Transcribe verbatim if visible.
 - **Collector number suffixes**: `e` suffix (e.g., `375e`) indicates an etched foil variant. `★` next to the collector number indicates a premium/promo printing in some older sets.
-- **Pre-Modern shooting star**: a small shooting star icon in the lower-left corner indicates a pre-8th Edition foil (distinct from the planeswalker symbol).
+- **Pre-Modern shooting star**: a small shooting star icon in the lower-left corner indicates a pre-8th Edition foil (distinct from the Planeswalker icon).
 
 ---
 
@@ -118,10 +132,11 @@ Evaluate foil signals in this order of reliability:
 ### 1. Separator character (most reliable when legible — modern cards only)
 - `•` between SET CODE and LANG → non-foil
 - `★` between SET CODE and LANG → foil
-- If unreadable, proceed to visual signals.
+- **Use the close-up image to read this character** — it is small and the full card image often lacks resolution
+- If unreadable even in the close-up, proceed to visual signals.
 
 ### 2. Pre-Modern shooting star (pre-8th Edition cards only)
-A small shooting star icon in the lower-left corner of the card face indicates a pre-Modern era foil. This is distinct from the planeswalker symbol used for List/Mystery Booster reprints.
+A small shooting star icon in the lower-left corner of the card face indicates a pre-Modern era foil. This is distinct from the Planeswalker icon used for List/Mystery Booster reprints.
 
 ### 3. Visual sheen (apply conservatively)
 Genuine traditional foil produces a **prismatic rainbow color shift visible across the full card surface** — including borders, frame, text box area, and artwork simultaneously.
@@ -217,9 +232,9 @@ Return valid JSON only. No commentary outside the JSON block.
   "cards": [
     {
       "title": "string — exact printed title",
-      "edition": "string — set name, or 'unknown'",
+      "edition": "string — the three-letter set code visible on the card (e.g., 'WAR', 'M10', '40K'), or 'unknown' if not visible",
       "edition_notes": "string — reasoning for edition assignment, especially for early cards",
-      "collector_number": "string — include any suffix (e, ★, etc.), or 'none' for pre-Exodus cards",
+      "collector_number": "string — the numeric collector number ONLY, with suffix letters like 'e' or '★' if present. Use 'none' for pre-Exodus cards without collector numbers",
       "foil": "boolean",
       "foil_type": "string — one of: none | rainbow_traditional | pre_modern_shootingstar | etched | textured | confetti | ripple | galaxy | halo | raised | unknown",
       "foil_evidence": ["array of strings — list each observed signal and what it indicates"],
@@ -242,8 +257,8 @@ Return valid JSON only. No commentary outside the JSON block.
   "cards": [
     {
       "title": "Mana Leak",
-      "edition": "Duel Decks: Speed vs. Cunning",
-      "edition_notes": "Set code DDN visible. Planeswalker symbol observed in lower-left — List or Mystery Booster reprint of DDN printing.",
+      "edition": "DDN",
+      "edition_notes": "Set code DDN visible. List icon (five-tined glyph) observed at far left edge of info strip — List or Mystery Booster reprint of DDN printing.",
       "collector_number": "064",
       "foil": false,
       "foil_type": "none",
@@ -253,14 +268,14 @@ Return valid JSON only. No commentary outside the JSON block.
       "list_reprint": "yes",
       "list_symbol_visible": true,
       "border_color": "black",
-      "copyright_line": "DDN • EN — Howard Lyon",
+      "copyright_line": "DDN • EN Howard Lyon",
       "promo_text": null,
       "confidence": 0.95,
       "notes": "Title, collector number, and separator clearly legible."
     },
     {
       "title": "Plague Rats",
-      "edition": "Unlimited Edition",
+      "edition": "2ED",
       "edition_notes": "White border. Credit line reads 'Illus. © Anson Maddocks' with © before artist name and no copyright year — consistent with Unlimited. Rules text uses old wording.",
       "collector_number": "none",
       "foil": false,
@@ -279,7 +294,7 @@ Return valid JSON only. No commentary outside the JSON block.
     },
     {
       "title": "Misthollow Griffin",
-      "edition": "Avacyn Restored",
+      "edition": "AVR",
       "edition_notes": "AVR set symbol visible. Collector number 68/244 matches AVR. Pre-M15 format — no SET CODE/LANG separator line.",
       "collector_number": "68",
       "foil": true,
@@ -294,7 +309,7 @@ Return valid JSON only. No commentary outside the JSON block.
       "copyright_line": "© 1993–2012 Wizards of the Coast LLC",
       "promo_text": null,
       "confidence": 0.78,
-      "notes": "Foil confirmed visually. Planeswalker symbol not visible — may be obscured by foil sheen on pre-M15 card. Cannot confirm original AVR printing vs. List/Mystery Booster reprint from image alone."
+      "notes": "Foil confirmed visually. List icon not visible at far left edge — may be obscured by foil sheen on pre-M15 card. Cannot confirm original AVR printing vs. List/Mystery Booster reprint from image alone."
     }
   ]
 }

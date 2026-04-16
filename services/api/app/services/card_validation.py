@@ -339,6 +339,10 @@ class CardValidationService:
         update: dict[str, object] = {"confidence": confidence_after}
         if status in {"ambiguous_match", "no_match"}:
             update["notes"] = _merge_notes(card.notes, reason)
+            # Normalize collector number even when no match found
+            normalized_number = normalize_collector_number(card.collector_number)
+            if normalized_number and normalized_number != card.collector_number:
+                update["collector_number"] = normalized_number
         validated_card = card.model_copy(update=update)
         return ValidatedCardResult(
             card=validated_card,

@@ -60,9 +60,10 @@ def encode_image_to_data_url(image_bytes: bytes, content_type: str) -> str:
 
 CORNER_CROP_PRESENT_TEXT = (
     "Close-up of the bottom-left corner of the same card. "
-    "Look carefully at the left side of the info strip: "
-    "is there a small white icon to the LEFT of the collector number? "
-    "Use this to determine list_reprint."
+    "Use this close-up for two purposes: "
+    "1) Look at the far LEFT edge for the Planeswalker icon (five-tined glyph) to determine list_reprint. "
+    "2) Read the separator character between the set code and language code (e.g., 'WAR • EN' or 'WAR ★ EN') to determine foil status. "
+    "The separator is either a bullet (•) for non-foil or a star (★) for foil."
 )
 
 CORNER_CROP_ABSENT_TEXT = (

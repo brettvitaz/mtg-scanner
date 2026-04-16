@@ -23,6 +23,8 @@ The card named "{{title}}" exists in the following confirmed printings. Select t
 - If foil status is visible, only select a printing that supports it (check the finishes column).
 - If you cannot determine which printing is correct, select the most recent printing and set confidence below 0.5.
 - Return the same JSON format as a standard recognition.
+- Output the three-letter set code for "edition", not the full set name.
+- Output ONLY the numeric collector number (with any suffix like 'e' or '★'), without rarity letters or total card count.
 
 ## Output Shape
 

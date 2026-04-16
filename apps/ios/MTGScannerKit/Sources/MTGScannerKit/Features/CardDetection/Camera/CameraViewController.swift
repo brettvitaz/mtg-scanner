@@ -26,12 +26,6 @@ final class CameraViewController: UIViewController {
     /// Used by `AutoScanViewModel` to feed frames into `CardPresenceTracker`.
     /// Set to `nil` when not in Auto Scan mode to avoid unnecessary overhead.
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
-    /// Detection zone for filtering card detections in auto-scan mode.
-    var detectionZone: DetectionZone? {
-        didSet {
-            updateZoneOverlay()
-        }
-    }
 
     // MARK: - Private
 
@@ -78,7 +72,6 @@ final class CameraViewController: UIViewController {
         detectionLayer.frame = view.bounds
         updatePreviewOrientation()
         engine.updateIsLandscape(view.bounds.width > view.bounds.height)
-        updateZoneOverlay()
     }
 
     // MARK: - Orientation
@@ -108,7 +101,6 @@ final class CameraViewController: UIViewController {
         if mode == .auto {
             renderer?.clear()
         }
-        updateZoneOverlay()
     }
 
     func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
@@ -133,13 +125,6 @@ final class CameraViewController: UIViewController {
     /// Sets the exposure bias (EV offset). Positive = brighter, negative = darker.
     func setExposureBias(_ bias: Float) {
         sessionManager.setExposureBias(bias)
-    }
-
-    // MARK: - Zone Overlay
-
-    private func updateZoneOverlay() {
-        guard let previewLayer, let detectionZone else { return }
-        renderer?.updateZoneOverlay(zone: detectionZone, previewLayer: previewLayer)
     }
 
     // MARK: - Zoom

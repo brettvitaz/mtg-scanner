@@ -85,6 +85,27 @@ struct DetectionZone: Sendable, Equatable {
         CGPoint(x: referenceRect.midX, y: referenceRect.midY)
     }
 
+    /// Radius (in normalized coordinates) for center-proximity acceptance.
+    ///
+    /// Derived from the reference rect's half-span plus tolerance, so the
+    /// allowed-center region tracks the calibration tightness automatically.
+    var centerProximityRadius: CGFloat {
+        let halfSpan = max(referenceRect.width, referenceRect.height) / 2
+        return halfSpan * (1 + tolerance)
+    }
+
+    /// Returns true if the box's center lies within `centerProximityRadius` of the zone's center.
+    ///
+    /// Used instead of full containment so cards that grow larger in the frame
+    /// (e.g. a growing physical stack) still pass the filter as long as they remain
+    /// centered in the calibrated area.
+    func containsCenter(of box: CGRect) -> Bool {
+        let dx = box.midX - center.x
+        let dy = box.midY - center.y
+        let r = centerProximityRadius
+        return (dx * dx + dy * dy) <= (r * r)
+    }
+
     /// Creates a new zone calibrated from a detected card bounding box.
     ///
     /// The box is expected to be in Vision coordinates (bottom-left origin).

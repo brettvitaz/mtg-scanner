@@ -18,15 +18,12 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     var torchLevel: Float = 0
     /// Exposure bias in EV stops. Positive = brighter, negative = darker.
     var exposureBias: Float = 0
-    /// Detection zone for filtering card detections in auto-scan mode.
-    var detectionZone: DetectionZone?
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let vc = CameraViewController()
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
         vc.onAutoScanFrame = onAutoScanFrame
-        vc.detectionZone = detectionZone
         captureCoordinator?.controller = vc
         return vc
     }
@@ -36,7 +33,6 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
         vc.onAutoScanFrame = onAutoScanFrame
-        vc.detectionZone = detectionZone
         vc.setZoom(zoomFactor)
         vc.setTorchLevel(torchLevel)
         vc.setExposureBias(exposureBias)

@@ -262,4 +262,65 @@ final class DetectionZoneTests: XCTestCase {
         XCTAssertTrue(zone.isLargeEnough(box))
         XCTAssertTrue(zone.isPortraitAspect(box))
     }
+
+}
+
+// MARK: - Center Proximity Tests
+
+final class DetectionZoneCenterProximityTests: XCTestCase {
+
+    func testCenterProximityRadiusDerivation() {
+        // radius = max(w, h) / 2 * (1 + tolerance)
+        let zone = DetectionZone(referenceRect: CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.6), tolerance: 0.15)
+        XCTAssertEqual(zone.centerProximityRadius, 0.345, accuracy: 0.001)
+    }
+
+    func testCenterProximityRadiusWithZeroTolerance() {
+        let zone = DetectionZone(referenceRect: CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.6), tolerance: 0)
+        XCTAssertEqual(zone.centerProximityRadius, 0.3, accuracy: 0.001)
+    }
+
+    func testContainsCenterAcceptsCenteredBoxAtCalibratedSize() {
+        let cardBox = CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.6)
+        let zone = DetectionZone.calibrated(from: cardBox, tolerance: 0.15)
+        XCTAssertTrue(zone.containsCenter(of: cardBox))
+    }
+
+    func testContainsCenterAcceptsLargerCenteredBox() {
+        // 1.5× size at same center — simulates stack growth. Old containment check would reject.
+        let cardBox = CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.6)
+        let zone = DetectionZone.calibrated(from: cardBox, tolerance: 0.15)
+        let largerBox = CGRect(x: cardBox.midX - 0.3, y: cardBox.midY - 0.45, width: 0.6, height: 0.9)
+        XCTAssertFalse(zone.contains(largerBox))
+        XCTAssertTrue(zone.containsCenter(of: largerBox))
+    }
+
+    func testContainsCenterRejectsBoxAtFrameEdge() {
+        let zone = DetectionZone.calibrated(from: CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4), tolerance: 0.15)
+        let edgeBox = CGRect(x: 0.0, y: 0.8, width: 0.15, height: 0.2)
+        XCTAssertFalse(zone.containsCenter(of: edgeBox))
+    }
+
+    func testContainsCenterRespectsTolerance() {
+        // ref center=(0.5,0.5), tight radius=0.15, loose radius=0.225
+        // box center=(0.70,0.50) → distance=0.2 → outside tight, inside loose
+        let ref = CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.3)
+        let tight = DetectionZone(referenceRect: ref, tolerance: 0.0)
+        let loose = DetectionZone(referenceRect: ref, tolerance: 0.5)
+        let box = CGRect(x: 0.65, y: 0.45, width: 0.1, height: 0.1)
+        XCTAssertFalse(tight.containsCenter(of: box))
+        XCTAssertTrue(loose.containsCenter(of: box))
+    }
+
+    func testUncalibratedZoneCenterProximityCoversCenter() {
+        let zone = DetectionZone.uncalibrated
+        let centeredCard = CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.6)
+        XCTAssertTrue(zone.containsCenter(of: centeredCard))
+    }
+
+    func testUncalibratedZoneCenterProximityRejectsExtremeEdge() {
+        let zone = DetectionZone.uncalibrated
+        let edgeCard = CGRect(x: 0.0, y: 0.0, width: 0.15, height: 0.2)  // center=(0.075, 0.1)
+        XCTAssertFalse(zone.containsCenter(of: edgeCard))
+    }
 }

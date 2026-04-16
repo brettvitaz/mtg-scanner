@@ -166,8 +166,7 @@ struct ScanView: View {
                 }
                 : nil,
             torchLevel: detectionViewModel.torchLevel,
-            exposureBias: Float(appModel.exposureBias),
-            detectionZone: isAutoScanMode ? (autoScanViewModel.detectionZone ?? .fullFrame) : nil
+            exposureBias: Float(appModel.exposureBias)
         )
         .accessibilityHidden(true)
     }

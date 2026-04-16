@@ -375,17 +375,18 @@ private extension CardPresenceTracker {
             width: box.width,
             height: box.height
         )
-        let contained = zone.contains(visionBox)
-        let largeEnough = zone.isLargeEnough(visionBox)
+        // Use center-proximity instead of full containment so cards that grow
+        // larger in the frame as the physical stack grows still pass the filter.
+        let centered = zone.containsCenter(of: visionBox)
         let portrait = zone.isPortraitAspect(visionBox)
         #if DEBUG
-        if !contained || !largeEnough || !portrait {
-            let zoneRect = zone.effectiveRect
+        if !centered || !portrait {
             print("\(logTimestamp()) [CardPresence] Box rejected: yolo=\(box) vision=\(visionBox) " +
-                  "zone=\(zoneRect) contained=\(contained) largeEnough=\(largeEnough) portrait=\(portrait)")
+                  "center=\(zone.center) radius=\(zone.centerProximityRadius) " +
+                  "centered=\(centered) portrait=\(portrait)")
         }
         #endif
-        return contained && largeEnough && portrait
+        return centered && portrait
     }
 
     func loadDetector() -> YOLOCardDetector? {

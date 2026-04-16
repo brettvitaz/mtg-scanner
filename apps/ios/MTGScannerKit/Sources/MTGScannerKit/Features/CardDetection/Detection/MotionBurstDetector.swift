@@ -142,8 +142,11 @@ struct MotionBurstDetector: Sendable {
     /// Resets state machine to idle.
     mutating func reset() {
         state = .idle
+        frameIndex = 0
+        diffHistory = Array(repeating: 0.0, count: configuration.burstWindowSize)
         consecutiveLowFrames = 0
         consecutiveStableFrames = 0
+        previousDiff = 0
         burstStartFrame = nil
         burstMaxDiff = 0
         lastRejectionReason = nil

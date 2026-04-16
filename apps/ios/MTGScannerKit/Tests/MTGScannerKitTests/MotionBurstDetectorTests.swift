@@ -157,6 +157,8 @@ final class MotionBurstDetectorTests: XCTestCase {
         detector.reset()
 
         XCTAssertEqual(detector.state, .idle)
+        XCTAssertEqual(detector.frameIndex, 0)
+        XCTAssertEqual(detector.currentMetrics().currentDiff, 0, accuracy: 0.001)
         XCTAssertEqual(detector.currentMetrics().consecutiveLowFrames, 0)
     }
 

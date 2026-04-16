@@ -35,8 +35,8 @@ Return valid JSON only.
   "cards": [
     {
       "title": "Pactdoll Terror",
-      "edition": "Aetherdrift",
-      "edition_notes": "AET set symbol visible; corrected from Dominaria which does not contain this card.",
+      "edition": "DFT",
+      "edition_notes": "DFT set symbol visible; corrected from Dominaria which does not contain this card.",
       "collector_number": "99",
       "foil": false,
       "foil_type": "none",
@@ -44,7 +44,7 @@ Return valid JSON only.
       "list_reprint": "no",
       "list_symbol_visible": false,
       "border_color": "black",
-      "copyright_line": "99 R\nAET • EN   John Avon",
+      "copyright_line": "99 R\nDFT • EN   John Avon",
       "promo_text": null,
       "confidence": 0.82,
       "notes": "Corrected: matched Aetherdrift set symbol; original set Dominaria was invalid for this card."

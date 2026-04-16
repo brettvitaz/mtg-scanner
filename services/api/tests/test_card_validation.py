@@ -38,7 +38,7 @@ def validation_service(tmp_path: Path) -> CardValidationService:
               "name": "Aetherdrift",
               "releaseDate": "2026-02-14",
               "cards": [
-                {"uuid": "autarch-mammoth-dft-166", "name": "Autarch Mammoth", "setCode": "DFT", "number": "166", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]},
+                {"uuid": "autarch-mammoth-dft-153", "name": "Autarch Mammoth", "setCode": "DFT", "number": "166", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]},
                 {"uuid": "pactdoll-terror-dft-99", "name": "Pactdoll Terror", "setCode": "DFT", "number": "99", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]}
               ]
             },
@@ -182,7 +182,7 @@ def test_validate_card_rejects_impossible_title_and_set_combination(validation_s
         RecognizedCard(
             title="Autarch Mammoth",
             edition="Outlaws of Thunder Junction",
-            collector_number="166",
+            collector_number="153",
             foil=False,
             confidence=0.92,
             notes=None,
@@ -193,7 +193,7 @@ def test_validate_card_rejects_impossible_title_and_set_combination(validation_s
     assert result.card.title == "Autarch Mammoth"
     assert result.card.edition == "Aetherdrift"
     assert result.card.set_code == "DFT"
-    assert result.trace.matched_uuid == "autarch-mammoth-dft-166"
+    assert result.trace.matched_uuid == "autarch-mammoth-dft-153"
 
 
 def test_validate_card_rejects_collector_number_conflict_inside_resolved_set(validation_service: CardValidationService) -> None:
@@ -637,6 +637,30 @@ def test_list_reprint_yes_rewrites_identity_to_plst(
     assert result.card.set_code == "PLST"
     assert result.card.edition == "The List"
     assert result.card.collector_number == "M10-146"
+
+
+def test_list_reprint_yes_rechecks_foil_against_plst_printing(
+    list_plst_service: CardValidationService,
+) -> None:
+    """Foil validation must run against the rewritten PLST record, not the source printing."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=True,
+        confidence=0.90,
+        list_reprint="yes",
+        list_symbol_visible=True,
+    )
+    result = list_plst_service.validate_card(card)
+
+    assert result.card.set_code == "PLST"
+    assert result.card.collector_number == "M10-146"
+    assert result.card.confidence == 0.87
+    assert result.trace.matched_set_code == "PLST"
+    assert result.trace.matched_collector_number == "M10-146"
+    assert result.card.notes is not None
+    assert "This printing is not available in foil." in result.card.notes
 
 
 def test_validator_passes_through_llm_list_reprint_unchanged(

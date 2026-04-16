@@ -293,11 +293,6 @@ class CardValidationService:
         confidence_after = _adjust_confidence(card.confidence, status)
         notes = _merge_notes(card.notes, f"Validated against MTGJSON ({status}).")
 
-        foil_note, foil_penalty = _check_foil_mismatch(card.foil, match)
-        if foil_note:
-            notes = _merge_notes(notes, foil_note)
-        confidence_after = max(0.0, round(confidence_after - foil_penalty, 4))
-
         effective_match = match
         if card.list_reprint == "yes" and match.collector_number:
             plst_number = f"{match.set_code}-{match.collector_number}"
@@ -306,6 +301,11 @@ class CardValidationService:
             )
             if plst_record is not None:
                 effective_match = plst_record
+
+        foil_note, foil_penalty = _check_foil_mismatch(card.foil, effective_match)
+        if foil_note:
+            notes = _merge_notes(notes, foil_note)
+        confidence_after = max(0.0, round(confidence_after - foil_penalty, 4))
 
         validated_card = card.model_copy(
             update=_build_match_update(card, effective_match, confidence_after, notes, card.list_reprint, card.list_symbol_visible)
@@ -318,9 +318,9 @@ class CardValidationService:
                     dict[str, object], trace_base["normalized_inputs"]
                 ),
                 status=status,
-                matched_uuid=match.uuid,
-                matched_set_code=match.set_code,
-                matched_collector_number=match.collector_number,
+                matched_uuid=effective_match.uuid,
+                matched_set_code=effective_match.set_code,
+                matched_collector_number=effective_match.collector_number,
                 confidence_before=card.confidence,
                 confidence_after=confidence_after,
                 reason=reason,

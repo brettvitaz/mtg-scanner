@@ -8,9 +8,10 @@ import json
 import mimetypes
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from app.models.recognition import RecognitionUploadMetadata
-from app.services.recognizer import get_recognition_service
+if TYPE_CHECKING:
+    from app.models.recognition import RecognitionUploadMetadata
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLES_DIR = REPO_ROOT / "samples"
@@ -36,6 +37,9 @@ class CaseResult:
 
 
 def main() -> int:
+    from app.models.recognition import RecognitionUploadMetadata
+    from app.services.recognizer import get_recognition_service
+
     parser = argparse.ArgumentParser(description="Run MTG card recognition evals")
     parser.add_argument(
         "--prompt-version",
@@ -99,6 +103,13 @@ def main() -> int:
 
 
 DEFAULT_PASS_CRITERIA = {"title", "edition", "collector_number"}
+SUPPORTED_PASS_CRITERIA = {
+    "title": "matched_title_count",
+    "edition": "matched_edition_count",
+    "collector_number": "matched_collector_number_count",
+    "foil_type": "matched_foil_count",
+    "border_color": "matched_border_color_count",
+}
 
 
 def compare_case(
@@ -122,11 +133,13 @@ def compare_case(
         "title": matched_title_count,
         "edition": matched_edition_count,
         "collector_number": matched_collector_number_count,
+        "foil_type": matched_foil_count,
+        "border_color": matched_border_color_count,
     }
     passed = len(expected_cards) == len(actual_cards) and all(
         criteria_counts[field] == len(expected_cards)
         for field in pass_criteria
-        if field in criteria_counts
+        if field in SUPPORTED_PASS_CRITERIA
     )
 
     return CaseResult(

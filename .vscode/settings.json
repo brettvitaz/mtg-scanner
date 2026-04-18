@@ -1,5 +1,6 @@
 {
   "sweetpad.build.xcodeWorkspacePath": "apps/ios/MTGScanner.xcworkspace",
+  "swift.disableSwiftPackageManagerIntegration": true,
   "swift.path": "/usr/bin",
   "swift.swiftEnvironmentVariables": {
     "SDKROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"

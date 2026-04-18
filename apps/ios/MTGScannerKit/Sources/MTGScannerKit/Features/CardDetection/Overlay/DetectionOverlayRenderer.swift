@@ -47,7 +47,7 @@ final class DetectionOverlayRenderer {
     /// Draws yellow dashed rectangles to visualize raw YOLO detections.
     ///
     /// Must be called on the main thread.
-    func updateYOLOOverlay(boxes: [CardBoundingBox], sourceSize: CGSize, previewLayer: AVCaptureVideoPreviewLayer) {
+    func updateYOLOOverlay(boxes: [CardBoundingBox], previewLayer: AVCaptureVideoPreviewLayer) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
@@ -61,13 +61,7 @@ final class DetectionOverlayRenderer {
 
         let path = UIBezierPath()
         for box in boxes {
-            let rect = CGRect(
-                x: box.rect.minX * sourceSize.width,
-                y: box.rect.minY * sourceSize.height,
-                width: box.rect.width * sourceSize.width,
-                height: box.rect.height * sourceSize.height
-            )
-            let screenRect = rectToLayer(yoloRectToVision(rect), previewLayer: previewLayer)
+            let screenRect = rectToLayer(yoloRectToVision(box.rect), previewLayer: previewLayer)
             path.append(UIBezierPath(rect: screenRect))
         }
         layer.path = path.cgPath

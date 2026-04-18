@@ -30,18 +30,8 @@ struct ScanView: View {
                     .allowsHitTesting(false)
             }
         }
-        .onAppear {
-            detectionViewModel.requestCameraPermissionIfNeeded()
-            lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
-            configureAutoScan()
-            UIApplication.shared.isIdleTimerDisabled = true
-        }
-        .onDisappear {
-            lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
-            UIApplication.shared.isIdleTimerDisabled = false
-            storeAndTurnOffTorch()
-            autoScanViewModel.stop()
-        }
+        .onAppear(perform: onAppearHandler)
+        .onDisappear(perform: onDisappearHandler)
         .onChange(of: appModel.apiBaseURL) { _, url in
             autoScanViewModel.apiBaseURL = url
         }
@@ -73,10 +63,7 @@ struct ScanView: View {
         } message: {
             Text("Enable camera access in Settings to use real-time card detection.")
         }
-        .alert("Photo Load Error", isPresented: Binding(
-            get: { photoLoadError != nil },
-            set: { if !$0 { photoLoadError = nil } }
-        )) {
+        .alert("Photo Load Error", isPresented: photoLoadErrorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(photoLoadError ?? "")
@@ -96,6 +83,18 @@ struct ScanView: View {
         autoScanViewModel.captureDelay = appModel.autoScanCaptureDelay
         autoScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.autoScanConfidenceThreshold)
         autoScanViewModel.recognitionQueue.maxConcurrent = appModel.maxConcurrentUploads
+        autoScanViewModel.updateMotionBurstConfiguration(motionBurstConfiguration)
+    }
+
+    private var motionBurstConfiguration: MotionBurstConfiguration {
+        let baseConfig = appModel.motionBurstPreset.configuration
+        if appModel.motionBurstPreset == .custom {
+            var config = baseConfig
+            config.motionThreshold = Float(appModel.motionBurstMotionThreshold)
+            config.minPeakThreshold = Float(appModel.motionBurstMinPeakThreshold)
+            return config
+        }
+        return baseConfig
     }
 
     private var isAutoScanMode: Bool {
@@ -166,7 +165,8 @@ struct ScanView: View {
                     }
                 }
                 : nil,
-            torchLevel: detectionViewModel.torchLevel
+            torchLevel: detectionViewModel.torchLevel,
+            exposureBias: Float(appModel.exposureBias)
         )
         .accessibilityHidden(true)
     }
@@ -280,5 +280,26 @@ private extension ScanView {
     private func handleScenePhaseChange(_ phase: ScenePhase) {
         guard phase == .background else { return }
         storeAndTurnOffTorch()
+    }
+
+    private var photoLoadErrorBinding: Binding<Bool> {
+        Binding(
+            get: { photoLoadError != nil },
+            set: { if !$0 { photoLoadError = nil } }
+        )
+    }
+
+    private func onAppearHandler() {
+        detectionViewModel.requestCameraPermissionIfNeeded()
+        lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
+        configureAutoScan()
+        UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    private func onDisappearHandler() {
+        lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
+        UIApplication.shared.isIdleTimerDisabled = false
+        storeAndTurnOffTorch()
+        autoScanViewModel.stop()
     }
 }

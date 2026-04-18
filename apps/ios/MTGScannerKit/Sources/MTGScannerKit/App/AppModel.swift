@@ -27,6 +27,18 @@ public final class AppModel {
     var maxConcurrentUploads: Int {
         didSet { UserDefaults.standard.set(maxConcurrentUploads, forKey: maxConcurrentUploadsKey) }
     }
+    var motionBurstPreset: MotionBurstPreset {
+        didSet { UserDefaults.standard.set(motionBurstPreset.rawValue, forKey: motionBurstPresetKey) }
+    }
+    var motionBurstMotionThreshold: Double {
+        didSet { UserDefaults.standard.set(motionBurstMotionThreshold, forKey: motionBurstMotionThresholdKey) }
+    }
+    var motionBurstMinPeakThreshold: Double {
+        didSet { UserDefaults.standard.set(motionBurstMinPeakThreshold, forKey: motionBurstMinPeakThresholdKey) }
+    }
+    var exposureBias: Double {
+        didSet { UserDefaults.standard.set(exposureBias, forKey: exposureBiasKey) }
+    }
     var isRecognizing = false
     var statusMessage = "Point camera at cards to scan."
     var lastUploadedFilename: String?
@@ -54,6 +66,10 @@ public final class AppModel {
     private let autoScanCaptureDelayKey = "auto_scan_capture_delay"
     private let autoScanConfidenceKey = "auto_scan_confidence_threshold"
     private let maxConcurrentUploadsKey = "max_concurrent_uploads"
+    private let motionBurstPresetKey = "motion_burst_preset"
+    private let motionBurstMotionThresholdKey = "motion_burst_motion_threshold"
+    private let motionBurstMinPeakThresholdKey = "motion_burst_min_peak_threshold"
+    private let exposureBiasKey = "exposure_bias"
 
     public init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
@@ -64,22 +80,19 @@ public final class AppModel {
         self.autoScanConfidenceThreshold = Self.clampAutoScanConfidence(storedConf)
         let storedConcurrent = UserDefaults.standard.integer(forKey: maxConcurrentUploadsKey)
         self.maxConcurrentUploads = Self.clampMaxConcurrentUploads(storedConcurrent)
+        let storedPreset = UserDefaults.standard.string(forKey: motionBurstPresetKey)
+        self.motionBurstPreset = MotionBurstPreset(rawValue: storedPreset ?? "") ?? .balanced
+        let storedMotionThreshold = UserDefaults.standard.double(forKey: motionBurstMotionThresholdKey)
+        self.motionBurstMotionThreshold = Self.clampMotionBurstMotionThreshold(
+            storedMotionThreshold > 0 ? storedMotionThreshold : 0.015
+        )
+        let storedMinPeak = UserDefaults.standard.double(forKey: motionBurstMinPeakThresholdKey)
+        self.motionBurstMinPeakThreshold = Self.clampMotionBurstMinPeakThreshold(
+            storedMinPeak > 0 ? storedMinPeak : 0.05
+        )
+        let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
+        self.exposureBias = storedBias ?? 0.0
         loadCorrections()
-    }
-
-    private static func clampAutoScanCaptureDelay(_ value: Double) -> Double {
-        guard value > 0 else { return 2.0 }
-        return min(max(value, 0.5), 5.0)
-    }
-
-    private static func clampAutoScanConfidence(_ value: Double) -> Double {
-        guard value > 0 else { return 0.5 }
-        return min(max(value, 0.3), 0.9)
-    }
-
-    private static func clampMaxConcurrentUploads(_ value: Int) -> Int {
-        guard value > 0 else { return 2 }
-        return min(max(value, 1), 6)
     }
 
     // MARK: - Recognition entry points
@@ -232,6 +245,35 @@ public final class AppModel {
 
 }
 
+// MARK: - UserDefaults Clamping
+
+private extension AppModel {
+    static func clampAutoScanCaptureDelay(_ value: Double) -> Double {
+        guard value > 0 else { return 2.0 }
+        return min(max(value, 0.5), 5.0)
+    }
+
+    static func clampAutoScanConfidence(_ value: Double) -> Double {
+        guard value > 0 else { return 0.5 }
+        return min(max(value, 0.3), 0.9)
+    }
+
+    static func clampMaxConcurrentUploads(_ value: Int) -> Int {
+        guard value > 0 else { return 2 }
+        return min(max(value, 1), 6)
+    }
+
+    static func clampMotionBurstMotionThreshold(_ value: Double) -> Double {
+        guard value > 0 else { return 0.015 }
+        return min(max(value, 0.005), 0.050)
+    }
+
+    static func clampMotionBurstMinPeakThreshold(_ value: Double) -> Double {
+        guard value > 0 else { return 0.05 }
+        return min(max(value, 0.020), 0.100)
+    }
+}
+
 // MARK: - Card Search and Printings
 
 extension AppModel {
@@ -318,5 +360,38 @@ extension AppModel {
         guard let latestUndoAction else { return }
         latestUndoAction()
         self.latestUndoAction = nil
+    }
+
+    func resetMotionBurstSettings() {
+        motionBurstPreset = .balanced
+        motionBurstMotionThreshold = 0.015
+        motionBurstMinPeakThreshold = 0.05
+    }
+}
+
+// MARK: - Motion Burst Preset
+
+public enum MotionBurstPreset: String, CaseIterable, Sendable {
+    case fast
+    case balanced
+    case conservative
+    case custom
+
+    public var displayName: String {
+        switch self {
+        case .fast: return "Fast"
+        case .balanced: return "Balanced"
+        case .conservative: return "Conservative"
+        case .custom: return "Custom"
+        }
+    }
+
+    var configuration: MotionBurstConfiguration {
+        switch self {
+        case .fast: return .fast
+        case .balanced: return .balanced
+        case .conservative: return .conservative
+        case .custom: return .balanced // Custom uses stored values
+        }
     }
 }

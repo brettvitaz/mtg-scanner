@@ -20,11 +20,17 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
     /// Called on the session queue for each delivered pixel buffer (CameraFrameSource).
     var onPixelBuffer: ((CVPixelBuffer, CMTime) -> Void)?
 
+    /// Prefer the physical wide-angle sensor directly over virtual multi-lens devices.
+    ///
+    /// Virtual devices (triple, dual-wide, dual) switch between physical lenses automatically
+    /// as zoom changes. Each switch interrupts the video stream, corrupting the motion
+    /// reference frame and causing spurious detections. The wide-angle physical sensor
+    /// never switches lenses — zoom is purely digital on that one sensor.
     static let preferredBackCameraTypes: [AVCaptureDevice.DeviceType] = [
-        .builtInTripleCamera,
-        .builtInDualWideCamera,
+        .builtInWideAngleCamera,
         .builtInDualCamera,
-        .builtInWideAngleCamera
+        .builtInDualWideCamera,
+        .builtInTripleCamera
     ]
 
     // MARK: - Internal (visible for testing)
@@ -256,6 +262,30 @@ private extension CameraSessionManager {
             device.exposureMode = .continuousAutoExposure
         }
         device.unlockForConfiguration()
+    }
+}
+
+// MARK: - Exposure
+
+extension CameraSessionManager {
+
+    /// Sets the exposure bias (EV offset) on the capture device.
+    ///
+    /// A positive value brightens the image; negative darkens it.
+    /// The device clamps the value to its supported range automatically.
+    /// Dispatches to the session queue and is safe to call from any thread.
+    func setExposureBias(_ bias: Float) {
+        sessionQueue.async { [weak self] in
+            guard
+                let self,
+                let device = self.captureDevice,
+                device.isExposureModeSupported(.custom) || device.isExposureModeSupported(.continuousAutoExposure)
+            else { return }
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            let clamped = max(device.minExposureTargetBias, min(device.maxExposureTargetBias, bias))
+            device.setExposureTargetBias(clamped)
+            device.unlockForConfiguration()
+        }
     }
 }
 

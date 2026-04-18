@@ -31,6 +31,10 @@ final class AutoScanViewModel {
     private(set) var captureState: CaptureState = .watching
     private(set) var statusMessage = "Tap Start to begin."
     private(set) var lastCroppedImage: UIImage?
+    private(set) var isCalibrated = false
+    var detectionZone: DetectionZone? {
+        didSet { presenceTracker.setZone(detectionZone) }
+    }
 
     // MARK: - Child Objects
 
@@ -53,10 +57,23 @@ final class AutoScanViewModel {
     private var settleTask: Task<Void, Never>?
     private let cropImage: @Sendable (UIImage) async -> CardCropResult
 
+    private struct CropResult {
+        let image: UIImage?
+        let boundingBox: CGRect?
+        let sourceSize: CGSize?
+    }
+
+    /// Video dimensions from session preset .hd1920x1080
+    private static let videoSize = CGSize(width: 1920, height: 1080)
+
     // MARK: - Init
 
-    init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init) {
-        presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
+    init(detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
+         burstConfiguration: MotionBurstConfiguration = .balanced) {
+        presenceTracker = CardPresenceTracker(
+            detectorProvider: detectorProvider,
+            burstConfiguration: burstConfiguration
+        )
         recognitionQueue = RecognitionQueue()
         identifiedCardsViewModel = IdentifiedCardsViewModel()
         let service = CardCropService()
@@ -115,10 +132,25 @@ final class AutoScanViewModel {
         lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
         identifiedCardsViewModel.clearAll()
+        presenceTracker.resetZone()
+        detectionZone = nil
+        isCalibrated = false
     }
 
     func cancelRecognition() {
         recognitionQueue.cancelAll()
+    }
+
+    /// Resets the detection zone calibration, reverting to default (full frame) detection.
+    func resetDetectionZone() {
+        presenceTracker.resetZone()
+        detectionZone = nil
+        isCalibrated = false
+    }
+
+    /// Updates the motion burst detection configuration.
+    func updateMotionBurstConfiguration(_ configuration: MotionBurstConfiguration) {
+        presenceTracker.burstConfiguration = configuration
     }
 
     // MARK: - Standard Scan Enqueue
@@ -164,15 +196,19 @@ final class AutoScanViewModel {
     // MARK: - Frame Forwarding
 
     /// Forward camera frames to the presence tracker while active.
+    ///
+    /// Frames are dropped during `.settling` and `.capturing` — there is no value in
+    /// processing motion while a capture is imminent or in progress, and doing so
+    /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, captureState != .capturing else { return }
+        guard isActive, captureState == .watching else { return }
         presenceTracker.processFrame(sampleBuffer)
     }
 
     // MARK: - State Machine
 
     private func handleNewCardSignal(boundingBox: CGRect?) {
-        guard isActive else { return }
+        guard isActive, boundingBox != nil else { return }
         switch captureState {
         case .watching:
             startSettleTimer()
@@ -200,27 +236,46 @@ final class AutoScanViewModel {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         guard let payload = await captureCoordinator?.capturePhoto() else {
+            presenceTracker.markCaptured()
             captureState = .watching
             statusMessage = "Capture failed — watching…"
             return
         }
 
-        let cropped = await cropCapturedPayload(payload)
-        lastCroppedImage = cropped
-        presenceTracker.markCaptured()
-        enqueueAfterCapture(payload: payload, cropped: cropped)
+        let result = await cropCapturedPayload(payload)
+        lastCroppedImage = result.image
+        if let box = result.boundingBox, !isCalibrated {
+            let calibratedZone = DetectionZone.calibrated(fromYOLO: box)
+            // Set zone on the tracker directly via presenceQueue so the
+            // reference update from markCaptured runs BEFORE the zone change.
+            presenceTracker.markCapturedAndSetZone(calibratedZone)
+            detectionZone = calibratedZone
+            isCalibrated = true
+        } else {
+            presenceTracker.markCaptured()
+        }
+        enqueueAfterCapture(payload: payload, cropped: result.image)
         captureState = .watching
         statusMessage = "Captured! Watching for next card…"
     }
+}
 
-    private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> UIImage? {
+// MARK: - Crop Helpers
+private extension AutoScanViewModel {
+    private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> CropResult {
         let uprightImage = AutoScanCropHelper.normalizedImage(payload.displayImage)
-        guard let cgImage = uprightImage.cgImage,
-              let box = await presenceTracker.detectBestBox(in: cgImage) else { return nil }
-        return AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+        guard let cgImage = uprightImage.cgImage else {
+            return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
+        }
+        let sourceSize = CGSize(width: cgImage.width, height: cgImage.height)
+        guard let box = await presenceTracker.detectBestBox(in: cgImage) else {
+            return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
+        }
+        let cropped = AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+        return CropResult(image: cropped, boundingBox: box, sourceSize: sourceSize)
     }
 
-    private func enqueueAfterCapture(payload: RecognitionImagePayload, cropped: UIImage?) {
+    func enqueueAfterCapture(payload: RecognitionImagePayload, cropped: UIImage?) {
         if let cropped,
            let cropPayload = RecognitionImagePayload.generatedJPEG(from: cropped) {
             recognitionQueue.enqueue(
@@ -231,74 +286,5 @@ final class AutoScanViewModel {
                 payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
             )
         }
-    }
-}
-
-/// Manages the queue of recently identified cards for toast display.
-///
-/// Maintains up to `maxCards` recent identifications, auto-dismissing
-/// each card after `displayDuration` seconds.
-@MainActor
-@Observable
-final class IdentifiedCardsViewModel {
-
-    // MARK: - Published State
-
-    private(set) var recentCards: [IdentifiedCard] = []
-
-    // MARK: - Configuration
-
-    let maxCards = 10
-    let displayDuration: TimeInterval = 3.0
-
-    // MARK: - Private State
-
-    private var removalTasks: [UUID: Task<Void, Never>] = [:]
-
-    // MARK: - Public API
-
-    /// Adds a newly identified card to the queue.
-    /// If the queue exceeds `maxCards`, the oldest card is removed immediately.
-    /// The card will be automatically removed after `displayDuration` seconds.
-    func addCard(_ card: IdentifiedCard) {
-        recentCards.insert(card, at: 0)
-
-        if recentCards.count > maxCards {
-            let removed = recentCards.removeLast()
-            cancelRemovalTask(for: removed.id)
-        }
-
-        scheduleRemoval(for: card)
-    }
-
-    /// Manually removes a card from the queue (e.g., user dismissal).
-    func removeCard(id: UUID) {
-        cancelRemovalTask(for: id)
-        recentCards.removeAll { $0.id == id }
-    }
-
-    /// Clears all cards and cancels pending removal tasks.
-    func clearAll() {
-        for task in removalTasks.values {
-            task.cancel()
-        }
-        removalTasks.removeAll()
-        recentCards.removeAll()
-    }
-
-    // MARK: - Private Helpers
-
-    private func scheduleRemoval(for card: IdentifiedCard) {
-        let task = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(self?.displayDuration ?? 3.0))
-            guard !Task.isCancelled else { return }
-            await self?.removeCard(id: card.id)
-        }
-        removalTasks[card.id] = task
-    }
-
-    private func cancelRemovalTask(for id: UUID) {
-        removalTasks[id]?.cancel()
-        removalTasks.removeValue(forKey: id)
     }
 }

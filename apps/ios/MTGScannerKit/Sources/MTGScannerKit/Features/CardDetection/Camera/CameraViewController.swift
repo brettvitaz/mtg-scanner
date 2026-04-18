@@ -98,6 +98,9 @@ final class CameraViewController: UIViewController {
 
     func updateDetectionMode(_ mode: DetectionMode) {
         engine.updateDetectionMode(mode)
+        if mode == .auto {
+            renderer?.clear()
+        }
     }
 
     func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
@@ -115,6 +118,13 @@ final class CameraViewController: UIViewController {
 
     private func applyTorchLevel(_ level: Float) {
         sessionManager.setTorchLevel(level)
+    }
+
+    // MARK: - Exposure
+
+    /// Sets the exposure bias (EV offset). Positive = brighter, negative = darker.
+    func setExposureBias(_ bias: Float) {
+        sessionManager.setExposureBias(bias)
     }
 
     // MARK: - Zoom
@@ -187,7 +197,10 @@ final class CameraViewController: UIViewController {
 
         engine.onDetection = { [weak self] cards in
             guard let self, let previewLayer = self.previewLayer else { return }
-            self.renderer?.update(detections: cards, previewLayer: previewLayer)
+            // Only show green detection overlay in scan mode, not auto mode (which uses YOLO)
+            if self.engine.currentDetectionMode == .scan {
+                self.renderer?.update(detections: cards, previewLayer: previewLayer)
+            }
             self.onDetectedCardsChanged?(cards)
         }
     }

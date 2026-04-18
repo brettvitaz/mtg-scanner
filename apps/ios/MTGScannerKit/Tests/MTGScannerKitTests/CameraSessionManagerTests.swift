@@ -35,10 +35,10 @@ final class CameraSessionManagerTests: XCTestCase {
         XCTAssertEqual(
             CameraSessionManager.preferredBackCameraTypes,
             [
-                .builtInTripleCamera,
-                .builtInDualWideCamera,
+                .builtInWideAngleCamera,
                 .builtInDualCamera,
-                .builtInWideAngleCamera
+                .builtInDualWideCamera,
+                .builtInTripleCamera
             ]
         )
     }

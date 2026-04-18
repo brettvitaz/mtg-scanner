@@ -14,11 +14,63 @@ final class DetectionOverlayRenderer {
     private weak var detectionLayer: CALayer?
     private var layerPool: [CAShapeLayer] = []
     private var lastDetectionCount: Int = -1
+    private var yoloOverlayLayer: CAShapeLayer?
 
     // MARK: - Init
 
     init(detectionLayer: CALayer) {
         self.detectionLayer = detectionLayer
+        setupYOLOOverlay(in: detectionLayer)
+    }
+
+    // MARK: - YOLO Debug Overlay
+
+    private func setupYOLOOverlay(in parent: CALayer?) {
+        let layer = CAShapeLayer()
+        layer.strokeColor = UIColor.systemYellow.withAlphaComponent(0.8).cgColor
+        layer.fillColor = UIColor.clear.cgColor
+        layer.lineWidth = 2.0
+        layer.lineDashPattern = [4, 2]
+        layer.isHidden = true
+        layer.actions = [
+            "path": NSNull(),
+            "hidden": NSNull(),
+            "opacity": NSNull()
+        ]
+        parent?.addSublayer(layer)
+        yoloOverlayLayer = layer
+    }
+
+    /// Updates the YOLO debug overlay with raw bounding boxes.
+    ///
+    /// Boxes are in top-left origin normalized coordinates (0-1).
+    /// Draws yellow dashed rectangles to visualize raw YOLO detections.
+    ///
+    /// Must be called on the main thread.
+    func updateYOLOOverlay(boxes: [CardBoundingBox], previewLayer: AVCaptureVideoPreviewLayer) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
+        guard let layer = yoloOverlayLayer else { return }
+
+        if boxes.isEmpty {
+            layer.isHidden = true
+            return
+        }
+
+        let path = UIBezierPath()
+        for box in boxes {
+            let screenRect = rectToLayer(yoloRectToVision(box.rect), previewLayer: previewLayer)
+            path.append(UIBezierPath(rect: screenRect))
+        }
+        layer.path = path.cgPath
+        layer.isHidden = false
+    }
+
+    /// Hides the YOLO debug overlay.
+    func hideYOLOOverlay() {
+        yoloOverlayLayer?.isHidden = true
     }
 
     // MARK: - Public Update
@@ -116,5 +168,25 @@ final class DetectionOverlayRenderer {
             "bounds": NSNull()
         ]
         return layer
+    }
+
+    private func yoloRectToVision(_ rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.minX,
+            y: 1.0 - rect.maxY,
+            width: rect.width,
+            height: rect.height
+        )
+    }
+
+    private func rectToLayer(_ rect: CGRect, previewLayer: AVCaptureVideoPreviewLayer) -> CGRect {
+        // Vision rect is in normalized bottom-left-origin coordinates
+        // Convert min/max points to layer coordinates (VisionPointToLayer handles Y-flip)
+        let origin = Self.visionPointToLayer(CGPoint(x: rect.minX, y: rect.minY), previewLayer: previewLayer)
+        let maxPoint = Self.visionPointToLayer(CGPoint(x: rect.maxX, y: rect.maxY), previewLayer: previewLayer)
+        // Calculate rect from converted points (note: after Y-flip, maxY becomes minY visually)
+        let minY = min(origin.y, maxPoint.y)
+        let height = abs(maxPoint.y - origin.y)
+        return CGRect(x: origin.x, y: minY, width: maxPoint.x - origin.x, height: height)
     }
 }

@@ -6,6 +6,10 @@ final class DetectionOverlayRendererTests: XCTestCase {
 
     // MARK: - Layer pool
 
+    private var detectionLayerPoolCount: Int {
+        1 // YOLO debug overlay layer only
+    }
+
     func testUpdateWithNoDetectionsClearsAllLayers() {
         let parent = CALayer()
         let renderer = DetectionOverlayRenderer(detectionLayer: parent)
@@ -18,11 +22,11 @@ final class DetectionOverlayRendererTests: XCTestCase {
             makeCard(id: 1)
         ]
         renderer.update(detections: cards, previewLayer: previewLayer)
-        XCTAssertEqual(parent.sublayers?.count, 2)
+        XCTAssertEqual(parent.sublayers?.count, 2 + detectionLayerPoolCount)
 
         renderer.update(detections: [], previewLayer: previewLayer)
-        // Layers remain in the pool but should all be hidden.
-        let visible = parent.sublayers?.filter { !$0.isHidden } ?? []
+        // Layers remain in the pool but should all be hidden (excluding zone overlay).
+        let visible = parent.sublayers?.filter { !$0.isHidden && $0 !== parent.sublayers?.first } ?? []
         XCTAssertEqual(visible.count, 0)
     }
 
@@ -32,10 +36,10 @@ final class DetectionOverlayRendererTests: XCTestCase {
         let previewLayer = AVCaptureVideoPreviewLayer(session: AVCaptureSession())
 
         renderer.update(detections: [makeCard(id: 0)], previewLayer: previewLayer)
-        XCTAssertEqual(parent.sublayers?.count, 1)
+        XCTAssertEqual(parent.sublayers?.count, 1 + detectionLayerPoolCount)
 
         renderer.update(detections: [makeCard(id: 0), makeCard(id: 1), makeCard(id: 2)], previewLayer: previewLayer)
-        XCTAssertEqual(parent.sublayers?.count, 3)
+        XCTAssertEqual(parent.sublayers?.count, 3 + detectionLayerPoolCount)
     }
 
     func testUpdateDoesNotShrinkPoolWhenDetectionCountDecreases() {
@@ -45,12 +49,12 @@ final class DetectionOverlayRendererTests: XCTestCase {
         let previewLayer = AVCaptureVideoPreviewLayer(session: AVCaptureSession())
 
         renderer.update(detections: (0..<5).map { makeCard(id: $0) }, previewLayer: previewLayer)
-        XCTAssertEqual(parent.sublayers?.count, 5)
+        XCTAssertEqual(parent.sublayers?.count, 5 + detectionLayerPoolCount)
 
         renderer.update(detections: [makeCard(id: 0)], previewLayer: previewLayer)
-        // Still 5 layers in the pool; only 1 is visible.
-        XCTAssertEqual(parent.sublayers?.count, 5)
-        let visible = parent.sublayers?.filter { !$0.isHidden } ?? []
+        // Still 5 layers in the pool + zone overlay; only 1 is visible (detection layers, not zone).
+        XCTAssertEqual(parent.sublayers?.count, 5 + detectionLayerPoolCount)
+        let visible = parent.sublayers?.filter { !$0.isHidden && $0 !== parent.sublayers?.first } ?? []
         XCTAssertEqual(visible.count, 1)
     }
 
@@ -60,11 +64,11 @@ final class DetectionOverlayRendererTests: XCTestCase {
         let previewLayer = AVCaptureVideoPreviewLayer(session: AVCaptureSession())
 
         renderer.update(detections: (0..<3).map { makeCard(id: $0) }, previewLayer: previewLayer)
-        let visibleBefore = parent.sublayers?.filter { !$0.isHidden }.count ?? 0
+        let visibleBefore = parent.sublayers?.filter { !$0.isHidden && $0 !== parent.sublayers?.first }.count ?? 0
         XCTAssertEqual(visibleBefore, 3)
 
         renderer.clear()
-        let visibleAfter = parent.sublayers?.filter { !$0.isHidden }.count ?? 0
+        let visibleAfter = parent.sublayers?.filter { !$0.isHidden && $0 !== parent.sublayers?.first }.count ?? 0
         XCTAssertEqual(visibleAfter, 0)
     }
 
@@ -75,7 +79,8 @@ final class DetectionOverlayRendererTests: XCTestCase {
 
         renderer.update(detections: [makeCard(id: 0)], previewLayer: previewLayer)
 
-        guard let shapeLayer = parent.sublayers?.first as? CAShapeLayer else {
+        // Detection layers are at the end; zone overlay is first
+        guard let shapeLayer = parent.sublayers?.last as? CAShapeLayer else {
             XCTFail("Expected a CAShapeLayer in pool")
             return
         }

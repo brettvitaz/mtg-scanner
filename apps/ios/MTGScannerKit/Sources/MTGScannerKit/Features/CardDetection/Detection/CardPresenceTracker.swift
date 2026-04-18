@@ -225,6 +225,7 @@ final class CardPresenceTracker: @unchecked Sendable {
         let motionZone = detectionZone?.effectiveRect
         let samples = analyzer.sample(pixelBuffer, zone: motionZone)
         lastSamples = samples
+        let legacyMode = useLegacyDetection
 
         #if DEBUG
         logFrameInfo(pixelBuffer: pixelBuffer, samples: samples, motionZone: motionZone)
@@ -233,7 +234,7 @@ final class CardPresenceTracker: @unchecked Sendable {
         let diff = calculateFrameDiff(samples: samples)
         checkReferenceDecay()
 
-        let shouldTrigger = determineTrigger(diff: diff)
+        let shouldTrigger = determineTrigger(diff: diff, legacyMode: legacyMode)
         sendDebugMetricsIfEnabled()
 
         #if DEBUG
@@ -263,8 +264,8 @@ final class CardPresenceTracker: @unchecked Sendable {
         #endif
     }
 
-    private func determineTrigger(diff: Float) -> Bool {
-        useLegacyDetection
+    private func determineTrigger(diff: Float, legacyMode: Bool) -> Bool {
+        legacyMode
             ? diff >= burstConfiguration.motionThreshold
             : burstDetector.process(diff: diff)
     }

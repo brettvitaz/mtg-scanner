@@ -83,27 +83,16 @@ public final class AppModel {
         let storedPreset = UserDefaults.standard.string(forKey: motionBurstPresetKey)
         self.motionBurstPreset = MotionBurstPreset(rawValue: storedPreset ?? "") ?? .balanced
         let storedMotionThreshold = UserDefaults.standard.double(forKey: motionBurstMotionThresholdKey)
-        self.motionBurstMotionThreshold = storedMotionThreshold > 0 ? storedMotionThreshold : 0.015
+        self.motionBurstMotionThreshold = Self.clampMotionBurstMotionThreshold(
+            storedMotionThreshold > 0 ? storedMotionThreshold : 0.015
+        )
         let storedMinPeak = UserDefaults.standard.double(forKey: motionBurstMinPeakThresholdKey)
-        self.motionBurstMinPeakThreshold = storedMinPeak > 0 ? storedMinPeak : 0.05
+        self.motionBurstMinPeakThreshold = Self.clampMotionBurstMinPeakThreshold(
+            storedMinPeak > 0 ? storedMinPeak : 0.05
+        )
         let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
         self.exposureBias = storedBias ?? 0.0
         loadCorrections()
-    }
-
-    private static func clampAutoScanCaptureDelay(_ value: Double) -> Double {
-        guard value > 0 else { return 2.0 }
-        return min(max(value, 0.5), 5.0)
-    }
-
-    private static func clampAutoScanConfidence(_ value: Double) -> Double {
-        guard value > 0 else { return 0.5 }
-        return min(max(value, 0.3), 0.9)
-    }
-
-    private static func clampMaxConcurrentUploads(_ value: Int) -> Int {
-        guard value > 0 else { return 2 }
-        return min(max(value, 1), 6)
     }
 
     // MARK: - Recognition entry points
@@ -254,6 +243,35 @@ public final class AppModel {
         }
     }
 
+}
+
+// MARK: - UserDefaults Clamping
+
+private extension AppModel {
+    static func clampAutoScanCaptureDelay(_ value: Double) -> Double {
+        guard value > 0 else { return 2.0 }
+        return min(max(value, 0.5), 5.0)
+    }
+
+    static func clampAutoScanConfidence(_ value: Double) -> Double {
+        guard value > 0 else { return 0.5 }
+        return min(max(value, 0.3), 0.9)
+    }
+
+    static func clampMaxConcurrentUploads(_ value: Int) -> Int {
+        guard value > 0 else { return 2 }
+        return min(max(value, 1), 6)
+    }
+
+    static func clampMotionBurstMotionThreshold(_ value: Double) -> Double {
+        guard value > 0 else { return 0.015 }
+        return min(max(value, 0.005), 0.050)
+    }
+
+    static func clampMotionBurstMinPeakThreshold(_ value: Double) -> Double {
+        guard value > 0 else { return 0.05 }
+        return min(max(value, 0.020), 0.100)
+    }
 }
 
 // MARK: - Card Search and Printings

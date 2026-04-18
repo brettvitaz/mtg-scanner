@@ -144,6 +144,7 @@ final class AutoScanViewModel {
     /// Resets the detection zone calibration, reverting to default (full frame) detection.
     func resetDetectionZone() {
         presenceTracker.resetZone()
+        detectionZone = nil
         isCalibrated = false
     }
 
@@ -235,6 +236,7 @@ final class AutoScanViewModel {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         guard let payload = await captureCoordinator?.capturePhoto() else {
+            presenceTracker.markCaptured()
             captureState = .watching
             statusMessage = "Capture failed — watching…"
             return
@@ -242,12 +244,8 @@ final class AutoScanViewModel {
 
         let result = await cropCapturedPayload(payload)
         lastCroppedImage = result.image
-        if let box = result.boundingBox, let sourceSize = result.sourceSize, !isCalibrated {
-            let calibratedZone = DetectionZone.calibrated(
-                fromYOLO: box,
-                sourceSize: sourceSize,
-                videoSize: Self.videoSize
-            )
+        if let box = result.boundingBox, !isCalibrated {
+            let calibratedZone = DetectionZone.calibrated(fromYOLO: box)
             // Set zone on the tracker directly via presenceQueue so the
             // reference update from markCaptured runs BEFORE the zone change.
             presenceTracker.markCapturedAndSetZone(calibratedZone)

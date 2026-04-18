@@ -54,13 +54,9 @@ final class DetectionZoneTests: XCTestCase {
 
     func testCalibratedFromYOLO() {
         // Photo: 3024x4032 (portrait), Video: 1920x1080 (landscape)
-        let sourceSize = CGSize(width: 3024, height: 4032)
-        let videoSize = CGSize(width: 1920, height: 1080)
         let yoloBox = CGRect(x: 0.2, y: 0.3, width: 0.4, height: 0.5)
         let zone = DetectionZone.calibrated(
             fromYOLO: yoloBox,
-            sourceSize: sourceSize,
-            videoSize: videoSize,
             tolerance: 0.15
         )
         // Verify zone was created with expected tolerance
@@ -81,9 +77,8 @@ final class DetectionZoneTests: XCTestCase {
     func testCalibratedFromYOLOConvertsTopLeftToBottomLeft() {
         // Square aspect ratio test - demonstrates 90-degree rotation + Vision Y-flip
         // With square, aspect ratios match, so it's pure rotation
-        let size = CGSize(width: 1000, height: 1000)
         let yoloBox = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.4)
-        let zone = DetectionZone.calibrated(fromYOLO: yoloBox, sourceSize: size, videoSize: size)
+        let zone = DetectionZone.calibrated(fromYOLO: yoloBox, tolerance: 0.15)
 
         // Yolo box: center=(0.25, 0.3), size=(0.3, 0.4)
         // After 90-degree rotation:

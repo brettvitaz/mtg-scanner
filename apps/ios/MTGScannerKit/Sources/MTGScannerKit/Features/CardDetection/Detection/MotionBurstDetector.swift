@@ -41,7 +41,7 @@ struct MotionBurstDetector: Sendable {
     private var idleBaseline: Float = 0
 
     /// Timestamp of last reference frame update.
-    private var lastReferenceUpdate: Date = Date()
+    internal(set) var lastReferenceUpdate: Date = Date()
 
     // MARK: - Metrics (for debug overlay)
 
@@ -159,7 +159,7 @@ struct MotionBurstDetector: Sendable {
         let lastDiffIndex = frameIndex == 0 ? 0 : (frameIndex - 1) % configuration.burstWindowSize
         return Metrics(
             currentDiff: diffHistory[lastDiffIndex],
-            recentDiffs: Array(diffHistory.suffix(min(configuration.burstWindowSize, frameIndex))),
+            recentDiffs: orderedRecentDiffs(count: configuration.burstWindowSize),
             state: state,
             consecutiveLowFrames: consecutiveLowFrames,
             framesSinceBurstStart: framesSinceBurst,
@@ -270,6 +270,18 @@ struct MotionBurstDetector: Sendable {
     }
 
     // MARK: - Helpers
+
+    /// Returns the most recent `count` diff values in chronological order.
+    private func orderedRecentDiffs(count: Int) -> [Float] {
+        let actualCount = min(count, frameIndex)
+        guard actualCount > 0 else { return [] }
+        var result = [Float](repeating: 0.0, count: actualCount)
+        for i in 0..<actualCount {
+            let idx = (frameIndex - actualCount + i) % configuration.burstWindowSize
+            result[i] = diffHistory[idx]
+        }
+        return result
+    }
 
     /// Counts frames above threshold in the recent window.
     private func countRecentFramesAboveThreshold() -> Int {

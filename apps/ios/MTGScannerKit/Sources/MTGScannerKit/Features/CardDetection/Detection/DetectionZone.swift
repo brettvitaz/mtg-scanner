@@ -121,57 +121,19 @@ struct DetectionZone: Sendable, Equatable {
     /// Creates a new zone calibrated from a YOLO bounding box in normalized coordinates.
     ///
     /// YOLOCardDetector returns boxes in normalized coordinates (0-1, top-left origin) from the captured photo.
-    /// This method maps those coordinates to the video preview coordinate space.
+    /// This method maps those coordinates to the video preview coordinate space via 90° rotation.
     ///
-    /// The key insight is that both photo and video come from the same camera. The video buffer is
-    /// delivered in landscape orientation (1920x1080) but Vision processing treats it as the native
-    /// sensor orientation. The preview layer handles the rotation for display.
+    /// Both photo and video come from the same camera. The photo is portrait; the video buffer is landscape.
+    /// Normalized coordinates map through rotation: photo X → video Y, photo Y → 1 - video X.
+    /// The preview layer handles display rotation for all device orientations.
     ///
     /// - Parameters:
     ///   - box: Bounding box in normalized coordinates from photo (top-left origin, 0-1 range)
-    ///   - sourceSize: Size of the source photo image
-    ///   - videoSize: Size of the video preview frame (landscape, e.g., 1920x1080)
     ///   - tolerance: Fractional margin around the reference rect
     static func calibrated(
         fromYOLO box: CGRect,
-        sourceSize: CGSize,
-        videoSize: CGSize,
         tolerance: CGFloat = 0.15
     ) -> DetectionZone {
-        // The photo is captured in portrait orientation (e.g., 3024x4032)
-        // The video is delivered in landscape orientation (1920x1080)
-        //
-        // Vision processes the video buffer in its native landscape orientation.
-        // The preview layer rotates it for display.
-        //
-        // To map from photo coordinates to video/Vision coordinates:
-        // We need to account for the 90-degree rotation between photo and video.
-        //
-        // Photo (portrait):     Video (landscape):
-        // +----+----+----+      +----+----+----+----+----+----+----+
-        // |    |    |    |      |    |    |    |    |    |    |    |
-        // |    |CARD|    |      |    |    |    |CARD|    |    |    |
-        // |    |    |    |      |    |    |    |    |    |    |    |
-        // +----+----+----+      +----+----+----+----+----+----+----+
-        //
-        // The card appears in different positions due to rotation.
-        // Photo X maps to Video Y (with flip), Photo Y maps to Video X.
-
-        // For a direct mapping, we can use the fact that normalized coordinates
-        // in the center region map approximately when accounting for aspect ratio difference.
-        //
-        // The video aspect ratio (16:9 = 1.78) is wider than photo (3:4 = 0.75).
-        // When the video is displayed with resizeAspectFill on a portrait screen,
-        // the video fills the height and crops the sides.
-        //
-        // For coordinate mapping:
-        // - Photo X (0-1 left to right) -> maps to Video X' position
-        // - Photo Y (0-1 top to bottom) -> maps to Video Y' position
-        //
-        // Since the video is landscape, when rotated for display:
-        // - Photo left-right becomes display top-bottom (reversed)
-        // - Photo top-bottom becomes display left-right
-
         // Calculate the center point of the box
         let centerX = box.midX
         let centerY = box.midY

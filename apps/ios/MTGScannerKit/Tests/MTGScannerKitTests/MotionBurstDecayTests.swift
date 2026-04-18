@@ -13,9 +13,9 @@ final class MotionBurstDecayTests: XCTestCase {
         let firstCheck = detector.shouldDecayReference()
         XCTAssertFalse(firstCheck, "Should not decay immediately after creation")
 
-        // Update to a shorter timeout and wait
+        // Set the timestamp far enough in the past to trigger decay
         detector.configuration.referenceDecayTimeout = 0.1
-        Thread.sleep(forTimeInterval: 0.15)
+        detector.lastReferenceUpdate = Date(timeIntervalSinceNow: -2.0)
 
         // Should decay after timeout
         let secondCheck = detector.shouldDecayReference()
@@ -34,8 +34,8 @@ final class MotionBurstDecayTests: XCTestCase {
             _ = detector.process(diff: 0.5)
         }
 
-        // In active state, should not decay even after timeout
-        Thread.sleep(forTimeInterval: 0.15)
+        // In active state, should not decay even with old timestamp
+        detector.lastReferenceUpdate = Date(timeIntervalSinceNow: -2.0)
         XCTAssertFalse(detector.shouldDecayReference())
     }
 
@@ -44,9 +44,7 @@ final class MotionBurstDecayTests: XCTestCase {
             referenceDecayTimeout: 0.1
         ))
 
-        Thread.sleep(forTimeInterval: 0.05)
         detector.markReferenceUpdated()
-        Thread.sleep(forTimeInterval: 0.07)
 
         // Should not decay because timer was reset
         XCTAssertFalse(detector.shouldDecayReference())

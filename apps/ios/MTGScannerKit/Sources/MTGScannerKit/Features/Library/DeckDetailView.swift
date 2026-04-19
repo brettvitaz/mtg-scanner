@@ -19,6 +19,7 @@ struct DeckDetailView: View {
     @State private var contextMoveItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
+    @State private var openSwipeRowID: UUID?
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: deck.items)
@@ -127,15 +128,21 @@ struct DeckDetailView: View {
             List(selection: $selectedItems) {
                 Section {
                     ForEach(items) { cardRowView(for: $0) }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 } header: { cardListHeader(for: items) }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.dsBackground)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
                 bottomActionBar
             }
         }
+        .background(Color.dsBackground)
     }
 
     @ViewBuilder
@@ -149,11 +156,10 @@ struct DeckDetailView: View {
                     showQuantityStepper: true,
                     onCopy: { contextCopyItem = item },
                     onMove: { contextMoveItem = item },
-                    onDelete: { contextDeleteItem = item }
+                    onDelete: { contextDeleteItem = item },
+                    onSwipeDelete: { deleteItem(item) },
+                    openRowID: $openSwipeRowID
                 )
-            }
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) { deleteItem(item) } label: { Label("Delete", systemImage: "trash") }
             }
         }
     }

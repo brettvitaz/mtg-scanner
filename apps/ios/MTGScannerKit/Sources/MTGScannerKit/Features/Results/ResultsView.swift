@@ -2,7 +2,9 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-struct ResultsView: View {
+public struct ResultsView: View {
+    public init() {}
+
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @Query(
@@ -21,12 +23,13 @@ struct ResultsView: View {
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
+    @State private var openSwipeRowID: UUID?
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: inboxItems)
     }
 
-    var body: some View {
+    public var body: some View {
         @Bindable var appModel = appModel
         NavigationStack(path: $appModel.resultsNavigationPath) {
             Group {
@@ -92,16 +95,18 @@ struct ResultsView: View {
         VStack(spacing: 16) {
             Image(systemName: "rectangle.and.text.magnifyingglass")
                 .font(.system(size: 52))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.dsTextSecondary)
             Text("No results yet")
-                .font(.title3.bold())
+                .font(.geist(.sectionHeading))
+                .foregroundStyle(Color.dsTextPrimary)
             Text("Scan a card to see recognition results here.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.geist(.body))
+                .foregroundStyle(Color.dsTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.dsBackground)
     }
 
     // MARK: - Card List
@@ -111,15 +116,21 @@ struct ResultsView: View {
             List(selection: $selectedItems) {
                 Section {
                     ForEach(displayedItems) { cardRowView(for: $0) }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 } header: { cardListHeader }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.dsBackground)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
                 bottomActionBar
             }
         }
+        .background(Color.dsBackground)
     }
 
     @ViewBuilder
@@ -132,30 +143,30 @@ struct ResultsView: View {
                     item: item,
                     onCopy: { contextCopyItem = item },
                     onDelete: { contextDeleteItem = item },
-                    onToggleFoil: { toggleFoil(item) }
+                    onSwipeDelete: { deleteItem(item) },
+                    onToggleFoil: { toggleFoil(item) },
+                    openRowID: $openSwipeRowID
                 )
             }
             .simultaneousGesture(TapGesture(count: 2).onEnded { toggleFoil(item) })
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) {
-                    deleteItem(item)
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
         }
     }
 
     private var cardListHeader: some View {
         HStack {
-            Text("Scanned Cards")
+            Text("SCANNED CARDS")
+                .font(.geist(.caption))
+                .foregroundStyle(Color.dsTextSecondary)
+                .textCase(nil)
             Spacer()
             if filterState.isFilterActive {
                 Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
+                    .font(.geist(.caption))
+                    .foregroundStyle(Color.dsTextSecondary)
             } else {
                 Text("\(displayedItems.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
+                    .font(.geist(.caption))
+                    .foregroundStyle(Color.dsTextSecondary)
             }
         }
     }

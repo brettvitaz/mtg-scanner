@@ -8,7 +8,7 @@ public final class FontRegistry {
             "Geist-Medium",
             "Geist-SemiBold",
             "GeistMono-Regular",
-            "GeistMono-Medium",
+            "GeistMono-Medium"
         ]
 
         for name in names {

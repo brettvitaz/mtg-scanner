@@ -211,18 +211,13 @@ struct RarityBadge: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
-            .background(color, in: Capsule())
+            .background(badgeColor, in: Capsule())
             .accessibilityLabel("Rarity")
             .accessibilityValue(rarity.capitalized)
     }
 
-    private var color: Color {
-        switch rarity.lowercased() {
-        case "mythic": return .orange
-        case "rare": return .yellow
-        case "uncommon": return .gray
-        default: return Color.secondary
-        }
+    private var badgeColor: Color {
+        Rarity(rarity)?.badgeColor ?? .secondary
     }
 }
 

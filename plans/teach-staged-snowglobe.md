@@ -1,0 +1,172 @@
+# Plan: /impeccable teach — MTG Scanner Design Context
+
+## Context
+
+The user invoked `/impeccable teach` to establish a design context file (`.impeccable.md`) that will guide all future UI work in the project. This is a one-time setup that captures brand, audience, tone, and aesthetic direction so future `/impeccable` calls can produce distinctive, cohesive output without re-asking these questions.
+
+Separately, the `/impeccable` skill file contains a `<post-update-cleanup>` maintenance script that removes deprecated skill files. It runs once per update and needs to be executed before the main write.
+
+---
+
+## Design Context (to be written to `.impeccable.md`)
+
+Based on user answers and codebase exploration:
+
+| Question | Answer |
+|---|---|
+| Primary user | Both home collectors and game store players |
+| Interface feel | Technical dashboard — data-dense, numbers/prices/sets prominent |
+| Theme | System (both light and dark, first-class) |
+| Personality | Clean. Fast. Confident. |
+| Color direction | MTG-inspired neutrals with rarity color-coding |
+| Anti-references | No fintech/crypto glows, no flashy gaming, no e-commerce grids |
+
+---
+
+## Actions
+
+### 1. Run post-update-cleanup script
+
+```bash
+node .agents/skills/impeccable/scripts/cleanup-deprecated.mjs
+```
+
+### 2. Write `.impeccable.md` to project root
+
+Full content:
+
+```markdown
+## Design Context
+
+### Users
+MTG players in two distinct contexts: **home collectors** sorting binders at a desk
+(methodical, good lighting, no time pressure) and **tournament/store players** who need
+fast identification in ambient noise and varied lighting. The UI must serve both without
+compromise — readable in a dark game store under fluorescents and in bright home lighting.
+
+### Brand Personality
+**Clean. Fast. Confident.**
+
+This is a precision tool for card cataloguing, not a game or a marketplace. It should feel
+like a high-end reference instrument — closer to a scientific data viewer or a Bloomberg
+terminal than an app store card game. It respects the user's expertise. No explanatory
+hand-holding; surfaces data clearly and gets out of the way.
+
+### Aesthetic Direction
+**Technical dashboard, system-adaptive theme.**
+
+- Both light and dark modes are first-class. Neither degrades into a compromise.
+- Color vocabulary is almost entirely neutral — deep blacks / warm parchment whites — with
+  rarity color-coding (mythic gold, rare yellow, uncommon silver) as the *only* chromatic
+  system. No decorative accent colors.
+- A single structural accent color (refined slate blue) for interactive affordances only.
+- Typography: **Geist** (headers, UI labels) paired with **Geist Mono** (prices, stats,
+  set codes, confidence percentages). Geist was designed for data-dense developer tooling —
+  excellent number rendering, legible at small sizes, precise but not cold.
+- Physical metaphor: a precision engineering spec sheet or a flight information display
+  board — not a trading card game manual, not a marketplace, not a fintech terminal.
+
+**Anti-references (do not build toward these):**
+- Fintech/crypto: dark base, cyan/purple glows, gradient text, dashboard widgets
+- Flashy gaming UI: aggressive type, particle effects, heavy drop shadows, over-branding
+- Generic e-commerce: product grids, star ratings, price-tag everywhere
+
+### Color System (OKLCH)
+
+All neutrals are tinted toward the brand hue (warm amber, ~50° hue) at chroma 0.008–0.015.
+
+**Dark mode**
+| Token | Value | Use |
+|---|---|---|
+| `--bg` | `oklch(11% 0.012 50)` | App background |
+| `--surface` | `oklch(16% 0.012 50)` | Cards, list rows |
+| `--border` | `oklch(24% 0.010 50)` | Dividers, outlines |
+| `--text-primary` | `oklch(93% 0.006 80)` | Headings, card names |
+| `--text-secondary` | `oklch(55% 0.008 60)` | Metadata, captions |
+| `--accent` | `oklch(60% 0.14 248)` | Interactive actions, links |
+
+**Light mode**
+| Token | Value | Use |
+|---|---|---|
+| `--bg` | `oklch(97% 0.007 80)` | App background (warm parchment) |
+| `--surface` | `oklch(100% 0 0)` | Cards, list rows |
+| `--border` | `oklch(88% 0.008 70)` | Dividers, outlines |
+| `--text-primary` | `oklch(14% 0.012 50)` | Headings, card names |
+| `--text-secondary` | `oklch(52% 0.010 70)` | Metadata, captions |
+| `--accent` | `oklch(52% 0.16 248)` | Interactive actions, links |
+
+**Rarity system (shared across modes)**
+| Rarity | Token | Value | Notes |
+|---|---|---|---|
+| Mythic | `--rarity-mythic` | `oklch(72% 0.18 45)` | Warm gold-orange |
+| Rare | `--rarity-rare` | `oklch(82% 0.14 95)` | Golden yellow |
+| Uncommon | `--rarity-uncommon` | `oklch(65% 0.03 225)` | Cool silver-blue |
+| Common | `--rarity-common` | neutral (`--text-secondary`) | No chroma |
+
+### Typography
+
+**Fonts:** Geist (sans) + Geist Mono (data)  
+→ Bundle both in Xcode project. Available at: https://fonts.google.com/specimen/Geist and https://fonts.google.com/specimen/Geist+Mono
+
+**Scale (fixed rem for app UI):**
+| Role | Font | Size | Weight |
+|---|---|---|---|
+| Screen title | Geist | 22pt | 600 |
+| Section heading | Geist | 17pt | 600 |
+| Card name / primary | Geist | 15pt | 500 |
+| Body / metadata | Geist | 13pt | 400 |
+| Caption / label | Geist | 11pt | 400 |
+| Price / stat / code | Geist Mono | 13pt | 400 |
+| Confidence % | Geist Mono | 11pt | 500 |
+
+Line height: 1.3 for headings, 1.45 for body. Cap body text at 65ch.
+
+### Design Principles
+
+1. **Data clarity over decoration.** Card name, set symbol, rarity, and price are the
+   primary information — they must be instantly readable. No element earns its place
+   through decoration alone.
+
+2. **Speed is felt.** Results should appear progressively. No full-screen loading states
+   where a partial result is better. Camera overlay paths have zero animation overhead.
+
+3. **Rarity is the only color vocabulary.** The four rarity tiers define all chromatic
+   meaning in the UI. Avoid introducing additional hues for status, navigation, or emphasis.
+   Use weight, size, and position for hierarchy instead.
+
+4. **Adaptive but uncompromising.** Light and dark modes are both first-class treatments.
+   Design each surface for its native context; do not simply invert one for the other.
+
+5. **Tool, not toy.** No onboarding illustrations, no empty-state mascots, no gamification.
+   The product's personality comes from precision and competence, not from friendliness
+   signals.
+
+### Spacing
+
+4pt base scale: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 / 96 pt  
+Corner radius: 4pt (data rows, badges) · 8pt (cards, sheets) · 12pt (modals)  
+Card thumbnail: 60×84pt (preserve existing MTG 2.5:3.5 aspect ratio)
+
+### Accessibility
+
+- WCAG AA minimum; target AAA for text on `--surface`
+- Support reduce-motion: disable spring animations, use fade (0.15s ease-out) instead
+- VoiceOver labels on all interactive elements (already partially in place)
+- Non-color state indicators (icon + label, not color alone)
+- Dynamic Type: clamp text down but never below 10pt
+```
+
+### 3. Edit the skill file to remove the `<post-update-cleanup>` block
+
+After running the cleanup script, delete the `<post-update-cleanup>` section from the skill file so it doesn't re-run on the next invocation.
+
+Skill file path: `/Users/brettvitaz/.claude/skills/impeccable/skill.md`
+
+---
+
+## Verification
+
+- `.impeccable.md` exists in project root and contains all five sections
+- Cleanup script ran without errors (or reported "nothing to clean")
+- The `<post-update-cleanup>` block is removed from the skill file
+- Running `/impeccable craft <any feature>` in a future session should proceed directly to design without asking setup questions

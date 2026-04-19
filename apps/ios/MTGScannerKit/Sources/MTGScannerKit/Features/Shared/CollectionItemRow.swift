@@ -12,11 +12,13 @@ struct CollectionItemRow: View {
     var onDelete: (() -> Void)?
     var onSwipeDelete: (() -> Void)?
     var onToggleFoil: (() -> Void)?
+    var onNavigate: (() -> Void)?
     var openRowID: Binding<UUID?> = .constant(nil)
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var swipeOffset: CGFloat = 0
     @State private var rowWidth: CGFloat = 390
+    @State private var isHorizontalDrag: Bool?
 
     let deleteButtonWidth: CGFloat = 80
 
@@ -52,7 +54,7 @@ private extension CollectionItemRow {
                             style: .continuous
                         )
                     )
-                    .gesture(dragGesture)
+                    .simultaneousGesture(dragGesture)
             }
         } else {
             rowContent
@@ -71,7 +73,7 @@ private extension CollectionItemRow {
         .frame(maxWidth: .infinity)
         .background(rowBackground)
         .overlay(alignment: .bottom) { hairlineDivider }
-        .overlay { closeRowOverlay }
+        .overlay { interactionOverlay }
     }
 
     var rowBackground: some View {
@@ -86,11 +88,13 @@ private extension CollectionItemRow {
     }
 
     @ViewBuilder
-    var closeRowOverlay: some View {
-        if openRowID.wrappedValue == item.id {
+    var interactionOverlay: some View {
+        if swipeOffset != 0 || onNavigate != nil {
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { closeSwipe() }
+                .onTapGesture {
+                    if swipeOffset != 0 { closeSwipe() } else { onNavigate?() }
+                }
         }
     }
 
@@ -217,6 +221,12 @@ private extension CollectionItemRow {
     }
 
     func handleDragChanged(_ value: DragGesture.Value) {
+        if isHorizontalDrag == nil {
+            let absX = abs(value.translation.width)
+            let absY = abs(value.translation.height)
+            isHorizontalDrag = absX > absY
+        }
+        guard isHorizontalDrag == true else { return }
         let translation = value.translation.width
         if translation < 0 {
             swipeOffset = max(translation, -deleteButtonWidth * 2)
@@ -226,6 +236,8 @@ private extension CollectionItemRow {
     }
 
     func handleDragEnded(_ value: DragGesture.Value) {
+        defer { isHorizontalDrag = nil }
+        guard isHorizontalDrag == true else { return }
         let traveled = -value.translation.width
         if traveled > rowWidth * 0.66 {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)

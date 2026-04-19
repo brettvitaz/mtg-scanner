@@ -138,16 +138,15 @@ public struct ResultsView: View {
         if isSelecting {
             CollectionItemRow(item: item)
         } else {
-            NavigationLink(value: item.toRecognizedCard()) {
-                CollectionItemRow(
-                    item: item,
-                    onCopy: { contextCopyItem = item },
-                    onDelete: { contextDeleteItem = item },
-                    onSwipeDelete: { deleteItem(item) },
-                    onToggleFoil: { toggleFoil(item) },
-                    openRowID: $openSwipeRowID
-                )
-            }
+            CollectionItemRow(
+                item: item,
+                onCopy: { contextCopyItem = item },
+                onDelete: { contextDeleteItem = item },
+                onSwipeDelete: { deleteItem(item) },
+                onToggleFoil: { toggleFoil(item) },
+                onNavigate: { appModel.resultsNavigationPath.append(item.toRecognizedCard()) },
+                openRowID: $openSwipeRowID
+            )
             .simultaneousGesture(TapGesture(count: 2).onEnded { toggleFoil(item) })
         }
     }

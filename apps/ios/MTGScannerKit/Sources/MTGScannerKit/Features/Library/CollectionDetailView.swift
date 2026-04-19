@@ -18,6 +18,7 @@ struct CollectionDetailView: View {
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var openSwipeRowID: UUID?
+    @State private var selectedCard: RecognizedCard?
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
@@ -32,7 +33,7 @@ struct CollectionDetailView: View {
             }
         }
         .navigationTitle(collection.name)
-        .navigationDestination(for: RecognizedCard.self) { card in
+        .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
         .toolbar { topToolbar }
@@ -117,16 +118,15 @@ struct CollectionDetailView: View {
         if isSelecting {
             CollectionItemRow(item: item)
         } else {
-            NavigationLink(value: item.toRecognizedCard()) {
-                CollectionItemRow(
-                    item: item,
-                    showQuantityStepper: true,
-                    onCopy: { contextCopyItem = item },
-                    onDelete: { contextDeleteItem = item },
-                    onSwipeDelete: { deleteItem(item) },
-                    openRowID: $openSwipeRowID
-                )
-            }
+            CollectionItemRow(
+                item: item,
+                showQuantityStepper: true,
+                onCopy: { contextCopyItem = item },
+                onDelete: { contextDeleteItem = item },
+                onSwipeDelete: { deleteItem(item) },
+                onNavigate: { selectedCard = item.toRecognizedCard() },
+                openRowID: $openSwipeRowID
+            )
         }
     }
 

@@ -144,6 +144,7 @@ public struct ResultsView: View {
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
+                onSwipeToggleFoil: { toggleFoil(item) },
                 onNavigate: { appModel.resultsNavigationPath.append(item.toRecognizedCard()) },
                 openRowID: $openSwipeRowID
             )

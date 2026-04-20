@@ -158,6 +158,8 @@ struct DeckDetailView: View {
                 onMove: { contextMoveItem = item },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
+                onToggleFoil: { toggleFoil(item) },
+                onSwipeToggleFoil: { toggleFoil(item) },
                 onNavigate: { selectedCard = item.toRecognizedCard() },
                 openRowID: $openSwipeRowID
             )
@@ -325,6 +327,15 @@ extension DeckDetailView {
         registerUndo(for: [item])
         modelContext.delete(item)
         deck.updatedAt = Date()
+    }
+
+    func toggleFoil(_ item: CollectionItem) {
+        if item.toggleFoilIfNoDuplicate(in: deck.items) {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            deck.updatedAt = Date()
+        } else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
     }
 
     func copyItem(_ item: CollectionItem, to destination: MoveDestination) {

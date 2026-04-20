@@ -124,6 +124,8 @@ struct CollectionDetailView: View {
                 onCopy: { contextCopyItem = item },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
+                onToggleFoil: { toggleFoil(item) },
+                onSwipeToggleFoil: { toggleFoil(item) },
                 onNavigate: { selectedCard = item.toRecognizedCard() },
                 openRowID: $openSwipeRowID
             )
@@ -287,6 +289,15 @@ private extension CollectionDetailView {
         registerUndo(for: [item])
         modelContext.delete(item)
         collection.updatedAt = Date()
+    }
+
+    func toggleFoil(_ item: CollectionItem) {
+        if item.toggleFoilIfNoDuplicate(in: collection.items) {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            collection.updatedAt = Date()
+        } else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
     }
 
     func copyItem(_ item: CollectionItem, to destination: MoveDestination) {

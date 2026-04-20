@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// Shared row for Results, Collection detail, and Deck detail.
-/// Pass `onSwipeDelete` to enable the swipe-to-delete gesture.
+/// Pass `onSwipeDelete` / `onSwipeToggleFoil` to enable the respective swipe action.
 /// Pass `openRowID` to coordinate single-open-row behaviour across a list.
 struct CollectionItemRow: View {
     @Bindable var item: CollectionItem
@@ -12,40 +12,44 @@ struct CollectionItemRow: View {
     var onDelete: (() -> Void)?
     var onSwipeDelete: (() -> Void)?
     var onToggleFoil: (() -> Void)?
+    var onSwipeToggleFoil: (() -> Void)?
     var onNavigate: (() -> Void)?
     var openRowID: Binding<UUID?> = .constant(nil)
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var swipeOffset: CGFloat = 0
-    @State private var rowWidth: CGFloat = 390
-    @State private var isHorizontalDrag: Bool?
+    @State var swipeOffset: CGFloat = 0
+    @State var rowWidth: CGFloat = 390
+    @State var gestureBaseOffset: CGFloat = 0
+    @State var crossedCommit = false
 
-    let deleteButtonWidth: CGFloat = 80
+    let actionRevealWidth: CGFloat = 80
 
     var body: some View {
         swipeContent
             .background(widthReader)
             .onChange(of: openRowID.wrappedValue) { _, newID in
                 guard newID != item.id, swipeOffset != 0 else { return }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    swipeOffset = 0
-                }
+                closeSwipe()
             }
             .modifier(ContextMenuModifier(row: self))
             .accessibilityElement(children: showQuantityStepper ? .contain : .ignore)
             .accessibilityLabel(accessibilitySummary)
             .accessibilityAction(named: Text("Delete")) { onSwipeDelete?() }
+            .accessibilityAction(named: Text("Toggle Foil")) { onSwipeToggleFoil?() }
     }
 }
 
 // MARK: - Swipe structure + row content
 
 private extension CollectionItemRow {
+    var hasSwipeAction: Bool { onSwipeDelete != nil || onSwipeToggleFoil != nil }
+
     @ViewBuilder
     var swipeContent: some View {
-        if onSwipeDelete != nil {
-            ZStack(alignment: .trailing) {
-                deleteButton
+        if hasSwipeAction {
+            ZStack {
+                trailingActionLayer
+                leadingActionLayer
                 rowContent
                     .offset(x: swipeOffset)
                     .clipShape(
@@ -54,8 +58,17 @@ private extension CollectionItemRow {
                             style: .continuous
                         )
                     )
-                    .simultaneousGesture(dragGesture)
             }
+            .gesture(
+                HorizontalPanGesture(
+                    onBegan: { gestureBaseOffset = swipeOffset },
+                    onChanged: { translation in handleDragChanged(translation: translation) },
+                    onEnded: { translation, velocity in
+                        handleDragEnded(translation: translation, velocity: velocity)
+                    },
+                    onCancelled: closeSwipe
+                )
+            )
         } else {
             rowContent
         }
@@ -63,17 +76,29 @@ private extension CollectionItemRow {
 
     var rowContent: some View {
         HStack(spacing: Spacing.md) {
-            cardThumbnail
-            cardDetails
-            Spacer(minLength: Spacing.lg)
-            priceColumn
+            navigationButton
+            if showQuantityStepper { quantityStepper.fixedSize() }
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(rowBackground)
         .overlay(alignment: .bottom) { hairlineDivider }
-        .overlay { interactionOverlay }
+    }
+
+    var navigationButton: some View {
+        Button {
+            if swipeOffset != 0 { closeSwipe() } else { onNavigate?() }
+        } label: {
+            HStack(spacing: Spacing.md) {
+                cardThumbnail
+                cardDetails
+                Spacer(minLength: Spacing.lg)
+                priceColumn
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     var rowBackground: some View {
@@ -85,17 +110,6 @@ private extension CollectionItemRow {
 
     var hairlineDivider: some View {
         Rectangle().fill(Color.dsBorder).frame(height: 0.5)
-    }
-
-    @ViewBuilder
-    var interactionOverlay: some View {
-        if swipeOffset != 0 || onNavigate != nil {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if swipeOffset != 0 { closeSwipe() } else { onNavigate?() }
-                }
-        }
     }
 
     var widthReader: some View {
@@ -136,7 +150,6 @@ private extension CollectionItemRow {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             cardNameRow
             metaRow
-            if showQuantityStepper { quantityStepper }
         }
     }
 
@@ -179,6 +192,8 @@ private extension CollectionItemRow {
         Stepper(value: $item.quantity, in: 1...999) {
             Text("Qty: \(item.quantity)").font(.geist(.caption)).foregroundStyle(Color.dsTextSecondary)
         }
+        .labelsHidden()
+        .buttonStyle(.borderless)
     }
 
     var priceColumn: some View {
@@ -196,76 +211,6 @@ private extension CollectionItemRow {
                 .foregroundStyle(value != nil ? Color.dsTextPrimary : Color.dsTextSecondary)
                 .monospacedDigit()
         }
-    }
-}
-
-// MARK: - Swipe gesture + delete button
-
-private extension CollectionItemRow {
-    var deleteButton: some View {
-        Button { commitDelete() } label: {
-            Image(systemName: "trash")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: deleteButtonWidth)
-                .frame(maxHeight: .infinity)
-        }
-        .background(Color(red: 1, green: 0.23, blue: 0.19))
-        .opacity(swipeOffset < 0 ? 1 : 0)
-    }
-
-    var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged(handleDragChanged)
-            .onEnded(handleDragEnded)
-    }
-
-    func handleDragChanged(_ value: DragGesture.Value) {
-        if isHorizontalDrag == nil {
-            let absX = abs(value.translation.width)
-            let absY = abs(value.translation.height)
-            isHorizontalDrag = absX > absY
-        }
-        guard isHorizontalDrag == true else { return }
-        let translation = value.translation.width
-        if translation < 0 {
-            swipeOffset = max(translation, -deleteButtonWidth * 2)
-        } else if openRowID.wrappedValue == item.id {
-            swipeOffset = min(0, -deleteButtonWidth + translation)
-        }
-    }
-
-    func handleDragEnded(_ value: DragGesture.Value) {
-        defer { isHorizontalDrag = nil }
-        guard isHorizontalDrag == true else { return }
-        let traveled = -value.translation.width
-        if traveled > rowWidth * 0.66 {
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            commitDelete()
-        } else if traveled > 40 {
-            openRowID.wrappedValue = item.id
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { swipeOffset = -deleteButtonWidth }
-        } else {
-            closeSwipe()
-        }
-    }
-
-    func commitDelete() {
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        withAnimation(
-            .spring(response: 0.2, dampingFraction: 0.9),
-            completionCriteria: .logicallyComplete
-        ) {
-            swipeOffset = -rowWidth
-        } completion: {
-            onSwipeDelete?()
-        }
-    }
-
-    func closeSwipe() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { swipeOffset = 0 }
-        if openRowID.wrappedValue == item.id { openRowID.wrappedValue = nil }
     }
 }
 

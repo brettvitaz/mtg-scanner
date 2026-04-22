@@ -75,9 +75,9 @@ private extension CollectionItemRow {
     }
 
     var rowContent: some View {
-        HStack(spacing: Spacing.md) {
+        HStack(spacing: Spacing.sm) {
             navigationButton
-            if showQuantityStepper { quantityStepper.fixedSize() }
+            if showQuantityStepper { compactQuantityStepper }
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, 10)
@@ -93,7 +93,7 @@ private extension CollectionItemRow {
             HStack(spacing: Spacing.md) {
                 cardThumbnail
                 cardDetails
-                Spacer(minLength: Spacing.lg)
+                Spacer(minLength: Spacing.sm)
                 priceColumn
             }
             .contentShape(Rectangle())
@@ -158,7 +158,8 @@ private extension CollectionItemRow {
             Text(item.title)
                 .font(.geist(.cardName))
                 .foregroundStyle(Color.dsTextPrimary)
-                .lineLimit(2)
+                .lineLimit(1)
+                .truncationMode(.tail)
             if item.foil {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10))
@@ -182,18 +183,41 @@ private extension CollectionItemRow {
                 Text(rarity.shortLabel).font(.geistMono(.metaMono)).foregroundStyle(rarity.badgeColor)
             }
         }
+        .lineLimit(1)
     }
 
     var metaDot: some View {
         Text("·").font(.geistMono(.metaMono)).foregroundStyle(Color.dsBorder).accessibilityHidden(true)
     }
 
-    var quantityStepper: some View {
-        Stepper(value: $item.quantity, in: 1...999) {
-            Text("Qty: \(item.quantity)").font(.geist(.caption)).foregroundStyle(Color.dsTextSecondary)
+    var compactQuantityStepper: some View {
+        VStack(spacing: 2) {
+            Button {
+                item.quantity = min(item.quantity + 1, 999)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 28, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Increase quantity")
+            Text("\(item.quantity)")
+                .font(.geistMono(.metaMono))
+                .foregroundStyle(Color.dsTextPrimary)
+                .frame(minWidth: 24)
+                .multilineTextAlignment(.center)
+            Button {
+                item.quantity = max(item.quantity - 1, 1)
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 28, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Decrease quantity")
         }
-        .labelsHidden()
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.dsTextSecondary)
     }
 
     var priceColumn: some View {

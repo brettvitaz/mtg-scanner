@@ -80,7 +80,7 @@ private extension CollectionItemRow {
             if showQuantityStepper { compactQuantityStepper }
         }
         .padding(.horizontal, Spacing.lg)
-        .padding(.vertical, 10)
+        .padding(.vertical, Spacing.md)
         .frame(maxWidth: .infinity)
         .background(rowBackground)
         .overlay(alignment: .bottom) { hairlineDivider }

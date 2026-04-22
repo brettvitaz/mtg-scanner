@@ -19,6 +19,7 @@ struct CollectionDetailView: View {
     @State private var showAddCard = false
     @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
+    @State private var showSearch = false
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
@@ -37,7 +38,6 @@ struct CollectionDetailView: View {
             CardDetailView(card: card)
         }
         .toolbar { topToolbar }
-        .searchable(text: $filterState.searchText, prompt: "Search by title or set")
         .sheet(isPresented: $showMoveSheet) {
             MoveToSheet(title: "Copy To Deck") { destination in
                 copySelectedItems(to: destination)
@@ -88,64 +88,6 @@ struct CollectionDetailView: View {
         }
     }
 
-    // MARK: - Card List
-
-    private var cardListWithToolbar: some View {
-        let items = displayedItems
-        return VStack(spacing: 0) {
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(items) { cardRowView(for: $0) }
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                } header: { cardListHeader(for: items) }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.dsBackground)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
-            if isSelecting {
-                bottomActionBar
-            }
-        }
-        .background(Color.dsBackground)
-    }
-
-    @ViewBuilder
-    private func cardRowView(for item: CollectionItem) -> some View {
-        if isSelecting {
-            CollectionItemRow(item: item)
-        } else {
-            CollectionItemRow(
-                item: item,
-                showQuantityStepper: true,
-                onCopy: { contextCopyItem = item },
-                onDelete: { contextDeleteItem = item },
-                onSwipeDelete: { deleteItem(item) },
-                onToggleFoil: { toggleFoil(item) },
-                onSwipeToggleFoil: { toggleFoil(item) },
-                onNavigate: { selectedCard = item.toRecognizedCard() },
-                openRowID: $openSwipeRowID
-            )
-        }
-    }
-
-    private func cardListHeader(for items: [CollectionItem]) -> some View {
-        HStack {
-            Text("Cards")
-            Spacer()
-            if filterState.isFilterActive {
-                Text("\(items.totalQuantity) of \(collection.items.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("\(items.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
     // MARK: - Top Toolbar
 
     @ToolbarContentBuilder
@@ -168,18 +110,20 @@ struct CollectionDetailView: View {
                 }
                 .accessibilityLabel("Exit selection mode")
             } else if !collection.items.isEmpty {
-                Menu {
-                    ExportMenuContent(items: collection.items, name: collection.name, exportFile: $exportFile)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
+                Button { toggleSearch() } label: {
+                    Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                 }
-                .accessibilityLabel("Export collection")
-                Button("Select") { enterSelecting() }
-                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
+                .accessibilityLabel(showSearch ? "Close search" : "Search")
                 Button { showAddCard = true } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add card manually")
+                CardListOverflowMenu(
+                    items: collection.items,
+                    name: collection.name,
+                    exportFile: $exportFile,
+                    onSelect: enterSelecting
+                )
             }
         }
     }
@@ -219,6 +163,67 @@ struct CollectionDetailView: View {
 }
 
 private extension CollectionDetailView {
+    // MARK: - Card List
+
+    var cardListWithToolbar: some View {
+        let items = displayedItems
+        return VStack(spacing: 0) {
+            if !isSelecting {
+                if showSearch {
+                    ListSearchField(text: $filterState.searchText)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                SortFilterChipRow(
+                    filterState: filterState,
+                    showFilterSheet: $showFilterSheet,
+                    displayedQuantity: items.totalQuantity,
+                    totalQuantity: collection.items.totalQuantity
+                )
+            }
+            List(selection: $selectedItems) {
+                Section {
+                    ForEach(items) { cardRowView(for: $0) }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.dsBackground)
+            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+
+            if isSelecting { bottomActionBar }
+        }
+        .background(Color.dsBackground)
+    }
+
+    @ViewBuilder
+    func cardRowView(for item: CollectionItem) -> some View {
+        if isSelecting {
+            CollectionItemRow(item: item)
+        } else {
+            CollectionItemRow(
+                item: item,
+                showQuantityStepper: true,
+                onCopy: { contextCopyItem = item },
+                onDelete: { contextDeleteItem = item },
+                onSwipeDelete: { deleteItem(item) },
+                onToggleFoil: { toggleFoil(item) },
+                onSwipeToggleFoil: { toggleFoil(item) },
+                onNavigate: { selectedCard = item.toRecognizedCard() },
+                openRowID: $openSwipeRowID
+            )
+        }
+    }
+
+    func toggleSearch() {
+        withAnimation(.smooth(duration: 0.2)) {
+            showSearch.toggle()
+            if !showSearch { filterState.searchText = "" }
+        }
+    }
+
     var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "folder")
@@ -238,6 +243,8 @@ private extension CollectionDetailView {
     }
 
     func enterSelecting() {
+        showSearch = false
+        filterState.searchText = ""
         selectedItems = []
         isSelecting = true
     }

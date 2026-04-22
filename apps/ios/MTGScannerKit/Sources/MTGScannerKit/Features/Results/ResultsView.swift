@@ -24,6 +24,7 @@ public struct ResultsView: View {
     @State private var contextCopyItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var openSwipeRowID: UUID?
+    @State private var showSearch = false
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: inboxItems)
@@ -41,7 +42,6 @@ public struct ResultsView: View {
             }
             .navigationTitle("Results")
             .toolbar { topToolbar }
-            .searchable(text: $filterState.searchText, prompt: "Search by title or set")
             .navigationDestination(for: RecognizedCard.self) { card in
                 CardDetailView(card: card)
                     .environment(appModel)
@@ -113,13 +113,25 @@ public struct ResultsView: View {
 
     private var cardListWithToolbar: some View {
         VStack(spacing: 0) {
+            if !isSelecting {
+                if showSearch {
+                    ListSearchField(text: $filterState.searchText)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                SortFilterChipRow(
+                    filterState: filterState,
+                    showFilterSheet: $showFilterSheet,
+                    displayedQuantity: displayedItems.totalQuantity,
+                    totalQuantity: inboxItems.totalQuantity
+                )
+            }
             List(selection: $selectedItems) {
                 Section {
                     ForEach(displayedItems) { cardRowView(for: $0) }
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
-                } header: { cardListHeader }
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -152,25 +164,6 @@ public struct ResultsView: View {
         }
     }
 
-    private var cardListHeader: some View {
-        HStack {
-            Text("SCANNED CARDS")
-                .font(.geist(.caption))
-                .foregroundStyle(Color.dsTextSecondary)
-                .textCase(nil)
-            Spacer()
-            if filterState.isFilterActive {
-                Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
-                    .font(.geist(.caption))
-                    .foregroundStyle(Color.dsTextSecondary)
-            } else {
-                Text("\(displayedItems.totalQuantity) card(s)")
-                    .font(.geist(.caption))
-                    .foregroundStyle(Color.dsTextSecondary)
-            }
-        }
-    }
-
     // MARK: - Top Toolbar
 
     @ToolbarContentBuilder
@@ -193,14 +186,21 @@ public struct ResultsView: View {
                 }
                 .accessibilityLabel("Exit selection mode")
             } else if !inboxItems.isEmpty {
-                Menu {
-                    ExportMenuContent(items: inboxItems, name: "results", exportFile: $exportFile)
+                Button {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        showSearch.toggle()
+                        if !showSearch { filterState.searchText = "" }
+                    }
                 } label: {
-                    Image(systemName: "square.and.arrow.up")
+                    Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                 }
-                .accessibilityLabel("Export results")
-                Button("Select") { enterSelecting() }
-                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
+                .accessibilityLabel(showSearch ? "Close search" : "Search")
+                CardListOverflowMenu(
+                    items: inboxItems,
+                    name: "results",
+                    exportFile: $exportFile,
+                    onSelect: enterSelecting
+                )
             }
         }
     }
@@ -256,6 +256,8 @@ private extension ResultsView {
     }
 
     func enterSelecting() {
+        showSearch = false
+        filterState.searchText = ""
         selectedItems = []
         isSelecting = true
     }

@@ -2,7 +2,9 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-struct ResultsView: View {
+public struct ResultsView: View {
+    public init() {}
+
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @Query(
@@ -21,12 +23,14 @@ struct ResultsView: View {
     @State private var showFilterSheet = false
     @State private var contextCopyItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
+    @State private var openSwipeRowID: UUID?
+    @State private var showSearch = false
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: inboxItems)
     }
 
-    var body: some View {
+    public var body: some View {
         @Bindable var appModel = appModel
         NavigationStack(path: $appModel.resultsNavigationPath) {
             Group {
@@ -38,7 +42,6 @@ struct ResultsView: View {
             }
             .navigationTitle("Results")
             .toolbar { topToolbar }
-            .searchable(text: $filterState.searchText, prompt: "Search by title or set")
             .navigationDestination(for: RecognizedCard.self) { card in
                 CardDetailView(card: card)
                     .environment(appModel)
@@ -92,34 +95,54 @@ struct ResultsView: View {
         VStack(spacing: 16) {
             Image(systemName: "rectangle.and.text.magnifyingglass")
                 .font(.system(size: 52))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.dsTextSecondary)
             Text("No results yet")
-                .font(.title3.bold())
+                .font(.geist(.sectionHeading))
+                .foregroundStyle(Color.dsTextPrimary)
             Text("Scan a card to see recognition results here.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.geist(.body))
+                .foregroundStyle(Color.dsTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.dsBackground)
     }
 
     // MARK: - Card List
 
     private var cardListWithToolbar: some View {
         VStack(spacing: 0) {
+            if !isSelecting {
+                if showSearch {
+                    ListSearchField(text: $filterState.searchText)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                SortFilterChipRow(
+                    filterState: filterState,
+                    showFilterSheet: $showFilterSheet,
+                    displayedQuantity: displayedItems.totalQuantity,
+                    totalQuantity: inboxItems.totalQuantity
+                )
+            }
             List(selection: $selectedItems) {
                 Section {
                     ForEach(displayedItems) { cardRowView(for: $0) }
-                } header: { cardListHeader }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.dsBackground)
             .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
 
             if isSelecting {
                 bottomActionBar
             }
         }
+        .background(Color.dsBackground)
     }
 
     @ViewBuilder
@@ -127,36 +150,17 @@ struct ResultsView: View {
         if isSelecting {
             CollectionItemRow(item: item)
         } else {
-            NavigationLink(value: item.toRecognizedCard()) {
-                CollectionItemRow(
-                    item: item,
-                    onCopy: { contextCopyItem = item },
-                    onDelete: { contextDeleteItem = item },
-                    onToggleFoil: { toggleFoil(item) }
-                )
-            }
+            CollectionItemRow(
+                item: item,
+                onCopy: { contextCopyItem = item },
+                onDelete: { contextDeleteItem = item },
+                onSwipeDelete: { deleteItem(item) },
+                onToggleFoil: { toggleFoil(item) },
+                onSwipeToggleFoil: { toggleFoil(item) },
+                onNavigate: { appModel.resultsNavigationPath.append(item.toRecognizedCard()) },
+                openRowID: $openSwipeRowID
+            )
             .simultaneousGesture(TapGesture(count: 2).onEnded { toggleFoil(item) })
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) {
-                    deleteItem(item)
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
-    }
-
-    private var cardListHeader: some View {
-        HStack {
-            Text("Scanned Cards")
-            Spacer()
-            if filterState.isFilterActive {
-                Text("\(displayedItems.totalQuantity) of \(inboxItems.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("\(displayedItems.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -182,14 +186,21 @@ struct ResultsView: View {
                 }
                 .accessibilityLabel("Exit selection mode")
             } else if !inboxItems.isEmpty {
-                Menu {
-                    ExportMenuContent(items: inboxItems, name: "results", exportFile: $exportFile)
+                Button {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        showSearch.toggle()
+                        if !showSearch { filterState.searchText = "" }
+                    }
                 } label: {
-                    Image(systemName: "square.and.arrow.up")
+                    Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                 }
-                .accessibilityLabel("Export results")
-                Button("Select") { enterSelecting() }
-                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
+                .accessibilityLabel(showSearch ? "Close search" : "Search")
+                CardListOverflowMenu(
+                    items: inboxItems,
+                    name: "results",
+                    exportFile: $exportFile,
+                    onSelect: enterSelecting
+                )
             }
         }
     }
@@ -245,6 +256,8 @@ private extension ResultsView {
     }
 
     func enterSelecting() {
+        showSearch = false
+        filterState.searchText = ""
         selectedItems = []
         isSelecting = true
     }

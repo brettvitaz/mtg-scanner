@@ -19,6 +19,9 @@ struct DeckDetailView: View {
     @State private var contextMoveItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
+    @State private var openSwipeRowID: UUID?
+    @State private var selectedCard: RecognizedCard?
+    @State private var showSearch = false
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: deck.items)
@@ -33,11 +36,10 @@ struct DeckDetailView: View {
             }
         }
         .navigationTitle(deck.name)
-        .navigationDestination(for: RecognizedCard.self) { card in
+        .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
         .toolbar { topToolbar }
-        .searchable(text: $filterState.searchText, prompt: "Search by title or set")
         .sheet(isPresented: $showMoveSheet) {
             MoveToSheet(title: "Move To Collection") { destination in
                 moveSelectedItems(to: destination)
@@ -99,79 +101,6 @@ struct DeckDetailView: View {
         }
     }
 
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "rectangle.stack")
-                .font(.system(size: 52))
-                .foregroundStyle(.secondary)
-            Text("No cards in this deck")
-                .font(.title3.bold())
-            Text("Add cards using the + button, or move cards here from the Results tab or a collection.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Add Card") { showAddCard = true }
-                .buttonStyle(.borderedProminent)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - Card List
-
-    private var cardListWithToolbar: some View {
-        let items = displayedItems
-        return VStack(spacing: 0) {
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(items) { cardRowView(for: $0) }
-                } header: { cardListHeader(for: items) }
-            }
-            .listStyle(.insetGrouped)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
-            if isSelecting {
-                bottomActionBar
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func cardRowView(for item: CollectionItem) -> some View {
-        if isSelecting {
-            CollectionItemRow(item: item)
-        } else {
-            NavigationLink(value: item.toRecognizedCard()) {
-                CollectionItemRow(
-                    item: item,
-                    showQuantityStepper: true,
-                    onCopy: { contextCopyItem = item },
-                    onMove: { contextMoveItem = item },
-                    onDelete: { contextDeleteItem = item }
-                )
-            }
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) { deleteItem(item) } label: { Label("Delete", systemImage: "trash") }
-            }
-        }
-    }
-
-    private func cardListHeader(for items: [CollectionItem]) -> some View {
-        HStack {
-            Text("Cards")
-            Spacer()
-            if filterState.isFilterActive {
-                Text("\(items.totalQuantity) of \(deck.items.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("\(items.totalQuantity) card(s)")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
     // MARK: - Top Toolbar
 
     @ToolbarContentBuilder
@@ -194,22 +123,106 @@ struct DeckDetailView: View {
                 }
                 .accessibilityLabel("Exit selection mode")
             } else if !deck.items.isEmpty {
-                Menu {
-                    ExportMenuContent(items: deck.items, name: deck.name, exportFile: $exportFile)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
+                Button { toggleSearch() } label: {
+                    Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                 }
-                .accessibilityLabel("Export deck")
-                Button("Select") { enterSelecting() }
-                FilterSortToolbar(filterState: filterState, showFilterSheet: $showFilterSheet)
+                .accessibilityLabel(showSearch ? "Close search" : "Search")
                 Button { showAddCard = true } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add card manually")
+                CardListOverflowMenu(
+                    items: deck.items,
+                    name: deck.name,
+                    exportFile: $exportFile,
+                    onSelect: enterSelecting
+                )
             }
         }
     }
 
+}
+
+// MARK: - Card List + Empty State
+
+private extension DeckDetailView {
+    var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "rectangle.stack")
+                .font(.system(size: 52))
+                .foregroundStyle(.secondary)
+            Text("No cards in this deck")
+                .font(.title3.bold())
+            Text("Add cards using the + button, or move cards here from the Results tab or a collection.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Add Card") { showAddCard = true }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    var cardListWithToolbar: some View {
+        let items = displayedItems
+        return VStack(spacing: 0) {
+            if !isSelecting {
+                if showSearch {
+                    ListSearchField(text: $filterState.searchText)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                SortFilterChipRow(
+                    filterState: filterState,
+                    showFilterSheet: $showFilterSheet,
+                    displayedQuantity: items.totalQuantity,
+                    totalQuantity: deck.items.totalQuantity
+                )
+            }
+            List(selection: $selectedItems) {
+                Section {
+                    ForEach(items) { cardRowView(for: $0) }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.dsBackground)
+            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+
+            if isSelecting { bottomActionBar }
+        }
+        .background(Color.dsBackground)
+    }
+
+    @ViewBuilder
+    func cardRowView(for item: CollectionItem) -> some View {
+        if isSelecting {
+            CollectionItemRow(item: item)
+        } else {
+            CollectionItemRow(
+                item: item,
+                showQuantityStepper: true,
+                onCopy: { contextCopyItem = item },
+                onMove: { contextMoveItem = item },
+                onDelete: { contextDeleteItem = item },
+                onSwipeDelete: { deleteItem(item) },
+                onToggleFoil: { toggleFoil(item) },
+                onSwipeToggleFoil: { toggleFoil(item) },
+                onNavigate: { selectedCard = item.toRecognizedCard() },
+                openRowID: $openSwipeRowID
+            )
+        }
+    }
+
+    func toggleSearch() {
+        withAnimation(.smooth(duration: 0.2)) {
+            showSearch.toggle()
+            if !showSearch { filterState.searchText = "" }
+        }
+    }
 }
 
 // MARK: - Bottom Action Bar
@@ -248,6 +261,8 @@ private extension DeckDetailView {
 
 extension DeckDetailView {
     func enterSelecting() {
+        showSearch = false
+        filterState.searchText = ""
         selectedItems = []
         isSelecting = true
     }
@@ -319,6 +334,15 @@ extension DeckDetailView {
         registerUndo(for: [item])
         modelContext.delete(item)
         deck.updatedAt = Date()
+    }
+
+    func toggleFoil(_ item: CollectionItem) {
+        if item.toggleFoilIfNoDuplicate(in: deck.items) {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            deck.updatedAt = Date()
+        } else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
     }
 
     func copyItem(_ item: CollectionItem, to destination: MoveDestination) {

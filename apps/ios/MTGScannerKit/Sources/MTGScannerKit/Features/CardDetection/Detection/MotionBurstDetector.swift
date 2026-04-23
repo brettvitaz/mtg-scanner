@@ -41,7 +41,7 @@ struct MotionBurstDetector: Sendable {
     private var idleBaseline: Float = 0
 
     /// Timestamp of last reference frame update.
-    internal(set) var lastReferenceUpdate: Date = Date()
+    var lastReferenceUpdate: Date = Date()
 
     // MARK: - Metrics (for debug overlay)
 

@@ -72,7 +72,7 @@ ios-test-matrix: ios-test ios-test-current ios-test-tablet
 ios-lint:
 	./scripts/lint-ios.sh
 
-IOS_SNAPSHOT_ROUTES ?= settings scan
+IOS_SNAPSHOT_ROUTES ?= settings scan results
 
 ios-snapshot: ios-build
 	ROUTE=$${ROUTE:-settings} ./scripts/ios-screenshot.sh "$${ROUTE:-settings}"

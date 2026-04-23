@@ -35,6 +35,10 @@ public struct PreviewGalleryRootView: View {
                     .ignoresSafeArea()
                 }
 
+            case "results":
+                ResultsFixtureView()
+                    .environment(appModel)
+
             default:
                 VStack(spacing: 12) {
                     Image(systemName: "questionmark.circle")
@@ -58,4 +62,8 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Scan (fixture camera)") {
     PreviewGalleryRootView(route: "scan")
+}
+
+#Preview("Results (fixture data)") {
+    PreviewGalleryRootView(route: "results")
 }

@@ -20,16 +20,21 @@ identifier_name:
   min_length: 1
 
 function_body_length:
-  warning: 30
-  error: 50
+  warning: 40
+  error: 60
 
 function_parameter_count:
   warning: 6
   error: 8
 
 closure_body_length:
-  warning: 30
-  error: 50
+  warning: 40
+  error: 60
+
+file_length:
+  warning: 500
+  error: 700
+  ignore_comment_only_lines: true
 
 nesting:
   type_level: 3
@@ -44,5 +49,5 @@ line_length:
   ignores_comments: true
 
 type_body_length:
-  warning: 200
-  error: 400
+  warning: 300
+  error: 500

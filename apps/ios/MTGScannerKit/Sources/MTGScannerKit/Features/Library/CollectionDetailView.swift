@@ -90,15 +90,19 @@ struct CollectionDetailView: View {
 
     private var cardListWithToolbar: some View {
         let items = displayedItems
-        return VStack(spacing: 0) {
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(items) { cardRowView(for: $0) }
-                } header: { cardListHeader(for: items) }
-            }
-            .listStyle(.insetGrouped)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
+        return List(selection: $selectedItems) {
+            // Fake header as first row
+            cardListHeader(for: items)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: -8, leading: 0, bottom: 0, trailing: 0))
+                .disabled(true)
+            
+            ForEach(items) { cardRowView(for: $0) }
+        }
+        .listStyle(.plain)
+        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .safeAreaInset(edge: .bottom) {
             if isSelecting {
                 bottomActionBar
             }
@@ -129,6 +133,7 @@ struct CollectionDetailView: View {
     private func cardListHeader(for items: [CollectionItem]) -> some View {
         HStack {
             Text("Cards")
+                .font(.body.weight(.semibold))
             Spacer()
             if filterState.isFilterActive {
                 Text("\(items.totalQuantity) of \(collection.items.totalQuantity) card(s)")
@@ -138,6 +143,7 @@ struct CollectionDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Top Toolbar

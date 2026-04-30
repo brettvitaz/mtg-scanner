@@ -16,6 +16,7 @@ Improve MTG card cropping in the iOS app so recognition receives tighter, de-ske
 5. Crop-disabled mode must preserve the existing behavior of uploading the full image.
 6. Do not modify downstream recognition models, API contracts, or server-side recognition logic.
 7. Prefer Apple-native frameworks already in use: Vision, CoreImage, UIKit, and AVFoundation.
+8. Add a debug-only way to preserve original camera captures for future crop fixture creation when crop outputs are unusable.
 
 ## Scope
 
@@ -24,12 +25,16 @@ Improve MTG card cropping in the iOS app so recognition receives tighter, de-ske
 - Rectangle candidate filtering/ranking in `RectangleFilter`.
 - Auto-scan still-photo crop handoff in `AutoScanViewModel`.
 - Focused unit tests for crop ranking, fallback behavior, output aspect/orientation, and existing view-model injection points.
+- Debug-only raw camera capture saving for manual and auto-scan camera captures.
+- Documentation of follow-up fixture and validation work.
 
 **Out of scope:**
 - Recognition pipeline or model changes.
 - New third-party computer-vision or ML dependencies.
 - Training or integrating a new corner/segmentation model.
 - UI redesign beyond preserving the existing crop setting behavior.
+- Release-build diagnostic UI or Photos saving.
+- Duplicating imported photo-library images into Photos.
 - 180-degree card-top orientation detection, since crop geometry alone cannot reliably distinguish upside-down card content.
 
 ## Verification
@@ -41,6 +46,16 @@ xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKit
 ```
 
 If simulator execution is unavailable, at minimum run a Swift parse check on the changed Swift files and record the environment blocker.
+
+Confirm debug raw-capture saving with targeted tests and a release build guard:
+
+```sh
+xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/AppModelCropToggleTests/testDebugSaveRawCapturesDefaultIsFalse -only-testing:MTGScannerKitTests/AppModelCropToggleTests/testDebugSaveRawCapturesPersistsToUserDefaults -only-testing:MTGScannerKitTests/AppModelCropToggleTests/testDebugSaveRawCapturesLoadsPersistedValue -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testRawCaptureSaverIsSkippedWhenDebugToggleDisabled -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testRawCaptureSaverReceivesOriginalUploadDataWhenDebugToggleEnabled -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testAutoCapturedPayloadSavesOriginalBytesBeforeRecognitionWork -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testGenericEnqueueDoesNotSaveImportedPhotoPayloads
+```
+
+```sh
+xcodebuild build -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -configuration Release -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO
+```
 
 ## Context
 
@@ -64,3 +79,4 @@ Decisions recorded before implementation:
 - Auto-scan should use Vision still-photo refinement first, with YOLO axis-aligned crop only as fallback.
 - iOS 18 is the minimum deployment target, so Vision/CoreImage APIs used by the existing app are acceptable.
 - No recognition API, server, or model changes are allowed for this effort.
+- Raw camera capture saving must be debug-only, default-off, and must preserve `RecognitionImagePayload.uploadData` rather than re-encoding images.

@@ -18,6 +18,11 @@ public final class AppModel {
     var onDeviceCropEnabled: Bool {
         didSet { persistOnDeviceCrop() }
     }
+#if DEBUG
+    var debugSaveRawCapturesToPhotoLibrary: Bool {
+        didSet { UserDefaults.standard.set(debugSaveRawCapturesToPhotoLibrary, forKey: debugSaveRawCapturesKey) }
+    }
+#endif
     var autoScanCaptureDelay: Double {
         didSet { UserDefaults.standard.set(autoScanCaptureDelay, forKey: autoScanCaptureDelayKey) }
     }
@@ -63,6 +68,9 @@ public final class AppModel {
     private let correctionsStoreKey = "card_corrections"
     private let apiBaseURLStoreKey = "api_base_url"
     private let onDeviceCropStoreKey = "on_device_crop_enabled"
+#if DEBUG
+    private let debugSaveRawCapturesKey = "debug_save_raw_captures_to_photo_library"
+#endif
     private let autoScanCaptureDelayKey = "auto_scan_capture_delay"
     private let autoScanConfidenceKey = "auto_scan_confidence_threshold"
     private let maxConcurrentUploadsKey = "max_concurrent_uploads"
@@ -74,6 +82,10 @@ public final class AppModel {
     public init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
+#if DEBUG
+        self.debugSaveRawCapturesToPhotoLibrary =
+            UserDefaults.standard.object(forKey: debugSaveRawCapturesKey) as? Bool ?? false
+#endif
         let storedDelay = UserDefaults.standard.double(forKey: autoScanCaptureDelayKey)
         self.autoScanCaptureDelay = Self.clampAutoScanCaptureDelay(storedDelay)
         let storedConf = UserDefaults.standard.double(forKey: autoScanConfidenceKey)

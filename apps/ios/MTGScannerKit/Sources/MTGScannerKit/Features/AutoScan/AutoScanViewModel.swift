@@ -51,6 +51,10 @@ final class AutoScanViewModel {
     weak var captureCoordinator: CameraCaptureCoordinator?
     var modelContext: ModelContext?
     var apiBaseURL: String = ""
+#if DEBUG
+    var debugSaveRawCapturesToPhotoLibrary = false
+    var rawCaptureSaver: RawCaptureSaving = RawCaptureDebugSaver()
+#endif
 
     // MARK: - Private
 
@@ -193,6 +197,14 @@ final class AutoScanViewModel {
         await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
     }
 
+#if DEBUG
+    @MainActor
+    func saveRawCaptureIfEnabled(_ payload: RecognitionImagePayload) async {
+        guard debugSaveRawCapturesToPhotoLibrary else { return }
+        await rawCaptureSaver.saveRawCapture(payload)
+    }
+#endif
+
     // MARK: - Frame Forwarding
 
     /// Forward camera frames to the presence tracker while active.
@@ -242,6 +254,13 @@ final class AutoScanViewModel {
             return
         }
 
+        await processAutoCapturedPayload(payload)
+    }
+
+    func processAutoCapturedPayload(_ payload: RecognitionImagePayload) async {
+#if DEBUG
+        await saveRawCaptureIfEnabled(payload)
+#endif
         let result = await cropCapturedPayload(payload)
         lastCroppedImage = result.image
         if let box = result.boundingBox, !isCalibrated {

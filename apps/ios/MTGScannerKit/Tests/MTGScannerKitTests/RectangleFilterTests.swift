@@ -240,7 +240,7 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
-    func testCropFilterSuppressesContainedInnerObservation() {
+    func testScanFilterSuppressesContainedInnerObservation() {
         let outer = makeObservation(
             box: CGRect(x: 0.1, y: 0.1, width: 0.30, height: 0.42),
             confidence: 0.8
@@ -250,10 +250,48 @@ final class RectangleFilterTests: XCTestCase {
             confidence: 0.9
         )
 
-        let result = cropFilter.filter([inner, outer], isLandscape: false)
+        let result = filter.filter([inner, outer], isLandscape: false)
 
         XCTAssertEqual(result.count, 1)
         XCTAssertTrue(result.first === outer)
+    }
+
+    func testCropFilterPrefersContainedSingleCardCandidate() {
+        let outer = makeObservation(
+            box: CGRect(x: 0.06, y: 0.06, width: 0.42, height: 0.59),
+            confidence: 0.95
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.13, y: 0.16, width: 0.28, height: 0.39),
+            confidence: 0.75
+        )
+
+        let result = cropFilter.filter([outer, inner], isLandscape: false)
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertTrue(result.first === inner)
+    }
+
+    func testCropRankPrefersHintSizedCandidateOverLargerContainer() {
+        let outer = makeObservation(
+            box: CGRect(x: 0.06, y: 0.06, width: 0.42, height: 0.59),
+            confidence: 0.95
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.13, y: 0.16, width: 0.28, height: 0.39),
+            confidence: 0.75
+        )
+        let hint = CGRect(x: 0.13, y: 0.16, width: 0.28, height: 0.39)
+
+        let result = cropFilter.rank(
+            [outer, inner],
+            isLandscape: false,
+            visionHint: hint,
+            preferSingle: true
+        )
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertTrue(result.first === inner)
     }
 
     func testRankPrefersRectangleSupportedByYoloHint() {

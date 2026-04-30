@@ -6,7 +6,7 @@ import Vision
 /// Responsibilities:
 /// - Accept observations whose aspect ratio matches a standard MTG card (63mm × 88mm ≈ 0.716).
 /// - Suppress overlapping detections using IoU-based Non-Maximum Suppression (NMS).
-/// - Prefer enclosing single-card rectangles over nested feature boxes while preserving peers.
+/// - Resolve nested rectangles differently for live scan detection and still-image crop generation.
 /// - Re-sort accepted observations in reading order (top-left to bottom-right).
 struct RectangleFilter {
 
@@ -62,14 +62,17 @@ struct RectangleFilter {
     struct Configuration {
         let aspectRatioTolerance: CGFloat
         let enablesContainmentSuppression: Bool
+        let prefersContainedSingleCard: Bool
 
         static let scan = Configuration(
             aspectRatioTolerance: RectangleFilter.scanAspectRatioTolerance,
-            enablesContainmentSuppression: true
+            enablesContainmentSuppression: true,
+            prefersContainedSingleCard: false
         )
         static let crop = Configuration(
             aspectRatioTolerance: RectangleFilter.cropAspectRatioTolerance,
-            enablesContainmentSuppression: true
+            enablesContainmentSuppression: true,
+            prefersContainedSingleCard: true
         )
     }
 
@@ -93,8 +96,8 @@ struct RectangleFilter {
     /// 1. Drops observations below `minConfidence`.
     /// 2. Drops observations whose aspect ratio falls outside the active band.
     /// 3. Applies IoU-based NMS (higher-confidence observation wins ties).
-    /// 4. Suppresses nested inner boxes by preferring the enclosing single-card candidate and
-    ///    discarding aggregate outer boxes that merely contain multiple peer cards.
+    /// 4. Suppresses nested boxes. Scan mode prefers enclosing single-card candidates; crop mode
+    ///    prefers contained single-card candidates to avoid bin/table edges winning crop selection.
     /// 5. Re-sorts in top-left → bottom-right reading order.
     func filter(_ observations: [VNRectangleObservation], isLandscape: Bool) -> [VNRectangleObservation] {
         filterResult(observations, isLandscape: isLandscape).observations
@@ -202,8 +205,10 @@ struct RectangleFilter {
         let hintScore = visionHint.map { hintSupportScore(obs.boundingBox, hint: $0) } ?? 0
         let hintWeight: CGFloat = visionHint == nil ? 0 : 0.35
         let baseWeight: CGFloat = 1 - hintWeight
+        let areaWeight: CGFloat = configuration.prefersContainedSingleCard ? 0.03 : 0.10
+        let confidenceWeight = 0.65 - areaWeight
 
-        return baseWeight * (confidenceScore * 0.55 + aspectScore * 0.35 + areaScore * 0.10)
+        return baseWeight * (confidenceScore * confidenceWeight + aspectScore * 0.35 + areaScore * areaWeight)
             + hintScore * hintWeight
     }
 
@@ -249,11 +254,12 @@ struct RectangleFilter {
     }
 
     private func hintSupportScore(_ rect: CGRect, hint: CGRect) -> CGFloat {
-        max(
-            Self.iou(rect, hint),
-            Self.coverage(of: rect, by: hint),
-            Self.coverage(of: hint, by: rect)
-        )
+        let intersection = rect.intersection(hint)
+        guard !intersection.isNull else { return 0 }
+        let supportArea = Self.area(of: intersection)
+        let largerArea = max(Self.area(of: rect), Self.area(of: hint))
+        guard largerArea > 0 else { return 0 }
+        return supportArea / largerArea
     }
 
     private func suppressContainedObservations(
@@ -264,8 +270,9 @@ struct RectangleFilter {
             return ContainmentSuppressionResult(observations: observations, suppressionCount: 0)
         }
 
-        let aggregateIndices = Set(observations.indices.filter {
-            directChildren(of: $0, in: containment).count > 1
+        let aggregateIndices = Set(observations.indices.filter { index in
+            let childCount = directChildren(of: index, in: containment).count
+            return configuration.prefersContainedSingleCard ? childCount >= 1 : childCount > 1
         })
         let suppressedIndices = Set(observations.indices.filter { index in
             if aggregateIndices.contains(index) {

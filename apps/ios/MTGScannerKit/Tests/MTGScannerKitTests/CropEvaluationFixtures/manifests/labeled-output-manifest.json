@@ -1,0 +1,86 @@
+[
+  {
+    "id": "auto-good-cauldrons-of-souls",
+    "mode": "autoScan",
+    "path": "labeled-outputs/good/auto-good-cauldrons-of-souls.jpg",
+    "sourcePath": "tmp/auto-scan/good/upload 2.jpg",
+    "expectedFailure": "none"
+  },
+  {
+    "id": "auto-good-kruphix-god-of-horizons",
+    "mode": "autoScan",
+    "path": "labeled-outputs/good/auto-good-kruphix-god-of-horizons.jpg",
+    "sourcePath": "tmp/auto-scan/good/upload 3.jpg",
+    "expectedFailure": "none"
+  },
+  {
+    "id": "table-good-teferis-protection",
+    "mode": "tableScan",
+    "path": "labeled-outputs/good/table-good-teferis-protection.jpg",
+    "sourcePath": "tmp/table-scan/good/upload.jpg",
+    "expectedFailure": "none"
+  },
+  {
+    "id": "auto-under-crop-pyretic-ritual-box",
+    "mode": "autoScan",
+    "path": "labeled-outputs/under-crop/auto-under-crop-pyretic-ritual-box.jpg",
+    "sourcePath": "tmp/auto-scan/not-enough-crop/upload.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "auto-under-crop-wear-tear-box",
+    "mode": "autoScan",
+    "path": "labeled-outputs/under-crop/auto-under-crop-wear-tear-box.jpg",
+    "sourcePath": "tmp/auto-scan/not-enough-crop/upload 2.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "auto-under-crop-manawelt-sliver-box",
+    "mode": "autoScan",
+    "path": "labeled-outputs/under-crop/auto-under-crop-manawelt-sliver-box.jpg",
+    "sourcePath": "tmp/auto-scan/not-enough-crop/upload 3.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "table-under-crop-kruphix-god-of-horizons-border",
+    "mode": "tableScan",
+    "path": "labeled-outputs/under-crop/table-under-crop-kruphix-god-of-horizons-border.jpg",
+    "sourcePath": "tmp/table-scan/not-enough-crop/Kruphix-God-of-Horizons_the-list_jou-152.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "table-under-crop-teferis-protection-border",
+    "mode": "tableScan",
+    "path": "labeled-outputs/under-crop/table-under-crop-teferis-protection-border.jpg",
+    "sourcePath": "tmp/table-scan/not-enough-crop/Teferis-Protection_the-list_c17-008.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "table-under-crop-teferis-protection-box",
+    "mode": "tableScan",
+    "path": "labeled-outputs/under-crop/table-under-crop-teferis-protection-box.jpg",
+    "sourcePath": "tmp/table-scan/not-enough-crop/bad-crop.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "table-under-crop-teferis-protection-border-wide",
+    "mode": "tableScan",
+    "path": "labeled-outputs/under-crop/table-under-crop-teferis-protection-border-wide.jpg",
+    "sourcePath": "tmp/table-scan/not-enough-crop/upload 2.jpg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "auto-over-crop-eldrazi-monument",
+    "mode": "autoScan",
+    "path": "labeled-outputs/over-crop/auto-over-crop-eldrazi-monument.jpg",
+    "sourcePath": "tmp/auto-scan/too-much-crop/eldrazi-monument_the-list_cma-216.jpg",
+    "expectedFailure": "overCrop"
+  },
+  {
+    "id": "auto-skewed-time-sieve",
+    "mode": "autoScan",
+    "path": "labeled-outputs/skewed/auto-skewed-time-sieve.jpg",
+    "sourcePath": "tmp/auto-scan/not-straight/time-sieve_the-list_arb-031.jpg",
+    "expectedFailure": "skewed"
+  }
+]

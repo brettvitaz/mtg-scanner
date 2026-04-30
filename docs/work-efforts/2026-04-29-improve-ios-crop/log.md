@@ -73,3 +73,54 @@ After simulator runtimes were repaired, the targeted XCTest command was correcte
 Deviations from plan: XCTest execution is blocked by environment setup, not by known code failures.
 
 ---
+
+### Step 8: Added debug raw camera capture saving
+
+**Status:** done
+
+Added a debug-only diagnostic setting that saves original camera capture bytes to the iPhone Photos library before crop or recognition work runs. The setting is persisted in `AppModel` as `debugSaveRawCapturesToPhotoLibrary`, defaults to `false`, and is exposed only in debug builds in a Settings > Diagnostics section labeled `Save Raw Captures to Photos`.
+
+Added `NSPhotoLibraryAddUsageDescription` to the app plist and introduced `RawCaptureDebugSaver`, a debug-only Photos add-only writer. The saver requests `.addOnly` authorization, writes `RecognitionImagePayload.uploadData` with `PHAssetCreationRequest.addResource(with: .photo, data:options:)`, logs failures in debug builds, and does not block the capture pipeline on permission denial or save failure.
+
+Manual camera capture now invokes the raw saver after `captureCoordinator.capturePhoto()` returns and before `enqueueForRecognition`. Auto-scan invokes it after still capture and before `cropCapturedPayload`. Photo-library imports intentionally do not call the saver because those images already originated in Photos and saving would create duplicates.
+
+Deviations from plan: none
+
+---
+
+### Step 9: Added debug raw capture tests
+
+**Status:** done
+
+Added guarded tests for the debug-save `AppModel` default, persistence, and load behavior. Added a spy `RawCaptureSaving` implementation in `AutoScanViewModelTests` to verify that saving is skipped when disabled, enabled saving receives the original `RecognitionImagePayload.uploadData`, auto captured payloads save before recognition work, and generic imported-photo enqueue does not save duplicates.
+
+Deviations from plan: actual `PHPhotoLibrary` writes remain out of unit tests by design.
+
+---
+
+### Step 10: Ran raw-capture validation
+
+**Status:** done
+
+Targeted raw-capture tests passed:
+
+```sh
+xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/AppModelCropToggleTests/testDebugSaveRawCapturesDefaultIsFalse -only-testing:MTGScannerKitTests/AppModelCropToggleTests/testDebugSaveRawCapturesPersistsToUserDefaults -only-testing:MTGScannerKitTests/AppModelCropToggleTests/testDebugSaveRawCapturesLoadsPersistedValue -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testRawCaptureSaverIsSkippedWhenDebugToggleDisabled -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testRawCaptureSaverReceivesOriginalUploadDataWhenDebugToggleEnabled -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testAutoCapturedPayloadSavesOriginalBytesBeforeRecognitionWork -only-testing:MTGScannerKitTests/AutoScanViewModelTests/testGenericEnqueueDoesNotSaveImportedPhotoPayloads
+```
+
+Release build validation passed after running outside the sandbox:
+
+```sh
+xcodebuild build -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -configuration Release -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO
+```
+
+Full `MTGScannerKitTests` execution ran 392 tests and failed one existing crop-filter regression outside the raw-capture diagnostic changes:
+
+```text
+RectangleFilterNMSTests/testCropFilterDoesNotApplyContainmentSuppression()
+XCTAssertEqual failed: ("1") is not equal to ("2")
+```
+
+Deviations from plan: `swift test` is not usable for this iOS-only package on macOS because UIKit is unavailable in a macOS package build. Use Xcode iOS simulator/device commands instead.
+
+---

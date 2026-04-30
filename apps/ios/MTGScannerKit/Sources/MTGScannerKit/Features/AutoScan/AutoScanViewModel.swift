@@ -55,7 +55,7 @@ final class AutoScanViewModel {
     // MARK: - Private
 
     private var settleTask: Task<Void, Never>?
-    private let cropImage: @Sendable (UIImage) async -> CardCropResult
+    private let cropImage: @Sendable (UIImage, CardCropHint?) async -> CardCropResult
 
     private struct CropResult {
         let image: UIImage?
@@ -77,7 +77,7 @@ final class AutoScanViewModel {
         recognitionQueue = RecognitionQueue()
         identifiedCardsViewModel = IdentifiedCardsViewModel()
         let service = CardCropService()
-        cropImage = { image in await service.detectAndCrop(image: image) }
+        cropImage = { image, hint in await service.detectAndCrop(image: image, hint: hint) }
         setupSignalHandler()
         setupRecognitionCallback()
     }
@@ -87,8 +87,8 @@ final class AutoScanViewModel {
         detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
         recognitionQueue: RecognitionQueue,
         identifiedCardsViewModel: IdentifiedCardsViewModel? = nil,
-        cropImage: @escaping @Sendable (UIImage) async -> CardCropResult = {
-            await CardCropService().detectAndCrop(image: $0)
+        cropImage: @escaping @Sendable (UIImage, CardCropHint?) async -> CardCropResult = {
+            await CardCropService().detectAndCrop(image: $0, hint: $1)
         }
     ) {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
@@ -165,7 +165,7 @@ final class AutoScanViewModel {
         if cropEnabled {
             let detectCrops = cropImage
             let crops = await Task.detached(priority: .userInitiated) {
-                await detectCrops(image)
+                await detectCrops(image, nil)
             }.value
             if crops.crops.isEmpty {
                 recognitionQueue.enqueue(
@@ -271,7 +271,9 @@ private extension AutoScanViewModel {
         guard let box = await presenceTracker.detectBestBox(in: cgImage) else {
             return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
         }
-        let cropped = AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+        let hint = CardCropHint(yoloBoxTopLeft: box, preferSingleCrop: true)
+        let cropResult = await cropImage(uprightImage, hint)
+        let cropped = cropResult.crops.first
         return CropResult(image: cropped, boundingBox: box, sourceSize: sourceSize)
     }
 

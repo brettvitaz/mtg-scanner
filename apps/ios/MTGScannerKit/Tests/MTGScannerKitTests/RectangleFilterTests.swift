@@ -240,6 +240,61 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func testCropFilterSuppressesContainedInnerObservation() {
+        let outer = makeObservation(
+            box: CGRect(x: 0.1, y: 0.1, width: 0.30, height: 0.42),
+            confidence: 0.8
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.15, y: 0.17, width: 0.20, height: 0.28),
+            confidence: 0.9
+        )
+
+        let result = cropFilter.filter([inner, outer], isLandscape: false)
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertTrue(result.first === outer)
+    }
+
+    func testRankPrefersRectangleSupportedByYoloHint() {
+        let hinted = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: 0.28, height: 0.40),
+            confidence: 0.6
+        )
+        let highConfidenceElsewhere = makeObservation(
+            box: CGRect(x: 0.60, y: 0.10, width: 0.28, height: 0.40),
+            confidence: 0.95
+        )
+        let hint = CGRect(x: 0.10, y: 0.10, width: 0.28, height: 0.40)
+
+        let result = cropFilter.rank(
+            [highConfidenceElsewhere, hinted],
+            isLandscape: false,
+            visionHint: hint,
+            preferSingle: true
+        )
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertTrue(result.first === hinted)
+    }
+
+    func testFilterSortsInTopLeftReadingOrder() {
+        let bottomLeft = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: 0.28, height: 0.40),
+            confidence: 0.9
+        )
+        let topLeft = makeObservation(
+            box: CGRect(x: 0.10, y: 0.55, width: 0.28, height: 0.40),
+            confidence: 0.8
+        )
+
+        let result = filter.filter([bottomLeft, topLeft], isLandscape: false)
+
+        XCTAssertEqual(result.count, 2)
+        XCTAssertTrue(result[0] === topLeft)
+        XCTAssertTrue(result[1] === bottomLeft)
+    }
+
     func testFilterRejectsTallAggregateBoxUnderPortraitTolerance() {
         let obs = VNRectangleObservation()
         obs.setValue(CGRect(x: 0.475, y: 0.434, width: 0.163, height: 0.451), forKey: "boundingBox")

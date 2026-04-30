@@ -226,7 +226,7 @@ final class AutoScanViewModelTests: XCTestCase {
         let vm = AutoScanViewModel(
             detectorProvider: { nil },
             recognitionQueue: queue,
-            cropImage: { _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }
+            cropImage: { _, _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }
         )
 
         await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)

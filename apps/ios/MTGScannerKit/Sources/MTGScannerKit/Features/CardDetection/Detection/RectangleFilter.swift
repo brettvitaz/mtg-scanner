@@ -69,7 +69,7 @@ struct RectangleFilter {
         )
         static let crop = Configuration(
             aspectRatioTolerance: RectangleFilter.cropAspectRatioTolerance,
-            enablesContainmentSuppression: false
+            enablesContainmentSuppression: true
         )
     }
 
@@ -101,23 +101,66 @@ struct RectangleFilter {
     }
 
     func filterResult(_ observations: [VNRectangleObservation], isLandscape: Bool) -> FilterResult {
+        let result = rankedResult(
+            observations,
+            isLandscape: isLandscape,
+            visionHint: nil,
+            preferSingle: false
+        )
+        return FilterResult(
+            observations: result.observations,
+            containmentSuppressionCount: result.containmentSuppressionCount
+        )
+    }
+
+    /// Returns accepted observations ranked for still-image crop generation.
+    ///
+    /// `visionHint` is an optional normalized rectangle in Vision coordinates
+    /// (bottom-left origin). When present, it biases ranking toward the rectangle
+    /// that best overlaps the detector box without making the detector box the crop.
+    func rank(
+        _ observations: [VNRectangleObservation],
+        isLandscape: Bool,
+        visionHint: CGRect?,
+        preferSingle: Bool
+    ) -> [VNRectangleObservation] {
+        rankedResult(
+            observations,
+            isLandscape: isLandscape,
+            visionHint: visionHint,
+            preferSingle: preferSingle
+        ).observations
+    }
+
+    private func rankedResult(
+        _ observations: [VNRectangleObservation],
+        isLandscape: Bool,
+        visionHint: CGRect?,
+        preferSingle: Bool
+    ) -> RankedResult {
         let candidates = observations
             .filter { $0.confidence >= Self.minConfidence }
             .filter { isCardAspectRatio($0, isLandscape: isLandscape) }
-            .sorted { $0.confidence > $1.confidence }
+            .sorted {
+                score($0, isLandscape: isLandscape, visionHint: visionHint) >
+                    score($1, isLandscape: isLandscape, visionHint: visionHint)
+            }
 
         let nmsAccepted = applyNMS(to: candidates)
         let containedSuppression = applyContainmentSuppression(to: nmsAccepted)
         var accepted = containedSuppression.observations
 
-        accepted.sort { a, b in
-            let ay = a.boundingBox.minY
-            let by = b.boundingBox.minY
-            if abs(ay - by) > 0.05 { return ay < by }
-            return a.boundingBox.minX < b.boundingBox.minX
+        if preferSingle {
+            accepted.sort {
+                score($0, isLandscape: isLandscape, visionHint: visionHint) >
+                    score($1, isLandscape: isLandscape, visionHint: visionHint)
+            }
+            accepted = Array(accepted.prefix(1))
+        } else {
+            accepted.sort(by: Self.readingOrder)
         }
 
-        return FilterResult(
+        return RankedResult(
             observations: accepted,
             containmentSuppressionCount: containedSuppression.suppressionCount
         )
@@ -145,6 +188,32 @@ struct RectangleFilter {
 
     // MARK: - Helpers
 
+    static func readingOrder(_ a: VNRectangleObservation, _ b: VNRectangleObservation) -> Bool {
+        let ay = a.boundingBox.maxY
+        let by = b.boundingBox.maxY
+        if abs(ay - by) > 0.05 { return ay > by }
+        return a.boundingBox.minX < b.boundingBox.minX
+    }
+
+    private func score(_ obs: VNRectangleObservation, isLandscape: Bool, visionHint: CGRect?) -> CGFloat {
+        let confidenceScore = CGFloat(obs.confidence)
+        let aspectScore = aspectCloseness(obs, isLandscape: isLandscape)
+        let areaScore = min(1, Self.area(of: obs.boundingBox) / 0.35)
+        let hintScore = visionHint.map { hintSupportScore(obs.boundingBox, hint: $0) } ?? 0
+        let hintWeight: CGFloat = visionHint == nil ? 0 : 0.35
+        let baseWeight: CGFloat = 1 - hintWeight
+
+        return baseWeight * (confidenceScore * 0.55 + aspectScore * 0.35 + areaScore * 0.10)
+            + hintScore * hintWeight
+    }
+
+    private func aspectCloseness(_ obs: VNRectangleObservation, isLandscape: Bool) -> CGFloat {
+        guard let ratio = edgeAspectRatio(obs) else { return 0 }
+        let center = isLandscape ? Self.portraitInBufferRatio : Self.targetAspectRatio
+        let relativeError = abs(ratio - center) / center
+        return max(0, 1 - relativeError / configuration.aspectRatioTolerance)
+    }
+
     /// Returns true when the observation's edge aspect ratio matches an MTG card in the current
     /// device orientation.
     ///
@@ -155,6 +224,14 @@ struct RectangleFilter {
     /// In landscape mode the card's long axis is vertical in the buffer (ratio ≈ 0.402 due to
     /// the non-square pixel normalization). Only one band is tested per call.
     private func isCardAspectRatio(_ obs: VNRectangleObservation, isLandscape: Bool) -> Bool {
+        guard let ratio = edgeAspectRatio(obs) else { return false }
+        let center = isLandscape ? Self.portraitInBufferRatio : Self.targetAspectRatio
+        let lower = center * (1 - configuration.aspectRatioTolerance)
+        let upper = center * (1 + configuration.aspectRatioTolerance)
+        return ratio >= lower && ratio <= upper
+    }
+
+    private func edgeAspectRatio(_ obs: VNRectangleObservation) -> CGFloat? {
         let topEdge = dist(obs.topLeft, obs.topRight)
         let bottomEdge = dist(obs.bottomLeft, obs.bottomRight)
         let leftEdge = dist(obs.topLeft, obs.bottomLeft)
@@ -162,17 +239,21 @@ struct RectangleFilter {
 
         let avgWidth = (topEdge + bottomEdge) / 2
         let avgHeight = (leftEdge + rightEdge) / 2
-        guard avgWidth > 0, avgHeight > 0 else { return false }
+        guard avgWidth > 0, avgHeight > 0 else { return nil }
 
-        let ratio = min(avgWidth, avgHeight) / max(avgWidth, avgHeight)
-        let center = isLandscape ? Self.portraitInBufferRatio : Self.targetAspectRatio
-        let lower = center * (1 - configuration.aspectRatioTolerance)
-        let upper = center * (1 + configuration.aspectRatioTolerance)
-        return ratio >= lower && ratio <= upper
+        return min(avgWidth, avgHeight) / max(avgWidth, avgHeight)
     }
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
         hypot(a.x - b.x, a.y - b.y)
+    }
+
+    private func hintSupportScore(_ rect: CGRect, hint: CGRect) -> CGFloat {
+        max(
+            Self.iou(rect, hint),
+            Self.coverage(of: rect, by: hint),
+            Self.coverage(of: hint, by: rect)
+        )
     }
 
     private func suppressContainedObservations(
@@ -254,6 +335,14 @@ struct RectangleFilter {
         return area(of: intersection) / innerArea
     }
 
+    static func coverage(of rect: CGRect, by coveringRect: CGRect) -> CGFloat {
+        let intersection = rect.intersection(coveringRect)
+        guard !intersection.isNull else { return 0 }
+        let rectArea = area(of: rect)
+        guard rectArea > 0 else { return 0 }
+        return area(of: intersection) / rectArea
+    }
+
     static func area(of rect: CGRect) -> CGFloat {
         rect.width * rect.height
     }
@@ -267,6 +356,11 @@ extension RectangleFilter {
 }
 
 private extension RectangleFilter {
+    struct RankedResult {
+        let observations: [VNRectangleObservation]
+        let containmentSuppressionCount: Int
+    }
+
     struct ContainmentSuppressionResult {
         let observations: [VNRectangleObservation]
         let suppressionCount: Int

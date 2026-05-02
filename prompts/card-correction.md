@@ -23,6 +23,8 @@ The card named "{{title}}" exists in the following confirmed printings. Select t
 - If foil status is visible, only select a printing that supports it (check the finishes column).
 - If you cannot determine which printing is correct, select the most recent printing and set confidence below 0.5.
 - Return the same JSON format as a standard recognition.
+- Output the three-letter set code for "edition", not the full set name.
+- Output ONLY the numeric collector number (with any suffix like 'e' or '★'), without rarity letters or total card count.
 
 ## Output Shape
 
@@ -33,9 +35,17 @@ Return valid JSON only.
   "cards": [
     {
       "title": "Pactdoll Terror",
-      "edition": "Aetherdrift",
+      "edition": "DFT",
+      "edition_notes": "DFT set symbol visible; corrected from Dominaria which does not contain this card.",
       "collector_number": "99",
       "foil": false,
+      "foil_type": "none",
+      "foil_evidence": ["bullet separator visible — non-foil confirmed"],
+      "list_reprint": "no",
+      "list_symbol_visible": false,
+      "border_color": "black",
+      "copyright_line": "99 R\nDFT • EN   John Avon",
+      "promo_text": null,
       "confidence": 0.82,
       "notes": "Corrected: matched Aetherdrift set symbol; original set Dominaria was invalid for this card."
     }

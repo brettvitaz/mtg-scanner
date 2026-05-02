@@ -1,6 +1,7 @@
 import base64
 import concurrent.futures
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -21,6 +22,16 @@ from app.services.llm import get_llm_provider, LLMProvider
 from app.settings import get_settings
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class RecognitionServiceResult:
+    response: RecognitionResponse
+    metadata: RecognitionUploadMetadata
+    detection_result: DetectionResult | None
+    validation_result: ValidationBatchResult | None
+    usage: TokenUsage | None
+    debug_images: dict[str, bytes] = field(default_factory=dict)
 
 
 class RecognitionProvider(Protocol):
@@ -77,6 +88,7 @@ class RecognitionService:
         max_concurrent_recognitions: int = 4,
         enable_llm_correction: bool = True,
         correction_prompt_version: str = "card-correction.md",
+        enable_corner_crop: bool = True,
     ) -> None:
         self._provider = provider
         self._card_detector = card_detector
@@ -84,6 +96,7 @@ class RecognitionService:
         self._max_concurrent_recognitions = max(1, max_concurrent_recognitions)
         self._enable_llm_correction = enable_llm_correction
         self._correction_prompt_version = correction_prompt_version
+        self._enable_corner_crop = enable_corner_crop
 
     def _validate_response(
         self,
@@ -240,13 +253,7 @@ class RecognitionService:
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         skip_detection: bool = False,
-    ) -> tuple[
-        RecognitionResponse,
-        RecognitionUploadMetadata,
-        DetectionResult | None,
-        ValidationBatchResult | None,
-        TokenUsage | None,
-    ]:
+    ) -> RecognitionServiceResult:
         """Recognize cards in an image.
 
         If a card detector is configured and multiple cards are detected,
@@ -255,9 +262,6 @@ class RecognitionService:
         When *skip_detection* is True the card-detector step is bypassed and
         the image is sent directly to the LLM provider.  The batch endpoint
         uses this for pre-cropped images that should not be re-cropped.
-
-        Returns:
-            Tuple of (RecognitionResponse, enriched metadata, detection result, validation result)
         """
         prompt_text = _load_prompt(metadata.prompt_version)
         enriched_metadata = metadata.model_copy(
@@ -266,6 +270,7 @@ class RecognitionService:
                 "model": self._provider.model_name,
             }
         )
+        debug_images = _generate_debug_images(image_bytes) if self._enable_corner_crop else {}
 
         # Try multi-card detection if detector is available
         detection_result: DetectionResult | None = None
@@ -317,12 +322,13 @@ class RecognitionService:
                     len(final_response.cards),
                     metadata.filename,
                 )
-                return (
-                    final_response,
-                    enriched_metadata,
-                    detection_result,
-                    validation_result,
-                    total_usage,
+                return RecognitionServiceResult(
+                    response=final_response,
+                    metadata=enriched_metadata,
+                    detection_result=detection_result,
+                    validation_result=validation_result,
+                    usage=total_usage,
+                    debug_images=debug_images,
                 )
 
         # Single card or no detection - use original behavior
@@ -345,12 +351,13 @@ class RecognitionService:
             metadata.filename,
             self._provider.provider_name,
         )
-        return (
-            final_response,
-            enriched_metadata,
-            detection_result,
-            validation_result,
-            total_usage,
+        return RecognitionServiceResult(
+            response=final_response,
+            metadata=enriched_metadata,
+            detection_result=detection_result,
+            validation_result=validation_result,
+            usage=total_usage,
+            debug_images=debug_images,
         )
 
 
@@ -381,6 +388,7 @@ def get_recognition_service() -> RecognitionService:
         max_concurrent_recognitions=settings.mtg_scanner_max_concurrent_recognitions,
         enable_llm_correction=settings.mtg_scanner_enable_llm_correction,
         correction_prompt_version=settings.mtg_scanner_correction_prompt_version,
+        enable_corner_crop=settings.mtg_scanner_enable_corner_crop,
     )
 
 
@@ -409,6 +417,16 @@ def _load_response_schema() -> dict:
 def _make_data_url(*, content_type: str, image_bytes: bytes) -> str:
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{content_type};base64,{encoded}"
+
+
+def _generate_debug_images(image_bytes: bytes) -> dict[str, bytes]:
+    """Generate debug images for artifact storage."""
+    from app.services.llm.base import crop_bottom_left_corner
+
+    corner = crop_bottom_left_corner(image_bytes)
+    if corner:
+        return {"corner_crop.jpg": corner}
+    return {}
 
 
 def _encode_crop_image(image_bytes: bytes, quality: int = 60) -> str:

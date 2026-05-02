@@ -28,3 +28,9 @@ def test_card_printings_response_example_matches_schema() -> None:
     schema = _load_json(SCHEMAS_DIR / "v1" / "card-printings-response.schema.json")
     example = _load_json(EXAMPLES_DIR / "card-printings-response.sample.json")
     Draft202012Validator(schema).validate(example)
+
+
+def test_llm_output_example_matches_schema() -> None:
+    schema = _load_json(SCHEMAS_DIR / "v1" / "llm-output.schema.json")
+    example = _load_json(EXAMPLES_DIR / "llm-output.sample.json")
+    Draft202012Validator(schema).validate(example)

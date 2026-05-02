@@ -38,7 +38,7 @@ app/
 - All new models must be Pydantic `BaseModel` subclasses.
 - Settings must go through `settings.py` — no raw `os.environ` reads in service code.
 - New exceptions inherit from `RecognitionConfigurationError` or `RecognitionProviderError`.
-- Async for all I/O: httpx for HTTP, aiofiles if file I/O becomes a bottleneck.
+- Recognition routes are sync `def` with sync `httpx.Client`. Do not combine `async def` routes with sync HTTP calls — it serializes all requests. See `.claude/rules/python-coding-standards.md`.
 - Keep endpoint handlers thin — business logic belongs in `services/`.
 
 ## Testing

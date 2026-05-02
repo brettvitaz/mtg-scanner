@@ -21,6 +21,8 @@ from app.services.llm import (
     AnthropicProvider,
 )
 from app.services.llm.base import (
+    CORNER_CROP_ABSENT_TEXT,
+    CORNER_CROP_PRESENT_TEXT,
     extract_anthropic_usage,
     extract_json_from_text,
     extract_openai_usage,
@@ -32,7 +34,7 @@ from app.settings import Settings
 
 @pytest.fixture
 def sample_recognition_response():
-    """Sample valid recognition response."""
+    """Sample valid recognition response including v2 LLM fields."""
     return {
         "cards": [
             {
@@ -41,6 +43,14 @@ def sample_recognition_response():
                 "collector_number": "1",
                 "foil": False,
                 "confidence": 0.95,
+                "edition_notes": "LEA set code inferred from black border and art style.",
+                "foil_type": "none",
+                "foil_evidence": ["no rainbow sheen visible"],
+                "list_reprint": "no",
+                "list_symbol_visible": False,
+                "border_color": "black",
+                "copyright_line": "Illus. © Christopher Rush",
+                "promo_text": None,
                 "set_code": "LEA",
                 "rarity": "common",
             }
@@ -245,6 +255,49 @@ class TestOpenAIProvider:
                     prompt_text="Extract card info",
                 )
 
+    def test_build_request_includes_corner_crop_when_enabled(self):
+        """Corner crop enabled: second image block and present-text appear in user content."""
+        provider = OpenAIProvider(
+            api_key="k", model="m", enable_corner_crop=True
+        )
+        fake_corner_url = "data:image/jpeg;base64,abc"
+        body = provider._build_request("prompt", "data:image/jpeg;base64,main", fake_corner_url)
+        user_content = body["messages"][1]["content"]
+        image_urls = [b["image_url"]["url"] for b in user_content if b.get("type") == "image_url"]
+        texts = [b["text"] for b in user_content if b.get("type") == "text"]
+        assert fake_corner_url in image_urls
+        assert any(CORNER_CROP_PRESENT_TEXT in t for t in texts)
+        assert not any(CORNER_CROP_ABSENT_TEXT in t for t in texts)
+
+    def test_build_request_omits_corner_crop_when_disabled(self):
+        """Corner crop disabled: no second image, absent-text appears instead."""
+        provider = OpenAIProvider(
+            api_key="k", model="m", enable_corner_crop=False
+        )
+        body = provider._build_request("prompt", "data:image/jpeg;base64,main", None)
+        user_content = body["messages"][1]["content"]
+        image_urls = [b["image_url"]["url"] for b in user_content if b.get("type") == "image_url"]
+        texts = [b["text"] for b in user_content if b.get("type") == "text"]
+        assert len(image_urls) == 1
+        assert any(CORNER_CROP_ABSENT_TEXT in t for t in texts)
+        assert not any(CORNER_CROP_PRESENT_TEXT in t for t in texts)
+
+    def test_crop_not_called_when_disabled(self, sample_metadata):
+        """crop_bottom_left_corner must not be invoked when toggle is off."""
+        provider = OpenAIProvider(api_key="k", model="m", enable_corner_crop=False)
+
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"cards": []}'}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        }
+        mock_response.raise_for_status = Mock()
+
+        with patch("app.services.llm.openai_provider.maybe_corner_crop", wraps=lambda img, enabled: None) as mock_crop:
+            with patch("httpx.Client.post", return_value=mock_response):
+                provider.recognize(image_bytes=b"img", metadata=sample_metadata, prompt_text="p")
+            mock_crop.assert_called_once_with(b"img", False)
+
 
 class TestMoonshotProvider:
     """Tests for Moonshot (Kimi) provider."""
@@ -296,6 +349,29 @@ class TestMoonshotProvider:
     def test_provider_name(self, provider):
         """Test provider name is set correctly."""
         assert provider.provider_name == "moonshot"
+
+    def test_build_request_includes_corner_crop_when_enabled(self):
+        """Corner crop enabled: second image block and present-text appear in user content."""
+        provider = MoonshotProvider(api_key="k", model="m", enable_corner_crop=True)
+        fake_corner_url = "data:image/jpeg;base64,corner"
+        body = provider._build_request("prompt", "data:image/jpeg;base64,main", fake_corner_url)
+        user_content = body["messages"][1]["content"]
+        image_urls = [b["image_url"]["url"] for b in user_content if b.get("type") == "image_url"]
+        texts = [b["text"] for b in user_content if b.get("type") == "text"]
+        assert fake_corner_url in image_urls
+        assert any(CORNER_CROP_PRESENT_TEXT in t for t in texts)
+        assert not any(CORNER_CROP_ABSENT_TEXT in t for t in texts)
+
+    def test_build_request_omits_corner_crop_when_disabled(self):
+        """Corner crop disabled: no second image, absent-text appears instead."""
+        provider = MoonshotProvider(api_key="k", model="m", enable_corner_crop=False)
+        body = provider._build_request("prompt", "data:image/jpeg;base64,main", None)
+        user_content = body["messages"][1]["content"]
+        image_urls = [b["image_url"]["url"] for b in user_content if b.get("type") == "image_url"]
+        texts = [b["text"] for b in user_content if b.get("type") == "text"]
+        assert len(image_urls) == 1
+        assert any(CORNER_CROP_ABSENT_TEXT in t for t in texts)
+        assert not any(CORNER_CROP_PRESENT_TEXT in t for t in texts)
 
 
 class TestAnthropicProvider:
@@ -440,6 +516,29 @@ class TestAnthropicProvider:
             headers = call_args[1]["headers"]
             assert headers["x-api-key"] == "test-key"
             assert headers["anthropic-version"] == "2023-06-01"
+
+    def test_build_request_includes_corner_crop_when_enabled(self):
+        """Corner crop enabled: second image block and present-text in user content."""
+        provider = AnthropicProvider(api_key="k", model="m", enable_corner_crop=True)
+        fake_corner = b"\xff\xd8\xff"  # JPEG magic bytes
+        body = provider._build_request("prompt", "abc123", "image/jpeg", fake_corner)
+        user_content = body["messages"][0]["content"]
+        image_blocks = [b for b in user_content if b.get("type") == "image"]
+        texts = [b["text"] for b in user_content if b.get("type") == "text"]
+        assert len(image_blocks) == 2
+        assert any(CORNER_CROP_PRESENT_TEXT in t for t in texts)
+        assert not any(CORNER_CROP_ABSENT_TEXT in t for t in texts)
+
+    def test_build_request_omits_corner_crop_when_disabled(self):
+        """Corner crop disabled: one image, absent-text in user content."""
+        provider = AnthropicProvider(api_key="k", model="m", enable_corner_crop=False)
+        body = provider._build_request("prompt", "abc123", "image/jpeg", None)
+        user_content = body["messages"][0]["content"]
+        image_blocks = [b for b in user_content if b.get("type") == "image"]
+        texts = [b["text"] for b in user_content if b.get("type") == "text"]
+        assert len(image_blocks) == 1
+        assert any(CORNER_CROP_ABSENT_TEXT in t for t in texts)
+        assert not any(CORNER_CROP_PRESENT_TEXT in t for t in texts)
 
 
 class TestProviderFactory:

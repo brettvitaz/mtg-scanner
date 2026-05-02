@@ -570,7 +570,7 @@ class TestMultiCardRecognitionAPI:
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
         monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
 
-        response, _, detection_result, validation_result, _ = service.recognize(
+        result = service.recognize(
             image_bytes=b"fake-image-bytes",
             metadata=RecognitionUploadMetadata(
                 filename="upload.jpg",
@@ -579,9 +579,9 @@ class TestMultiCardRecognitionAPI:
             ),
         )
 
-        assert detection_result is not None
-        assert validation_result is None
-        assert [card.title for card in response.cards] == ["Card 0", "Card 1", "Card 2"]
+        assert result.detection_result is not None
+        assert result.validation_result is None
+        assert [card.title for card in result.response.cards] == ["Card 0", "Card 1", "Card 2"]
 
     def test_multi_card_recognition_enforces_bounded_concurrency(self, monkeypatch):
         from app.models.recognition import RecognitionUploadMetadata
@@ -645,7 +645,7 @@ class TestMultiCardRecognitionAPI:
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
         monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
 
-        response, _, _, _, _ = service.recognize(
+        result = service.recognize(
             image_bytes=b"fake-image-bytes",
             metadata=RecognitionUploadMetadata(
                 filename="upload.jpg",
@@ -654,7 +654,7 @@ class TestMultiCardRecognitionAPI:
             ),
         )
 
-        assert len(response.cards) == 4
+        assert len(result.response.cards) == 4
         assert counters["max"] == 2
 
     def test_multi_card_recognition_cancels_pending_work_on_first_exception(self, monkeypatch):
@@ -811,7 +811,7 @@ class TestMultiCardRecognitionAPI:
         monkeypatch.setattr(CardDetector, "crop_region", fake_crop_region)
         monkeypatch.setattr(recognizer_module.MockRecognitionProvider, "recognize", fake_recognize)
 
-        response, _, _, _, _ = service.recognize(
+        result = service.recognize(
             image_bytes=b"fake-image-bytes",
             metadata=RecognitionUploadMetadata(
                 filename="upload.jpg",
@@ -826,4 +826,4 @@ class TestMultiCardRecognitionAPI:
             "upload.jpg-crop-1.jpg",
             "upload.jpg-crop-2.jpg",
         ]
-        assert [card.title for card in response.cards] == ["crop-0", "crop-20", "crop-40"]
+        assert [card.title for card in result.response.cards] == ["crop-0", "crop-20", "crop-40"]

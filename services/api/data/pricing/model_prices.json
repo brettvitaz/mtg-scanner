@@ -1,6 +1,6 @@
 {
   "source_url": "https://raw.githubusercontent.com/pydantic/genai-prices/main/prices/data_slim.json",
-  "fetched_at": "2026-04-10T22:39:52.755183+00:00",
+  "fetched_at": "2026-04-15T19:21:32.401552+00:00",
   "models": {
     "claude-2": {
       "input_mtok": 8.0,

@@ -41,10 +41,10 @@ def mtgjson_db(tmp_path: Path) -> Path:
                         "releaseDate": "2026-02-14",
                         "cards": [
                             {
-                                "uuid": "autarch-mammoth-dft-166",
+                                "uuid": "autarch-mammoth-dft-153",
                                 "name": "Autarch Mammoth",
                                 "setCode": "DFT",
-                                "number": "166",
+                                "number": "153",
                                 "layout": "normal",
                                 "language": "English",
                             }
@@ -126,7 +126,7 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
                     {
                         "title": "Autarch Mammoth",
                         "edition": "Outlaws of Thunder Junction",
-                        "collector_number": "166",
+                        "collector_number": "153",
                         "foil": False,
                         "confidence": 0.92,
                         "notes": "Model guessed the set from weak packaging context.",
@@ -154,7 +154,7 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
     # Auto-corrected: OTJ is invalid for this card, DFT is the only valid set
     assert payload["cards"][0]["edition"] == "Aetherdrift"
     assert payload["cards"][0]["set_code"] == "DFT"
-    assert payload["cards"][0]["collector_number"] == "166"
+    assert payload["cards"][0]["collector_number"] == "153"
     assert "corrected_match" in payload["cards"][0]["notes"].lower()
 
     recognition_dirs = list((tmp_path / "recognitions").iterdir())
@@ -162,7 +162,7 @@ def test_recognition_auto_corrects_impossible_title_and_set_combination(
     assert saved_metadata["validation"]["cards"][0]["status"] == "corrected_match"
     assert (
         saved_metadata["validation"]["cards"][0]["matched_uuid"]
-        == "autarch-mammoth-dft-166"
+        == "autarch-mammoth-dft-153"
     )
 
 

@@ -1,0 +1,22 @@
+{
+  "cards": [
+    {
+      "title": "Lightning Bolt",
+      "edition": "Magic 2010",
+      "collector_number": "146",
+      "foil": false,
+      "confidence": 0.98,
+      "notes": "High confidence from title line and art match.",
+      "edition_notes": "M10 set code visible in bottom strip. Collector number 146 matches M10 printing.",
+      "foil_type": "none",
+      "foil_evidence": [
+        "bullet separator visible between M10 and EN — non-foil confirmed"
+      ],
+      "list_reprint": "no",
+      "list_symbol_visible": false,
+      "border_color": "black",
+      "copyright_line": "146 C\nM10 • EN   Adam Rex",
+      "promo_text": null
+    }
+  ]
+}

@@ -78,6 +78,9 @@ class Settings(BaseSettings):
         default="https://www.cardkingdom.com/assets/json/product_catalog.json"
     )
 
+    # Corner crop for List/Mystery Booster symbol detection
+    mtg_scanner_enable_corner_crop: bool = Field(default=True)
+
     # LLM correction
     mtg_scanner_enable_llm_correction: bool = Field(default=True)
     mtg_scanner_correction_prompt_version: str = Field(default="card-correction.md")

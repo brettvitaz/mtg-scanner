@@ -9,9 +9,12 @@ import httpx
 from app.models.recognition import RecognitionResponse, RecognitionResult, RecognitionUploadMetadata
 from app.services.errors import RecognitionProviderError
 from app.services.llm.base import (
+    CORNER_CROP_ABSENT_TEXT,
+    CORNER_CROP_PRESENT_TEXT,
     encode_image_to_data_url,
     extract_json_from_text,
     extract_openai_usage,
+    maybe_corner_crop,
     parse_recognition_response,
 )
 
@@ -31,12 +34,14 @@ class OpenAIProvider:
         base_url: str = "https://api.openai.com/v1",
         timeout: float = 30.0,
         response_mode: str = "json_schema",
+        enable_corner_crop: bool = True,
     ) -> None:
         self.model_name: str | None = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._response_mode = response_mode
+        self._enable_corner_crop = enable_corner_crop
         self._schema = self._load_schema()
 
     def _load_schema(self) -> dict[str, Any]:
@@ -50,7 +55,7 @@ class OpenAIProvider:
             / "packages"
             / "schemas"
             / "v1"
-            / "recognition-response.schema.json"
+            / "llm-output.schema.json"
         )
         return json.loads(schema_path.read_text())
 
@@ -62,7 +67,9 @@ class OpenAIProvider:
     ) -> RecognitionResult:
         """Recognize cards in an image using OpenAI API."""
         data_url = encode_image_to_data_url(image_bytes, metadata.content_type)
-        request_body = self._build_request(prompt_text, data_url)
+        corner_bytes = maybe_corner_crop(image_bytes, self._enable_corner_crop)
+        corner_url = encode_image_to_data_url(corner_bytes, "image/jpeg") if corner_bytes else None
+        request_body = self._build_request(prompt_text, data_url, corner_url)
 
         url = f"{self._base_url}/chat/completions"
         logger.info(
@@ -115,22 +122,30 @@ class OpenAIProvider:
             usage=extract_openai_usage(payload),
         )
 
-    def _build_request(self, prompt_text: str, data_url: str) -> dict[str, Any]:
+    def _build_request(
+        self, prompt_text: str, data_url: str, corner_url: str | None = None
+    ) -> dict[str, Any]:
         """Build OpenAI API request body."""
+        user_content: list[dict[str, Any]] = [
+            {
+                "type": "text",
+                "text": "Analyze this Magic: The Gathering card image.",
+            },
+            {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
+        ]
+        if corner_url:
+            user_content.extend([
+                {"type": "text", "text": CORNER_CROP_PRESENT_TEXT},
+                {"type": "image_url", "image_url": {"url": corner_url, "detail": "high"}},
+            ])
+        else:
+            user_content.append({"type": "text", "text": CORNER_CROP_ABSENT_TEXT})
+
         body: dict[str, Any] = {
             "model": self.model_name,
             "messages": [
                 {"role": "system", "content": prompt_text},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze this Magic: The Gathering card image.",
-                        },
-                        {"type": "image_url", "image_url": {"url": data_url}},
-                    ],
-                },
+                {"role": "user", "content": user_content},
             ],
         }
 

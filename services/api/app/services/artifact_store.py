@@ -38,6 +38,7 @@ class LocalArtifactStore:
         validation_result: ValidationBatchResult | None = None,
         usage: TokenUsage | None = None,
         estimated_cost_usd: float | None = None,
+        debug_images: dict[str, bytes] | None = None,
     ) -> StoredRecognitionArtifacts:
         from app.services.card_detector import DetectionResult
 
@@ -47,6 +48,10 @@ class LocalArtifactStore:
 
         image_path = artifact_dir / self._make_image_name(metadata)
         image_path.write_bytes(image_bytes)
+
+        if debug_images:
+            for filename, data in debug_images.items():
+                (artifact_dir / filename).write_bytes(data)
 
         response_path = artifact_dir / "response.json"
         response_path.write_text(response.model_dump_json(indent=2) + "\n")

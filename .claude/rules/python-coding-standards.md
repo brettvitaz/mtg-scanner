@@ -24,9 +24,12 @@ paths:
 - Never swallow exceptions silently — log or re-raise.
 
 ## Async
-- Use `async/await` for all I/O-bound operations.
-- Use `httpx.AsyncClient` for HTTP requests, not `requests`.
-- Bounded concurrency with `asyncio.Semaphore` for parallel work.
+- Recognition routes are sync `def` — FastAPI runs them in a threadpool automatically.
+- LLM providers use sync `httpx.Client` inside sync routes. This is intentional: `async def` routes with sync HTTP calls block the event loop and serialize all requests.
+- Multi-crop concurrency uses `concurrent.futures.ThreadPoolExecutor` with bounded `max_workers`.
+- Card lookup routes (`cards.py`) are `async def` with sync SQLite — acceptable because SQLite is local and sub-millisecond, but prefer `def` for new routes that call sync code.
+- Do not use `requests` — use `httpx` (sync or async as appropriate).
+- See `docs/plans/async-conversion.md` for the planned migration to fully async.
 
 ## Code organization
 - Endpoint handlers must be thin — business logic belongs in `services/`.

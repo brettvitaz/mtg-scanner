@@ -9,6 +9,7 @@ from app.services.recognizer import (
     RecognitionProviderError,
     _encode_crop_image,
     get_recognition_service,
+    RecognitionServiceResult,
 )
 
 logger = get_logger(__name__)
@@ -35,11 +36,9 @@ def create_recognition(
         prompt_version=prompt_version,
     )
     try:
-        response, enriched_metadata, detection_result, validation_result, usage = (
-            get_recognition_service().recognize(
-                image_bytes=image_bytes,
-                metadata=metadata,
-            )
+        result: RecognitionServiceResult = get_recognition_service().recognize(
+            image_bytes=image_bytes,
+            metadata=metadata,
         )
     except RecognitionConfigurationError as exc:
         logger.error(
@@ -64,17 +63,18 @@ def create_recognition(
             detail=str(exc),
         ) from exc
 
-    cost = estimate_cost(usage, enriched_metadata.model) if usage is not None else None
+    cost = estimate_cost(result.usage, result.metadata.model) if result.usage is not None else None
     get_artifact_store().save_recognition(
         image_bytes=image_bytes,
-        metadata=enriched_metadata,
-        response=response,
-        detection_result=detection_result,
-        validation_result=validation_result,
-        usage=usage,
+        metadata=result.metadata,
+        response=result.response,
+        detection_result=result.detection_result,
+        validation_result=result.validation_result,
+        usage=result.usage,
         estimated_cost_usd=cost,
+        debug_images=result.debug_images or None,
     )
-    return response
+    return result.response
 
 
 @router.post("/recognitions/batch", response_model=RecognitionResponse)
@@ -113,12 +113,10 @@ def create_recognition_batch(
             prompt_version=prompt_version,
         )
         try:
-            response, enriched_metadata, detection_result, validation_result, usage = (
-                service.recognize(
-                    image_bytes=image_bytes,
-                    metadata=metadata,
-                    skip_detection=True,
-                )
+            result: RecognitionServiceResult = service.recognize(
+                image_bytes=image_bytes,
+                metadata=metadata,
+                skip_detection=True,
             )
         except RecognitionConfigurationError as exc:
             logger.error(
@@ -143,18 +141,19 @@ def create_recognition_batch(
                 detail=str(exc),
             ) from exc
 
-        cost = estimate_cost(usage, enriched_metadata.model) if usage is not None else None
+        cost = estimate_cost(result.usage, result.metadata.model) if result.usage is not None else None
         artifact_store.save_recognition(
             image_bytes=image_bytes,
-            metadata=enriched_metadata,
-            response=response,
-            detection_result=detection_result,
-            validation_result=validation_result,
-            usage=usage,
+            metadata=result.metadata,
+            response=result.response,
+            detection_result=result.detection_result,
+            validation_result=result.validation_result,
+            usage=result.usage,
             estimated_cost_usd=cost,
+            debug_images=result.debug_images or None,
         )
         encoded_crop = _encode_crop_image(image_bytes)
-        for card in response.cards:
+        for card in result.response.cards:
             all_cards.append(card.model_copy(update={"crop_image_data": encoded_crop}))
 
     return RecognitionResponse(cards=all_cards)

@@ -1,0 +1,17 @@
+{
+  "skip_detection": true,
+  "cards": [
+    {
+      "title": "Misthollow Griffin",
+      "edition": "Avacyn Restored",
+      "collector_number": "68",
+      "foil": true,
+      "foil_type": "rainbow_traditional",
+      "list_reprint": "yes",
+      "list_symbol_visible": true,
+      "border_color": "black",
+      "copyright_line": "TM & \u00a9 1993-2012 Wizards of the Coast LLC 68/244",
+      "promo_text": null
+    }
+  ]
+}

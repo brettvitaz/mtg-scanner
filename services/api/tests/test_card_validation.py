@@ -38,7 +38,7 @@ def validation_service(tmp_path: Path) -> CardValidationService:
               "name": "Aetherdrift",
               "releaseDate": "2026-02-14",
               "cards": [
-                {"uuid": "autarch-mammoth-dft-166", "name": "Autarch Mammoth", "setCode": "DFT", "number": "166", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]},
+                {"uuid": "autarch-mammoth-dft-153", "name": "Autarch Mammoth", "setCode": "DFT", "number": "166", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]},
                 {"uuid": "pactdoll-terror-dft-99", "name": "Pactdoll Terror", "setCode": "DFT", "number": "99", "language": "English", "layout": "normal", "finishes": ["nonfoil", "foil"]}
               ]
             },
@@ -182,7 +182,7 @@ def test_validate_card_rejects_impossible_title_and_set_combination(validation_s
         RecognizedCard(
             title="Autarch Mammoth",
             edition="Outlaws of Thunder Junction",
-            collector_number="166",
+            collector_number="153",
             foil=False,
             confidence=0.92,
             notes=None,
@@ -193,7 +193,7 @@ def test_validate_card_rejects_impossible_title_and_set_combination(validation_s
     assert result.card.title == "Autarch Mammoth"
     assert result.card.edition == "Aetherdrift"
     assert result.card.set_code == "DFT"
-    assert result.trace.matched_uuid == "autarch-mammoth-dft-166"
+    assert result.trace.matched_uuid == "autarch-mammoth-dft-153"
 
 
 def test_validate_card_rejects_collector_number_conflict_inside_resolved_set(validation_service: CardValidationService) -> None:
@@ -511,3 +511,178 @@ def test_validate_response_exposes_correction_candidates(validation_service: Car
 
     assert batch.traces[0].status == "needs_correction"
     assert len(batch.correction_candidates[0]) == 2
+
+
+def test_validate_card_preserves_v2_llm_fields(validation_service: CardValidationService) -> None:
+    """V2 LLM fields (foil_type, border_color, etc.) survive validation enrichment unchanged."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="Magic 2010",
+        collector_number="146",
+        foil=False,
+        confidence=0.95,
+        edition_notes="M10 set code visible in bottom strip.",
+        foil_type="none",
+        foil_evidence=["bullet separator visible — non-foil confirmed"],
+        list_reprint="no",
+        list_symbol_visible=False,
+        border_color="black",
+        copyright_line="146 C\nM10 • EN   Adam Rex",
+        promo_text=None,
+    )
+    result = validation_service.validate_card(card)
+    enriched = result.card
+
+    assert enriched.edition_notes == card.edition_notes
+    assert enriched.foil_type == card.foil_type
+    assert enriched.foil_evidence == card.foil_evidence
+    assert enriched.list_reprint == card.list_reprint
+    assert enriched.list_symbol_visible == card.list_symbol_visible
+    assert enriched.border_color == card.border_color
+    assert enriched.copyright_line == card.copyright_line
+    assert enriched.promo_text == card.promo_text
+
+
+# ---------------------------------------------------------------------------
+# list_reprint — LLM verdict is authoritative; identity fields follow it
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def list_plst_service(tmp_path: Path) -> CardValidationService:
+    """Validation service with M10 + PLST data for list_reprint identity tests."""
+    import json
+
+    payload = {
+        "meta": {"date": "2026-03-26", "version": "1.0.0"},
+        "data": {
+            "M10": {
+                "code": "M10",
+                "name": "Magic 2010",
+                "releaseDate": "2009-07-17",
+                "cards": [
+                    {
+                        "uuid": "bolt-m10-146",
+                        "name": "Lightning Bolt",
+                        "number": "146",
+                        "language": "English",
+                        "layout": "normal",
+                        "rarity": "common",
+                        "type": "Instant",
+                        "finishes": ["nonfoil", "foil"],
+                        "identifiers": {"scryfallId": "e3285e6b-0000-0000-0000-000000000000"},
+                    },
+                ],
+            },
+            "PLST": {
+                "code": "PLST",
+                "name": "The List",
+                "releaseDate": "2020-09-25",
+                "cards": [
+                    {
+                        "uuid": "bolt-plst-m10-146",
+                        "name": "Lightning Bolt",
+                        "number": "M10-146",
+                        "language": "English",
+                        "layout": "normal",
+                        "finishes": ["nonfoil"],
+                    },
+                ],
+            },
+        },
+    }
+    source_path = tmp_path / "AllPrintings.list.json"
+    source_path.write_text(json.dumps(payload))
+    db_path = tmp_path / "mtgjson.sqlite"
+    import_all_printings(source_path=source_path, db_path=db_path, manifest_path=tmp_path / "manifest.json")
+    return CardValidationService(index=MTGJSONIndex(db_path))
+
+
+def test_list_reprint_no_preserves_originating_set(
+    list_plst_service: CardValidationService,
+) -> None:
+    """When LLM says list_reprint='no', identity fields stay on the originating set."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="no",
+        list_symbol_visible=False,
+    )
+    result = list_plst_service.validate_card(card)
+
+    assert result.card.list_reprint == "no"
+    assert result.card.set_code == "M10"
+    assert result.card.edition == "Magic 2010"
+    assert result.card.collector_number == "146"
+
+
+def test_list_reprint_yes_rewrites_identity_to_plst(
+    list_plst_service: CardValidationService,
+) -> None:
+    """When LLM says list_reprint='yes', edition/set_code/collector_number are rewritten to PLST."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="yes",
+        list_symbol_visible=True,
+    )
+    result = list_plst_service.validate_card(card)
+
+    assert result.card.list_reprint == "yes"
+    assert result.card.set_code == "PLST"
+    assert result.card.edition == "The List"
+    assert result.card.collector_number == "M10-146"
+
+
+def test_list_reprint_yes_rechecks_foil_against_plst_printing(
+    list_plst_service: CardValidationService,
+) -> None:
+    """Foil validation must run against the rewritten PLST record, not the source printing."""
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=True,
+        confidence=0.90,
+        list_reprint="yes",
+        list_symbol_visible=True,
+    )
+    result = list_plst_service.validate_card(card)
+
+    assert result.card.set_code == "PLST"
+    assert result.card.collector_number == "M10-146"
+    assert result.card.confidence == 0.87
+    assert result.trace.matched_set_code == "PLST"
+    assert result.trace.matched_collector_number == "M10-146"
+    assert result.card.notes is not None
+    assert "This printing is not available in foil." in result.card.notes
+
+
+def test_validator_passes_through_llm_list_reprint_unchanged(
+    validation_service: CardValidationService,
+) -> None:
+    """The validator never flips list_reprint from 'no' to 'yes' on its own.
+
+    The existing validation_service fixture has no PLST data, confirming that
+    the validator does not inject list_reprint overrides when the LLM says 'no'.
+    """
+    card = RecognizedCard(
+        title="Lightning Bolt",
+        edition="M10",
+        collector_number="146",
+        foil=False,
+        confidence=0.90,
+        list_reprint="no",
+        list_symbol_visible=False,
+    )
+    result = validation_service.validate_card(card)
+
+    assert result.card.list_reprint == "no"
+    assert result.card.list_symbol_visible is False
+    assert result.card.set_code == "M10"
+    assert result.card.edition == "Magic 2010"

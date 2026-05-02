@@ -335,3 +335,5 @@ def test_lookup_by_face_name_no_match_for_normal_card(tmp_path: Path, mtgjson_fi
     index = MTGJSONIndex(db_path)
     results = index.lookup_by_face_name(title="Lightning Bolt")
     assert results == []
+
+

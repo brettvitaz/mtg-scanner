@@ -125,7 +125,7 @@ PYTHONPATH=services/api python evals/run_eval.py
 - Python 3.11+. Use `str | None` union syntax, not `Optional[str]`.
 - Pydantic models for all request/response shapes.
 - `pydantic_settings.BaseSettings` for configuration with `.env` file support.
-- async/await for I/O-bound operations.
+- Recognition routes are sync `def`; LLM providers use sync `httpx.Client`. Do not use `async def` with sync HTTP calls — it blocks the event loop. See `.claude/rules/python-coding-standards.md` for details.
 - Custom exceptions inherit from a base in `services/api/app/services/errors.py`.
 - Imports: stdlib → third-party → local, separated by blank lines.
 

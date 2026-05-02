@@ -58,6 +58,56 @@ def encode_image_to_data_url(image_bytes: bytes, content_type: str) -> str:
     return f"data:{content_type};base64,{encoded}"
 
 
+CORNER_CROP_PRESENT_TEXT = (
+    "Close-up of the bottom-left corner of the same card. "
+    "Use this close-up for two purposes: "
+    "1) Look at the far LEFT edge for the Planeswalker icon (five-tined glyph) to determine list_reprint. "
+    "2) Read the separator character between the set code and language code (e.g., 'WAR • EN' or 'WAR ★ EN') to determine foil status. "
+    "The separator is either a bullet (•) for non-foil or a star (★) for foil."
+)
+
+CORNER_CROP_ABSENT_TEXT = (
+    "No close-up image is provided. Make the List/Mystery Booster "
+    "determination from the full card image alone. If the planeswalker "
+    "icon is not clearly visible at that resolution, set list_reprint "
+    'to "possible" rather than guessing.'
+)
+
+
+def maybe_corner_crop(image_bytes: bytes, enabled: bool) -> bytes | None:
+    """Return corner crop bytes when enabled and crop succeeds, else None."""
+    if not enabled:
+        return None
+    corner = crop_bottom_left_corner(image_bytes)
+    return corner or None
+
+
+def crop_bottom_left_corner(image_bytes: bytes) -> bytes:
+    """Crop the bottom-left corner of a card image (List symbol area).
+
+    Returns a JPEG crop of the bottom-left 50% width × 20% height of the image.
+    This size is required so the model can distinguish the two stacked icons
+    (List symbol on line 1, MTG hourglass on line 2) as separate elements.
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return b""
+        h, w = img.shape[:2]
+        y0 = int(h * 0.80)
+        x1 = int(w * 0.50)
+        crop = img[y0:h, 0:x1]
+        ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        return buf.tobytes() if ok else b""
+    except Exception:
+        logger.debug("crop_bottom_left_corner failed, skipping corner crop")
+        return b""
+
+
 def extract_json_from_text(text: str) -> str:
     """Extract JSON object from text, handling markdown fences and partial content.
 

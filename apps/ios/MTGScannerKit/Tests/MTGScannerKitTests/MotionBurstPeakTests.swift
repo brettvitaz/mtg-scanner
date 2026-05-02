@@ -5,15 +5,15 @@ import XCTest
 final class MotionBurstPeakTests: XCTestCase {
 
     func testShadowWithoutPeakIsRejected() {
-        // Simulate shadow: gradual rise to diff that is < 3× the idle baseline.
-        // Idle baseline ≈ 0.010 after warmup; shadow peak of 0.025 is only 2.5× — rejected.
+        // Simulate shadow: gradual rise to diff that is < 2× the idle baseline.
+        // Idle baseline ≈ 0.010 after warmup; shadow peak of 0.015 is only 1.5× — rejected.
         var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
             burstFrameCount: 2,
             burstWindowSize: 4,
             settlementFrames: 2,
             motionThreshold: 0.015,
             maxHoverDuration: 3,  // Short hover to trigger reset quickly
-            minPeakThreshold: 0.05  // absolute floor (adaptive threshold = max(0.01, 0.030))
+            minPeakThreshold: 0.05  // absolute floor (adaptive threshold = max(0.01, 0.020))
         ))
 
         // Warm up — establishes idle baseline ≈ 0.010
@@ -21,13 +21,13 @@ final class MotionBurstPeakTests: XCTestCase {
             _ = detector.process(diff: 0.01)
         }
 
-        // Gradual rise (shadow pattern) — peak 0.025 < adaptiveThreshold (0.030 = 0.010 * 3)
-        _ = detector.process(diff: 0.02)
-        _ = detector.process(diff: 0.025)
+        // Gradual rise (shadow pattern) — peak 0.015 < adaptiveThreshold (0.020 = 0.010 * 2)
+        _ = detector.process(diff: 0.012)
+        _ = detector.process(diff: 0.014)
 
         // Continue with varying diffs to trigger hover timeout, then flush ring buffer with low diffs
         for i in 0..<12 {
-            _ = detector.process(diff: 0.025 + Float(i % 3) * 0.002)
+            _ = detector.process(diff: 0.014 + Float(i % 3) * 0.001)
         }
         // Flush ring buffer so re-triggered bursts from residual high diffs clear out
         for _ in 0..<4 {
@@ -39,14 +39,14 @@ final class MotionBurstPeakTests: XCTestCase {
     }
 
     func testCardWithPeakTriggers() {
-        // Simulate card: sharp spike to diff that is ≥ 3× the idle baseline.
+        // Simulate card: sharp spike to diff that is ≥ 2× the idle baseline.
         // Idle baseline ≈ 0.010; peak of 0.08 is 8× — accepted.
         var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
             burstFrameCount: 2,
             burstWindowSize: 4,
             settlementFrames: 2,
             motionThreshold: 0.015,
-            minPeakThreshold: 0.05  // absolute floor (adaptive = max(0.01, 0.030))
+            minPeakThreshold: 0.05  // absolute floor (adaptive = max(0.01, 0.020))
         ))
 
         // Warm up — establishes idle baseline ≈ 0.010
@@ -54,7 +54,7 @@ final class MotionBurstPeakTests: XCTestCase {
             _ = detector.process(diff: 0.01)
         }
 
-        // Sharp spike (card pattern) — peak 0.08 >> adaptiveThreshold (0.030)
+        // Sharp spike (card pattern) — peak 0.08 >> adaptiveThreshold (0.020)
         _ = detector.process(diff: 0.08)  // spike
         _ = detector.process(diff: 0.06)  // still high
 
@@ -70,13 +70,13 @@ final class MotionBurstPeakTests: XCTestCase {
     func testDarkSceneCardIsDetected() {
         // Simulate a dark/shadowed scene where absolute diffs are compressed.
         // Idle baseline ≈ 0.005; card arrival produces peak of 0.018 = 3.6× baseline.
-        // adaptiveThreshold = max(0.010, 0.005 * 3) = max(0.010, 0.015) = 0.015 → accepted.
+        // adaptiveThreshold = max(0.010, 0.005 * 2) = max(0.010, 0.010) = 0.010 → accepted.
         var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
             burstFrameCount: 2,
             burstWindowSize: 4,
             settlementFrames: 2,
             motionThreshold: 0.010,  // Lower threshold for dark scene
-            minPeakThreshold: 0.05   // Old absolute floor — adaptive replaces this
+            minPeakThreshold: 0.05   // Absolute floor — adaptive replaces this
         ))
 
         // Warm up — dark scene baseline ≈ 0.005
@@ -92,19 +92,17 @@ final class MotionBurstPeakTests: XCTestCase {
         _ = detector.process(diff: 0.006)
         let triggered = detector.process(diff: 0.005)
 
-        // SHOULD detect — burst peak (burstMaxDiff=0.016 at burst-trigger frame) >= adaptiveThreshold (0.015)
+        // SHOULD detect — burst peak >= adaptiveThreshold (0.010)
         XCTAssertTrue(triggered)
         XCTAssertEqual(detector.state, .settled)
     }
 
-    func testLightChangeWithoutPeakIsRejected() {
+ func testLightChangeWithoutPeakIsRejected() {
         // Simulate a noisy environment where idle baseline is elevated, then a light
-        // change occurs. The light-change peak must be < 3× the idle baseline to be rejected.
+        // change occurs. The light-change peak must be < 2× the idle baseline to be rejected.
         // We use motionThreshold=0.030 so warmup frames at 0.020 stay below threshold.
-        // Idle baseline ≈ 0.020; light-change peak of 0.065 < 0.020 * 3 = 0.060...
-        // Actually 0.065 > 0.060, so use a lower peak:
-        // Peak = 0.050, adaptiveThreshold = max(0.010, 0.020 * 3) = max(0.010, 0.060) = 0.060.
-        // 0.050 < 0.060 → rejected.
+        // Idle baseline ≈ 0.020; adaptiveThreshold = max(0.010, 0.020 * 2) = max(0.010, 0.040) = 0.040.
+        // Peak = 0.035 < 0.040 → rejected.
         var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
             burstFrameCount: 3,
             burstWindowSize: 5,
@@ -119,14 +117,14 @@ final class MotionBurstPeakTests: XCTestCase {
             _ = detector.process(diff: 0.020)
         }
 
-        // Step change (light flicker) — peak 0.050 < adaptiveThreshold (max(0.010, 0.060)=0.060)
-        _ = detector.process(diff: 0.040)
-        _ = detector.process(diff: 0.045)
-        _ = detector.process(diff: 0.050)
+        // Step change (light flicker) — peak 0.035 < adaptiveThreshold (max(0.010, 0.040)=0.040)
+        _ = detector.process(diff: 0.030)
+        _ = detector.process(diff: 0.032)
+        _ = detector.process(diff: 0.035)
 
         // Continue with varying diffs to trigger hover timeout, then flush ring buffer with low diffs
         for i in 0..<12 {
-            _ = detector.process(diff: 0.050 + Float(i % 3) * 0.003)
+            _ = detector.process(diff: 0.035 + Float(i % 3) * 0.003)
         }
         // Flush ring buffer so re-triggered bursts from residual high diffs clear out
         for _ in 0..<5 {
@@ -135,5 +133,34 @@ final class MotionBurstPeakTests: XCTestCase {
 
         // Should NOT have triggered capture — light change rejected by adaptive peak check
         XCTAssertEqual(detector.state, .idle)
+    }
+
+    func testGentleCardPlacementWithLowDiffTriggers() {
+        // Simulate a gently placed card with modest diff values.
+        // Idle baseline ≈ 0.003; gentle placement peak of 0.012 = 4× baseline — accepted.
+        var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
+            burstFrameCount: 2,
+            burstWindowSize: 4,
+            settlementFrames: 2,
+            motionThreshold: 0.010,
+            minPeakThreshold: 0.05
+        ))
+
+        // Warm up — very low ambient noise
+        for _ in 0..<4 {
+            _ = detector.process(diff: 0.003)
+        }
+
+        // Gentle card placement — modest but clear spike
+        _ = detector.process(diff: 0.012)
+        _ = detector.process(diff: 0.010)
+
+        // Settlement: diffs drop back toward baseline
+        _ = detector.process(diff: 0.004)
+        let triggered = detector.process(diff: 0.003)
+
+        // SHOULD detect — peak (0.012) >= adaptiveThreshold (max(0.010, 0.006)=0.010)
+        XCTAssertTrue(triggered)
+        XCTAssertEqual(detector.state, .settled)
     }
 }

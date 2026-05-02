@@ -160,6 +160,72 @@ final class MotionBurstDetectorTests: XCTestCase {
         XCTAssertEqual(detector.frameIndex, 0)
         XCTAssertEqual(detector.currentMetrics().currentDiff, 0, accuracy: 0.001)
         XCTAssertEqual(detector.currentMetrics().consecutiveLowFrames, 0)
+        XCTAssertEqual(detector.idleBaseline, 0, accuracy: 0.001)
+    }
+
+    func testIdleBaselineIsResetOnReset() {
+        var detector = MotionBurstDetector()
+
+        // Establish a non-zero idle baseline during warmup
+        for _ in 0..<8 {
+            _ = detector.process(diff: 0.005)
+        }
+        XCTAssertGreaterThan(detector.idleBaseline, 0)
+
+        detector.reset()
+        XCTAssertEqual(detector.idleBaseline, 0, accuracy: 0.001)
+    }
+
+    func testFastSettlingCardTriggersWithoutEarlyReset() {
+        // A card arriving and settling quickly (within burst detection frames)
+        // should NOT be rejected by an early-motion-stop guard.
+        var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
+            burstFrameCount: 2,
+            burstWindowSize: 4,
+            settlementFrames: 2,
+            motionThreshold: 0.3,
+            minPeakThreshold: 0.1
+        ))
+
+        // Warm up
+        for _ in 0..<4 {
+            _ = detector.process(diff: 0.01)
+        }
+
+        // Burst (2 high frames) — detected at frameIndex=6
+        _ = detector.process(diff: 0.5)
+        _ = detector.process(diff: 0.5)
+        XCTAssertEqual(detector.state, .burstDetected(burstStartFrame: 6))
+
+        // Immediate settlement (2 low frames) — should trigger, not reset
+        _ = detector.process(diff: 0.01)  // 1st low frame
+        let triggered = detector.process(diff: 0.01)  // 2nd low frame → settled
+        XCTAssertTrue(triggered)
+        XCTAssertEqual(detector.state, .settled)
+    }
+
+    func testBurstMaxDiffCapturesWindowPeak() {
+        // When burst is detected on the second high frame, burstMaxDiff should
+        // reflect the max of BOTH high frames in the window, not just the current one.
+        var detector = MotionBurstDetector(configuration: MotionBurstConfiguration(
+            burstFrameCount: 2,
+            burstWindowSize: 4,
+            settlementFrames: 2,
+            motionThreshold: 0.3,
+            minPeakThreshold: 0.1
+        ))
+
+        // Warm up
+        for _ in 0..<4 {
+            _ = detector.process(diff: 0.01)
+        }
+
+        // Frame with diff=0.5 (high), then frame with diff=0.3 (just above threshold, burst fires)
+        _ = detector.process(diff: 0.5)
+        _ = detector.process(diff: 0.3)
+
+        // burstMaxDiff should be 0.5 (the window peak), not 0.3 (current frame)
+        XCTAssertEqual(detector.burstMaxDiff, 0.5, accuracy: 0.001)
     }
 
     // MARK: - Edge Cases
@@ -169,7 +235,9 @@ final class MotionBurstDetectorTests: XCTestCase {
             burstFrameCount: 2,
             burstWindowSize: 4,
             settlementFrames: 3,
-            motionThreshold: 0.3
+            motionThreshold: 0.3,
+            maxHoverDuration: 5,
+            minPeakThreshold: 0.1
         ))
 
         // Warm up
@@ -177,16 +245,18 @@ final class MotionBurstDetectorTests: XCTestCase {
             _ = detector.process(diff: 0.01)
         }
 
-        // Brief burst
+        // Brief burst (2 frames above threshold)
         _ = detector.process(diff: 0.5)
+        _ = detector.process(diff: 0.5)
+        XCTAssertEqual(detector.state, .burstDetected(burstStartFrame: 6))
 
-        // Motion stops quickly (not settlement, just removed)
-        for _ in 0..<5 {
-            _ = detector.process(diff: 0.01)
+        // Varying diffs to prevent settlement while exceeding hover timeout
+        for i in 0..<8 {
+            _ = detector.process(diff: 0.3 + Float(i % 4) * 0.05)
         }
 
-        // Should return to idle
-        XCTAssertEqual(detector.state, .idle)
+        // Should have transitioned to hovering due to hover timeout, not early reset
+        XCTAssertEqual(detector.state, .hovering(burstStartFrame: 6))
     }
 
     func testPartialBurstDoesNotTrigger() {

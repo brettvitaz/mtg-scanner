@@ -35,10 +35,10 @@ struct MotionBurstDetector: Sendable {
     private var burstStartFrame: Int?
 
     /// Maximum diff observed during current burst (for peak detection).
-    private var burstMaxDiff: Float = 0
+    var burstMaxDiff: Float = 0
 
     /// Exponential moving average of idle diff values (ambient noise baseline).
-    private var idleBaseline: Float = 0
+    var idleBaseline: Float = 0
 
     /// Timestamp of last reference frame update.
     internal(set) var lastReferenceUpdate: Date = Date()
@@ -149,6 +149,7 @@ struct MotionBurstDetector: Sendable {
         previousDiff = 0
         burstStartFrame = nil
         burstMaxDiff = 0
+        idleBaseline = 0
         lastRejectionReason = nil
         shouldUpdateReference = true
     }
@@ -195,7 +196,7 @@ struct MotionBurstDetector: Sendable {
         // Burst detected
         state = .burstDetected(burstStartFrame: frameIndex)
         burstStartFrame = frameIndex
-        burstMaxDiff = diff
+        burstMaxDiff = maxRecentDiffInWindow()
         consecutiveLowFrames = 0
     }
 
@@ -209,12 +210,12 @@ struct MotionBurstDetector: Sendable {
                      consecutiveStableFrames >= configuration.settlementFrames
         if settled {
             // Require the burst peak to be a meaningful spike above ambient noise.
-            // Use 3× the idle baseline so detection adapts to ambient lighting:
+            // Use 2× the idle baseline so detection adapts to ambient lighting:
             // dark scenes produce compressed diffs, but a card arrival still creates
-            // a spike several times larger than the noise floor.
+            // a spike larger than the noise floor.
             // The absolute floor (minPeakThreshold / 5) is a sanity minimum only —
             // the ratio check is the primary discriminator.
-            let adaptiveThreshold = max(configuration.minPeakThreshold / 5.0, idleBaseline * 3.0)
+            let adaptiveThreshold = max(configuration.minPeakThreshold / 5.0, idleBaseline * 2.0)
             guard burstMaxDiff >= adaptiveThreshold else {
                 let maxStr = String(format: "%.3f", burstMaxDiff)
                 let threshStr = String(format: "%.3f", adaptiveThreshold)
@@ -232,15 +233,6 @@ struct MotionBurstDetector: Sendable {
             state = .hovering(burstStartFrame: startFrame)
             lastRejectionReason = "Hover timeout (\(elapsedFrames) frames)"
             return
-        }
-
-        // Still in burst - check if motion stopped without settlement
-        if diff < configuration.motionThreshold && consecutiveLowFrames > 1 {
-            // Hand/object removed without card settlement
-            if elapsedFrames < configuration.settlementFrames {
-                reset()
-                lastRejectionReason = "Motion stopped without settlement"
-            }
         }
     }
 
@@ -281,6 +273,18 @@ struct MotionBurstDetector: Sendable {
             result[i] = diffHistory[idx]
         }
         return result
+    }
+
+    /// Returns the maximum diff value in the recent evaluation window.
+    private func maxRecentDiffInWindow() -> Float {
+        var maxDiff: Float = 0
+        let windowStart = max(0, frameIndex - configuration.burstWindowSize)
+        let windowEnd = frameIndex
+        for i in windowStart..<windowEnd {
+            let idx = i % configuration.burstWindowSize
+            maxDiff = max(maxDiff, diffHistory[idx])
+        }
+        return maxDiff
     }
 
     /// Counts frames above threshold in the recent window.

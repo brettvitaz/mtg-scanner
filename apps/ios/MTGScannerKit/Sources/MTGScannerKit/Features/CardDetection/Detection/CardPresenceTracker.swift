@@ -231,8 +231,11 @@ final class CardPresenceTracker: @unchecked Sendable {
         logFrameInfo(pixelBuffer: pixelBuffer, samples: samples, motionZone: motionZone)
         #endif
 
-        let diff = calculateFrameDiff(samples: samples)
+        // Establish reference BEFORE computing diff so post-reset frames use real data.
+        // After markCaptured() clears the reference and resets the burst detector,
+        // checkReferenceDecay will populate the reference from lastSamples.
         checkReferenceDecay()
+        let diff = calculateFrameDiff(samples: samples)
 
         let shouldTrigger = determineTrigger(diff: diff, legacyMode: legacyMode)
         sendDebugMetricsIfEnabled()
@@ -365,7 +368,7 @@ private extension CardPresenceTracker {
         return filtered.max(by: { $0.confidence < $1.confidence })?.rect
     }
 
-    func passesZoneFilter(_ box: CGRect) -> Bool {
+   func passesZoneFilter(_ box: CGRect) -> Bool {
         let zone = detectionZone ?? .uncalibrated
         // YOLO returns boxes in top-left origin coordinates
         // Zone uses Vision coordinates (bottom-left origin)
@@ -376,17 +379,24 @@ private extension CardPresenceTracker {
             width: box.width,
             height: box.height
         )
-        let contained = zone.contains(visionBox)
+        // Use center-proximity for calibrated zones (allows cards slightly offset
+        // from calibration position) and strict containment for uncalibrated zones.
+        let inZone: Bool
+        if detectionZone != nil {
+            inZone = zone.containsCenter(of: visionBox)
+        } else {
+            inZone = zone.contains(visionBox)
+        }
         let largeEnough = zone.isLargeEnough(visionBox)
         let portrait = zone.isPortraitAspect(visionBox)
         #if DEBUG
-        if !contained || !largeEnough || !portrait {
+        if !inZone || !largeEnough || !portrait {
             print("\(logTimestamp()) [CardPresence] Box rejected: yolo=\(box) vision=\(visionBox) " +
-                  "zone=\(zone.effectiveRect) contained=\(contained) " +
+                  "zone=\(zone.effectiveRect) inZone=\(inZone) " +
                   "largeEnough=\(largeEnough) portrait=\(portrait)")
         }
         #endif
-        return contained && largeEnough && portrait
+        return inZone && largeEnough && portrait
     }
 
     func loadDetector() -> YOLOCardDetector? {

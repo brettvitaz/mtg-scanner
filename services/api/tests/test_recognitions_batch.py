@@ -4,7 +4,8 @@ Covers:
 - Basic happy-path: two pre-cropped images return merged results.
 - Empty-images case returns an empty result, not an error.
 - Non-image uploads are rejected with 400.
-- Each crop is saved to its own artifact directory.
+- Batch artifacts are saved to recognitions-batch/ with inputs/ and refined/ folders.
+- Second-pass crop tightening is applied before recognition.
 """
 
 import json
@@ -96,7 +97,7 @@ class TestBatchRecognitionEndpoint:
         assert len(payload["cards"]) == 1
 
     def test_batch_saves_artifact_per_crop(self, tmp_path, monkeypatch, mtgjson_db) -> None:
-        """Each crop in a batch should produce its own artifact directory."""
+        """Batch upload should create a single artifact directory with inputs/ folder."""
         monkeypatch.setenv("MTG_SCANNER_LLM_PROVIDER", "mock")
         monkeypatch.setenv("MTG_SCANNER_ARTIFACTS_DIR", str(tmp_path))
         monkeypatch.setenv("MTG_SCANNER_MTGJSON_DB_PATH", str(mtgjson_db))
@@ -112,15 +113,26 @@ class TestBatchRecognitionEndpoint:
 
         assert response.status_code == 200
 
-        recognition_dirs = list((tmp_path / "recognitions").iterdir())
-        assert len(recognition_dirs) == 2
+        # Check new batch artifact layout
+        batch_dirs = list((tmp_path / "recognitions-batch").iterdir())
+        assert len(batch_dirs) == 1
 
-        # Each artifact directory should have the original crop image and response.
-        for artifact_dir in recognition_dirs:
-            assert (artifact_dir / "response.json").exists()
-            assert (artifact_dir / "metadata.json").exists()
-            metadata = json.loads((artifact_dir / "metadata.json").read_text())
-            assert metadata["filename"] in {"card-a.jpg", "card-b.jpg"}
+        artifact_dir = batch_dirs[0]
+        # Should have inputs/ folder with both crops
+        inputs_dir = artifact_dir / "inputs"
+        assert inputs_dir.exists()
+        assert (inputs_dir / "crop-0.jpg").exists()
+        assert (inputs_dir / "crop-1.jpg").exists()
+
+        # Should have refined/ folder (may be empty if no refinement occurred)
+        refined_dir = artifact_dir / "refined"
+        assert refined_dir.exists()
+
+        # Should have response.json and metadata.json at root
+        assert (artifact_dir / "response.json").exists()
+        assert (artifact_dir / "metadata.json").exists()
+        metadata = json.loads((artifact_dir / "metadata.json").read_text())
+        assert metadata["crop_count"] == 2
 
     def test_batch_rejects_non_image_content_type(self, monkeypatch) -> None:
         """Non-image files in the batch should return HTTP 400."""
@@ -174,6 +186,8 @@ class TestBatchRecognitionEndpoint:
         )
 
         assert response.status_code == 200
-        recognition_dirs = list((tmp_path / "recognitions").iterdir())
-        metadata = json.loads((recognition_dirs[0] / "metadata.json").read_text())
+        # Check new batch artifact layout
+        batch_dirs = list((tmp_path / "recognitions-batch").iterdir())
+        assert len(batch_dirs) == 1
+        metadata = json.loads((batch_dirs[0] / "metadata.json").read_text())
         assert metadata["prompt_version"] == "card-recognition.md"

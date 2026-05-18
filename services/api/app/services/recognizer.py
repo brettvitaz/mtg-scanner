@@ -247,12 +247,55 @@ class RecognitionService:
             if not shutdown_nowait:
                 executor.shutdown(wait=True)
 
+    def refine_crop(self, image_bytes: bytes) -> bytes:
+        """Apply second-pass crop tightening to a pre-cropped card image.
+
+        Uses the card detector's crop refinement to tighten the crop boundaries
+        by detecting and removing excess background. Returns the refined image bytes.
+        If refinement fails or detector is unavailable, returns original bytes.
+        """
+        if self._card_detector is None:
+            return image_bytes
+
+        try:
+            # Create a synthetic region that covers the whole image
+            from app.services.card_detector import CardRegion
+            import numpy as np
+
+            image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+            import cv2
+            image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+
+            if image is None:
+                return image_bytes
+
+            height, width = image.shape[:2]
+            # Create a region covering the whole image with high confidence
+            full_region = CardRegion(
+                x=0,
+                y=0,
+                width=width,
+                height=height,
+                confidence=1.0,
+                corners=None,
+            )
+
+            # Use crop_region which internally calls _refine_cropped_card
+            refined_bytes, _ = self._card_detector.crop_region(
+                image_bytes, full_region
+            )
+            return refined_bytes
+        except Exception as exc:
+            logger.warning("Crop refinement failed: %s", exc)
+            return image_bytes
+
     def recognize(
         self,
         *,
         image_bytes: bytes,
         metadata: RecognitionUploadMetadata,
         skip_detection: bool = False,
+        refine_crop_first: bool = False,
     ) -> RecognitionServiceResult:
         """Recognize cards in an image.
 
@@ -262,6 +305,10 @@ class RecognitionService:
         When *skip_detection* is True the card-detector step is bypassed and
         the image is sent directly to the LLM provider.  The batch endpoint
         uses this for pre-cropped images that should not be re-cropped.
+
+        When *refine_crop_first* is True, applies second-pass crop tightening
+        before recognition. This is used by the batch endpoint to refine
+        client-side crops before sending to the recognizer.
         """
         prompt_text = _load_prompt(metadata.prompt_version)
         enriched_metadata = metadata.model_copy(
@@ -332,8 +379,15 @@ class RecognitionService:
                 )
 
         # Single card or no detection - use original behavior
+        # Apply second-pass crop refinement if requested (for batch endpoint)
+        processed_image_bytes = image_bytes
+        if refine_crop_first and self._card_detector is not None:
+            processed_image_bytes = self.refine_crop(image_bytes)
+            if processed_image_bytes is not image_bytes:
+                logger.debug("Applied second-pass crop refinement for '%s'", metadata.filename)
+
         single_result = self._provider.recognize(
-            image_bytes=image_bytes,
+            image_bytes=processed_image_bytes,
             metadata=enriched_metadata,
             prompt_text=prompt_text,
         )

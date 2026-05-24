@@ -20,7 +20,10 @@ let package = Package(
     targets: [
         .target(
             name: "MTGScannerKit",
-            path: "Sources/MTGScannerKit"
+            path: "Sources/MTGScannerKit",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .target(
             name: "MTGScannerFixtures",

@@ -11,6 +11,8 @@ struct MTGScannerApp: App {
     @State private var libraryViewModel = LibraryViewModel()
 
     init() {
+        FontRegistry.registerAll()
+
         let cacheDir = URL.cachesDirectory.appending(path: "card-images")
         URLCache.shared = URLCache(
             memoryCapacity: 50 * 1024 * 1024,

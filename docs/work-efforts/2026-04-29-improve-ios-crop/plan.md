@@ -9,6 +9,8 @@ Unify crop generation around `CardCropService` so manual crop-enabled capture, p
 
 After the first crop-quality pass, add a debug-only raw camera capture save option. This diagnostic path should preserve original camera JPEG bytes before crop or recognition work so failed crop cases can be converted into source-image fixtures with ground-truth quads. The option must default off, compile out of release builds, and never duplicate imported photo-library images.
 
+After the auto-scan regression pass, hinted single-crop selection also validates candidate crop quality before return. Vision refinement is still preferred when it produces a usable crop, but a YOLO axis-aligned crop is preferable to a perspective-corrected interior printed-feature crop.
+
 ## Implementation Steps
 
 1. Add `CardCropHint` to `CardCropService` with an optional top-left-origin YOLO box and a `preferSingleCrop` flag.
@@ -87,10 +89,18 @@ Dependencies: step 4 depends on steps 1 and 2. Step 5 depends on the production 
 - Preserve crop-off behavior as full-image upload.
 - Use Vision still-photo refinement first for auto-scan.
 - Keep YOLO box cropping only as fallback.
+- Validate hinted Vision crops before returning them.
+- For hinted auto-scan, rank eligible Vision candidates and try them in order instead of committing to the top candidate before crop validation.
+- Reject hinted candidates that are much smaller than the YOLO whole-card hint or poorly supported by it.
 - Do not add new ML dependencies or train a model for this iteration.
 - Do not touch downstream recognition code or API contracts.
 - Debug-only raw capture saving is a diagnostic fixture-generation aid, not product behavior. Release builds must not expose the setting or saver path.
 - Imported Photos images are intentionally not saved again.
+- Architecture decision recorded in `docs/decisions/adr-0005-auto-scan-crop-validation.md`.
+- Table/manual multi-card crop validation is recorded in `docs/decisions/adr-0006-table-scan-crop-quality-validation.md`.
+- For table scans, under/over crop signals are hard filters, but skew alone is not.
+- Split-card printed-half detections should produce one physical-card crop when geometry indicates a single card.
+- Crop-only quality metrics are guardrails; annotated source-image quads remain the preferred long-term regression oracle.
 
 ## Verification Plan
 
@@ -107,6 +117,12 @@ swiftc -parse apps/ios/MTGScannerKit/Sources/MTGScannerKit/Services/CardCropServ
 ```
 
 Record any blocked validation explicitly in `review.md`.
+
+For the auto-scan regression crop validation pass, run:
+
+```sh
+xcodebuild test -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerKitTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:MTGScannerKitTests/CardCropServiceTests -only-testing:MTGScannerKitTests/CardCropEvaluationTests -only-testing:MTGScannerKitTests/RectangleFilterTests -only-testing:MTGScannerKitTests/RectangleFilterHintTests -only-testing:MTGScannerKitTests/RectangleFilterGeometryTests -only-testing:MTGScannerKitTests/RectangleFilterNMSTests -only-testing:MTGScannerKitTests/AutoScanViewModelTests
+```
 
 For the raw-capture diagnostic phase, run the targeted tests:
 

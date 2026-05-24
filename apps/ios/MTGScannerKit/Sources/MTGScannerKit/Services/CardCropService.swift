@@ -33,9 +33,9 @@ struct CardCropHint: Sendable {
 /// 4. Cropping each accepted region with perspective correction
 final class CardCropService: @unchecked Sendable {
 
-    private static let cropPadding: CGFloat = 0.01
+    static let cropPadding: CGFloat = 0.025
     private static let hintROIPadding: CGFloat = 0.18
-    private static let cardAspectRatio = RectangleFilter.targetAspectRatio
+    static let cardAspectRatio = RectangleFilter.targetAspectRatio
     private let rectangleFilter = RectangleFilter(configuration: .crop)
     private let ciContext = CIContext()
 
@@ -62,18 +62,26 @@ final class CardCropService: @unchecked Sendable {
             preferSingle: hint?.preferSingleCrop == true
         )
 
-        // Step 3: Perspective-correct and crop each detected card.
-        let crops = ranked.compactMap { cropCard(from: cgImage, observation: $0) }
-
-        if crops.isEmpty,
-           let fallbackBox = yoloHint,
-           let fallbackCrop = axisAlignedCrop(from: cgImage, yoloBox: fallbackBox) {
-            return CardCropResult(crops: [fallbackCrop], detectedCount: 0)
+        if let result = singleCropResult(
+            from: cgImage,
+            ranked: ranked,
+            yoloHint: yoloHint,
+            visionHint: visionHint,
+            prefersSingle: hint?.preferSingleCrop == true
+        ) {
+            return result
         }
 
-        return CardCropResult(crops: crops, detectedCount: ranked.count)
+        return multiCropResult(
+            from: cgImage,
+            ranked: ranked,
+            yoloHint: yoloHint,
+            sourceIsPortrait: upright.size.height > upright.size.width
+        )
     }
+}
 
+extension CardCropService {
     // MARK: - Orientation Normalization
 
     /// Redraws the image so that cgImage pixels are upright (.up orientation).
@@ -128,7 +136,7 @@ final class CardCropService: @unchecked Sendable {
     /// - Vision returns normalized coords in [0,1] with bottom-left origin.
     /// - CIImage(cgImage:) also uses bottom-left origin.
     /// - Therefore we scale Vision coords to pixel dimensions directly (no Y-flip).
-    private func cropCard(
+    func cropCard(
         from cgImage: CGImage,
         observation: VNRectangleObservation
     ) -> UIImage? {
@@ -188,6 +196,16 @@ final class CardCropService: @unchecked Sendable {
         guard paddedRect.width > 0, paddedRect.height > 0,
               let cropped = cgImage.cropping(to: paddedRect) else { return nil }
         return canonicalPortraitCardImage(UIImage(cgImage: cropped))
+    }
+
+    func axisAlignedVisionCrop(from cgImage: CGImage, visionBox: CGRect) -> UIImage? {
+        let yoloBox = CGRect(
+            x: visionBox.minX,
+            y: 1.0 - visionBox.maxY,
+            width: visionBox.width,
+            height: visionBox.height
+        )
+        return axisAlignedCrop(from: cgImage, yoloBox: yoloBox)
     }
 
     // MARK: - Geometry Helpers
@@ -273,4 +291,59 @@ final class CardCropService: @unchecked Sendable {
             image.draw(in: CGRect(origin: .zero, size: targetSize))
         }
     }
+}
+
+private extension CardCropService {
+    func multiCropResult(
+        from cgImage: CGImage,
+        ranked: [VNRectangleObservation],
+        yoloHint: CGRect?,
+        sourceIsPortrait: Bool
+    ) -> CardCropResult {
+        if let crop = mergedSplitCardCrop(from: cgImage, ranked: ranked, sourceIsPortrait: sourceIsPortrait) {
+            return CardCropResult(crops: [crop], detectedCount: ranked.count)
+        }
+
+        let crops = qualityAcceptedCrops(from: cgImage, ranked: ranked)
+        if crops.isEmpty,
+           let fallbackBox = yoloHint,
+           let fallbackCrop = axisAlignedCrop(from: cgImage, yoloBox: fallbackBox) {
+            return CardCropResult(crops: [fallbackCrop], detectedCount: 0)
+        }
+        return CardCropResult(crops: crops, detectedCount: ranked.count)
+    }
+
+    func singleCropResult(
+        from cgImage: CGImage,
+        ranked: [VNRectangleObservation],
+        yoloHint: CGRect?,
+        visionHint: CGRect?,
+        prefersSingle: Bool
+    ) -> CardCropResult? {
+        guard prefersSingle, let yoloHint, let visionHint else { return nil }
+        if let crop = firstAcceptableSingleCrop(from: cgImage, ranked: ranked, visionHint: visionHint) {
+            return CardCropResult(crops: [crop], detectedCount: ranked.count)
+        }
+        guard let fallbackCrop = axisAlignedCrop(from: cgImage, yoloBox: yoloHint) else { return nil }
+        return CardCropResult(crops: [fallbackCrop], detectedCount: ranked.count)
+    }
+
+    func firstAcceptableSingleCrop(
+        from cgImage: CGImage,
+        ranked: [VNRectangleObservation],
+        visionHint: CGRect
+    ) -> UIImage? {
+        for observation in ranked {
+            guard let crop = cropCard(from: cgImage, observation: observation) else { continue }
+            let result = CropQualityEvaluator.evaluate(
+                crop,
+                cropBox: observation.boundingBox,
+                hintBox: visionHint,
+                maxHorizontalSkewDegrees: 0.70
+            )
+            if result.passes { return crop }
+        }
+        return nil
+    }
+
 }

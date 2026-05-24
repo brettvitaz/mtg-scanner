@@ -59,6 +59,10 @@ struct RectangleFilter {
     /// Minimum larger/smaller area ratio required before containment suppression fires.
     static let containmentAreaRatioThreshold: CGFloat = 1.50
 
+    static let hintedCropMinAreaRatio: CGFloat = 0.60
+    static let hintedCropMinHintCoverage: CGFloat = 0.45
+    static let hintedCropMinCandidateCoverage: CGFloat = 0.50
+
     struct Configuration {
         let aspectRatioTolerance: CGFloat
         let enablesContainmentSuppression: Bool
@@ -144,6 +148,7 @@ struct RectangleFilter {
         let candidates = observations
             .filter { $0.confidence >= Self.minConfidence }
             .filter { isCardAspectRatio($0, isLandscape: isLandscape) }
+            .filter { isHintEligible($0, visionHint: visionHint, preferSingle: preferSingle) }
             .sorted {
                 score($0, isLandscape: isLandscape, visionHint: visionHint) >
                     score($1, isLandscape: isLandscape, visionHint: visionHint)
@@ -158,7 +163,9 @@ struct RectangleFilter {
                 score($0, isLandscape: isLandscape, visionHint: visionHint) >
                     score($1, isLandscape: isLandscape, visionHint: visionHint)
             }
-            accepted = Array(accepted.prefix(1))
+            if visionHint == nil {
+                accepted = Array(accepted.prefix(1))
+            }
         } else {
             accepted.sort(by: Self.readingOrder)
         }
@@ -168,7 +175,9 @@ struct RectangleFilter {
             containmentSuppressionCount: containedSuppression.suppressionCount
         )
     }
+}
 
+private extension RectangleFilter {
     private func applyNMS(to candidates: [VNRectangleObservation]) -> [VNRectangleObservation] {
         var accepted: [VNRectangleObservation] = []
         for obs in candidates {
@@ -219,15 +228,6 @@ struct RectangleFilter {
         return max(0, 1 - relativeError / configuration.aspectRatioTolerance)
     }
 
-    /// Returns true when the observation's edge aspect ratio matches an MTG card in the current
-    /// device orientation.
-    ///
-    /// Uses the quad's corner points to compute actual edge lengths rather than the axis-aligned
-    /// bounding box, which distorts the ratio for slightly rotated cards.
-    ///
-    /// In portrait mode the card's long axis is horizontal in the 16:9 buffer (ratio ≈ 0.785).
-    /// In landscape mode the card's long axis is vertical in the buffer (ratio ≈ 0.402 due to
-    /// the non-square pixel normalization). Only one band is tested per call.
     private func isCardAspectRatio(_ obs: VNRectangleObservation, isLandscape: Bool) -> Bool {
         guard let ratio = edgeAspectRatio(obs) else { return false }
         let center = isLandscape ? Self.portraitInBufferRatio : Self.targetAspectRatio
@@ -260,6 +260,29 @@ struct RectangleFilter {
         let largerArea = max(Self.area(of: rect), Self.area(of: hint))
         guard largerArea > 0 else { return 0 }
         return supportArea / largerArea
+    }
+
+    private func isHintEligible(
+        _ obs: VNRectangleObservation,
+        visionHint: CGRect?,
+        preferSingle: Bool
+    ) -> Bool {
+        guard preferSingle, let visionHint else { return true }
+        let rect = obs.boundingBox
+        let rectArea = Self.area(of: rect)
+        let hintArea = Self.area(of: visionHint)
+        guard rectArea > 0, hintArea > 0 else { return false }
+
+        let intersection = rect.intersection(visionHint)
+        guard !intersection.isNull else { return false }
+        let intersectionArea = Self.area(of: intersection)
+        let areaRatio = rectArea / hintArea
+        let hintCoverage = intersectionArea / hintArea
+        let candidateCoverage = intersectionArea / rectArea
+
+        return areaRatio >= Self.hintedCropMinAreaRatio &&
+            hintCoverage >= Self.hintedCropMinHintCoverage &&
+            candidateCoverage >= Self.hintedCropMinCandidateCoverage
     }
 
     private func suppressContainedObservations(
@@ -324,8 +347,9 @@ struct RectangleFilter {
         guard outerArea / innerArea >= containmentAreaRatioThreshold else { return false }
         return containmentRatio(of: inner, in: outer) >= containmentThreshold
     }
+}
 
-    /// Intersection-over-union of two axis-aligned rectangles in normalized coordinates.
+extension RectangleFilter {
     static func iou(_ a: CGRect, _ b: CGRect) -> CGFloat {
         let ix = max(0, min(a.maxX, b.maxX) - max(a.minX, b.minX))
         let iy = max(0, min(a.maxY, b.maxY) - max(a.minY, b.minY))

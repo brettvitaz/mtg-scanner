@@ -82,5 +82,33 @@
     "path": "labeled-outputs/skewed/auto-skewed-time-sieve.jpg",
     "sourcePath": "tmp/auto-scan/not-straight/time-sieve_the-list_arb-031.jpg",
     "expectedFailure": "skewed"
+  },
+  {
+    "id": "auto-under-crop-img-1955",
+    "mode": "autoScan",
+    "path": "labeled-outputs/auto-scan-regressions/IMG_1955-crop.jpg",
+    "sourcePath": "tmp/poorly-cropped/IMG_1955.jpeg",
+    "expectedFailure": "none"
+  },
+  {
+    "id": "auto-under-crop-img-1956",
+    "mode": "autoScan",
+    "path": "labeled-outputs/auto-scan-regressions/IMG_1956-crop.jpg",
+    "sourcePath": "tmp/poorly-cropped/IMG_1956.jpeg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "auto-under-crop-img-1957",
+    "mode": "autoScan",
+    "path": "labeled-outputs/auto-scan-regressions/IMG_1957-crop.jpg",
+    "sourcePath": "tmp/poorly-cropped/IMG_1957.jpeg",
+    "expectedFailure": "underCrop"
+  },
+  {
+    "id": "auto-under-crop-img-1960",
+    "mode": "autoScan",
+    "path": "labeled-outputs/auto-scan-regressions/IMG_1960-crop.jpg",
+    "sourcePath": "tmp/poorly-cropped/IMG_1960.jpeg",
+    "expectedFailure": "underCrop"
   }
 ]

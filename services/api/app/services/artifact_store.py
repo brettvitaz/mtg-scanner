@@ -25,6 +25,15 @@ class StoredRecognitionArtifacts:
     crops_dir: Path | None = None
 
 
+@dataclass(slots=True)
+class StoredBatchRecognitionArtifacts:
+    directory: Path
+    inputs_dir: Path
+    refined_dir: Path
+    response_path: Path
+    metadata_path: Path
+
+
 class LocalArtifactStore:
     def __init__(self, base_dir: Path) -> None:
         self._base_dir = base_dir
@@ -145,6 +154,89 @@ class LocalArtifactStore:
             response_path=response_path,
             metadata_path=metadata_path,
             crops_dir=crops_dir,
+        )
+
+    def save_batch_recognition(
+        self,
+        crops: list[tuple[bytes, str]],  # [(image_bytes, filename), ...]
+        refined_crops: list[tuple[bytes, str]] | None,
+        response: RecognitionResponse,
+        metadata: RecognitionUploadMetadata,
+        usage: TokenUsage | None = None,
+        estimated_cost_usd: float | None = None,
+    ) -> StoredBatchRecognitionArtifacts:
+        """Save a batch recognition with clear input/refined separation.
+
+        Layout:
+            recognitions-batch/<timestamp>-<id>/
+            ├── inputs/crop-0.jpg, crop-1.jpg, ...
+            ├── refined/crop-0-tight.jpg, crop-1-tight.jpg, ... (optional)
+            ├── response.json
+            └── metadata.json
+        """
+        run_id = self._make_run_id()
+        artifact_dir = self._base_dir / "recognitions-batch" / run_id
+        artifact_dir.mkdir(parents=True, exist_ok=False)
+
+        # Create subdirectories
+        inputs_dir = artifact_dir / "inputs"
+        inputs_dir.mkdir(exist_ok=True)
+
+        refined_dir = artifact_dir / "refined"
+        refined_dir.mkdir(exist_ok=True)
+
+        # Save input crops
+        input_files: list[str] = []
+        for i, (image_bytes, filename) in enumerate(crops):
+            input_filename = f"crop-{i}.jpg"
+            input_path = inputs_dir / input_filename
+            input_path.write_bytes(image_bytes)
+            input_files.append(input_filename)
+
+        # Save refined crops if provided
+        refined_files: list[str] = []
+        if refined_crops:
+            for i, (image_bytes, filename) in enumerate(refined_crops):
+                refined_filename = f"crop-{i}-tight.jpg"
+                refined_path = refined_dir / refined_filename
+                refined_path.write_bytes(image_bytes)
+                refined_files.append(refined_filename)
+
+        # Save response
+        response_path = artifact_dir / "response.json"
+        response_path.write_text(response.model_dump_json(indent=2) + "\n")
+
+        # Build metadata dict
+        metadata_dict: dict = {
+            "filename": metadata.filename,
+            "content_type": metadata.content_type,
+            "prompt_version": metadata.prompt_version,
+            "provider": metadata.provider,
+            "model": metadata.model,
+            "crop_count": len(crops),
+            "input_files": input_files,
+            "refined_files": refined_files if refined_crops else [],
+            "saved_at": datetime.now(UTC).isoformat(),
+        }
+
+        if usage is not None:
+            metadata_dict["usage"] = {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "total_tokens": usage.total_tokens,
+            }
+        if estimated_cost_usd is not None:
+            metadata_dict["estimated_cost_usd"] = round(estimated_cost_usd, 6)
+
+        metadata_path = artifact_dir / "metadata.json"
+        metadata_path.write_text(json.dumps(metadata_dict, indent=2) + "\n")
+
+        return StoredBatchRecognitionArtifacts(
+            directory=artifact_dir,
+            inputs_dir=inputs_dir,
+            refined_dir=refined_dir,
+            response_path=response_path,
+            metadata_path=metadata_path,
         )
 
     def _make_run_id(self) -> str:

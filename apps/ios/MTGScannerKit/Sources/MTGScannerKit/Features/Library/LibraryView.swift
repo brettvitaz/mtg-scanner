@@ -16,6 +16,19 @@ struct LibraryView: View {
     @State private var renamingDeck: Deck?
     @State private var editingName = ""
 
+    @State private var showSearch = false
+    @State private var searchText = ""
+
+    private var filteredCollections: [CardCollection] {
+        guard !searchText.isEmpty else { return collections }
+        return collections.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var filteredDecks: [Deck] {
+        guard !searchText.isEmpty else { return decks }
+        return decks.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
     var body: some View {
         NavigationStack {
             libraryList
@@ -24,15 +37,21 @@ struct LibraryView: View {
 
     private var libraryList: some View {
         VStack(spacing: 0) {
+            if showSearch {
+                ListSearchField(text: $searchText, prompt: "Search collections and decks")
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             List {
                 collectionsSection
                 decksSection
             }
             .listStyle(.plain)
-            .environment(\.editMode, .constant(.inactive))
+            .scrollContentBackground(.hidden)
+            .background(Color.dsBackground)
         }
+        .background(Color.dsBackground)
         .navigationTitle("Library")
-        .toolbar { addMenu }
+        .toolbar { libraryToolbar }
         .alert("New Collection", isPresented: $showNewCollection) {
             TextField("Name", text: $newName)
             Button("Create") { createCollection() }
@@ -61,8 +80,18 @@ struct LibraryView: View {
         }
     }
 
-    private var addMenu: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+    @ToolbarContentBuilder
+    private var libraryToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    showSearch.toggle()
+                    if !showSearch { searchText = "" }
+                }
+            } label: {
+                Image(systemName: showSearch ? "xmark" : "magnifyingglass")
+            }
+            .accessibilityLabel(showSearch ? "Close search" : "Search")
             Menu {
                 Button("New Collection") {
                     newName = ""
@@ -82,140 +111,138 @@ struct LibraryView: View {
     // MARK: - Sections
 
     private var collectionsSection: some View {
-        Section {
+        Section(header: sectionHeader("COLLECTIONS", count: filteredCollections.count)) {
             if collections.isEmpty {
-                Text("No collections yet")
-                    .foregroundStyle(.secondary)
+                emptyRow("No collections yet")
             } else {
-                ForEach(collections) { collection in
+                ForEach(filteredCollections) { collection in
                     collectionRow(for: collection)
                 }
+                .onDelete { offsets in
+                    for index in offsets {
+                        libraryViewModel.deleteCollection(filteredCollections[index])
+                    }
+                }
+                if filteredCollections.isEmpty {
+                    emptyRow("No results for \"\(searchText)\"")
+                }
             }
-        } header: {
-            sectionHeader(title: "Collections", count: collections.count)
         }
     }
 
     private var decksSection: some View {
-        Section {
+        Section(header: sectionHeader("DECKS", count: filteredDecks.count)) {
             if decks.isEmpty {
-                Text("No decks yet")
-                    .foregroundStyle(.secondary)
+                emptyRow("No decks yet")
             } else {
-                ForEach(decks) { deck in
+                ForEach(filteredDecks) { deck in
                     deckRow(for: deck)
                 }
+                .onDelete { offsets in
+                    for index in offsets {
+                        libraryViewModel.deleteDeck(filteredDecks[index])
+                    }
+                }
+                if filteredDecks.isEmpty {
+                    emptyRow("No results for \"\(searchText)\"")
+                }
             }
-        } header: {
-            sectionHeader(title: "Decks", count: decks.count)
         }
     }
 
-    @ViewBuilder
-    private func collectionRow(for collection: CardCollection) -> some View {
+    private func sectionHeader(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title)
+                .font(.geist(.caption))
+                .foregroundStyle(Color.dsTextSecondary)
+                .textCase(nil)
+            Spacer()
+            Text("\(count)")
+                .font(.geist(.caption))
+                .foregroundStyle(Color.dsTextSecondary)
+        }
+    }
+
+    private func emptyRow(_ text: String) -> some View {
+        Text(text)
+            .font(.geist(.body))
+            .foregroundStyle(Color.dsTextSecondary)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
+}
+
+// MARK: - Row builders + Actions
+
+private extension LibraryView {
+    func collectionRow(for collection: CardCollection) -> some View {
         NavigationLink(value: collection) {
-            CollectionRow(
+            LibraryItemRow(
+                iconSystemName: "folder.fill",
                 name: collection.name,
-                count: collection.items.totalQuantity
+                cardCount: collection.items.totalQuantity,
+                updatedAt: collection.updatedAt
             )
         }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
         .contextMenu {
             Button {
                 renamingCollection = collection
                 editingName = collection.name
                 showRenameCollection = true
-            } label: {
-                Label("Rename", systemImage: "pencil")
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                libraryViewModel.deleteCollection(collection)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
+            } label: { Label("Rename", systemImage: "pencil") }
         }
     }
 
-    @ViewBuilder
-    private func deckRow(for deck: Deck) -> some View {
+    func deckRow(for deck: Deck) -> some View {
         NavigationLink(value: deck) {
-            CollectionRow(
+            LibraryItemRow(
+                iconSystemName: "rectangle.stack.fill",
                 name: deck.name,
-                count: deck.items.totalQuantity
+                cardCount: deck.items.totalQuantity,
+                updatedAt: deck.updatedAt
             )
         }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
         .contextMenu {
             Button {
                 renamingDeck = deck
                 editingName = deck.name
                 showRenameDeck = true
-            } label: {
-                Label("Rename", systemImage: "pencil")
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                libraryViewModel.deleteDeck(deck)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
+            } label: { Label("Rename", systemImage: "pencil") }
         }
     }
 
-    private func sectionHeader(title: String, count: Int) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text("\(count) item(s)")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func createCollection() {
+    func createCollection() {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         libraryViewModel.createCollection(name: trimmed)
     }
 
-    private func createDeck() {
+    func createDeck() {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         libraryViewModel.createDeck(name: trimmed)
     }
 
-    private func renameCollection() {
+    func renameCollection() {
         guard let collection = renamingCollection else { return }
         libraryViewModel.renameCollection(collection, to: editingName)
         renamingCollection = nil
     }
 
-    private func renameDeck() {
+    func renameDeck() {
         guard let deck = renamingDeck else { return }
         libraryViewModel.renameDeck(deck, to: editingName)
         renamingDeck = nil
-    }
-
-}
-
-// MARK: - Row
-
-private struct CollectionRow: View {
-    let name: String
-    let count: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(name)
-                .font(.headline)
-            Text("\(count) card(s)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name), \(count) card(s)")
     }
 }

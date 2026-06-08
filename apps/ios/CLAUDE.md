@@ -48,7 +48,7 @@ Do not use `swift test` for this iOS package. Use `make ios-test` or run `xcodeb
 xcodebuild test \
   -workspace apps/ios/MTGScanner.xcworkspace \
   -scheme MTGScanner \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' \
   2>&1 | xcpretty
 ```
 
@@ -60,6 +60,7 @@ Or via Makefile: `make ios-test`
 - Use `XCTAssertEqual(_:_:accuracy:)` for CGFloat/Double comparisons.
 - Test models (initialization, equality, identifiability) and pure logic (filters, interpolation, decoding).
 - If you need to target the Swift package tests directly, run `xcodebuild test` with the `MTGScannerKitTests` scheme rather than `swift test`.
+- Pin simulator OS in scripted commands. `name=iPhone 16` alone resolves to `OS:latest`, which can fail when latest runtimes only have newer device families.
 
 ## Build verification
 

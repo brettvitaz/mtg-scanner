@@ -33,7 +33,10 @@ let package = Package(
         .testTarget(
             name: "MTGScannerKitTests",
             dependencies: ["MTGScannerKit", "MTGScannerFixtures"],
-            path: "Tests/MTGScannerKitTests"
+            path: "Tests/MTGScannerKitTests",
+            resources: [
+                .process("CropEvaluationFixtures")
+            ]
         )
     ]
 )

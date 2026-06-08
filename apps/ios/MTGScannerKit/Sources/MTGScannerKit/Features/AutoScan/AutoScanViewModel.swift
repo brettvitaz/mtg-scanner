@@ -51,11 +51,15 @@ final class AutoScanViewModel {
     weak var captureCoordinator: CameraCaptureCoordinator?
     var modelContext: ModelContext?
     var apiBaseURL: String = ""
+#if DEBUG
+    var debugSaveRawCapturesToPhotoLibrary = false
+    var rawCaptureSaver: RawCaptureSaving = RawCaptureDebugSaver()
+#endif
 
     // MARK: - Private
 
     private var settleTask: Task<Void, Never>?
-    private let cropImage: @Sendable (UIImage) async -> CardCropResult
+    private let cropImage: @Sendable (UIImage, CardCropHint?) async -> CardCropResult
 
     private struct CropResult {
         let image: UIImage?
@@ -77,7 +81,7 @@ final class AutoScanViewModel {
         recognitionQueue = RecognitionQueue()
         identifiedCardsViewModel = IdentifiedCardsViewModel()
         let service = CardCropService()
-        cropImage = { image in await service.detectAndCrop(image: image) }
+        cropImage = { image, hint in await service.detectAndCrop(image: image, hint: hint) }
         setupSignalHandler()
         setupRecognitionCallback()
     }
@@ -87,8 +91,8 @@ final class AutoScanViewModel {
         detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
         recognitionQueue: RecognitionQueue,
         identifiedCardsViewModel: IdentifiedCardsViewModel? = nil,
-        cropImage: @escaping @Sendable (UIImage) async -> CardCropResult = {
-            await CardCropService().detectAndCrop(image: $0)
+        cropImage: @escaping @Sendable (UIImage, CardCropHint?) async -> CardCropResult = {
+            await CardCropService().detectAndCrop(image: $0, hint: $1)
         }
     ) {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
@@ -165,7 +169,7 @@ final class AutoScanViewModel {
         if cropEnabled {
             let detectCrops = cropImage
             let crops = await Task.detached(priority: .userInitiated) {
-                await detectCrops(image)
+                await detectCrops(image, nil)
             }.value
             if crops.crops.isEmpty {
                 recognitionQueue.enqueue(
@@ -192,6 +196,14 @@ final class AutoScanViewModel {
         guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else { return }
         await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
     }
+
+#if DEBUG
+    @MainActor
+    func saveRawCaptureIfEnabled(_ payload: RecognitionImagePayload) async {
+        guard debugSaveRawCapturesToPhotoLibrary else { return }
+        await rawCaptureSaver.saveRawCapture(payload)
+    }
+#endif
 
     // MARK: - Frame Forwarding
 
@@ -242,6 +254,13 @@ final class AutoScanViewModel {
             return
         }
 
+        await processAutoCapturedPayload(payload)
+    }
+
+    func processAutoCapturedPayload(_ payload: RecognitionImagePayload) async {
+#if DEBUG
+        await saveRawCaptureIfEnabled(payload)
+#endif
         let result = await cropCapturedPayload(payload)
         lastCroppedImage = result.image
         if let box = result.boundingBox, !isCalibrated {
@@ -271,7 +290,9 @@ private extension AutoScanViewModel {
         guard let box = await presenceTracker.detectBestBox(in: cgImage) else {
             return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
         }
-        let cropped = AutoScanCropHelper.cropImage(uprightImage, toNormalizedRect: box)
+        let hint = CardCropHint(yoloBoxTopLeft: box, preferSingleCrop: true)
+        let cropResult = await cropImage(uprightImage, hint)
+        let cropped = cropResult.crops.first
         return CropResult(image: cropped, boundingBox: box, sourceSize: sourceSize)
     }
 

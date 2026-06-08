@@ -1,6 +1,6 @@
 {
   "source_url": "https://raw.githubusercontent.com/pydantic/genai-prices/main/prices/data_slim.json",
-  "fetched_at": "2026-04-15T19:21:32.401552+00:00",
+  "fetched_at": "2026-04-29T16:20:46.616317+00:00",
   "models": {
     "claude-2": {
       "input_mtok": 8.0,
@@ -58,6 +58,11 @@
       "provider": "anthropic"
     },
     "claude-opus-4-6": {
+      "input_mtok": 5.0,
+      "output_mtok": 25.0,
+      "provider": "anthropic"
+    },
+    "claude-opus-4-7": {
       "input_mtok": 5.0,
       "output_mtok": 25.0,
       "provider": "anthropic"
@@ -363,6 +368,16 @@
       "provider": "openai"
     },
     "gpt-5.4-pro": {
+      "input_mtok": 30.0,
+      "output_mtok": 180.0,
+      "provider": "openai"
+    },
+    "gpt-5.5": {
+      "input_mtok": 5.0,
+      "output_mtok": 30.0,
+      "provider": "openai"
+    },
+    "gpt-5.5-pro": {
       "input_mtok": 30.0,
       "output_mtok": 180.0,
       "provider": "openai"

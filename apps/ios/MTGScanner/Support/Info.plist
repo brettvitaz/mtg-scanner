@@ -29,6 +29,8 @@
 	<string>Capture card photos to upload for recognition.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Select card photos to upload for recognition.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save debug camera captures to Photos for crop diagnosis.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

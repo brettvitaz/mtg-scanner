@@ -44,6 +44,9 @@ private struct SettingsForm: View {
             recognitionSection
             autoScanSection
             motionBurstSection
+#if DEBUG
+            diagnosticsSection
+#endif
         }
     }
 
@@ -94,6 +97,21 @@ private struct SettingsForm: View {
             .foregroundStyle(.secondary)
         }
     }
+
+#if DEBUG
+    // MARK: - Diagnostics Section
+
+    @ViewBuilder
+    private var diagnosticsSection: some View {
+        Section("Diagnostics") {
+            Toggle("Save Raw Captures to Photos", isOn: $appModel.debugSaveRawCapturesToPhotoLibrary)
+
+            Text("Saves the original camera JPEG before crop or recognition for crop diagnosis.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+#endif
 
     // MARK: - Auto Scan Section
 

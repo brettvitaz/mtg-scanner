@@ -47,6 +47,11 @@ struct ScanView: View {
         .onChange(of: appModel.maxConcurrentUploads) { _, count in
             autoScanViewModel.recognitionQueue.maxConcurrent = count
         }
+#if DEBUG
+        .onChange(of: appModel.debugSaveRawCapturesToPhotoLibrary) { _, isEnabled in
+            autoScanViewModel.debugSaveRawCapturesToPhotoLibrary = isEnabled
+        }
+#endif
         .onChange(of: detectionMode) { _, mode in
             if mode != .auto {
                 autoScanViewModel.stop()
@@ -84,6 +89,9 @@ struct ScanView: View {
         autoScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.autoScanConfidenceThreshold)
         autoScanViewModel.recognitionQueue.maxConcurrent = appModel.maxConcurrentUploads
         autoScanViewModel.updateMotionBurstConfiguration(motionBurstConfiguration)
+#if DEBUG
+        autoScanViewModel.debugSaveRawCapturesToPhotoLibrary = appModel.debugSaveRawCapturesToPhotoLibrary
+#endif
     }
 
     private var motionBurstConfiguration: MotionBurstConfiguration {
@@ -211,6 +219,9 @@ struct ScanView: View {
         triggerShutterFeedback()
         Task {
             guard let payload = await captureCoordinator.capturePhoto() else { return }
+#if DEBUG
+            await autoScanViewModel.saveRawCaptureIfEnabled(payload)
+#endif
             await enqueueForRecognition(payload)
         }
     }

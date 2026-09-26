@@ -213,3 +213,21 @@ Do not add provider-specific integrations unless the OpenAI-compatible path prov
 - `docs/plans/` — active feature plans.
 
 Update docs alongside code when behavior or configuration changes. Record important architectural decisions as ADRs in `docs/decisions/`.
+
+## Context compaction rules
+
+When the user asks to compact context, first update `docs/agent-state.md`.
+
+The compacted context must preserve:
+
+- Current goal
+- Current task
+- Relevant files and symbols
+- Architectural decisions
+- Constraints and do-not-change rules
+- Known failures, test results, and commands already run
+- Next concrete steps
+
+Prefer decisions and verified facts over discussion history.
+Drop abandoned approaches unless they explain why not to repeat them.
+Do not preserve unrelated implementation details.

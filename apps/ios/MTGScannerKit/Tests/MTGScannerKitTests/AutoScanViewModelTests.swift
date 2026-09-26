@@ -1,3 +1,4 @@
+import UniformTypeIdentifiers
 import XCTest
 @testable import MTGScannerKit
 
@@ -226,7 +227,7 @@ final class AutoScanViewModelTests: XCTestCase {
         let vm = AutoScanViewModel(
             detectorProvider: { nil },
             recognitionQueue: queue,
-            cropImage: { _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }
+            cropImage: { _, _ in CardCropResult(crops: fakeCrops, detectedCount: fakeCrops.count) }
         )
 
         await vm.enqueueCapturedImage(makeBlankImage(), cropEnabled: true)
@@ -234,6 +235,62 @@ final class AutoScanViewModelTests: XCTestCase {
         // Two crops returned → two separate enqueue calls, each marked isCropped.
         XCTAssertEqual(queue.pendingCount, 2)
     }
+
+#if DEBUG
+    // MARK: - Raw capture debug saving
+
+    func testRawCaptureSaverIsSkippedWhenDebugToggleDisabled() async {
+        let spy = SpyRawCaptureSaver()
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: makeStubQueue())
+        vm.rawCaptureSaver = spy
+        vm.debugSaveRawCapturesToPhotoLibrary = false
+
+        await vm.saveRawCaptureIfEnabled(makeCameraPayload(rawBytes: Data([0x01, 0x02, 0x03])))
+
+        let savedPayloads = await spy.savedPayloads
+        XCTAssertTrue(savedPayloads.isEmpty)
+    }
+
+    func testRawCaptureSaverReceivesOriginalUploadDataWhenDebugToggleEnabled() async {
+        let originalBytes = Data([0xFF, 0xD8, 0x10, 0x20, 0xFF, 0xD9])
+        let spy = SpyRawCaptureSaver()
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: makeStubQueue())
+        vm.rawCaptureSaver = spy
+        vm.debugSaveRawCapturesToPhotoLibrary = true
+
+        await vm.saveRawCaptureIfEnabled(makeCameraPayload(rawBytes: originalBytes))
+
+        let savedPayloads = await spy.savedPayloads
+        XCTAssertEqual(savedPayloads, [originalBytes])
+    }
+
+    func testAutoCapturedPayloadSavesOriginalBytesBeforeRecognitionWork() async {
+        let originalBytes = Data([0xFF, 0xD8, 0x21, 0x22, 0xFF, 0xD9])
+        let spy = SpyRawCaptureSaver()
+        let queue = makeStubQueue()
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        vm.rawCaptureSaver = spy
+        vm.debugSaveRawCapturesToPhotoLibrary = true
+
+        await vm.processAutoCapturedPayload(makeCameraPayload(rawBytes: originalBytes))
+
+        let savedPayloads = await spy.savedPayloads
+        XCTAssertEqual(savedPayloads, [originalBytes])
+        XCTAssertEqual(queue.pendingCount, 1)
+    }
+
+    func testGenericEnqueueDoesNotSaveImportedPhotoPayloads() async {
+        let spy = SpyRawCaptureSaver()
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: makeStubQueue())
+        vm.rawCaptureSaver = spy
+        vm.debugSaveRawCapturesToPhotoLibrary = true
+
+        await vm.enqueueCapturedImage(makeImportedPayload(rawBytes: Data([0xFF, 0xD8, 0x30, 0x31, 0xFF, 0xD9])), cropEnabled: false)
+
+        let savedPayloads = await spy.savedPayloads
+        XCTAssertTrue(savedPayloads.isEmpty)
+    }
+#endif
 
     // MARK: - Helpers
 
@@ -250,4 +307,30 @@ final class AutoScanViewModelTests: XCTestCase {
             recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
         )
     }
+
+    private func makeCameraPayload(rawBytes: Data) -> RecognitionImagePayload {
+        RecognitionImagePayload.cameraCapture(image: makeBlankImage(), data: rawBytes)
+    }
+
+    private func makeImportedPayload(rawBytes: Data) -> RecognitionImagePayload {
+        RecognitionImagePayload.importedPhoto(
+            data: rawBytes,
+            image: makeBlankImage(),
+            supportedContentTypes: [.jpeg]
+        )!
+    }
 }
+
+#if DEBUG
+private actor SpyRawCaptureSaver: RawCaptureSaving {
+    private var payloads: [Data] = []
+
+    func saveRawCapture(_ payload: RecognitionImagePayload) async {
+        payloads.append(payload.uploadData)
+    }
+
+    var savedPayloads: [Data] {
+        payloads
+    }
+}
+#endif

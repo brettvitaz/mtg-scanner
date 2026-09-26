@@ -114,12 +114,13 @@ final class RectangleFilterNMSTests: XCTestCase {
         XCTAssertEqual(result[0].boundingBox, larger.boundingBox)
     }
 
-    func testCropFilterDoesNotApplyContainmentSuppression() {
+    func testCropFilterSuppressesAggregateContainer() {
         let ratio = RectangleFilter.targetAspectRatio
         let outer = makeObservation(box: CGRect(x: 0.10, y: 0.10, width: 0.45 * ratio, height: 0.45), confidence: 0.75)
         let inner = makeObservation(box: CGRect(x: 0.16, y: 0.18, width: 0.22 * ratio, height: 0.22), confidence: 0.95)
         let result = cropFilter.filter([inner, outer], isLandscape: false)
-        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.boundingBox, inner.boundingBox)
     }
 
     func testFilterReturnsEmptyForEmptyInput() {

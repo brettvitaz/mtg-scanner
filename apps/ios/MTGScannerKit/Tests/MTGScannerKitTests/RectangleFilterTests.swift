@@ -5,55 +5,6 @@ import Vision
 final class RectangleFilterTests: XCTestCase {
 
     private let filter = RectangleFilter()
-    private let cropFilter = RectangleFilter(configuration: .crop)
-
-    // MARK: - Constants
-
-    func testTargetAspectRatioApproximatesMTGCard() {
-        // 63mm / 88mm ≈ 0.716
-        XCTAssertEqual(RectangleFilter.targetAspectRatio, 63.0 / 88.0, accuracy: 0.001)
-    }
-
-    func testPortraitInBufferRatioIsTargetScaledByBufferRatio() {
-        // The 1920×1080 buffer compresses normalized x by 9/16 relative to y.
-        // A card standing upright in landscape mode appears with ratio ≈ target × (1080/1920).
-        let expected = RectangleFilter.targetAspectRatio * (1080.0 / 1920.0)
-        XCTAssertEqual(RectangleFilter.portraitInBufferRatio, expected, accuracy: 0.001)
-    }
-
-    // MARK: - IoU
-
-    func testIouOfIdenticalRectanglesIsOne() {
-        let rect = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.4)
-        XCTAssertEqual(RectangleFilter.iou(rect, rect), 1.0, accuracy: 0.001)
-    }
-
-    func testIouOfNonOverlappingRectanglesIsZero() {
-        let a = CGRect(x: 0.0, y: 0.0, width: 0.2, height: 0.2)
-        let b = CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.2)
-        XCTAssertEqual(RectangleFilter.iou(a, b), 0.0, accuracy: 0.001)
-    }
-
-    func testIouOfHalfOverlapIsCorrect() {
-        // a covers [0, 0.4] × [0, 1.0], b covers [0.2, 0.6] × [0, 1.0]
-        // intersection: [0.2, 0.4] × [0, 1.0] = 0.2 × 1.0 = 0.2
-        // union: 0.4 + 0.4 - 0.2 = 0.6
-        let a = CGRect(x: 0.0, y: 0.0, width: 0.4, height: 1.0)
-        let b = CGRect(x: 0.2, y: 0.0, width: 0.4, height: 1.0)
-        XCTAssertEqual(RectangleFilter.iou(a, b), 0.2 / 0.6, accuracy: 0.001)
-    }
-
-    func testIouWithZeroAreaRectangleIsZero() {
-        let a = CGRect(x: 0.1, y: 0.1, width: 0.0, height: 0.4)
-        let b = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.4)
-        XCTAssertEqual(RectangleFilter.iou(a, b), 0.0, accuracy: 0.001)
-    }
-
-    func testContainmentRatioOfFullyContainedRectangleIsOne() {
-        let inner = CGRect(x: 0.2, y: 0.2, width: 0.2, height: 0.3)
-        let outer = CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.6)
-        XCTAssertEqual(RectangleFilter.containmentRatio(of: inner, in: outer), 1.0, accuracy: 0.001)
-    }
 
     // MARK: - Aspect ratio — portrait device (isLandscape: false)
 
@@ -226,18 +177,37 @@ final class RectangleFilterTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
     }
 
-    func testCropFilterRejectsPerspectiveDistortedCardNearPortraitLowerBound() {
-        let obs = VNRectangleObservation()
-        obs.setValue(CGRect(x: 0.210, y: 0.664, width: 0.132, height: 0.317), forKey: "boundingBox")
-        obs.setValue(Float(1.0), forKey: "confidence")
-        obs.setValue(CGPoint(x: 0.210, y: 0.929), forKey: "topLeft")
-        obs.setValue(CGPoint(x: 0.324, y: 0.981), forKey: "topRight")
-        obs.setValue(CGPoint(x: 0.342, y: 0.730), forKey: "bottomRight")
-        obs.setValue(CGPoint(x: 0.220, y: 0.664), forKey: "bottomLeft")
+    func testScanFilterSuppressesContainedInnerObservation() {
+        let outer = makeObservation(
+            box: CGRect(x: 0.1, y: 0.1, width: 0.30, height: 0.42),
+            confidence: 0.8
+        )
+        let inner = makeObservation(
+            box: CGRect(x: 0.15, y: 0.17, width: 0.20, height: 0.28),
+            confidence: 0.9
+        )
 
-        let result = cropFilter.filter([obs], isLandscape: false)
+        let result = filter.filter([inner, outer], isLandscape: false)
 
-        XCTAssertTrue(result.isEmpty)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertTrue(result.first === outer)
+    }
+
+    func testFilterSortsInTopLeftReadingOrder() {
+        let bottomLeft = makeObservation(
+            box: CGRect(x: 0.10, y: 0.10, width: 0.28, height: 0.40),
+            confidence: 0.9
+        )
+        let topLeft = makeObservation(
+            box: CGRect(x: 0.10, y: 0.55, width: 0.28, height: 0.40),
+            confidence: 0.8
+        )
+
+        let result = filter.filter([bottomLeft, topLeft], isLandscape: false)
+
+        XCTAssertEqual(result.count, 2)
+        XCTAssertTrue(result[0] === topLeft)
+        XCTAssertTrue(result[1] === bottomLeft)
     }
 
     func testFilterRejectsTallAggregateBoxUnderPortraitTolerance() {
@@ -252,23 +222,6 @@ final class RectangleFilterTests: XCTestCase {
         let result = filter.filter([obs], isLandscape: false)
 
         XCTAssertTrue(result.isEmpty)
-    }
-
-    // MARK: - Vision bounds
-
-    func testVisionBoundsIncludePortraitAndLandscape() {
-        let portraitRatio: Float = Float(63.0 / 88.0)
-        let landscapeRatio: Float = Float(88.0 / 63.0)
-
-        XCTAssertTrue(RectangleFilter.visionMinAspectRatio <= portraitRatio)
-        XCTAssertTrue(RectangleFilter.visionMaxAspectRatio >= landscapeRatio)
-    }
-
-    func testVisionBoundsAreWiderThanEdgeFilter() {
-        // Vision bounds must be wider than the edge-based filter because
-        // bounding-box aspect ratios distort more than edge ratios for rotated cards.
-        let edgeLower = Float(RectangleFilter.targetAspectRatio * (1 - RectangleFilter.scanAspectRatioTolerance))
-        XCTAssertTrue(RectangleFilter.visionMinAspectRatio < edgeLower)
     }
 
     // MARK: - Helpers

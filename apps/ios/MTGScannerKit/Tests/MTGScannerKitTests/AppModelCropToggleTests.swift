@@ -9,6 +9,9 @@ final class AppModelCropToggleTests: XCTestCase {
     private let oldQuickScanDelayKey = "quick_scan_capture_delay"
     private let oldQuickScanConfidenceKey = "quick_scan_confidence_threshold"
     private let maxConcurrentUploadsKey = "max_concurrent_uploads"
+#if DEBUG
+    private let debugSaveRawCapturesKey = "debug_save_raw_captures_to_photo_library"
+#endif
 
     override func setUp() {
         super.setUp()
@@ -18,6 +21,9 @@ final class AppModelCropToggleTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: oldQuickScanDelayKey)
         UserDefaults.standard.removeObject(forKey: oldQuickScanConfidenceKey)
         UserDefaults.standard.removeObject(forKey: maxConcurrentUploadsKey)
+#if DEBUG
+        UserDefaults.standard.removeObject(forKey: debugSaveRawCapturesKey)
+#endif
     }
 
     override func tearDown() {
@@ -27,6 +33,9 @@ final class AppModelCropToggleTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: oldQuickScanDelayKey)
         UserDefaults.standard.removeObject(forKey: oldQuickScanConfidenceKey)
         UserDefaults.standard.removeObject(forKey: maxConcurrentUploadsKey)
+#if DEBUG
+        UserDefaults.standard.removeObject(forKey: debugSaveRawCapturesKey)
+#endif
         super.tearDown()
     }
 
@@ -136,4 +145,30 @@ final class AppModelCropToggleTests: XCTestCase {
         let model = AppModel()
         XCTAssertEqual(model.maxConcurrentUploads, 2)
     }
+
+#if DEBUG
+    // MARK: - Raw capture debug saving
+
+    @MainActor
+    func testDebugSaveRawCapturesDefaultIsFalse() {
+        let model = AppModel()
+        XCTAssertFalse(model.debugSaveRawCapturesToPhotoLibrary)
+    }
+
+    @MainActor
+    func testDebugSaveRawCapturesPersistsToUserDefaults() {
+        let model = AppModel()
+        model.debugSaveRawCapturesToPhotoLibrary = true
+
+        let stored = UserDefaults.standard.object(forKey: debugSaveRawCapturesKey) as? Bool
+        XCTAssertEqual(stored, true)
+    }
+
+    @MainActor
+    func testDebugSaveRawCapturesLoadsPersistedValue() {
+        UserDefaults.standard.set(true, forKey: debugSaveRawCapturesKey)
+        let model = AppModel()
+        XCTAssertTrue(model.debugSaveRawCapturesToPhotoLibrary)
+    }
+#endif
 }

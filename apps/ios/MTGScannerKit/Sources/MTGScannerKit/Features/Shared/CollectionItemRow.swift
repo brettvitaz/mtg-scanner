@@ -127,7 +127,7 @@ private extension CollectionItemRow {
             if let urlString = item.imageUrl, let url = URL(string: urlString) {
                 CachedAsyncImage(url: url) { phase in
                     switch phase {
-                    case .success(let image): image.resizable().aspectRatio(contentMode: .fill)
+                    case .success(let image): image.resizable().scaledToFill()
                     default: thumbnailPlaceholder
                     }
                 }

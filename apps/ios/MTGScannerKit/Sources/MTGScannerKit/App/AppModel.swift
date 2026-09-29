@@ -307,14 +307,24 @@ extension AppModel {
         )
     }
 
-    func fetchMissingPrices(for items: [CollectionItem]) async {
-        for item in items where item.priceRetail == nil && item.priceBuy == nil {
-            let request = PriceFetchRequest(item: item)
-            guard let price = try? await fetchPrice(
+    func refreshPrices(for items: [CollectionItem]) async {
+        for item in items {
+            guard !Task.isCancelled else { return }
+            await refreshPrice(for: item)
+        }
+    }
+
+    func refreshPrice(for item: CollectionItem) async {
+        let request = PriceFetchRequest(item: item)
+        do {
+            let price = try await fetchPrice(
                 name: request.name, scryfallId: request.scryfallId, isFoil: request.isFoil
-            ), request.matches(item), !item.isDeleted else { continue }
-            item.priceRetail = price.priceRetail
-            item.priceBuy = price.priceBuy
+            )
+            guard !Task.isCancelled else { return }
+            item.apply(price: price, matching: request)
+        } catch {
+            guard !Task.isCancelled else { return }
+            print("[Prices] Refresh failed for \(request.name): \(error)")
         }
     }
 }

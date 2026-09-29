@@ -18,7 +18,8 @@ final class AccessibilitySummaryTests: XCTestCase {
 
         XCTAssertEqual(
             CollectionItemRow.accessibilitySummary(for: item),
-            "Lightning Bolt, Magic 2010, collector number 146, foil, quantity 3, sell price 1.25, buy price 0.50"
+            "Lightning Bolt, Magic 2010, collector number 146, foil, quantity 3, "
+                + "retail price 1.25, buylist price 0.50, CK status unknown"
         )
     }
 }

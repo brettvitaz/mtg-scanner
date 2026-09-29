@@ -24,6 +24,7 @@ public final class CollectionItem {
     public var colorIdentity: String?
     public var priceRetail: String?
     public var priceBuy: String?
+    public var qtyBuying: Int?
     public var addedAt: Date
     public var quantity: Int
 
@@ -54,6 +55,7 @@ public final class CollectionItem {
         colorIdentity: String? = nil,
         priceRetail: String? = nil,
         priceBuy: String? = nil,
+        qtyBuying: Int? = nil,
         addedAt: Date = Date(),
         quantity: Int = 1,
         collection: CardCollection? = nil,
@@ -80,6 +82,7 @@ public final class CollectionItem {
         self.colorIdentity = colorIdentity
         self.priceRetail = priceRetail
         self.priceBuy = priceBuy
+        self.qtyBuying = qtyBuying
         self.addedAt = addedAt
         self.quantity = quantity
         self.collection = collection
@@ -147,6 +150,7 @@ public final class CollectionItem {
     func toggleFoilIfNoDuplicate(in siblings: [CollectionItem]) -> Bool {
         guard !hasFoilCollision(in: siblings) else { return false }
         foil.toggle()
+        clearPrices()
         return true
     }
 
@@ -155,6 +159,7 @@ public final class CollectionItem {
     /// foil and non-foil copies of the same card in their inbox.
     func toggleFoilUnconditionally() {
         foil.toggle()
+        clearPrices()
     }
 
     /// Create a copy of this item (for operations that need a standalone duplicate).
@@ -180,6 +185,7 @@ public final class CollectionItem {
             colorIdentity: colorIdentity,
             priceRetail: priceRetail,
             priceBuy: priceBuy,
+            qtyBuying: qtyBuying,
             quantity: quantity
         )
     }

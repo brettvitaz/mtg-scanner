@@ -13,6 +13,14 @@ enum CardSortField: String, CaseIterable, Identifiable {
     case priceRetail = "Sell Price"
     case priceBuy = "Buy Price"
 
+    var displayName: String {
+        switch self {
+        case .priceRetail: return "Retail Price"
+        case .priceBuy: return "Buylist Price"
+        default: return rawValue
+        }
+    }
+
     var id: String { rawValue }
 }
 
@@ -96,6 +104,7 @@ final class CardFilterState {
     var selectedSets: Set<String> = []
     var selectedRarities: Set<RarityFilter> = []
     var foilOnly: Bool = false
+    var ckBuyingOnly = false
     var selectedColors: Set<ColorFilter> = []
     var selectedCardTypes: Set<String> = []
     var priceRetailMin: Double?
@@ -108,7 +117,7 @@ final class CardFilterState {
         !searchText.isEmpty
             || !selectedSets.isEmpty
             || !selectedRarities.isEmpty
-            || foilOnly
+            || foilOnly || ckBuyingOnly
             || !selectedColors.isEmpty
             || !selectedCardTypes.isEmpty
             || priceRetailMin != nil || priceRetailMax != nil
@@ -124,6 +133,7 @@ final class CardFilterState {
         selectedSets = []
         selectedRarities = []
         foilOnly = false
+        ckBuyingOnly = false
         selectedColors = []
         selectedCardTypes = []
         priceRetailMin = nil
@@ -140,14 +150,7 @@ final class CardFilterState {
     private func applyFilters(_ items: [CollectionItem]) -> [CollectionItem] {
         var result = items
 
-        if !searchText.isEmpty {
-            let lowered = searchText.lowercased()
-            result = result.filter { item in
-                item.title.localizedCaseInsensitiveContains(lowered)
-                    || item.edition.localizedCaseInsensitiveContains(lowered)
-                    || (item.setCode?.localizedCaseInsensitiveContains(lowered) ?? false)
-            }
-        }
+        result = applySearch(result)
 
         if !selectedSets.isEmpty {
             result = result.filter { selectedSets.contains($0.edition) }
@@ -159,21 +162,34 @@ final class CardFilterState {
         }
 
         if foilOnly { result = result.filter(\.foil) }
+        if ckBuyingOnly { result = result.filter { ($0.qtyBuying ?? 0) > 0 } }
 
-        if !selectedColors.isEmpty {
-            let colorLetters = selectedColors.map(\.rawValue)
-            result = result.filter { item in
-                guard let identity = item.colorIdentity, !identity.isEmpty else { return false }
-                let cardColors = identity.components(separatedBy: ",")
-                return colorLetters.contains { cardColors.contains($0) }
-            }
-        }
+        result = applyColorFilter(result)
 
         if !selectedCardTypes.isEmpty {
             result = result.filter { selectedCardTypes.contains(primaryCardType(from: $0.typeLine)) }
         }
 
         return applyPriceFilters(result)
+    }
+
+    private func applySearch(_ items: [CollectionItem]) -> [CollectionItem] {
+        guard !searchText.isEmpty else { return items }
+        return items.filter { item in
+            item.title.localizedCaseInsensitiveContains(searchText)
+                || item.edition.localizedCaseInsensitiveContains(searchText)
+                || (item.setCode?.localizedCaseInsensitiveContains(searchText) ?? false)
+        }
+    }
+
+    private func applyColorFilter(_ items: [CollectionItem]) -> [CollectionItem] {
+        guard !selectedColors.isEmpty else { return items }
+        let colorLetters = selectedColors.map(\.rawValue)
+        return items.filter { item in
+            guard let identity = item.colorIdentity, !identity.isEmpty else { return false }
+            let cardColors = identity.components(separatedBy: ",")
+            return colorLetters.contains { cardColors.contains($0) }
+        }
     }
 
     private func applyPriceFilters(_ items: [CollectionItem]) -> [CollectionItem] {

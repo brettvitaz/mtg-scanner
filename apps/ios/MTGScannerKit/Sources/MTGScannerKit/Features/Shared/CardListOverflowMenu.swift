@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CardListOverflowMenu: View {
+    @AppStorage("showCardListTotals") private var showTotals = true
+
     let items: [CollectionItem]
     let name: String
     @Binding var exportFile: ExportActivityItem?
@@ -19,6 +21,7 @@ struct CardListOverflowMenu: View {
                     Label("Import CSV", systemImage: "square.and.arrow.down")
                 }
             }
+            Toggle("Show totals", isOn: $showTotals)
             Divider()
             ExportMenuContent(items: items, name: name, exportFile: $exportFile)
         } label: {

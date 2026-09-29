@@ -88,7 +88,7 @@ struct CollectionDetailView: View {
             }
         }
         .task(id: collection.items.map(\.id)) {
-            await appModel.fetchMissingPrices(for: collection.items)
+            await appModel.refreshPrices(for: collection.items)
         }
     }
 
@@ -181,7 +181,7 @@ private extension CollectionDetailView {
                 SortFilterChipRow(
                     filterState: filterState,
                     showFilterSheet: $showFilterSheet,
-                    displayedQuantity: items.totalQuantity,
+                    displayedItems: items,
                     totalQuantity: collection.items.totalQuantity
                 )
             }
@@ -191,6 +191,11 @@ private extension CollectionDetailView {
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
+                }
+            }
+            .overlay {
+                if displayedItems.isEmpty {
+                    CardListNoMatchesView(filterState: filterState)
                 }
             }
             .listStyle(.plain)
@@ -307,6 +312,7 @@ private extension CollectionDetailView {
 
     func toggleFoil(_ item: CollectionItem) {
         if item.toggleFoilIfNoDuplicate(in: collection.items) {
+            Task { await appModel.refreshPrice(for: item) }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             collection.updatedAt = Date()
         } else {

@@ -105,6 +105,11 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | Route | View | Notes |
 |-------|------|-------|
 | `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
+| `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
+| `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |
+| `pricing-deck` | `CardListPricingFixtureView` | Populated deck with quantities and totals |
+| `pricing-filter` | `CardListPricingFixtureView` | CK buying toggle and Retail/Buylist price filters |
+| `pricing-large` | `CardListPricingFixtureView` | Large monetary totals for layout checks |
 | `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |

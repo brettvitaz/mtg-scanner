@@ -127,12 +127,15 @@ struct CardDetailView: View {
                 Text("Card Kingdom Prices").font(.subheadline.bold())
                 HStack(spacing: 16) {
                     if let retail = price.priceRetail {
-                        PriceLabel(title: "Sell", price: retail, detail: stockText(price.qtyRetail))
+                        PriceLabel(title: "Retail", price: retail, detail: stockText(price.qtyRetail))
                     }
                     if let buy = price.priceBuy {
-                        PriceLabel(title: "Buy", price: buy, detail: buyingText(price.qtyBuying))
+                        PriceLabel(title: "Buylist", price: buy, detail: buyingText(price.qtyBuying))
                     }
                 }
+                Text("Retail is CK’s selling price. Buylist is CK’s offer to buy your card.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -143,8 +146,8 @@ struct CardDetailView: View {
     }
 
     private func buyingText(_ qty: Int?) -> String? {
-        guard let qty else { return nil }
-        return "buying \(qty)"
+        guard let qty, qty >= 0 else { return "CK status unknown" }
+        return qty == 0 ? "CK not buying" : "CK buying \(qty)"
     }
 
     // MARK: - Actions
@@ -225,9 +228,8 @@ extension CardDetailView {
         }
         let request = PriceFetchRequest(item: item)
         await viewModel.loadPrice(using: appModel)
-        guard request.matches(item), !item.isDeleted, let price = viewModel.cardPrice else { return }
-        item.priceRetail = price.priceRetail
-        item.priceBuy = price.priceBuy
+        guard let price = viewModel.cardPrice else { return }
+        item.apply(price: price, matching: request)
     }
 
     func addCardTo(_ destination: MoveDestination) {

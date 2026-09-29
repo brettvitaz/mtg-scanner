@@ -3,15 +3,26 @@ import SwiftUI
 struct SortFilterChipRow: View {
     @Bindable var filterState: CardFilterState
     @Binding var showFilterSheet: Bool
-    var displayedQuantity: Int
+    @AppStorage("showCardListTotals") private var showTotals = true
+    var displayedItems: [CollectionItem]
+
+    private var displayedQuantity: Int { displayedItems.totalQuantity }
     var totalQuantity: Int
 
     var body: some View {
-        HStack(spacing: Spacing.sm) {
-            sortChip
-            filterChip
-            Spacer()
-            countLabel
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.sm) {
+                controls
+                Spacer(minLength: Spacing.sm)
+                trailingSummary
+            }
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                controls
+                HStack {
+                    Spacer(minLength: 0)
+                    trailingSummary
+                }
+            }
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.sm)
@@ -21,10 +32,37 @@ struct SortFilterChipRow: View {
         }
     }
 
+    private var controls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.sm) {
+                sortChip
+                filterChip
+                if showTotals { countLabel }
+            }
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                sortChip
+                HStack(spacing: Spacing.sm) {
+                    filterChip
+                    if showTotals { countLabel }
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var trailingSummary: some View {
+        if showTotals {
+            CardListSummaryView(pricing: CardListPricing(items: displayedItems))
+        } else {
+            countLabel
+        }
+    }
+
     private var sortChip: some View {
         Menu {
             Picker("Sort By", selection: $filterState.sort.field) {
-                ForEach(CardSortField.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(CardSortField.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.inline)
             Divider()
@@ -33,10 +71,11 @@ struct SortFilterChipRow: View {
             }
             .pickerStyle(.inline)
         } label: {
-            chip(label: filterState.sort.field.rawValue + " " + directionArrow)
+            chip(label: filterState.sort.field.displayName + " " + directionArrow)
         }
+        .frame(minHeight: 44)
         .accessibilityLabel("Sort cards")
-        .accessibilityValue("\(filterState.sort.field.rawValue), \(filterState.sort.direction.rawValue)")
+        .accessibilityValue("\(filterState.sort.field.displayName), \(filterState.sort.direction.rawValue)")
     }
 
     private var filterChip: some View {
@@ -46,7 +85,7 @@ struct SortFilterChipRow: View {
                     Circle().fill(Color.dsAccent).frame(width: 6, height: 6)
                 }
                 Text("Filter")
-                    .font(.geist(.body))
+                    .font(.custom(GeistStyle.body.family, size: 13, relativeTo: .body))
                     .foregroundStyle(Color.dsTextPrimary)
             }
             .padding(.vertical, Spacing.xs)
@@ -59,6 +98,7 @@ struct SortFilterChipRow: View {
             )
         }
         .buttonStyle(.plain)
+        .frame(minHeight: 44)
         .accessibilityLabel("Filter cards")
         .accessibilityValue(filterState.isFilterActive ? "Filters active" : "No filters")
     }
@@ -68,7 +108,7 @@ struct SortFilterChipRow: View {
             ? "\(displayedQuantity) of \(totalQuantity)"
             : "\(totalQuantity) cards"
         return Text(text)
-            .font(.geist(.caption))
+            .font(.custom(GeistStyle.caption.family, size: 11, relativeTo: .caption))
             .foregroundStyle(Color.dsTextSecondary)
     }
 
@@ -78,7 +118,7 @@ struct SortFilterChipRow: View {
 
     private func chip(label: String) -> some View {
         Text(label)
-            .font(.geist(.body))
+            .font(.custom(GeistStyle.body.family, size: 13, relativeTo: .body))
             .foregroundStyle(Color.dsTextPrimary)
             .padding(.vertical, Spacing.xs)
             .padding(.horizontal, Spacing.sm)

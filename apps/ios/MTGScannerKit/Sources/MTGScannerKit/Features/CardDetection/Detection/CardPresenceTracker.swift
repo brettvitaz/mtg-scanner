@@ -71,7 +71,7 @@ final class CardPresenceTracker: @unchecked Sendable {
     ///
     /// The `CGRect?` is the highest-confidence bounding box in normalized top-left-origin
     /// image coordinates, or `nil` if position data is unavailable.
-    var onNewCardSignal: ((CGRect?) -> Void)?
+    var onNewCardSignal: (@Sendable (CGRect?, UUID) -> Void)?
 
     /// Called on the main queue with updated detection metrics for debug overlay.
     /// Only called when debug mode is enabled.
@@ -96,14 +96,18 @@ final class CardPresenceTracker: @unchecked Sendable {
     /// Prevents the burst detector from re-triggering on the same card before
     /// the VM has acknowledged the capture.
     private var pendingCapture: Bool = false
+    private var sessionID = UUID()
+    private let detectCards: (@Sendable (CVPixelBuffer) -> [CardBoundingBox])?
 
     // MARK: - Init
 
     init(
         detectorProvider: @escaping () -> YOLOCardDetector? = { nil },
-        burstConfiguration: MotionBurstConfiguration = .balanced
+        burstConfiguration: MotionBurstConfiguration = .balanced,
+        detectCards: (@Sendable (CVPixelBuffer) -> [CardBoundingBox])? = nil
     ) {
         self.detectorProvider = detectorProvider
+        self.detectCards = detectCards
         self.burstConfiguration = burstConfiguration
         self.burstDetector = MotionBurstDetector(configuration: burstConfiguration)
     }
@@ -133,6 +137,19 @@ final class CardPresenceTracker: @unchecked Sendable {
     }
 
     // MARK: - Reference Management
+
+    /// Clears all session state, even when the detection zone is already nil.
+    func resetSession(_ sessionID: UUID) {
+        presenceQueue.async { [weak self] in
+            guard let self else { return }
+            self.sessionID = sessionID
+            self.detectionZone = nil
+            self.referenceSamples = []
+            self.lastSamples = []
+            self.burstDetector.reset()
+            self.pendingCapture = false
+        }
+    }
 
     /// Updates the reference frame to the most recently processed frame.
     ///
@@ -295,13 +312,14 @@ final class CardPresenceTracker: @unchecked Sendable {
         guard let bestBox = detectBestFilteredBox(in: pixelBuffer) else { return }
         pendingCapture = true
         resetDetectionState()
+        let signalSessionID = sessionID
         DispatchQueue.main.async { [weak self] in
-            self?.onNewCardSignal?(bestBox)
+            self?.onNewCardSignal?(bestBox, signalSessionID)
         }
     }
 
     private func detectBestFilteredBox(in pixelBuffer: CVPixelBuffer) -> CGRect? {
-        let boxes = loadDetector()?.detect(in: pixelBuffer) ?? []
+        let boxes = detectCards?(pixelBuffer) ?? loadDetector()?.detect(in: pixelBuffer) ?? []
         #if DEBUG
         print("\(logTimestamp()) [CardPresence] YOLO boxes: \(boxes.count)")
         #endif

@@ -4,7 +4,7 @@ import SwiftUI
 ///
 /// The camera preview and detection overlay (YOLO bounding boxes) are rendered by
 /// the underlying `CameraPreviewRepresentable` in `ScanView`. This view adds the
-/// Auto Scan-specific controls: running counts, status strip, and Start/Stop button.
+/// Auto Scan-specific controls: running counts, status strip, manual capture, and Start/Stop button.
 struct AutoScanView: View {
     @Bindable var viewModel: AutoScanViewModel
     @Bindable var recognitionQueue: RecognitionQueue
@@ -85,11 +85,11 @@ struct AutoScanView: View {
 
     private var bottomBar: some View {
         HStack(alignment: .center) {
-            Color.clear.frame(width: 54, height: 54)
-            Spacer()
             startStopButton
-            Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            CaptureButton(action: viewModel.captureManually, isDisabled: !viewModel.canCaptureManually)
             FlashlightButton(torchLevel: $torchLevel, lastTorchLevel: $lastTorchLevel)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.bottom, 8)
     }
@@ -101,7 +101,8 @@ struct AutoScanView: View {
             Text(viewModel.isActive ? "Stop" : "Start")
                 .font(.title3.bold())
                 .foregroundStyle(.white)
-                .frame(width: 120, height: 54)
+                .frame(minWidth: 64, minHeight: 54)
+                .padding(.horizontal, 8)
                 .background(viewModel.isActive ? Color.red.opacity(0.85) : Color.green.opacity(0.85))
                 .clipShape(Capsule())
         }

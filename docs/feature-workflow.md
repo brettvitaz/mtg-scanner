@@ -17,14 +17,15 @@ Only load more if needed:
 This keeps the token footprint small for local agents with ~65k context windows.
 
 ## Working agreement
-1. **All code changes happen in a worktree** — never commit directly to main/master.
+1. **All repository changes happen in a task-specific worktree** — never edit directly on main/master. Follow setup and verification guidance in `AGENTS.md`.
 2. Work one feature/fix at a time.
-3. **Run baseline verification** (tests/build) before making changes.
+3. **Run applicable baseline verification** before making changes; prose-only changes need diff and reference checks, not runtime builds.
 4. Make the smallest useful change that solves the problem.
 5. Run verification after changes, before claiming success.
 6. **Pass code review checklist** (`.agents/rules/code-review.md`) with explicit pass/fail per criterion.
 7. **Commit after each feature or change** with a meaningful message (what + why).
 8. Keep docs concise; avoid creating instruction sprawl.
+9. Leave the worktree, branch, and review artifacts available for manual review. Remove them only on an explicit cleanup request, following `AGENTS.md`; a merge does not authorize cleanup.
 
 ## Feature thread template
 Each implementation thread should define:
@@ -46,7 +47,8 @@ Context to read:
 
 Setup:
 - Create worktree: git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>
-- Run baseline verification before making changes
+- Run applicable baseline verification before making changes
+- Preserve the worktree and branch for manual review; do not clean up automatically
 
 Requirements:
 - [bullets]
@@ -65,21 +67,25 @@ Report back with:
 - post-implementation verification results
 - code review results (each criterion: pass/fail)
 - commit hash
+- absolute worktree path and branch
+- commands to inspect or run the change for manual review
 ```
 
 ## Definition of done
-A feature/change is done when ALL of these are true:
+Implementation is ready for user review when ALL applicable items are true.
+Readiness does not authorize worktree cleanup:
 - [ ] work was done in a worktree, not on main/master
 - [ ] pre-implementation baseline established (tests/build passed before changes, or failures noted)
 - [ ] code implemented and matches the stated requirements
 - [ ] relevant tests added or updated; tests exercise real code paths
-- [ ] all tests and builds pass after changes
+- [ ] applicable verification passes after changes; skipped checks and unrelated baseline failures are reported
 - [ ] code review checklist completed — each criterion stated with pass/fail
 - [ ] no scope creep — only requested changes included
 - [ ] artifacts/debug outputs still make sense if the change touches recognition
 - [ ] docs updated if behavior/config changed
 - [ ] important findings and decisions recorded in repo docs
 - [ ] commit created with a meaningful message (what + why)
+- [ ] worktree, branch, and review artifacts retained; handoff includes their location and manual review commands
 
 ## Recognition-specific rules
 If work touches detection/recognition:

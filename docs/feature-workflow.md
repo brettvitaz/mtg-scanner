@@ -22,7 +22,7 @@ This keeps the token footprint small for local agents with ~65k context windows.
 3. **Run baseline verification** (tests/build) before making changes.
 4. Make the smallest useful change that solves the problem.
 5. Run verification after changes, before claiming success.
-6. **Pass code review checklist** (`.claude/rules/code-review.md`) with explicit pass/fail per criterion.
+6. **Pass code review checklist** (`.agents/rules/code-review.md`) with explicit pass/fail per criterion.
 7. **Commit after each feature or change** with a meaningful message (what + why).
 8. Keep docs concise; avoid creating instruction sprawl.
 

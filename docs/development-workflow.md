@@ -13,12 +13,11 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 
 ## Local development
 ### Backend
-- Bootstrap: `make api-bootstrap`
+- Python: 3.14 or newer. Local bootstrap and CI use the standard Python 3.14 interpreter.
+- Bootstrap: `make api-bootstrap`; rerun after upgrading to recreate an older `.venv`.
 - Run server: `make api-run`
 - Run tests: `make api-test`
-- Run type checking: `make api-lint`. It targets the supported Python 3.11 minimum.
-  NumPy is constrained below 2.5 because newer stubs use Python 3.12 type-alias syntax.
-  Re-run `make api-bootstrap` after dependency constraints change to refresh the local environment.
+- Run type checking: `make api-lint`. It targets the supported Python 3.14 minimum.
 - Override artifact output with `MTG_SCANNER_ARTIFACTS_DIR=/tmp/mtg-scanner-artifacts` when you want a custom local debug/eval directory.
 
 ### iOS

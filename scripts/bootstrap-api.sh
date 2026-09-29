@@ -7,6 +7,6 @@ if ! command -v uv &>/dev/null; then
 	exit 1
 fi
 
-uv venv --clear .venv
+uv venv --clear --python 3.14 .venv
 uv pip install -e "./services/api[dev]"
 echo "API environment ready. Activate with: source .venv/bin/activate"

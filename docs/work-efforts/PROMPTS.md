@@ -95,13 +95,13 @@ Review a completed work effort against the project's code review standards.
 Files to read:
 - docs/work-efforts/[EFFORT]/request.md (original requirements)
 - docs/work-efforts/[EFFORT]/review.md (implementing agent's self-assessment)
-- .claude/rules/code-review.md (review criteria)
+- .agents/rules/code-review.md (review criteria)
 - The actual code changes (diffs or changed files listed in the plan)
 
 Task:
 1. Read request.md to understand what was asked.
 2. Read review.md to see the implementing agent's self-assessment.
-3. Review each changed file against the 8 criteria in .claude/rules/code-review.md.
+3. Review each changed file against the 8 criteria in .agents/rules/code-review.md.
 4. For each criterion, state whether you agree with the implementing agent's assessment.
 5. Flag any discrepancies — places where review.md claims "pass" but the code suggests otherwise.
 6. Check the Deferred Items section — is each deferral justified?

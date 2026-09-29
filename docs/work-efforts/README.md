@@ -15,7 +15,7 @@ docs/work-efforts/
     review.md
   PROMPTS.md          Copy-pasteable agent prompts for each phase
   ORCHESTRATION.md    Human workflow guide and phase gates
-  CLAUDE.md           Standing agent instructions (portable snippet)
+  AGENTS.md           Standing agent instructions (portable snippet)
   2026-04-01-fix-crop-rotation/
     request.md        Human-authored: what to do and why
     plan.md           Agent-authored: how it will be done
@@ -80,6 +80,6 @@ When reviewing a work effort:
 
 1. Load `request.md` to understand the original requirements.
 2. Load `review.md` to see the implementing agent's self-assessment.
-3. Review the actual code changes (diffs) against the criteria in `.claude/rules/code-review.md`.
+3. Review the actual code changes (diffs) against the criteria in `.agents/rules/code-review.md`.
 4. Flag any discrepancies between what `review.md` claims and what the code actually does.
 5. Verify the **Deferred items** section — anything deferred should be justified, not just forgotten.

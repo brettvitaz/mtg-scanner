@@ -130,9 +130,9 @@ class RequestIdMiddleware:
 After conversion is verified:
 
 **Files to update:**
-- `.claude/rules/python-coding-standards.md` — revert async section to prescribe `async/await`, `httpx.AsyncClient`, `asyncio.Semaphore`
-- `CLAUDE.md` — update Python section to reference async patterns
-- `services/api/CLAUDE.md` — update coding rules to reference async patterns
+- `.agents/rules/python-coding-standards.md` — revert async section to prescribe `async/await`, `httpx.AsyncClient`, `asyncio.Semaphore`
+- `AGENTS.md` — update Python section to reference async patterns
+- `services/api/AGENTS.md` — update coding rules to reference async patterns
 - This file — mark as completed
 
 ## Error handling during conversion

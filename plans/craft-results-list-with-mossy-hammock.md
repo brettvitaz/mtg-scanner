@@ -232,9 +232,9 @@ does not expose that progress).
    still announce via `accessibilitySummary` and that a "Delete" custom action is
    available via the rotor.
 
-## Post-implementation review (mandatory per CLAUDE.md)
+## Post-implementation review (mandatory per AGENTS.md)
 
-Run the code-review gate against every changed file using `.claude/rules/code-review.md`
+Run the code-review gate against every changed file using `.agents/rules/code-review.md`
 and state pass/fail on each criterion. Pay particular attention to:
 - Functions under 30 lines (the new row's gesture + state management is the risk).
 - No force unwraps in the new gesture code.

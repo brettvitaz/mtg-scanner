@@ -5,8 +5,8 @@ struct CardListSummaryView: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            totalRow("Buylist", total: pricing.buylist)
             totalRow("Retail", total: pricing.retail)
+            totalRow("Buylist", total: pricing.buylist)
         }
     }
 

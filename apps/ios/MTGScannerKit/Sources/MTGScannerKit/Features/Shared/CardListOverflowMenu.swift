@@ -21,7 +21,9 @@ struct CardListOverflowMenu: View {
                     Label("Import CSV", systemImage: "square.and.arrow.down")
                 }
             }
-            Toggle("Show totals", isOn: $showTotals)
+            Toggle(isOn: $showTotals) {
+                Label("Show totals", systemImage: "sum")
+            }
             Divider()
             ExportMenuContent(items: items, name: name, exportFile: $exportFile)
         } label: {

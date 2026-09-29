@@ -11,7 +11,7 @@ struct SortFilterChipRow: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: Spacing.sm) {
+            HStack(alignment: .top, spacing: Spacing.sm) {
                 controls
                 Spacer(minLength: Spacing.sm)
                 trailingSummary
@@ -25,7 +25,7 @@ struct SortFilterChipRow: View {
             }
         }
         .padding(.horizontal, Spacing.lg)
-        .padding(.vertical, Spacing.sm)
+        .padding(.top, Spacing.xs)
         .background(Color.dsBackground)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.dsBorder).frame(height: 0.5)
@@ -34,14 +34,14 @@ struct SortFilterChipRow: View {
 
     private var controls: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: Spacing.sm) {
+            HStack(alignment: .top, spacing: Spacing.sm) {
                 sortChip
                 filterChip
                 if showTotals { countLabel }
             }
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 sortChip
-                HStack(spacing: Spacing.sm) {
+                HStack(alignment: .top, spacing: Spacing.sm) {
                     filterChip
                     if showTotals { countLabel }
                 }
@@ -73,7 +73,6 @@ struct SortFilterChipRow: View {
         } label: {
             chip(label: filterState.sort.field.displayName + " " + directionArrow)
         }
-        .frame(minHeight: 44)
         .accessibilityLabel("Sort cards")
         .accessibilityValue("\(filterState.sort.field.displayName), \(filterState.sort.direction.rawValue)")
     }
@@ -96,9 +95,10 @@ struct SortFilterChipRow: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(Color.dsBorder, lineWidth: 1)
             )
+            .frame(minHeight: 44, alignment: .top)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(minHeight: 44)
         .accessibilityLabel("Filter cards")
         .accessibilityValue(filterState.isFilterActive ? "Filters active" : "No filters")
     }
@@ -110,6 +110,7 @@ struct SortFilterChipRow: View {
         return Text(text)
             .font(.custom(GeistStyle.caption.family, size: 11, relativeTo: .caption))
             .foregroundStyle(Color.dsTextSecondary)
+            .padding(.top, Spacing.xs)
     }
 
     private var directionArrow: String {
@@ -128,5 +129,7 @@ struct SortFilterChipRow: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(Color.dsBorder, lineWidth: 1)
             )
+            .frame(minHeight: 44, alignment: .top)
+            .contentShape(Rectangle())
     }
 }

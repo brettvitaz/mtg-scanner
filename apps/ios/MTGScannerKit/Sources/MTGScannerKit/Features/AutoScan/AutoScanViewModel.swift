@@ -58,17 +58,18 @@ final class AutoScanViewModel {
 
     // MARK: - Private
 
+    private(set) var scanSessionID = UUID()
+    private var captureOperationID: UUID?
+    var canCaptureManually: Bool { captureOperationID == nil }
+    private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
+    private var detectBox: (@Sendable (CGImage) async -> CGRect?)?
     private var settleTask: Task<Void, Never>?
     private let cropImage: @Sendable (UIImage, CardCropHint?) async -> CardCropResult
 
     private struct CropResult {
         let image: UIImage?
         let boundingBox: CGRect?
-        let sourceSize: CGSize?
     }
-
-    /// Video dimensions from session preset .hd1920x1080
-    private static let videoSize = CGSize(width: 1920, height: 1080)
 
     // MARK: - Init
 
@@ -91,6 +92,8 @@ final class AutoScanViewModel {
         detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
         recognitionQueue: RecognitionQueue,
         identifiedCardsViewModel: IdentifiedCardsViewModel? = nil,
+        capturePhoto: (@MainActor () async -> RecognitionImagePayload?)? = nil,
+        detectBox: (@Sendable (CGImage) async -> CGRect?)? = nil,
         cropImage: @escaping @Sendable (UIImage, CardCropHint?) async -> CardCropResult = {
             await CardCropService().detectAndCrop(image: $0, hint: $1)
         }
@@ -98,6 +101,8 @@ final class AutoScanViewModel {
         presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
         self.recognitionQueue = recognitionQueue
         self.identifiedCardsViewModel = identifiedCardsViewModel ?? IdentifiedCardsViewModel()
+        self.detectBox = detectBox
+        self.capturePhoto = capturePhoto
         self.cropImage = cropImage
         setupSignalHandler()
         setupRecognitionCallback()
@@ -108,8 +113,10 @@ final class AutoScanViewModel {
     }
 
     private func setupSignalHandler() {
-        presenceTracker.onNewCardSignal = { [weak self] boundingBox in
-            Task { @MainActor [weak self] in self?.handleNewCardSignal(boundingBox: boundingBox) }
+        presenceTracker.onNewCardSignal = { [weak self] boundingBox, sessionID in
+            Task { @MainActor [weak self] in
+                self?.handleNewCardSignal(boundingBox: boundingBox, sessionID: sessionID)
+            }
         }
     }
 
@@ -123,6 +130,8 @@ final class AutoScanViewModel {
     // MARK: - Controls
 
     func start() {
+        guard !isActive else { return }
+        resetSession()
         isActive = true
         captureState = .watching
         statusMessage = "Watching for cards…"
@@ -136,9 +145,26 @@ final class AutoScanViewModel {
         lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
         identifiedCardsViewModel.clearAll()
-        presenceTracker.resetZone()
+        resetSession()
+    }
+
+    private func resetSession() {
+        scanSessionID = UUID()
         detectionZone = nil
         isCalibrated = false
+        presenceTracker.resetSession(scanSessionID)
+    }
+
+    /// Captures immediately, including when automatic scanning is stopped.
+    func captureManually() {
+        guard canCaptureManually else { return }
+        settleTask?.cancel()
+        settleTask = nil
+        let sessionID = scanSessionID
+        let operationID = beginCapture()
+        Task { [weak self] in
+            await self?.performCapture(sessionID: sessionID, operationID: operationID)
+        }
     }
 
     func cancelRecognition() {
@@ -213,14 +239,14 @@ final class AutoScanViewModel {
     /// processing motion while a capture is imminent or in progress, and doing so
     /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, captureState == .watching else { return }
+        guard isActive, captureState == .watching, canCaptureManually else { return }
         presenceTracker.processFrame(sampleBuffer)
     }
 
     // MARK: - State Machine
 
-    private func handleNewCardSignal(boundingBox: CGRect?) {
-        guard isActive, boundingBox != nil else { return }
+    private func handleNewCardSignal(boundingBox: CGRect?, sessionID: UUID) {
+        guard isActive, sessionID == scanSessionID, boundingBox != nil, canCaptureManually else { return }
         switch captureState {
         case .watching:
             startSettleTimer()
@@ -234,48 +260,73 @@ final class AutoScanViewModel {
         captureState = .settling
         statusMessage = "Card detected — settling…"
         settleTask?.cancel()
+        let sessionID = scanSessionID
         settleTask = Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: .seconds(captureDelay))
-            guard !Task.isCancelled else { return }
-            await triggerCapture()
+            guard !Task.isCancelled, isActive, sessionID == scanSessionID, canCaptureManually else { return }
+            let operationID = beginCapture()
+            await performCapture(sessionID: sessionID, operationID: operationID)
         }
     }
 
-    private func triggerCapture() async {
+    private func beginCapture() -> UUID {
+        let operationID = UUID()
+        captureOperationID = operationID
         captureState = .capturing
         statusMessage = "Capturing…"
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        return operationID
+    }
 
-        guard let payload = await captureCoordinator?.capturePhoto() else {
-            presenceTracker.markCaptured()
+    private func performCapture(sessionID: UUID, operationID: UUID) async {
+        defer {
+            if captureOperationID == operationID { captureOperationID = nil }
+        }
+        guard sessionID == scanSessionID else { return }
+        let payload: RecognitionImagePayload?
+        if let capturePhoto {
+            payload = await capturePhoto()
+        } else {
+            payload = await captureCoordinator?.capturePhoto()
+        }
+        guard sessionID == scanSessionID else { return }
+        guard let payload else {
+            if isActive { presenceTracker.markCaptured() }
             captureState = .watching
-            statusMessage = "Capture failed — watching…"
+            statusMessage = isActive ? "Capture failed — watching…" : "Capture failed — tap Capture to retry."
             return
         }
-
-        await processAutoCapturedPayload(payload)
+        await processAutoCapturedPayload(payload, sessionID: sessionID)
     }
 
     func processAutoCapturedPayload(_ payload: RecognitionImagePayload) async {
+        await processAutoCapturedPayload(payload, sessionID: scanSessionID)
+    }
+
+    private func processAutoCapturedPayload(_ payload: RecognitionImagePayload, sessionID: UUID) async {
 #if DEBUG
         await saveRawCaptureIfEnabled(payload)
 #endif
+        guard sessionID == scanSessionID else { return }
         let result = await cropCapturedPayload(payload)
+        guard sessionID == scanSessionID else { return }
         lastCroppedImage = result.image
-        if let box = result.boundingBox, !isCalibrated {
-            let calibratedZone = DetectionZone.calibrated(fromYOLO: box)
-            // Set zone on the tracker directly via presenceQueue so the
-            // reference update from markCaptured runs BEFORE the zone change.
-            presenceTracker.markCapturedAndSetZone(calibratedZone)
-            detectionZone = calibratedZone
-            isCalibrated = true
-        } else {
-            presenceTracker.markCaptured()
-        }
+        if isActive { acknowledgeCapture(boundingBox: result.boundingBox) }
         enqueueAfterCapture(payload: payload, cropped: result.image)
         captureState = .watching
-        statusMessage = "Captured! Watching for next card…"
+        statusMessage = isActive ? "Captured! Watching for next card…" : "Captured! Tap Start to begin auto scan."
+    }
+
+    private func acknowledgeCapture(boundingBox: CGRect?) {
+        guard let box = boundingBox, !isCalibrated else {
+            presenceTracker.markCaptured()
+            return
+        }
+        let calibratedZone = DetectionZone.calibrated(fromYOLO: box)
+        presenceTracker.markCapturedAndSetZone(calibratedZone)
+        detectionZone = calibratedZone
+        isCalibrated = true
     }
 }
 
@@ -284,16 +335,20 @@ private extension AutoScanViewModel {
     private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> CropResult {
         let uprightImage = AutoScanCropHelper.normalizedImage(payload.displayImage)
         guard let cgImage = uprightImage.cgImage else {
-            return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
+            return CropResult(image: nil, boundingBox: nil)
         }
-        let sourceSize = CGSize(width: cgImage.width, height: cgImage.height)
-        guard let box = await presenceTracker.detectBestBox(in: cgImage) else {
-            return CropResult(image: nil, boundingBox: nil, sourceSize: nil)
+        let box = if let detectBox {
+            await detectBox(cgImage)
+        } else {
+            await presenceTracker.detectBestBox(in: cgImage)
+        }
+        guard let box else {
+            return CropResult(image: nil, boundingBox: nil)
         }
         let hint = CardCropHint(yoloBoxTopLeft: box, preferSingleCrop: true)
         let cropResult = await cropImage(uprightImage, hint)
         let cropped = cropResult.crops.first
-        return CropResult(image: cropped, boundingBox: box, sourceSize: sourceSize)
+        return CropResult(image: cropped, boundingBox: box)
     }
 
     func enqueueAfterCapture(payload: RecognitionImagePayload, cropped: UIImage?) {

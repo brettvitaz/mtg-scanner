@@ -50,7 +50,7 @@ final class AutoScanViewModelTests: XCTestCase {
 
         // Simulate a new-card signal by calling the internal signal handler directly
         // via the presenceTracker callback.
-        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7), vm.scanSessionID)
 
         // Give main loop time to process the async dispatch.
         try await Task.sleep(for: .milliseconds(50))
@@ -61,7 +61,7 @@ final class AutoScanViewModelTests: XCTestCase {
         let vm = AutoScanViewModel(detector: nil)
         vm.captureDelay = 60
         vm.start()
-        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7), vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(vm.captureState, .settling)
 
@@ -77,13 +77,13 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.captureDelay = 60
         vm.start()
 
-        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7), vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, .settling)
 
         // Subsequent signals should be ignored — state stays .settling.
-        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
-        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7), vm.scanSessionID)
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7), vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, .settling)
     }
@@ -96,11 +96,11 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.start()
 
         let box = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7)
-        vm.presenceTracker.onNewCardSignal?(box)
+        vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
         // Keep firing signals — they must NOT reset the timer.
         for _ in 0..<5 {
             try await Task.sleep(for: .milliseconds(20))
-            vm.presenceTracker.onNewCardSignal?(box)
+            vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
         }
 
         // Allow the 0.1 s timer to expire (plus a small buffer).
@@ -113,7 +113,7 @@ final class AutoScanViewModelTests: XCTestCase {
 
     func testSignalIgnoredWhenInactive() async throws {
         let vm = AutoScanViewModel(detector: nil)
-        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7))
+        vm.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.7), vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(vm.captureState, .watching)
         XCTAssertFalse(vm.isActive)
@@ -141,7 +141,7 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.start()
 
         let box = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
-        vm.presenceTracker.onNewCardSignal?(box)
+        vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
 
         // Wait for settle + capture attempt.
         try await Task.sleep(for: .milliseconds(300))
@@ -156,7 +156,7 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.captureDelay = 60
         vm.start()
 
-        vm.presenceTracker.onNewCardSignal?(nil)
+        vm.presenceTracker.onNewCardSignal?(nil, vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.watching)
     }
@@ -177,13 +177,13 @@ final class AutoScanViewModelTests: XCTestCase {
         vm.start()
 
         let box = CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)
-        vm.presenceTracker.onNewCardSignal?(box)
+        vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.settling)
 
         // Fire another signal with a different box — must be ignored.
         let otherBox = CGRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1)
-        vm.presenceTracker.onNewCardSignal?(otherBox)
+        vm.presenceTracker.onNewCardSignal?(otherBox, vm.scanSessionID)
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(vm.captureState, AutoScanViewModel.CaptureState.settling)
     }
@@ -279,13 +279,14 @@ final class AutoScanViewModelTests: XCTestCase {
         XCTAssertEqual(queue.pendingCount, 1)
     }
 
-    func testGenericEnqueueDoesNotSaveImportedPhotoPayloads() async {
+    func testGenericEnqueueDoesNotSaveImportedPhotoPayloads() async throws {
         let spy = SpyRawCaptureSaver()
         let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: makeStubQueue())
         vm.rawCaptureSaver = spy
         vm.debugSaveRawCapturesToPhotoLibrary = true
 
-        await vm.enqueueCapturedImage(makeImportedPayload(rawBytes: Data([0xFF, 0xD8, 0x30, 0x31, 0xFF, 0xD9])), cropEnabled: false)
+        let payload = try makeImportedPayload(rawBytes: Data([0xFF, 0xD8, 0x30, 0x31, 0xFF, 0xD9]))
+        await vm.enqueueCapturedImage(payload, cropEnabled: false)
 
         let savedPayloads = await spy.savedPayloads
         XCTAssertTrue(savedPayloads.isEmpty)
@@ -312,12 +313,12 @@ final class AutoScanViewModelTests: XCTestCase {
         RecognitionImagePayload.cameraCapture(image: makeBlankImage(), data: rawBytes)
     }
 
-    private func makeImportedPayload(rawBytes: Data) -> RecognitionImagePayload {
-        RecognitionImagePayload.importedPhoto(
+    private func makeImportedPayload(rawBytes: Data) throws -> RecognitionImagePayload {
+        try XCTUnwrap(RecognitionImagePayload.importedPhoto(
             data: rawBytes,
             image: makeBlankImage(),
             supportedContentTypes: [.jpeg]
-        )!
+        ))
     }
 }
 

@@ -38,6 +38,13 @@ Run the `MTGScanner` scheme in Xcode. The app flow is:
 3. Upload crops to the backend batch endpoint (or full image as fallback)
 4. View results list with card thumbnails; tap a card for full detail view with metadata, edition picker, and purchase links
 
+In Auto Scan, **Start** watches for card arrivals and **Stop** resets detection and calibration.
+After restarting, move or place the next card to trigger automatic capture. Use the shutter
+button to capture a stationary card immediately; it also works while Auto Scan is stopped
+without starting automatic scanning. During the settling delay, the shutter captures immediately.
+Capture is disabled while a photo is being captured or prepared for recognition. If on-device
+cropping finds no card, the original photo is uploaded for recognition.
+
 ## Useful commands
 ```bash
 make bootstrap     # prepare local dependencies

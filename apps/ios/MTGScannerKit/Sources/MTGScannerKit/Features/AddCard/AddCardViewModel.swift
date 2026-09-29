@@ -24,6 +24,8 @@ final class AddCardViewModel {
     // MARK: - Error state
 
     var errorMessage: String?
+    var searchError: String?
+    private(set) var printingTask: Task<Void, Never>?
 
     // MARK: - Private
 
@@ -46,44 +48,51 @@ final class AddCardViewModel {
 
     func updateSearch(using appModel: AppModel) {
         searchTask?.cancel()
+        searchError = nil
+        isSearching = false
         let query = searchText
         guard query.count >= 2 else {
             searchResults = []
             isSearching = false
             return
         }
-        if query == lastSearchedQuery && !searchResults.isEmpty {
-            return
-        }
+        if query == lastSearchedQuery && !searchResults.isEmpty { return }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled, query == searchText else { return }
-            isSearching = true
-            do {
-                let results = try await appModel.searchCardNames(query: query)
-                guard !Task.isCancelled, query == searchText else {
-                    isSearching = false
-                    return
-                }
-                searchResults = results
-                lastSearchedQuery = query
-            } catch {
-                if !Task.isCancelled, query == searchText { searchResults = [] }
-            }
-            isSearching = false
+            await search(query, using: appModel)
         }
     }
 
+    private func search(_ query: String, using appModel: AppModel) async {
+        isSearching = true
+        do {
+            let results = try await appModel.searchCardNames(query: query)
+            guard !Task.isCancelled, query == searchText else { return }
+            searchResults = results
+            lastSearchedQuery = query
+        } catch {
+            guard !Task.isCancelled, query == searchText else { return }
+            searchResults = []
+            searchError = "Could not search cards."
+        }
+        isSearching = false
+    }
+
     func selectName(_ name: String, using appModel: AppModel) {
+        printingTask?.cancel()
         selectedName = name
         printings = []
         printingFilterText = ""
         isLoadingPrintings = true
         errorMessage = nil
-        Task {
+        printingTask = Task {
             do {
-                printings = try await appModel.fetchPrintings(name: name)
+                let results = try await appModel.fetchPrintings(name: name)
+                guard !Task.isCancelled, selectedName == name else { return }
+                printings = results
             } catch {
+                guard !Task.isCancelled, selectedName == name else { return }
                 errorMessage = "Failed to load printings."
             }
             isLoadingPrintings = false

@@ -36,6 +36,8 @@ public struct PreviewGalleryRootView: View {
                 }
 
             #if DEBUG
+            case "card-edit", "card-detail":
+                CardEditFixtureView(route: route)
             case "csv-import", "collection-empty", "deck-empty":
                 CSVImportFixtureView(route: route)
             #endif

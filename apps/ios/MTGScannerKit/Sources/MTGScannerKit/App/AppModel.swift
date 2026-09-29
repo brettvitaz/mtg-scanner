@@ -309,9 +309,10 @@ extension AppModel {
 
     func fetchMissingPrices(for items: [CollectionItem]) async {
         for item in items where item.priceRetail == nil && item.priceBuy == nil {
+            let request = PriceFetchRequest(item: item)
             guard let price = try? await fetchPrice(
-                name: item.title, scryfallId: item.scryfallId, isFoil: item.foil
-            ) else { continue }
+                name: request.name, scryfallId: request.scryfallId, isFoil: request.isFoil
+            ), request.matches(item), !item.isDeleted else { continue }
             item.priceRetail = price.priceRetail
             item.priceBuy = price.priceBuy
         }

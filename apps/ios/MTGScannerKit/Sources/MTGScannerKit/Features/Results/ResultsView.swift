@@ -243,14 +243,14 @@ private extension ResultsView {
 
 private extension ResultsView {
     func refetchPrice(for item: CollectionItem) async {
-        let requestedFoil = item.foil
+        let request = PriceFetchRequest(item: item)
         guard let price = try? await appModel.fetchPrice(
-            name: item.title, scryfallId: item.scryfallId, isFoil: requestedFoil
+            name: request.name, scryfallId: request.scryfallId, isFoil: request.isFoil
         ) else {
             print("[ResultsView] refetchPrice failed for \(item.title)")
             return
         }
-        guard item.foil == requestedFoil else { return }
+        guard request.matches(item), !item.isDeleted else { return }
         item.priceRetail = price.priceRetail
         item.priceBuy = price.priceBuy
     }
@@ -344,7 +344,8 @@ private extension ResultsView {
                 guard
                     let price,
                     let item = items.first(where: { $0.id == id }),
-                    item.foil == fetchRequests.first(where: { $0.id == id })?.isFoil
+                    fetchRequests.first(where: { $0.id == id })?.matches(item) == true,
+                    !item.isDeleted
                 else { continue }
                 item.priceRetail = price.priceRetail
                 item.priceBuy = price.priceBuy

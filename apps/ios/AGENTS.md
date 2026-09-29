@@ -104,6 +104,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 | Route | View | Notes |
 |-------|------|-------|
+| `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
+| `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
 | `csv-import` | `CSVImportFixtureView` | Resolved, ambiguous, and invalid import rows |

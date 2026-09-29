@@ -6,11 +6,9 @@ struct CardDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: CardDetailViewModel
     @State private var showFullscreenImage = false
-    @State private var showEditionPicker = false
+    @State private var showEditor = false
     @State private var showAddToSheet = false
     @State private var addedMessage: String?
-    @State private var isInitialized = false
-    @State private var autoSaveTask: Task<Void, Never>?
 
     init(card: RecognizedCard) {
         _viewModel = State(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
@@ -31,24 +29,26 @@ struct CardDetailView: View {
         .navigationTitle(viewModel.displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { initializeViewModel() }
-        .onChange(of: viewModel.editTitle) { _, _ in autoSave() }
-        .onChange(of: viewModel.editEdition) { _, _ in autoSave() }
-        .onChange(of: viewModel.editCollectorNumber) { _, _ in autoSave() }
-        .onChange(of: viewModel.editFoil) { _, _ in
-            autoSave()
-            guard isInitialized else { return }
-            Task { await viewModel.loadPrice(using: appModel) }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Edit") { showEditor = true }
+            }
         }
-        .onChange(of: viewModel.selectedPrinting) { _, _ in autoSave() }
-        .onChange(of: viewModel.cardPrice) { _, _ in updateCollectionItem() }
         .fullScreenCover(isPresented: $showFullscreenImage) {
             FullscreenImageView(
                 imageUrl: viewModel.showingCropImage ? nil : viewModel.displayImageUrl,
                 uiImage: viewModel.showingCropImage ? appModel.cardCropImages[viewModel.card.id] : nil
             )
         }
-        .sheet(isPresented: $showEditionPicker) {
-            EditionPickerSheet(viewModel: viewModel, appModel: appModel, isPresented: $showEditionPicker)
+        .sheet(isPresented: $showEditor) {
+            EditCardView(
+                draft: CardEditDraft(card: currentCard, printing: viewModel.selectedPrinting),
+                onSave: saveEdit,
+                requiresMerge: { draft in
+                    guard let item = storedItem else { return false }
+                    return !draft.duplicates(for: item).isEmpty
+                }
+            )
         }
         .sheet(isPresented: $showAddToSheet) {
             MoveToSheet(title: "Add To") { destination in
@@ -74,38 +74,28 @@ struct CardDetailView: View {
             if let typeLine = viewModel.displayTypeLine {
                 Text(typeLine).font(.subheadline.italic()).foregroundStyle(.secondary)
             }
-            editionButton
+            editionRow
             if !viewModel.displayCollectorNumber.isEmpty {
                 Text("#\(viewModel.displayCollectorNumber)").font(.subheadline).foregroundStyle(.secondary)
             }
-            Toggle("Foil", isOn: $viewModel.editFoil).font(.subheadline)
+            LabeledContent("Finish", value: viewModel.editFoil ? "Foil" : "Non-foil")
+                .font(.subheadline)
         }
         .accessibilityElement(children: .contain)
     }
 
-    private var editionButton: some View {
-        Button { showEditionPicker = true } label: {
-            HStack(spacing: 24) {
-                HStack(spacing: 6) {
-                    if let symbolUrl = viewModel.displaySetSymbolUrl {
-                        CachedAsyncImage(url: symbolUrl) { phase in
-                            if case .success(let img) = phase { img.resizable().scaledToFit() }
-                        }
-                        .frame(width: 16, height: 16)
-                    }
-                    Text(viewModel.displayEdition).font(.subheadline)
-                    Image(systemName: "chevron.down").font(.caption2)
+    private var editionRow: some View {
+        HStack(spacing: 6) {
+            if let symbolUrl = viewModel.displaySetSymbolUrl {
+                CachedAsyncImage(url: symbolUrl) { phase in
+                    if case .success(let image) = phase { image.resizable().scaledToFit() }
                 }
-                .foregroundStyle(.primary)
-                Spacer()
-                if let rarity = viewModel.displayRarity {
-                    RarityBadge(rarity: rarity)
-                }
+                .frame(width: 16, height: 16)
             }
+            Text(viewModel.displayEdition).font(.subheadline)
+            Spacer()
+            if let rarity = viewModel.displayRarity { RarityBadge(rarity: rarity) }
         }
-        .accessibilityLabel("Edition")
-        .accessibilityValue(viewModel.displayEdition)
-        .accessibilityHint("Choose a different printing.")
     }
 
     // MARK: - Details
@@ -187,65 +177,62 @@ struct CardDetailView: View {
 // MARK: - Actions
 
 extension CardDetailView {
-    func initializeViewModel() {
-        isInitialized = false
-        let correction = appModel.corrections[viewModel.card.id]
-        viewModel.editTitle = correction?.title ?? viewModel.card.title ?? ""
-        viewModel.editEdition = correction?.edition ?? viewModel.card.edition ?? ""
-        viewModel.editCollectorNumber = correction?.collectorNumber ?? viewModel.card.collectorNumber ?? ""
-        viewModel.editFoil = correction?.foil ?? viewModel.card.foil ?? false
-        viewModel.selectedPrinting = correction?.selectedPrintingSnapshot
-        isInitialized = true
-        Task { await viewModel.loadPrintings(using: appModel) }
-        Task { await viewModel.loadPrice(using: appModel) }
-    }
-
-    func autoSave() {
-        guard isInitialized else { return }
-        autoSaveTask?.cancel()
-        autoSaveTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            viewModel.saveCorrection(to: appModel)
-            updateCollectionItem()
-        }
-    }
-
-    func updateCollectionItem() {
-        let targetId = viewModel.card.id
-        var descriptor = FetchDescriptor<CollectionItem>(
-            predicate: #Predicate { $0.id == targetId }
-        )
+    private var storedItem: CollectionItem? {
+        let targetID = viewModel.card.id
+        var descriptor = FetchDescriptor<CollectionItem>(predicate: #Predicate { $0.id == targetID })
         descriptor.fetchLimit = 1
-        guard let item = try? modelContext.fetch(descriptor).first else { return }
-        item.title = viewModel.displayTitle
-        item.edition = viewModel.displayEdition
-        item.setCode = viewModel.displaySetCode.isEmpty ? item.setCode : viewModel.displaySetCode
-        item.collectorNumber = viewModel.displayCollectorNumber.nonEmpty
-        item.foil = viewModel.editFoil
-        item.rarity = viewModel.displayRarity
-        item.typeLine = viewModel.displayTypeLine
-        item.oracleText = viewModel.displayOracleText
-        item.manaCost = viewModel.displayManaCost
-        item.power = viewModel.displayPower
-        item.toughness = viewModel.displayToughness
-        item.loyalty = viewModel.displayLoyalty
-        item.defense = viewModel.displayDefense
-        if let scryfallId = viewModel.selectedPrinting?.scryfallId {
-            item.scryfallId = scryfallId
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private var currentCard: RecognizedCard {
+        storedItem?.toRecognizedCard() ?? viewModel.card
+    }
+
+    func initializeViewModel() {
+        let card = currentCard
+        viewModel.card = card
+        let correction = appModel.corrections[card.id]
+        viewModel.editTitle = card.title ?? ""
+        viewModel.editEdition = card.edition ?? ""
+        viewModel.editCollectorNumber = card.collectorNumber ?? ""
+        viewModel.editFoil = card.foil ?? false
+        viewModel.selectedPrinting = correction?.selectedPrintingSnapshot
+        Task { await refreshPrice() }
+    }
+
+    private func saveEdit(_ draft: CardEditDraft, merge: Bool) -> Bool {
+        guard let item = storedItem else {
+            draft.errorMessage = "This card is no longer available."
+            return false
         }
-        item.imageUrl = viewModel.displayImageUrl?.absoluteString
-        item.setSymbolUrl = viewModel.displaySetSymbolUrl?.absoluteString
-        item.cardKingdomUrl = viewModel.displayCardKingdomUrl?.absoluteString ?? item.cardKingdomUrl
-        if let price = viewModel.cardPrice {
-            item.priceRetail = price.priceRetail
-            item.priceBuy = price.priceBuy
+        guard draft.save(item: item, context: modelContext, merge: merge) else { return false }
+        viewModel.card = item.toRecognizedCard()
+        viewModel.selectedPrinting = draft.printing
+        viewModel.editTitle = item.title
+        viewModel.editEdition = item.edition
+        viewModel.editCollectorNumber = item.collectorNumber ?? ""
+        viewModel.editFoil = item.foil
+        viewModel.cardPrice = nil
+        viewModel.saveCorrection(to: appModel)
+        Task { await refreshPrice() }
+        return true
+    }
+
+    private func refreshPrice() async {
+        guard let item = storedItem else {
+            await viewModel.loadPrice(using: appModel)
+            return
         }
+        let request = PriceFetchRequest(item: item)
+        await viewModel.loadPrice(using: appModel)
+        guard request.matches(item), !item.isDeleted, let price = viewModel.cardPrice else { return }
+        item.priceRetail = price.priceRetail
+        item.priceBuy = price.priceBuy
     }
 
     func addCardTo(_ destination: MoveDestination) {
-        let correction = appModel.corrections[viewModel.card.id]
-        let item = CollectionItem(from: viewModel.card, correction: correction)
+        let item = storedItem?.duplicate() ?? CollectionItem(from: viewModel.card)
+        item.quantity = 1
         switch destination {
         case .collection(let collection):
             mergeOrInsert(item, into: collection.items, context: modelContext) {

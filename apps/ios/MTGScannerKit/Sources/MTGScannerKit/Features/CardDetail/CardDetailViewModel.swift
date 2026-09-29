@@ -9,12 +9,10 @@ extension String {
 @MainActor
 @Observable
 final class CardDetailViewModel {
-    let card: RecognizedCard
+    var card: RecognizedCard
     let cropImage: UIImage?
 
     var showingCropImage = false
-    var printings: [CardPrinting] = []
-    var isLoadingPrintings = false
     var selectedPrinting: CardPrinting?
     var cardPrice: CardPrice?
     var isLoadingPrice = false
@@ -34,69 +32,71 @@ final class CardDetailViewModel {
         self.editFoil = card.foil ?? false
     }
 
+    private var displayPrinting: CardPrinting { selectedPrinting ?? CardPrinting(card: card) }
+
     var displayImageUrl: URL? {
-        guard let urlString = selectedPrinting?.imageUrl ?? card.imageUrl else { return nil }
+        guard let urlString = displayPrinting.imageUrl else { return nil }
         return URL(string: urlString)
     }
 
     var displayTitle: String {
-        editTitle.nonEmpty ?? selectedPrinting?.name ?? card.title ?? "Unknown card"
+        editTitle.nonEmpty ?? displayPrinting.name
     }
 
     var displayEdition: String {
-        editEdition.nonEmpty ?? selectedPrinting?.setName ?? card.edition ?? ""
+        editEdition.nonEmpty ?? displayPrinting.setName ?? displayPrinting.setCode
     }
 
     var displaySetCode: String {
-        selectedPrinting?.setCode ?? card.setCode ?? ""
+        displayPrinting.setCode
     }
 
     var displayCollectorNumber: String {
-        editCollectorNumber.nonEmpty ?? selectedPrinting?.collectorNumber ?? card.collectorNumber ?? ""
+        editCollectorNumber.nonEmpty ?? displayPrinting.collectorNumber ?? ""
     }
 
     var displayRarity: String? {
-        selectedPrinting?.rarity ?? card.rarity
+        displayPrinting.rarity
     }
 
     var displayTypeLine: String? {
-        selectedPrinting?.typeLine ?? card.typeLine
+        displayPrinting.typeLine
     }
 
     var displayOracleText: String? {
-        selectedPrinting?.oracleText ?? card.oracleText
+        displayPrinting.oracleText
     }
 
     var displayManaCost: String? {
-        selectedPrinting?.manaCost ?? card.manaCost
+        displayPrinting.manaCost
     }
 
     var displayPower: String? {
-        selectedPrinting?.power ?? card.power
+        displayPrinting.power
     }
 
     var displayToughness: String? {
-        selectedPrinting?.toughness ?? card.toughness
+        displayPrinting.toughness
     }
 
     var displayLoyalty: String? {
-        selectedPrinting?.loyalty ?? card.loyalty
+        displayPrinting.loyalty
     }
 
     var displayDefense: String? {
-        selectedPrinting?.defense ?? card.defense
+        displayPrinting.defense
     }
 
     var displaySetSymbolUrl: URL? {
-        let urlString = selectedPrinting?.setSymbolUrl ?? card.setSymbolUrl
+        let urlString = displayPrinting.setSymbolUrl
         guard let urlString else { return nil }
         return URL(string: urlString)
     }
 
     var displayCardKingdomUrl: URL? {
         let foil = editFoil
-        let foilUrl = selectedPrinting?.cardKingdomFoilUrl ?? card.cardKingdomFoilUrl
-        let normalUrl = selectedPrinting?.cardKingdomUrl ?? card.cardKingdomUrl
+        let foilUrl = displayPrinting.cardKingdomFoilUrl
+        let normalUrl = displayPrinting.cardKingdomUrl
         let urlString = (foil ? foilUrl : nil) ?? normalUrl
         guard let urlString else { return nil }
         return URL(string: urlString)
@@ -119,40 +119,31 @@ final class CardDetailViewModel {
         return nil
     }
 
-    func loadPrintings(using appModel: AppModel) async {
-        guard let name = card.title, !name.isEmpty else { return }
-        isLoadingPrintings = true
-        do {
-            printings = try await appModel.fetchPrintings(name: name)
-        } catch {
-            printings = []
-        }
-        isLoadingPrintings = false
-    }
-
     func loadPrice(using appModel: AppModel) async {
         let name = displayTitle
         guard !name.isEmpty else { return }
-        let scryfallId = selectedPrinting?.scryfallId ?? card.scryfallId
+        let scryfallId = displayPrinting.scryfallId
+        let requestedFoil = editFoil
+        let requestedPrinting = displayPrinting
         let isRefresh = cardPrice != nil
         if !isRefresh { isLoadingPrice = true }
         do {
-            cardPrice = try await appModel.fetchPrice(
-                name: name, scryfallId: scryfallId, isFoil: editFoil
+            let price = try await appModel.fetchPrice(
+                name: name, scryfallId: scryfallId, isFoil: requestedFoil
             )
+            guard matchesPriceRequest(name: name, printing: requestedPrinting, foil: requestedFoil) else { return }
+            cardPrice = price
         } catch {
+            guard matchesPriceRequest(name: name, printing: requestedPrinting, foil: requestedFoil) else { return }
             print("[CardDetail] Price lookup failed: \(error.localizedDescription)")
             cardPrice = nil
         }
         isLoadingPrice = false
     }
 
-    func selectPrinting(_ printing: CardPrinting, using appModel: AppModel) {
-        selectedPrinting = printing
-        editTitle = printing.name ?? editTitle
-        editEdition = printing.setName ?? ""
-        editCollectorNumber = printing.collectorNumber ?? ""
-        Task { await loadPrice(using: appModel) }
+    private func matchesPriceRequest(name: String, printing: CardPrinting, foil: Bool) -> Bool {
+        displayTitle == name && editFoil == foil
+            && displayPrinting == printing
     }
 
     func saveCorrection(to appModel: AppModel) {

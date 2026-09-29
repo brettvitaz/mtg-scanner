@@ -67,53 +67,6 @@ struct CardImageSection: View {
     }
 }
 
-// MARK: - Edition Picker Sheet
-
-struct EditionPickerSheet: View {
-    @Bindable var viewModel: CardDetailViewModel
-    let appModel: AppModel
-    @Binding var isPresented: Bool
-
-    var body: some View {
-        NavigationStack {
-            pickerContent
-                .navigationTitle("Select Edition")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { isPresented = false }
-                    }
-                }
-        }
-    }
-
-    @ViewBuilder
-    private var pickerContent: some View {
-        if viewModel.isLoadingPrintings {
-            ProgressView("Loading editions...")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if viewModel.printings.isEmpty {
-            Text("No other editions found.")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            printingsList
-        }
-    }
-
-    private var printingsList: some View {
-        List(viewModel.printings) { printing in
-            Button {
-                viewModel.selectPrinting(printing, using: appModel)
-                isPresented = false
-            } label: {
-                PrintingRow(printing: printing)
-            }
-            .foregroundStyle(.primary)
-        }
-    }
-}
-
 // MARK: - Supporting Subviews
 
 struct PrintingRow: View {

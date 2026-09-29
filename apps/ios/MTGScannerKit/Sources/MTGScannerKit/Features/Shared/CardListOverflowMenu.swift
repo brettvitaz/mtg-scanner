@@ -22,7 +22,7 @@ struct CardListOverflowMenu: View {
                 }
             }
             Toggle(isOn: $showTotals) {
-                Label("Show totals", systemImage: "sum")
+                Label("Show price totals", systemImage: "dollarsign.circle")
             }
             Divider()
             ExportMenuContent(items: items, name: name, exportFile: $exportFile)

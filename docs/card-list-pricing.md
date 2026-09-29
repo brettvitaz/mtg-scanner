@@ -6,8 +6,8 @@ listed offer to buy a card; Retail is its selling price. The same terminology is
 used in rows, details, sorting, and price filters.
 
 Retail appears above Buylist, matching the card rows. Sort and Filter align with
-the top of the totals in a compact header, wrapping when screen width or text size
-requires it. **More options → Show totals** hides them and restores the original
+the bottom of the totals in a compact header, wrapping when screen width or text size
+requires it. **More options → Show price totals** hides them and restores the original
 count layout. This preference is shared across the three screens and survives
 relaunch. The summary is hidden while selecting cards.
 

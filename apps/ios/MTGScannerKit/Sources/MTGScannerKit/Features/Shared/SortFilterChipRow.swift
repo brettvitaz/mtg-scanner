@@ -11,17 +11,17 @@ struct SortFilterChipRow: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: Spacing.sm) {
+            HStack(alignment: .bottom, spacing: Spacing.sm) {
                 controls
                 Spacer(minLength: Spacing.sm)
                 trailingSummary
             }
             VStack(alignment: .leading, spacing: Spacing.sm) {
-                controls
                 HStack {
                     Spacer(minLength: 0)
                     trailingSummary
                 }
+                controls
             }
         }
         .padding(.horizontal, Spacing.lg)
@@ -34,14 +34,14 @@ struct SortFilterChipRow: View {
 
     private var controls: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: Spacing.sm) {
+            HStack(alignment: .bottom, spacing: Spacing.sm) {
                 sortChip
                 filterChip
                 if showTotals { countLabel }
             }
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 sortChip
-                HStack(alignment: .top, spacing: Spacing.sm) {
+                HStack(alignment: .bottom, spacing: Spacing.sm) {
                     filterChip
                     if showTotals { countLabel }
                 }
@@ -95,7 +95,7 @@ struct SortFilterChipRow: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(Color.dsBorder, lineWidth: 1)
             )
-            .frame(minHeight: 44, alignment: .top)
+            .frame(minHeight: 44, alignment: .bottom)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -110,7 +110,7 @@ struct SortFilterChipRow: View {
         return Text(text)
             .font(.custom(GeistStyle.caption.family, size: 11, relativeTo: .caption))
             .foregroundStyle(Color.dsTextSecondary)
-            .padding(.top, Spacing.xs)
+            .padding(.bottom, Spacing.xs)
     }
 
     private var directionArrow: String {
@@ -129,7 +129,7 @@ struct SortFilterChipRow: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(Color.dsBorder, lineWidth: 1)
             )
-            .frame(minHeight: 44, alignment: .top)
+            .frame(minHeight: 44, alignment: .bottom)
             .contentShape(Rectangle())
     }
 }

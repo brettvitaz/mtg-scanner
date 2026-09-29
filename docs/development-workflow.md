@@ -16,6 +16,9 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 - Bootstrap: `make api-bootstrap`
 - Run server: `make api-run`
 - Run tests: `make api-test`
+- Run type checking: `make api-lint`. It targets the supported Python 3.11 minimum.
+  NumPy is constrained below 2.5 because newer stubs use Python 3.12 type-alias syntax.
+  Re-run `make api-bootstrap` after dependency constraints change to refresh the local environment.
 - Override artifact output with `MTG_SCANNER_ARTIFACTS_DIR=/tmp/mtg-scanner-artifacts` when you want a custom local debug/eval directory.
 
 ### iOS

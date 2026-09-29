@@ -12,12 +12,12 @@ struct FullscreenImageView: View {
             if let uiImage {
                 Image(uiImage: uiImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
             } else if let imageUrl {
                 CachedAsyncImage(url: imageUrl) { phase in
                     switch phase {
                     case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fit)
+                        image.resizable().scaledToFit()
                     case .failure:
                         imagePlaceholder
                     default:

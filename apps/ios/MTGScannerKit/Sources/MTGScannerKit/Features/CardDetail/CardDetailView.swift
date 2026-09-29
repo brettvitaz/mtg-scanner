@@ -89,7 +89,7 @@ struct CardDetailView: View {
                 HStack(spacing: 6) {
                     if let symbolUrl = viewModel.displaySetSymbolUrl {
                         CachedAsyncImage(url: symbolUrl) { phase in
-                            if case .success(let img) = phase { img.resizable().aspectRatio(contentMode: .fit) }
+                            if case .success(let img) = phase { img.resizable().scaledToFit() }
                         }
                         .frame(width: 16, height: 16)
                     }

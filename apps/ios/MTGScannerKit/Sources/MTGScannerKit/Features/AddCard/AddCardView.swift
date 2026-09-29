@@ -174,7 +174,7 @@ struct AddCardView: View {
                     switch phase {
                     case .success(let image):
                         image.resizable()
-                            .aspectRatio(contentMode: .fit)
+                            .scaledToFit()
                             .frame(maxHeight: 200)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     case .failure:

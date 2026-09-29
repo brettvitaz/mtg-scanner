@@ -39,11 +39,11 @@ struct CardImageSection: View {
     @ViewBuilder
     private var cardImage: some View {
         if viewModel.showingCropImage, let crop = appModel.cardCropImages[viewModel.card.id] {
-            Image(uiImage: crop).resizable().aspectRatio(contentMode: .fit).frame(height: 340)
+            Image(uiImage: crop).resizable().scaledToFit().frame(height: 340)
         } else if let url = viewModel.displayImageUrl {
             CachedAsyncImage(url: url) { phase in
                 switch phase {
-                case .success(let img): img.resizable().aspectRatio(contentMode: .fit).frame(height: 340)
+                case .success(let img): img.resizable().scaledToFit().frame(height: 340)
                 case .failure: CardImagePlaceholder()
                 default: ProgressView().frame(height: 340)
                 }

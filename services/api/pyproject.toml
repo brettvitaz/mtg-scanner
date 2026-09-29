@@ -11,7 +11,8 @@ dependencies = [
   "python-multipart>=0.0.26,<1.0.0",
   "httpx>=0.28.1,<1.0.0",
   "opencv-python-headless>=4.13.0.92,<6.0.0",
-  "numpy>=1.26.0,<3.0.0",
+  # NumPy 2.5 stubs require Python 3.12 syntax; mypy checks our Python 3.11 minimum.
+  "numpy>=1.26.0,<2.5.0",
   "cloudscraper>=1.2.71,<2.0.0"
 ]
 

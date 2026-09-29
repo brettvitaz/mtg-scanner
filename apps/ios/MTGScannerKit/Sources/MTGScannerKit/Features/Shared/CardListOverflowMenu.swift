@@ -5,6 +5,7 @@ struct CardListOverflowMenu: View {
     let name: String
     @Binding var exportFile: ExportActivityItem?
     let onSelect: () -> Void
+    var onImport: (() -> Void)?
 
     var body: some View {
         Menu {
@@ -12,6 +13,11 @@ struct CardListOverflowMenu: View {
                 onSelect()
             } label: {
                 Label("Select", systemImage: "checkmark.circle")
+            }
+            if let onImport {
+                Button(action: onImport) {
+                    Label("Import CSV", systemImage: "square.and.arrow.down")
+                }
             }
             Divider()
             ExportMenuContent(items: items, name: name, exportFile: $exportFile)

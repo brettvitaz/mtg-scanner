@@ -106,6 +106,9 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 |-------|------|-------|
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
+| `csv-import` | `CSVImportFixtureView` | Resolved, ambiguous, and invalid import rows |
+| `collection-empty` | `CSVImportFixtureView` | Empty collection with CSV import entry point |
+| `deck-empty` | `CSVImportFixtureView` | Empty deck with CSV import entry point |
 
 ### Adding a new route
 

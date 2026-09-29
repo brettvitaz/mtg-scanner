@@ -101,7 +101,7 @@ struct DeckDetailView: View {
             }
         }
         .task(id: deck.items.map(\.id)) {
-            await appModel.fetchMissingPrices(for: deck.items)
+            await appModel.refreshPrices(for: deck.items)
         }
     }
 
@@ -182,7 +182,7 @@ private extension DeckDetailView {
                 SortFilterChipRow(
                     filterState: filterState,
                     showFilterSheet: $showFilterSheet,
-                    displayedQuantity: items.totalQuantity,
+                    displayedItems: items,
                     totalQuantity: deck.items.totalQuantity
                 )
             }
@@ -192,6 +192,11 @@ private extension DeckDetailView {
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
+                }
+            }
+            .overlay {
+                if displayedItems.isEmpty {
+                    CardListNoMatchesView(filterState: filterState)
                 }
             }
             .listStyle(.plain)
@@ -345,6 +350,7 @@ extension DeckDetailView {
 
     func toggleFoil(_ item: CollectionItem) {
         if item.toggleFoilIfNoDuplicate(in: deck.items) {
+            Task { await appModel.refreshPrice(for: item) }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             deck.updatedAt = Date()
         } else {

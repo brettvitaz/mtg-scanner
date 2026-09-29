@@ -17,6 +17,7 @@ struct CollectionItemRow: View {
     var openRowID: Binding<UUID?> = .constant(nil)
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State var swipeOffset: CGFloat = 0
     @State var rowWidth: CGFloat = 390
     @State var gestureBaseOffset: CGFloat = 0
@@ -90,15 +91,30 @@ private extension CollectionItemRow {
         Button {
             if swipeOffset != 0 { closeSwipe() } else { onNavigate?() }
         } label: {
+            navigationContent.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    var navigationContent: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack(spacing: Spacing.md) {
+                    cardThumbnail
+                    cardDetails
+                    Spacer(minLength: 0)
+                }
+                priceColumn.frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        } else {
             HStack(spacing: Spacing.md) {
                 cardThumbnail
                 cardDetails
                 Spacer(minLength: Spacing.sm)
                 priceColumn
             }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     var rowBackground: some View {
@@ -158,7 +174,7 @@ private extension CollectionItemRow {
             Text(item.title)
                 .font(.geist(.cardName))
                 .foregroundStyle(Color.dsTextPrimary)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                 .truncationMode(.tail)
             if item.foil {
                 Image(systemName: "sparkles")
@@ -222,19 +238,25 @@ private extension CollectionItemRow {
 
     var priceColumn: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            priceRow(label: "sell", value: item.priceRetail)
-            priceRow(label: "buy", value: item.priceBuy)
+            priceRow(label: "Retail", value: item.priceRetail)
+            priceRow(label: "Buylist", value: item.priceBuy)
+            if let status = item.buyingStatusLabel {
+                Text(status)
+                    .font(.custom(GeistStyle.caption.family, size: 11, relativeTo: .caption))
+                    .foregroundStyle(Color.dsTextSecondary)
+            }
         }
     }
 
     func priceRow(label: String, value: String?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(label).font(.geistMono(.metaMono)).foregroundStyle(Color.dsTextSecondary)
+            Text(label).fixedSize().font(.geistMono(.metaMono)).foregroundStyle(Color.dsTextSecondary)
             Text(value ?? "—")
                 .font(.geistMono(.priceMono))
                 .foregroundStyle(value != nil ? Color.dsTextPrimary : Color.dsTextSecondary)
                 .monospacedDigit()
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -249,8 +271,9 @@ extension CollectionItemRow {
         if let cn = item.collectorNumber { parts.append("collector number \(cn)") }
         if item.foil { parts.append("foil") }
         if item.quantity > 1 { parts.append("quantity \(item.quantity)") }
-        if let p = item.priceRetail { parts.append("sell price \(p)") }
-        if let p = item.priceBuy { parts.append("buy price \(p)") }
+        if let p = item.priceRetail { parts.append("retail price \(p)") }
+        if let p = item.priceBuy { parts.append("buylist price \(p)") }
+        parts.append(item.buyingAccessibilitySummary)
         return parts.joined(separator: ", ")
     }
 }

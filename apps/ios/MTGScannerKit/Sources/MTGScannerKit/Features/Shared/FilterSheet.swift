@@ -28,6 +28,7 @@ struct FilterSheet: View {
                 foilSection
                 colorSection
                 typeSection
+                buyingSection
                 if hasPrices {
                     priceSection
                 }
@@ -127,12 +128,22 @@ struct FilterSheet: View {
         }
     }
 
+    private var buyingSection: some View {
+        Section {
+            Toggle("Show cards CK is buying", isOn: $filterState.ckBuyingOnly)
+        } header: {
+            Text("Card Kingdom")
+        } footer: {
+            Text("Shows cards with a confirmed buying quantity above zero. Unknown availability is excluded.")
+        }
+    }
+
     private var priceSection: some View {
         Section("Price") {
-            priceRangeRow(label: "Min Sell", value: $filterState.priceRetailMin)
-            priceRangeRow(label: "Max Sell", value: $filterState.priceRetailMax)
-            priceRangeRow(label: "Min Buy", value: $filterState.priceBuyMin)
-            priceRangeRow(label: "Max Buy", value: $filterState.priceBuyMax)
+            priceRangeRow(label: "Min Retail", value: $filterState.priceRetailMin)
+            priceRangeRow(label: "Max Retail", value: $filterState.priceRetailMax)
+            priceRangeRow(label: "Min Buylist", value: $filterState.priceBuyMin)
+            priceRangeRow(label: "Max Buylist", value: $filterState.priceBuyMax)
         }
     }
 

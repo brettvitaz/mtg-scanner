@@ -77,8 +77,7 @@ extension CollectionItem {
         colorIdentity = printing.colorIdentity
         applyRules(from: printing)
         if !request.matches(self) {
-            priceRetail = nil
-            priceBuy = nil
+            clearPrices()
         }
     }
 

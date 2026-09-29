@@ -85,7 +85,7 @@ public struct ResultsView: View {
             FilterSheet(filterState: filterState, items: inboxItems)
         }
         .task(id: inboxItems.map(\.id)) {
-            await appModel.fetchMissingPrices(for: inboxItems)
+            await appModel.refreshPrices(for: inboxItems)
         }
     }
 
@@ -121,7 +121,7 @@ public struct ResultsView: View {
                 SortFilterChipRow(
                     filterState: filterState,
                     showFilterSheet: $showFilterSheet,
-                    displayedQuantity: displayedItems.totalQuantity,
+                    displayedItems: displayedItems,
                     totalQuantity: inboxItems.totalQuantity
                 )
             }
@@ -131,6 +131,11 @@ public struct ResultsView: View {
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
+                }
+            }
+            .overlay {
+                if displayedItems.isEmpty {
+                    CardListNoMatchesView(filterState: filterState)
                 }
             }
             .listStyle(.plain)
@@ -242,19 +247,6 @@ private extension ResultsView {
 // MARK: - Actions
 
 private extension ResultsView {
-    func refetchPrice(for item: CollectionItem) async {
-        let request = PriceFetchRequest(item: item)
-        guard let price = try? await appModel.fetchPrice(
-            name: request.name, scryfallId: request.scryfallId, isFoil: request.isFoil
-        ) else {
-            print("[ResultsView] refetchPrice failed for \(item.title)")
-            return
-        }
-        guard request.matches(item), !item.isDeleted else { return }
-        item.priceRetail = price.priceRetail
-        item.priceBuy = price.priceBuy
-    }
-
     func enterSelecting() {
         showSearch = false
         filterState.searchText = ""
@@ -328,7 +320,7 @@ private extension ResultsView {
     func toggleFoil(_ item: CollectionItem) {
         item.toggleFoilUnconditionally()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        Task { await refetchPrice(for: item) }
+        Task { await appModel.refreshPrice(for: item) }
     }
 
     func toggleSelectedFoil() {
@@ -344,11 +336,9 @@ private extension ResultsView {
                 guard
                     let price,
                     let item = items.first(where: { $0.id == id }),
-                    fetchRequests.first(where: { $0.id == id })?.matches(item) == true,
-                    !item.isDeleted
+                    let request = fetchRequests.first(where: { $0.id == id })
                 else { continue }
-                item.priceRetail = price.priceRetail
-                item.priceBuy = price.priceBuy
+                item.apply(price: price, matching: request)
             }
         }
     }

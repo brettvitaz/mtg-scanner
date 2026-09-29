@@ -35,6 +35,8 @@ app/
 
 ## Coding rules
 
+- Python 3.14+; local bootstrap and CI use the standard Python 3.14 interpreter.
+
 - All new models must be Pydantic `BaseModel` subclasses.
 - Settings must go through `settings.py` — no raw `os.environ` reads in service code.
 - New exceptions inherit from `RecognitionConfigurationError` or `RecognitionProviderError`.

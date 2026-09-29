@@ -137,7 +137,7 @@ PYTHONPATH=services/api python evals/run_eval.py
 
 ### Python (services/api)
 
-- Python 3.11+. Use `str | None` union syntax, not `Optional[str]`.
+- Python 3.14+. Use `str | None` union syntax, not `Optional[str]`.
 - Pydantic models for all request/response shapes.
 - `pydantic_settings.BaseSettings` for configuration with `.env` file support.
 - Recognition routes are sync `def`; LLM providers use sync `httpx.Client`. Do not use `async def` with sync HTTP calls — it blocks the event loop. See `.agents/rules/python-coding-standards.md` for details.

@@ -21,6 +21,9 @@ Monorepo for an iPhone-first Magic: The Gathering card scanning system.
 
 ## Quick start
 ### API
+The API requires Python 3.14 or newer. Bootstrap selects the standard Python 3.14
+interpreter and recreates the local virtual environment. After upgrading, rerun:
+
 ```bash
 make api-bootstrap
 make api-import-ck-prices

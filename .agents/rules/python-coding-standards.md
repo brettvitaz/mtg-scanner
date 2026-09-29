@@ -1,7 +1,7 @@
 # Python Coding Standards
 
 ## Language level
-- Python 3.11+. Use modern union syntax: `str | None`, not `Optional[str]`.
+- Python 3.14+. Use modern union syntax: `str | None`, not `Optional[str]`.
 - Use `list[T]`, `dict[K, V]` lowercase generics, not `List`, `Dict` from typing.
 
 ## Models and config

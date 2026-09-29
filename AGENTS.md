@@ -49,50 +49,65 @@ not automatically applied glob rules. Paths below are relative to the repo root.
 ## Mandatory agent workflows
 
 ### Worktree requirement
-All code changes MUST be made in a git worktree, never directly on main/master. Before writing any code:
 
-0. Make sure the main project branch is up to date before starting. If it is not, notify the user for resolution.
-1. Create a worktree with a descriptive name: `git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>`
-2. The name must be a short description of the work (e.g., `add-binder-detection`, `fix-crop-rotation`). No generic names like `feature-1` or `dev`.
-3. Bootstrap the worktree environment (see "Worktree setup reference" below).
-4. Do all work in the worktree.
-5. Clean up when done: `git worktree remove ../mtg-scanner-worktrees/<task-description>`
+All repository changes, including documentation and instructions, MUST be made
+in a task-specific git worktree, never directly on main/master.
 
-If you are already in a worktree, proceed. If you are on main/master, create a worktree first. No exceptions.
+1. Fetch the remote and verify the main project branch is up to date before starting. If it is behind or diverged, notify the user for resolution. If freshness cannot be verified, report that limitation.
+2. Create a worktree with a short, descriptive name: `git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>` (e.g., `add-binder-detection`, `fix-crop-rotation`).
+3. If already in a worktree for this task, proceed there. Do not reuse another task's worktree or modify its work.
+4. Set up only the dependencies needed for the task and do all work in the worktree.
+5. Leave the worktree, branch, local configuration, and review artifacts available for the user's manual review after completing implementation and verification.
 
-After creating a worktree:
+### Worktree setup
 
-1. Copy configuration files to the worktree: `cp services/api/.env <worktree-directory>/services/api/.env`
-2. Bootstrap the api in the worktree: `make api-bootstrap && make api-import-ck-prices && make api-update-mtgjson`
-3. Verify the worktree environment works: `make api-test && make api-lint`
+- Documentation/instruction-only changes require no API bootstrap, data downloads, or app build.
+- For backend work, run `make api-bootstrap`. Copy `services/api/.env` from the original checkout only when local configuration is needed and the file exists; never print or commit its contents. Tests use mocks and fixtures without API keys.
+- Run `make api-import-ck-prices` or `make api-update-mtgjson` only when the task or manual validation needs those datasets. Do not download them for every worktree.
+- For iOS-only work, set up the iOS build environment; bootstrap the backend only if integration validation needs it.
 
-### Pre-implementation baseline
+### Manual review handoff and cleanup
 
-Before making any code changes, run the relevant test/build commands to establish a passing baseline:
+Implementation and verification complete means **ready for user review**.
+Agent self-review, passing tests, a commit, a PR, or a merge does not authorize
+worktree cleanup.
 
-- Backend: `make api-test && make api-lint`
-- iOS: `make ios-build` (or `xcodebuild -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`)
-- Static analysis: `make lint` (runs mypy + SwiftLint)
+- In the final handoff, include the absolute worktree path, branch, commit hash (or uncommitted status), verification results and limitations, and the commands needed to inspect or run the changed behavior.
+- Do not remove the worktree, delete its branch, or discard review artifacts unless the user explicitly requests cleanup of that worktree. Approval to merge alone is not approval to clean up.
+- When cleanup is explicitly requested, check for uncommitted/untracked work and locally unique commits first. Preserve them or report them for resolution; never force removal to bypass those checks.
+- After safe, authorized cleanup, report what was removed. Delete the branch only if branch deletion was also requested.
 
-If the baseline is already failing, note the failures before proceeding so you do not introduce confusion about what you broke vs. what was already broken.
+### Pre-implementation baseline and verification
+
+Run the checks relevant to the changed subsystem before implementation and again
+afterward. Setup verification counts as the baseline; do not repeat identical
+checks without a change or failure that warrants it.
+
+- Backend: `make api-test` and `make api-lint`.
+- iOS: `make ios-build`, `make ios-lint`, and relevant tests via `make ios-test`.
+- Cross-stack changes: run both sets (`make lint` covers both lint commands).
+- Documentation/instruction-only changes: review the diff, check referenced paths/commands, and run `git diff --check`; no runtime tests or builds are required unless executable behavior changes.
+
+Record existing baseline failures before proceeding. Fix failures introduced by
+the task, and report unrelated failures without expanding scope. Do not claim a
+check passed if it failed or was not run.
 
 ### Code review gate
 
-All code changes MUST pass a code review before the work is considered done. After implementation, review every changed file against `.agents/rules/code-review.md`. Explicitly state each criterion with pass/fail:
+Review every changed file before committing or handing off work. Use
+`.agents/rules/code-review.md` as the canonical checklist rather than maintaining
+a duplicate here. Explicitly report pass/fail for each applicable criterion;
+mark inapplicable criteria N/A with a reason (e.g., runtime tests for prose-only
+changes). Fix failures introduced by the change before committing.
 
-1. **Complexity** — functions < 30 lines, nesting ≤ 3 levels, no unnecessary abstractions.
-2. **Correctness** — implementation matches the spec, edge cases handled.
-3. **Tests** — new/changed code has tests that exercise real code paths and would fail if the implementation were broken.
-4. **Best practices** — no force unwraps (Swift), no unhandled exceptions (Python), no scope creep, no dead code.
-5. **Static analysis** — `make lint` passes. For Python-only changes run `make api-lint`; for Swift-only changes run `make ios-lint`. Lint fixes must be structural, not cosmetic. Fix the underlying design issue the rule is detecting, not just the surface violation. Never suppress or work around a lint rule without explicit approval.
-
-Fix any failures before committing.
+Lint fixes must address the underlying design issue. Do not suppress or bypass a
+lint rule without explicit approval.
 
 ### Commit discipline
 
 - One logical change per commit. Do not bundle unrelated changes.
 - Commit messages must state what changed and why, not just "fix" or "update."
-- Run verification (tests/build) before committing. Do not commit code that fails its own tests.
+- Run the applicable verification above before committing. Do not commit code that fails its own tests.
 
 ### Scope guard
 
@@ -178,19 +193,6 @@ PYTHONPATH=services/api python evals/run_eval.py
 - Test edge cases: empty input, boundary values, nil/optional paths.
 - A test must fail if the implementation is broken. Ask: "If I deleted the implementation body, would this test fail?"
 - Do not write tests that test language features rather than your logic.
-
-## Code review checklist
-
-When reviewing changes (your own or others'):
-
-1. **Correctness** — Does it do what the spec says? Edge cases handled?
-2. **Simplicity** — Is there a simpler way? Functions < 30 lines? Nesting ≤ 3 levels?
-3. **No scope creep** — Only implements what was requested? No "while I'm here" changes?
-4. **Tests exist and are meaningful** — Cover the change? Would fail if implementation broke?
-5. **No force unwraps** (Swift) or unhandled exceptions (Python) in production code.
-6. **Thread safety** — Shared mutable state properly synchronized? Camera/Vision on correct queue?
-7. **API contract preserved** — Response schema unchanged unless explicitly requested?
-8. **Artifacts/logging** — Recognition changes still produce useful debug artifacts?
 
 ## Contract-first changes
 

@@ -11,9 +11,19 @@ struct AddCardView: View {
 
     let confirmTitle: String
     let onAdd: (CollectionItem) -> Void
+    private var isPicking: Bool { onPick != nil }
+    let initialName: String?
+    let initialFoil: Bool
+    let onPick: ((CardPrinting, Bool) -> Void)?
 
-    init(confirmTitle: String = "Add to Collection", onAdd: @escaping (CollectionItem) -> Void) {
+    init(
+        confirmTitle: String = "Add to Collection", initialName: String? = nil, initialFoil: Bool = false,
+        onPick: ((CardPrinting, Bool) -> Void)? = nil,
+        onAdd: @escaping (CollectionItem) -> Void) {
         self.confirmTitle = confirmTitle
+        self.initialName = initialName
+        self.initialFoil = initialFoil
+        self.onPick = onPick
         self.onAdd = onAdd
     }
 
@@ -32,6 +42,12 @@ struct AddCardView: View {
                     }
                 }
         }
+        .task {
+            viewModel.isFoil = initialFoil
+            guard let initialName else { return }
+            viewModel.selectName(initialName, using: appModel)
+            navigationPath = [.printings]
+        }
     }
 
     // MARK: - Stage 1: Name Search
@@ -41,6 +57,12 @@ struct AddCardView: View {
             if viewModel.isSearching {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = viewModel.searchError {
+                ContentUnavailableView {
+                    Label(error, systemImage: "wifi.exclamationmark")
+                } actions: {
+                    Button("Retry") { viewModel.updateSearch(using: appModel) }
+                }
             } else if viewModel.searchResults.isEmpty && viewModel.searchText.count >= 2 {
                 Text("No cards found.")
                     .foregroundStyle(.secondary)
@@ -60,7 +82,7 @@ struct AddCardView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Add Card")
+        .navigationTitle(isPicking ? "Change Card" : "Add Card")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -83,9 +105,13 @@ struct AddCardView: View {
             } else if viewModel.filteredPrintings.isEmpty {
                 let message = viewModel.errorMessage
                     ?? (viewModel.printings.isEmpty ? "No printings found." : "No printings match the filter.")
-                Text(message)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView {
+                    Label(message, systemImage: "rectangle.stack")
+                } actions: {
+                    if viewModel.errorMessage != nil, let name = viewModel.selectedName {
+                        Button("Retry") { viewModel.selectName(name, using: appModel) }
+                    }
+                }
             } else {
                 List(viewModel.filteredPrintings) { printing in
                     Button {
@@ -112,31 +138,41 @@ struct AddCardView: View {
     private func confirmView(printing: CardPrinting) -> some View {
         @Bindable var vm = viewModel
         List {
-            Section { cardImageRow(printing: printing) }
+            Section { CardPrintingImage(printing: printing) }
             cardIdentitySection(printing: printing)
             Section("Options") {
-                Stepper("Quantity: \(viewModel.quantity)", value: $vm.quantity, in: 1...99)
+                if !isPicking {
+                    Stepper("Quantity: \(viewModel.quantity)", value: $vm.quantity, in: 1...99)
+                }
                 foilToggle(for: printing, isFoil: $vm.isFoil)
             }
         }
         .navigationTitle(confirmTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Add") {
-                    let item = viewModel.buildCollectionItem(from: printing)
-                    onAdd(item)
-                    dismiss()
+        .toolbar { confirmationToolbar(printing: printing) }
+        .onAppear { normalizeFinish(for: printing) }
+    }
+
+    @ToolbarContentBuilder
+    private func confirmationToolbar(printing: CardPrinting) -> some ToolbarContent {
+        ToolbarItem(placement: .confirmationAction) {
+            Button(isPicking ? "Use Card" : "Add") {
+                if let onPick {
+                    onPick(printing, viewModel.isFoil)
+                } else {
+                    onAdd(viewModel.buildCollectionItem(from: printing))
                 }
-                .fontWeight(.semibold)
+                dismiss()
             }
+            .fontWeight(.semibold)
         }
-        .onAppear {
-            if printing.isFoilOnly {
-                viewModel.isFoil = true
-            } else if printing.isNonFoilOnly {
-                viewModel.isFoil = false
-            }
+    }
+
+    private func normalizeFinish(for printing: CardPrinting) {
+        if printing.isFoilOnly {
+            viewModel.isFoil = true
+        } else if printing.isNonFoilOnly {
+            viewModel.isFoil = false
         }
     }
 
@@ -165,39 +201,6 @@ struct AddCardView: View {
         }
     }
 
-    @ViewBuilder
-    private func cardImageRow(printing: CardPrinting) -> some View {
-        if let urlString = printing.imageUrl, let url = URL(string: urlString) {
-            HStack {
-                Spacer()
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    case .failure:
-                        cardImagePlaceholder
-                    case .empty:
-                        ProgressView()
-                            .frame(height: 200)
-                    @unknown default:
-                        cardImagePlaceholder
-                    }
-                }
-                Spacer()
-            }
-            .listRowBackground(Color.clear)
-        }
-    }
-
-    private var cardImagePlaceholder: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(Color.secondary.opacity(0.15))
-            .frame(height: 200)
-            .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
-    }
 }
 
 // MARK: - Navigation Route

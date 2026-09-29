@@ -140,3 +140,7 @@ The backend selects its recognition provider from environment variables.
 - Latest results are written to `evals/results/latest.json`
 
 See [services/api/.env.example](services/api/.env.example) for a concrete backend setup.
+
+### Correcting card identities
+
+Open a card from Results, a collection, or a deck, then tap **Edit**. Use **Change Card** to search by name or **Change Printing** to select another edition. Choose the finish and tap **Save**. **Cancel** or dismissing the sheet discards the draft. Quantity stays unchanged. If the printing and finish already exist in the same collection or deck, confirm **Merge** to combine quantities, or cancel to keep editing. Results allows separate duplicate rows.

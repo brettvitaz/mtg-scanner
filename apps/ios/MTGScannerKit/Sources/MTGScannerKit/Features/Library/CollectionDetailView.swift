@@ -17,6 +17,7 @@ struct CollectionDetailView: View {
     @State private var contextCopyItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
+    @State private var showCSVImport = false
     @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
     @State private var showSearch = false
@@ -75,6 +76,9 @@ struct CollectionDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: collection.items)
         }
+        .sheet(isPresented: $showCSVImport) {
+            CSVImportView(destination: .collection(collection))
+        }
         .sheet(isPresented: $showAddCard) {
             AddCardView { item in
                 mergeOrInsert(item, into: collection.items, context: modelContext) {
@@ -122,7 +126,8 @@ struct CollectionDetailView: View {
                     items: collection.items,
                     name: collection.name,
                     exportFile: $exportFile,
-                    onSelect: enterSelecting
+                    onSelect: enterSelecting,
+                    onImport: { showCSVImport = true }
                 )
             }
         }
@@ -237,6 +242,8 @@ private extension CollectionDetailView {
                 .multilineTextAlignment(.center)
             Button("Add Card") { showAddCard = true }
                 .buttonStyle(.borderedProminent)
+            Button("Import CSV") { showCSVImport = true }
+                .buttonStyle(.bordered)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

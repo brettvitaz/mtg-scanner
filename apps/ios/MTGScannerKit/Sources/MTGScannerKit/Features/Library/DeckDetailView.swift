@@ -19,6 +19,7 @@ struct DeckDetailView: View {
     @State private var contextMoveItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
+    @State private var showCSVImport = false
     @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
     @State private var showSearch = false
@@ -88,6 +89,9 @@ struct DeckDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: deck.items)
         }
+        .sheet(isPresented: $showCSVImport) {
+            CSVImportView(destination: .deck(deck))
+        }
         .sheet(isPresented: $showAddCard) {
             AddCardView(confirmTitle: "Add to Deck") { item in
                 mergeOrInsert(item, into: deck.items, context: modelContext) {
@@ -135,7 +139,8 @@ struct DeckDetailView: View {
                     items: deck.items,
                     name: deck.name,
                     exportFile: $exportFile,
-                    onSelect: enterSelecting
+                    onSelect: enterSelecting,
+                    onImport: { showCSVImport = true }
                 )
             }
         }
@@ -159,6 +164,8 @@ private extension DeckDetailView {
                 .multilineTextAlignment(.center)
             Button("Add Card") { showAddCard = true }
                 .buttonStyle(.borderedProminent)
+            Button("Import CSV") { showCSVImport = true }
+                .buttonStyle(.bordered)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

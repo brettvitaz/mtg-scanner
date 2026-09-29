@@ -35,6 +35,11 @@ public struct PreviewGalleryRootView: View {
                     .ignoresSafeArea()
                 }
 
+            #if DEBUG
+            case "csv-import", "collection-empty", "deck-empty":
+                CSVImportFixtureView(route: route)
+            #endif
+
             case "results":
                 ResultsFixtureView()
                     .environment(appModel)

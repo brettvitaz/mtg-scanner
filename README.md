@@ -165,3 +165,12 @@ See [services/api/.env.example](services/api/.env.example) for a concrete backen
 ### Correcting card identities
 
 Open a card from Results, a collection, or a deck, then tap **Edit**. Use **Change Card** to search by name or **Change Printing** to select another edition. Choose the finish and tap **Save**. **Cancel** or dismissing the sheet discards the draft. Quantity stays unchanged. If the printing and finish already exist in the same collection or deck, confirm **Merge** to combine quantities, or cancel to keep editing. Results allows separate duplicate rows.
+
+### Importing CSV files
+
+CSV imports automatically match printings using supplied set codes, collector numbers,
+and Scryfall IDs. A matching set code takes precedence over the edition label, so
+vendor names such as “Masterpiece Series: Mythic Edition” and “Mystery Booster/The List”
+do not require manual selection. Without a set code, the edition must match the
+database's set name or code. Conflicting identifiers and unsupported finishes still
+require review.

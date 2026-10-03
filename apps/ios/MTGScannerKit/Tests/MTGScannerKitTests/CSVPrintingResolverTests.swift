@@ -53,9 +53,29 @@ final class CSVPrintingResolverTests: XCTestCase {
         ))
     }
 
-    func testConflictingSetOrEditionRequiresReview() throws {
+    func testMatchingSetCodeAcceptsDifferentEditionName() throws {
         let record = CSVImportRecord(
-            title: "Lightning Bolt", edition: "Wrong Edition", setCode: "M10", collectorNumber: nil,
+            title: "Lightning Bolt", edition: "Vendor Edition Name", setCode: "m10", collectorNumber: "146",
+            scryfallId: "bolt-146", quantity: 1, foil: false
+        )
+        let printing = try CSVImportTestFixtures.printing()
+        XCTAssertEqual(resolver.resolve(record, among: [printing]), printing)
+    }
+
+    func testEditionMustMatchWhenSetCodeIsAbsent() throws {
+        let printing = try CSVImportTestFixtures.printing()
+        for edition in ["Magic 2010", "m10", "Wrong Edition"] {
+            let record = CSVImportRecord(
+                title: "Lightning Bolt", edition: edition, setCode: nil, collectorNumber: "146",
+                scryfallId: "bolt-146", quantity: 1, foil: false
+            )
+            XCTAssertEqual(resolver.resolve(record, among: [printing]), edition == "Wrong Edition" ? nil : printing)
+        }
+    }
+
+    func testConflictingSetRequiresReview() throws {
+        let record = CSVImportRecord(
+            title: "Lightning Bolt", edition: "Magic 2010", setCode: "M11", collectorNumber: nil,
             scryfallId: "bolt-146", quantity: 1, foil: false
         )
         XCTAssertNil(resolver.resolve(record, among: [try CSVImportTestFixtures.printing()]))

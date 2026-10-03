@@ -3,6 +3,31 @@ import XCTest
 
 final class CSVImportViewModelTests: XCTestCase {
     @MainActor
+    func testCardKingdomEditionAliasesResolveWithoutManualSelection() async throws {
+        let csv = """
+        quantity,title,edition,set_code,collector_number,foil,scryfall_id
+        1,"Ajani, Mentor of Heroes",Masterpiece Series: Mythic Edition,MED,RA5,true,596f6812-2cee-4f0b-b1e5-ddf1f57c3f95
+        1,Alhammarret's Archive,Mystery Booster/The List,PLST,ORI-221,false,810c91b8-6b2f-469f-8fd1-568885178c9b
+        """
+        let data = Data("""
+        {"printings":[
+          {"name":"Ajani, Mentor of Heroes","set_code":"MED","set_name":"Mythic Edition",
+           "collector_number":"RA5","scryfall_id":"596f6812-2cee-4f0b-b1e5-ddf1f57c3f95","finishes":"foil"},
+          {"name":"Alhammarret's Archive","set_code":"PLST","set_name":"The List",
+           "collector_number":"ORI-221","scryfall_id":"810c91b8-6b2f-469f-8fd1-568885178c9b","finishes":"nonfoil"}
+        ]}
+        """.utf8)
+        let printings = try JSONDecoder().decode(CardPrintingsResponse.self, from: data).printings
+        let model = CSVImportViewModel()
+        model.rows = try CSVImportService().parse(data: Data(csv.utf8))
+        await model.resolve { title in printings.filter { $0.name == title } }
+        XCTAssertEqual(model.rows.map { $0.printing?.scryfallId }, printings.map(\.scryfallId))
+        XCTAssertTrue(model.rows.allSatisfy { $0.issue == nil })
+        XCTAssertTrue(model.canImport)
+        XCTAssertEqual(model.totalQuantity, 2)
+    }
+
+    @MainActor
     func testResolutionCachesTitlesAndEnablesImport() async throws {
         let model = CSVImportViewModel()
         model.rows = try [CSVImportTestFixtures.row(), CSVImportTestFixtures.row(id: 3, quantity: 3)]

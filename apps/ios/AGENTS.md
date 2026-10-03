@@ -113,7 +113,11 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
-| `csv-import` | `CSVImportFixtureView` | Resolved, ambiguous, and invalid import rows |
+| `csv-import` | `CSVImportFixtureView` | Matched, ambiguous, and invalid rows; problems-first review |
+| `csv-import-undo` | `CSVImportFixtureView` | Bulk skip feedback with Undo |
+| `csv-import-ready` / `csv-import-skipped` | `CSVImportFixtureView` | All-ready and all-skipped reviews |
+| `csv-import-loading` / `csv-import-error` / `csv-import-empty` | `CSVImportFixtureView` | Progress, file error, and file selection |
+| `csv-import-large` / `csv-import-detail` | `CSVImportFixtureView` | Large matched list and unresolved row details |
 | `collection-empty` | `CSVImportFixtureView` | Empty collection with CSV import entry point |
 | `deck-empty` | `CSVImportFixtureView` | Empty deck with CSV import entry point |
 

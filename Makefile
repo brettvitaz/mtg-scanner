@@ -73,7 +73,8 @@ ios-lint:
 	./scripts/lint-ios.sh
 
 IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-empty card-detail card-edit \
-	pricing-results pricing-collection pricing-deck pricing-large pricing-filter
+	pricing-results pricing-collection pricing-deck pricing-large pricing-filter \
+	csv-import-undo csv-import-ready csv-import-skipped csv-import-loading csv-import-error csv-import-empty csv-import-large csv-import-detail
 
 ios-snapshot: ios-build
 	ROUTE=$${ROUTE:-settings} ./scripts/ios-screenshot.sh "$${ROUTE:-settings}"

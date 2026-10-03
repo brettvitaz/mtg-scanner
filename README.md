@@ -179,5 +179,18 @@ CSV import has no retry action. If card information cannot be loaded, check the
 server connection in Settings, then reopen the import. Ambiguous matches require
 choosing a printing or skipping the row.
 
-The import review numbers displayed rows from 1, excluding the CSV header and
-blank records. Skipping a row keeps its position in the review list.
+The review shows rows needing attention first. The summary counts matched card
+copies; **Cards to Import** opens the full list of included rows, and **Skipped**
+opens excluded rows. Tap any row to inspect
+the imported values, choose or change its printing, or skip/include it.
+**Skip All Unmatched** skips every row needing attention, including invalid rows,
+while keeping matched cards included. Use **Undo** to restore the most recent
+skipped batch, or restore individual rows from **Skipped**. Destination and file
+details share the review header. Included cards appear in one full list without
+a separate preview. At accessibility text
+sizes, the import action scrolls with the content.
+Row details use the original CSV row number, including the header and blank records.
+
+The **Import N Cards** button becomes available after every included row
+has a matching printing. Skipped rows are not imported. Imports add quantities to
+existing cards; importing the same file again adds those quantities again.

@@ -178,3 +178,6 @@ require review.
 CSV import has no retry action. If card information cannot be loaded, check the
 server connection in Settings, then reopen the import. Ambiguous matches require
 choosing a printing or skipping the row.
+
+The import review numbers displayed rows from 1, excluding the CSV header and
+blank records. Skipping a row keeps its position in the review list.

@@ -78,13 +78,15 @@ struct CSVImportView: View {
             }
             Text("Resolve or skip every row before importing. Re-importing this file adds its quantities again.")
                 .font(.subheadline).foregroundStyle(.primary)
-            ForEach(viewModel.rows) { row in reviewRow(row) }
+            ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
+                reviewRow(row, number: index + 1)
+            }
         }
     }
 
-    private func reviewRow(_ row: CSVImportRow) -> some View {
+    private func reviewRow(_ row: CSVImportRow, number: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Row \(row.id): \(row.title.isEmpty ? "Missing title" : row.title)").font(.headline)
+            Text("Row \(number): \(row.title.isEmpty ? "Missing title" : row.title)").font(.headline)
             if let record = row.record {
                 Text("\(record.quantity) × \(record.edition) · \(record.foil ? "Foil" : "Nonfoil")")
                     .font(.subheadline)

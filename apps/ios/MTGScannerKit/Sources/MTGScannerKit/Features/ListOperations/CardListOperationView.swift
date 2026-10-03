@@ -19,7 +19,7 @@ struct CardListOperationView: View {
                     CardListOperationReview(viewModel: viewModel)
                 }
             }
-            .navigationTitle("Add or Subtract Cards")
+            .navigationTitle("Apply a List")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

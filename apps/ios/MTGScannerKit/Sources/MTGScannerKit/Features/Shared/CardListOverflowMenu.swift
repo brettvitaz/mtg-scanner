@@ -24,7 +24,7 @@ struct CardListOverflowMenu: View {
             }
             if let onListOperation {
                 Button(action: onListOperation) {
-                    Label("Add or Subtract Cards", systemImage: "plus.forwardslash.minus")
+                    Label("Apply a List", systemImage: "plus.forwardslash.minus")
                 }
             }
             Toggle(isOn: $showTotals) {

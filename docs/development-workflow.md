@@ -27,7 +27,7 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 
 ### Collection and deck quantity operations
 
-Open a collection or deck, then choose **Add or Subtract Cards** from More options
+Open a collection or deck, then choose **Apply a List** from More options
 (or the empty-state button). That list is the preselected **target**, which receives
 the changes. Choose or change the target first, then choose a **tool** list supplying
 cards and quantities. Every collection/deck pairing is supported.

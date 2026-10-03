@@ -263,7 +263,7 @@ private extension CollectionDetailView {
                 .multilineTextAlignment(.center)
             Button("Add Card") { showAddCard = true }
                 .buttonStyle(.borderedProminent)
-            Button("Add or Subtract Cards") { showListOperation = true }
+            Button("Apply a List") { showListOperation = true }
                 .buttonStyle(.bordered)
             Button("Import CSV") { showCSVImport = true }
                 .buttonStyle(.bordered)

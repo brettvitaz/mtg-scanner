@@ -40,6 +40,9 @@ public struct PreviewGalleryRootView: View {
                 CardEditFixtureView(route: route)
             case "pricing-results", "pricing-collection", "pricing-deck", "pricing-large", "pricing-filter":
                 CardListPricingFixtureView(route: route)
+            case "list-operation", "list-subtract", "list-add-delete", "list-operation-complete",
+                 "csv-subtract", "list-deleted-collection", "list-deleted-deck":
+                CardListOperationFixtureView(route: route)
             case "csv-import", "collection-empty", "deck-empty":
                 CSVImportFixtureView(route: route)
             #endif

@@ -12,14 +12,14 @@ final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unche
 
     let generation: Int
     private let maxPhotoDimensions: CMVideoDimensions
-    private var completion: (@Sendable (RecognitionImagePayload?) -> Void)?
+    private var completion: (@Sendable (CameraCaptureResult) -> Void)?
     private let sessionQueue: DispatchQueue
     private let onDone: @Sendable (PhotoCaptureHandler) -> Void
 
     init(
         generation: Int,
         maxPhotoDimensions: CMVideoDimensions,
-        completion: @escaping @Sendable (RecognitionImagePayload?) -> Void,
+        completion: @escaping @Sendable (CameraCaptureResult) -> Void,
         sessionQueue: DispatchQueue,
         onDone: @escaping @Sendable (PhotoCaptureHandler) -> Void
     ) {
@@ -43,11 +43,16 @@ final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unche
         output.capturePhoto(with: settings, delegate: self)
     }
 
-    /// Called by `stop()` (on sessionQueue) to resolve the pending continuation with nil.
+    /// Called by `stop()` (on sessionQueue) to resolve the pending continuation with an unavailable failure.
     func cancel() {
+        fail(.unavailable)
+    }
+
+    func fail(_ failure: CameraCaptureFailure) {
         let pending = completion
         completion = nil
-        DispatchQueue.main.async { pending?(nil) }
+        onDone(self)
+        DispatchQueue.main.async { pending?(.failure(failure)) }
     }
 
     func photoOutput(
@@ -71,7 +76,7 @@ final class PhotoCaptureHandler: NSObject, AVCapturePhotoCaptureDelegate, @unche
             self.completion = nil
             self.onDone(self)
             guard let pending else { return }
-            DispatchQueue.main.async { pending(payload) }
+            DispatchQueue.main.async { pending(payload.map { .success($0) } ?? .failure(.unavailable)) }
         }
     }
 }

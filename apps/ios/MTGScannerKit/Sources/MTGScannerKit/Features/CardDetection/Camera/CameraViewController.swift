@@ -27,6 +27,8 @@ final class CameraViewController: UIViewController {
     /// Set to `nil` when not in Auto Scan mode to avoid unnecessary overhead.
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
 
+    var camera: AutoScanCamera = .standard
+
     // MARK: - Private
 
     private let sessionManager = CameraSessionManager()
@@ -34,6 +36,7 @@ final class CameraViewController: UIViewController {
     private var renderer: DetectionOverlayRenderer?
     private var isVisible = false
     private var desiredTorchLevel: Float = 0
+    private var desiredExposureBias: Float = 0
 
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
@@ -48,7 +51,7 @@ final class CameraViewController: UIViewController {
         setupDetectionLayer()
         setupPinchGesture()
         wireComponents()
-        sessionManager.configure()
+        sessionManager.configure(camera: camera)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -56,6 +59,7 @@ final class CameraViewController: UIViewController {
         isVisible = true
         sessionManager.start()
         applyTorchLevel(desiredTorchLevel)
+        sessionManager.setExposureBias(desiredExposureBias)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -103,8 +107,19 @@ final class CameraViewController: UIViewController {
         }
     }
 
-    func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
-        sessionManager.capturePhoto(completion: completion)
+    func captureFocusedPhoto(
+        focusPoint: CGPoint?, completion: @escaping @Sendable (CameraCaptureResult) -> Void
+    ) {
+        sessionManager.captureFocusedPhoto(focusPoint: focusPoint, completion: completion)
+    }
+
+    func focus(on point: CGPoint) {
+        sessionManager.focus(on: point)
+    }
+
+    func shutDown() {
+        onAutoScanFrame = nil
+        sessionManager.shutDown()
     }
 
     // MARK: - Torch
@@ -124,6 +139,8 @@ final class CameraViewController: UIViewController {
 
     /// Sets the exposure bias (EV offset). Positive = brighter, negative = darker.
     func setExposureBias(_ bias: Float) {
+        desiredExposureBias = bias
+        guard isVisible else { return }
         sessionManager.setExposureBias(bias)
     }
 

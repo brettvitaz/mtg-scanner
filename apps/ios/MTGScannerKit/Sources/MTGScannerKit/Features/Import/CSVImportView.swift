@@ -3,17 +3,18 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct CSVImportView: View {
-    let destination: CSVImportDestination
+    let destination: CardListReference
     @Environment(AppModel.self) private var appModel
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = CSVImportViewModel()
     @State private var showFilePicker = false
     @State private var selectedRow: CSVImportRow?
     @State private var importTask: Task<Void, Never>?
-    @State private var importedQuantity: Int?
+    @State private var operation: CardListOperation = .add
+    @State private var operationViewModel: CardListOperationViewModel?
+    @State private var showReview = false
 
-    init(destination: CSVImportDestination, viewModel: CSVImportViewModel = CSVImportViewModel()) {
+    init(destination: CardListReference, viewModel: CSVImportViewModel = CSVImportViewModel()) {
         self.destination = destination
         _viewModel = State(initialValue: viewModel)
     }
@@ -30,7 +31,7 @@ struct CSVImportView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Import") { save() }.disabled(!viewModel.canImport)
+                    Button("Review") { prepareReview() }.disabled(!viewModel.canImport)
                 }
             }
             .fileImporter(isPresented: $showFilePicker, allowedContentTypes: [.commaSeparatedText]) { result in
@@ -44,12 +45,10 @@ struct CSVImportView: View {
                     CSVPrintingPicker(record: record) { viewModel.choose($0, for: row.id) }
                 }
             }
-            .alert("Import Complete", isPresented: Binding(
-                get: { importedQuantity != nil }, set: { if !$0 { dismiss() } }
-            )) {
-                Button("Done") { dismiss() }
-            } message: {
-                Text("Added \(importedQuantity ?? 0) cards to \(destination.name).")
+            .navigationDestination(isPresented: $showReview) {
+                if let operationViewModel {
+                    CSVOperationReviewScreen(viewModel: operationViewModel) { dismiss() }
+                }
             }
             .onDisappear { importTask?.cancel() }
         }
@@ -57,8 +56,14 @@ struct CSVImportView: View {
 
     private var fileSection: some View {
         Section {
-            LabeledContent("Destination") { Text(destination.name).foregroundStyle(.primary) }
-            Text("Choose a CSV exported by this app. Matching cards gain quantity; existing cards are kept.")
+            LabeledContent("Target") { Text(destination.name).foregroundStyle(.primary) }
+            Picker("Operation", selection: $operation) {
+                ForEach(CardListOperation.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            Text(operation == .add
+                 ? "Matching cards gain quantity; existing cards are kept."
+                 : "Remove available copies of exact printings and finishes. Review shortfalls before applying.")
                 .foregroundStyle(.primary)
             Button(viewModel.filename.isEmpty ? "Choose CSV File" : "Choose Another File") { showFilePicker = true }
                 .disabled(viewModel.isLoading)
@@ -76,7 +81,7 @@ struct CSVImportView: View {
             } else {
                 Text("Quantity is too large. Reduce quantities in the file or skip rows.")
             }
-            Text("Resolve or skip every row before importing. Re-importing this file adds its quantities again.")
+            Text("Resolve or skip every row before reviewing. Repeating this import applies its quantities again.")
                 .font(.subheadline).foregroundStyle(.primary)
             ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
                 reviewRow(row, number: index + 1)
@@ -119,13 +124,15 @@ struct CSVImportView: View {
         importTask = Task { await viewModel.load(url: url, fetch: appModel.fetchPrintings) }
     }
 
-    private func save() {
+    private func prepareReview() {
         do {
-            importedQuantity = try CSVImportPersistence().save(
-                rows: viewModel.rows, to: destination, context: modelContext, commit: modelContext.save
+            operationViewModel = CardListOperationViewModel(
+                target: destination, csvItems: try CSVImportPersistence().preparedItems(viewModel.rows),
+                csvName: viewModel.filename.isEmpty ? "CSV" : viewModel.filename, operation: operation
             )
+            showReview = true
         } catch {
-            viewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+            viewModel.errorMessage = error.localizedDescription
         }
     }
 }

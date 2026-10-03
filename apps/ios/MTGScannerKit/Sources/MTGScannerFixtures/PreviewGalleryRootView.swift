@@ -18,49 +18,55 @@ public struct PreviewGalleryRootView: View {
     }
 
     public var body: some View {
-        ZStack {
-            switch route {
-            case "settings":
-                NavigationStack {
-                    SettingsView()
+        ZStack { routedContent }
+    }
+
+    @ViewBuilder
+    private var routedContent: some View {
+        switch route {
+        case "settings":
+            NavigationStack {
+                SettingsView()
+            }
+            .environment(appModel)
+
+        case "scan":
+            ZStack {
+                FixtureCameraPreviewRepresentable { cards in
+                    // Detection count visible in console logs; overlay rendered inside the VC.
+                    _ = cards
                 }
+                .ignoresSafeArea()
+            }
+
+        #if DEBUG
+        case "card-edit", "card-detail":
+            CardEditFixtureView(route: route)
+        case "pricing-results", "pricing-collection", "pricing-deck",
+             "pricing-large", "pricing-filter", "copy-move":
+            CardListPricingFixtureView(route: route)
+        case "list-operation", "list-subtract", "list-add-delete", "list-operation-complete",
+             "csv-subtract", "list-deleted-collection", "list-deleted-deck":
+            CardListOperationFixtureView(route: route)
+        case "csv-import", "collection-empty", "deck-empty":
+            CSVImportFixtureView(route: route)
+        #endif
+
+        case "results":
+            ResultsFixtureView()
                 .environment(appModel)
 
-            case "scan":
-                ZStack {
-                    FixtureCameraPreviewRepresentable { cards in
-                        // Detection count visible in console logs; overlay rendered inside the VC.
-                        _ = cards
-                    }
-                    .ignoresSafeArea()
-                }
-
-            #if DEBUG
-            case "card-edit", "card-detail":
-                CardEditFixtureView(route: route)
-            case "pricing-results", "pricing-collection", "pricing-deck",
-                 "pricing-large", "pricing-filter", "copy-move":
-                CardListPricingFixtureView(route: route)
-            case "csv-import", "collection-empty", "deck-empty":
-                CSVImportFixtureView(route: route)
-            #endif
-
-            case "results":
-                ResultsFixtureView()
-                    .environment(appModel)
-
-            default:
-                VStack(spacing: 12) {
-                    Image(systemName: "questionmark.circle")
-                        .font(.largeTitle)
-                    Text("Unknown route: \(route)")
-                        .font(.headline)
-                    Text("Add a case for \"\(route)\" in PreviewGalleryRootView.swift")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
+        default:
+            VStack(spacing: 12) {
+                Image(systemName: "questionmark.circle")
+                    .font(.largeTitle)
+                Text("Unknown route: \(route)")
+                    .font(.headline)
+                Text("Add a case for \"\(route)\" in PreviewGalleryRootView.swift")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
         }
     }

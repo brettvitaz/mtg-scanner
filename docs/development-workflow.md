@@ -25,6 +25,36 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 - Keep UI state and network logic simple and obvious.
 - Avoid introducing package managers or generated project complexity until the app shape stabilizes.
 
+### Collection and deck quantity operations
+
+Open a collection or deck, then choose **Apply a List** from More options
+(or the empty-state button). That list is the preselected **target**, which receives
+the changes. Choose or change the target first, then choose a **tool** list supplying
+cards and quantities. Every collection/deck pairing is supported.
+
+Choose **Add** or **Subtract**, then **Keep** or **Delete** the tool list on the review
+screen. Add sums quantities; Subtract removes only available copies of matching
+printings and finishes. Review shortfalls before applying. Keep leaves the tool
+unchanged. Delete removes the entire tool, including unmatched cards, in the same
+save as the target changes. The target remains even when emptied.
+
+CSV import offers the same Add/Subtract choice, with Add selected initially. Resolve
+or skip rows, then choose **Review** to inspect the quantity changes. The file serves
+as the tool; no temporary list is created and there is no tool-deletion option.
+The supported CSV format is unchanged.
+
+After saving, **Undo** restores the complete operation, including a deleted tool,
+until you leave the completion screen. Undo refuses to overwrite subsequent edits
+to an affected list’s identities, quantities, or name. Automatic price refreshes do
+not block Undo; existing rows keep their latest prices. If the open detail list is
+deleted as the tool, closing the action returns to Library. Repeating an action or
+CSV import applies its quantities again;
+operations are not automatically deduplicated. Printing and foil must match; ambiguous
+legacy identities must be corrected before applying.
+
+Simulator fixtures: `make ios-snapshot ROUTE=list-subtract`, `ROUTE=list-operation`,
+`ROUTE=list-add-delete`, `ROUTE=list-operation-complete`, and `ROUTE=csv-subtract`.
+
 ## Contract-first changes
 - Update versioned schemas under `packages/schemas/v1/`.
 - Add or update matching examples under `packages/schemas/examples/v1/`.

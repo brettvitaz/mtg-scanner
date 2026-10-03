@@ -115,6 +115,13 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
 | `csv-import` | `CSVImportFixtureView` | Resolved, ambiguous, and invalid import rows |
+| `list-operation` | `CardListOperationFixtureView` | Target-first list selection |
+| `list-subtract` | `CardListOperationFixtureView` | Sale subtraction with quantity shortfalls |
+| `list-add-delete` | `CardListOperationFixtureView` | Add quantities and delete tool preview |
+| `list-operation-complete` | `CardListOperationFixtureView` | Saved operation with Undo |
+| `csv-subtract` | `CardListOperationFixtureView` | CSV subtraction review |
+| `list-deleted-collection` | `CardListOperationFixtureView` | Open collection safely handles tool deletion |
+| `list-deleted-deck` | `CardListOperationFixtureView` | Open deck safely handles tool deletion |
 | `collection-empty` | `CSVImportFixtureView` | Empty collection with CSV import entry point |
 | `deck-empty` | `CSVImportFixtureView` | Empty deck with CSV import entry point |
 

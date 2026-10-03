@@ -8,12 +8,25 @@ final class CSVImportViewModel {
     var errorMessage: String?
     var filename = ""
     var processedRows = 0
+    private var skippedBatch: Set<Int> = []
     private var cache: [String: [CardPrinting]] = [:]
 
-    var skippedCount: Int { rows.filter(\.isSkipped).count }
-    var totalQuantity: Int? {
+    var readyRows: [CSVImportRow] {
+        rows.filter { !$0.isSkipped && $0.record != nil && $0.printing != nil }
+    }
+    var attentionRows: [CSVImportRow] {
+        rows.filter { !$0.isSkipped && ($0.record == nil || $0.printing == nil) }
+    }
+    var skippedRows: [CSVImportRow] { rows.filter(\.isSkipped) }
+    var bulkSkippedCount: Int { skippedBatch.count }
+    var canUndoSkipAll: Bool { !isLoading && !skippedBatch.isEmpty }
+    var skippedCount: Int { skippedRows.count }
+    var readyQuantity: Int? { quantity(in: readyRows) }
+    var totalQuantity: Int? { quantity(in: rows.filter { !$0.isSkipped }) }
+
+    private func quantity(in rows: [CSVImportRow]) -> Int? {
         var total = 0
-        for row in rows where !row.isSkipped {
+        for row in rows {
             let sum = total.addingReportingOverflow(row.record?.quantity ?? 0)
             guard !sum.overflow else { return nil }
             total = sum.partialValue
@@ -27,6 +40,7 @@ final class CSVImportViewModel {
     }
 
     func load(url: URL, fetch: (String) async throws -> [CardPrinting]) async {
+        skippedBatch = []
         filename = url.lastPathComponent
         errorMessage = nil
         rows = []
@@ -61,13 +75,33 @@ final class CSVImportViewModel {
     func choose(_ printing: CardPrinting, for rowID: Int) {
         guard let index = rows.firstIndex(where: { $0.id == rowID }), let record = rows[index].record,
               CSVPrintingResolver().supportsFinish(record, printing: printing) else { return }
+        skippedBatch.remove(rowID)
         rows[index].printing = printing
         rows[index].issue = nil
         rows[index].isSkipped = false
     }
 
+    func skipAllUnmatched() {
+        guard !isLoading else { return }
+        let ids = Set(attentionRows.map(\.id))
+        guard !ids.isEmpty else { return }
+        skippedBatch = ids
+        for index in rows.indices where ids.contains(rows[index].id) {
+            rows[index].isSkipped = true
+        }
+    }
+
+    func undoSkipAllUnmatched() {
+        guard canUndoSkipAll else { return }
+        for index in rows.indices where skippedBatch.contains(rows[index].id) {
+            rows[index].isSkipped = false
+        }
+        skippedBatch = []
+    }
+
     func toggleSkip(_ rowID: Int) {
         guard let index = rows.firstIndex(where: { $0.id == rowID }) else { return }
+        skippedBatch.remove(rowID)
         rows[index].isSkipped.toggle()
     }
 
@@ -85,7 +119,7 @@ final class CSVImportViewModel {
             guard !Task.isCancelled else { return }
             rows[index].printing = CSVPrintingResolver().resolve(record, among: printings)
             rows[index].issue = rows[index].printing == nil
-                ? "No unique matching printing. Choose a printing or skip this row." : nil
+                ? "Choose a printing. No unique match was found." : nil
         } catch is CancellationError {
             return
         } catch {

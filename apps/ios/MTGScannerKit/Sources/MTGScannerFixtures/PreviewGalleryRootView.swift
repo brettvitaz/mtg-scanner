@@ -48,7 +48,9 @@ public struct PreviewGalleryRootView: View {
         case "list-operation", "list-subtract", "list-add-delete", "list-operation-complete",
              "csv-subtract", "list-deleted-collection", "list-deleted-deck":
             CardListOperationFixtureView(route: route)
-        case "csv-import", "collection-empty", "deck-empty":
+        case "csv-import", "csv-import-undo", "csv-import-ready", "csv-import-skipped", "csv-import-loading",
+             "csv-import-error", "csv-import-empty", "csv-import-large", "csv-import-detail",
+             "collection-empty", "deck-empty":
             CSVImportFixtureView(route: route)
         #endif
 

@@ -24,7 +24,7 @@ public struct CardListPricingFixtureView: View {
             container.mainContext.insert(collection)
             container.mainContext.insert(deck)
             for item in fixtureItems {
-                if route == "pricing-collection" { item.collection = collection }
+                if route == "pricing-collection" || route == "copy-move" { item.collection = collection }
                 if route == "pricing-deck" { item.deck = deck }
                 container.mainContext.insert(item)
             }
@@ -50,6 +50,7 @@ public struct CardListPricingFixtureView: View {
         switch route {
         case "pricing-collection": NavigationStack { CollectionDetailView(collection: collection) }
         case "pricing-deck": NavigationStack { DeckDetailView(deck: deck) }
+        case "copy-move": CopyMoveSheet(items: fixtureItems) { _ in }
         case "pricing-filter": FilterSheet(filterState: filterState, items: fixtureItems)
         default: ResultsView()
         }

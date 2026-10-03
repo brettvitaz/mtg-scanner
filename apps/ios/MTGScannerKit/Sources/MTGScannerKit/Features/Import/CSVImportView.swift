@@ -1,22 +1,26 @@
-import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct CSVImportView: View {
-    let destination: CSVImportDestination
+    let destination: CardListReference
     @Environment(AppModel.self) private var appModel
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewModel = CSVImportViewModel()
     @State private var showFilePicker = false
     @State private var importTask: Task<Void, Never>?
-    @State private var importedQuantity: Int?
+    @State private var operation: CardListOperation = .add
+    @State private var operationViewModel: CardListOperationViewModel?
+    @State private var showReview = false
 
-    init(destination: CSVImportDestination, viewModel: CSVImportViewModel = CSVImportViewModel()) {
+    init(
+        destination: CardListReference, viewModel: CSVImportViewModel = CSVImportViewModel(),
+        operation: CardListOperation = .add
+    ) {
         self.destination = destination
         _viewModel = State(initialValue: viewModel)
+        _operation = State(initialValue: operation)
     }
 
     var body: some View {
@@ -26,6 +30,11 @@ struct CSVImportView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                }
+                .navigationDestination(isPresented: $showReview) {
+                    if let operationViewModel {
+                        CSVOperationReviewScreen(viewModel: operationViewModel) { dismiss() }
+                    }
                 }
                 .safeAreaInset(edge: .bottom) {
                     if !viewModel.rows.isEmpty && !dynamicTypeSize.isAccessibilitySize { importBar }
@@ -37,13 +46,6 @@ struct CSVImportView: View {
             case .success(let url): load(url)
             case .failure(let error): viewModel.errorMessage = error.localizedDescription
             }
-        }
-        .alert("Import Complete", isPresented: Binding(
-            get: { importedQuantity != nil }, set: { if !$0 { dismiss() } }
-        )) {
-            Button("Done") { dismiss() }
-        } message: {
-            Text("Added \(importedQuantity ?? 0) cards to \(destination.name).")
         }
         .onDisappear { importTask?.cancel() }
     }
@@ -78,6 +80,7 @@ struct CSVImportView: View {
                         .font(CSVImportStyle.metadata)
                 }
                 fileContext
+                operationPicker
             }
             .padding(.vertical, Spacing.xs)
         }
@@ -85,14 +88,29 @@ struct CSVImportView: View {
         .listRowSeparator(.hidden)
     }
 
+    private var operationPicker: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Picker("Operation", selection: $operation) {
+                ForEach(CardListOperation.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(minHeight: 44)
+            .disabled(viewModel.isLoading)
+            Text(operation == .add
+                 ? "Add copies to this list."
+                 : "Remove available copies of exact printings and finishes. Review shortfalls before applying.")
+                .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
+        }
+    }
+
     private var statusTitle: String {
         if viewModel.isLoading { return "Matching cards…" }
-        if viewModel.rows.isEmpty { return "Import to \(destination.name)" }
+        if viewModel.rows.isEmpty { return "Import CSV into \(destination.name)" }
         if viewModel.totalQuantity == nil { return "Reduce import quantity" }
         let count = viewModel.attentionRows.count
         if count > 0 { return "\(count) \(count == 1 ? "row needs" : "rows need") attention" }
         guard let quantity = viewModel.readyQuantity, quantity > 0 else { return "No cards selected" }
-        return "\(quantity) \(quantity == 1 ? "card" : "cards") ready to import"
+        return "\(quantity) \(quantity == 1 ? "card" : "cards") ready for review"
     }
 
     private var statusSubtitle: String? {
@@ -100,9 +118,9 @@ struct CSVImportView: View {
         if viewModel.rows.isEmpty { return "Choose a CSV exported by this app." }
         if viewModel.totalQuantity == nil { return "Lower quantities in the CSV or skip rows." }
         if !viewModel.attentionRows.isEmpty, let quantity = viewModel.readyQuantity {
-            return "\(quantity) \(quantity == 1 ? "card is" : "cards are") ready to import."
+            return "\(quantity) \(quantity == 1 ? "card is" : "cards are") ready for review."
         }
-        if viewModel.readyRows.isEmpty { return "Include a row from Skipped to import." }
+        if viewModel.readyRows.isEmpty { return "Include a row from Skipped to review." }
         return nil
     }
 
@@ -120,7 +138,7 @@ struct CSVImportView: View {
 
     private var fileLabel: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text("To \(destination.name)")
+            Text("Target: \(destination.name)")
             Text(viewModel.filename)
         }
         .font(CSVImportStyle.metadata)
@@ -194,7 +212,7 @@ struct CSVImportView: View {
                     CSVImportReviewedList(viewModel: viewModel, showSkipped: false)
                 } label: {
                     reviewGroupLabel(
-                        "Cards to Import", count: viewModel.readyRows.count, quantity: viewModel.readyQuantity
+                        "Included Cards", count: viewModel.readyRows.count, quantity: viewModel.readyQuantity
                     )
                 }
             }
@@ -228,7 +246,7 @@ struct CSVImportView: View {
         Section {
             if dynamicTypeSize.isAccessibilitySize { importButton }
         } footer: {
-            Text("Adds to existing quantities. Importing this file again adds them again.")
+            Text("Review quantity changes before applying. Repeating this operation applies its quantities again.")
                 .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
         }
         .listRowBackground(Color.dsBackground)
@@ -244,8 +262,8 @@ struct CSVImportView: View {
     }
 
     private var importButton: some View {
-        Button(action: save) {
-            Text(importButtonTitle)
+        Button(action: prepareReview) {
+            Text("Review Changes")
                 .font(CSVImportStyle.body)
                 .foregroundStyle(importButtonTextColor)
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -260,11 +278,6 @@ struct CSVImportView: View {
         return colorScheme == .dark ? Color.dsBackground : .white
     }
 
-    private var importButtonTitle: String {
-        guard let quantity = viewModel.readyQuantity, quantity > 0 else { return "Import Cards" }
-        return "Import \(quantity) \(quantity == 1 ? "Card" : "Cards")"
-    }
-
     private func rowCount(_ count: Int) -> String { "\(count) \(count == 1 ? "row" : "rows")" }
 
     private func load(_ url: URL) {
@@ -272,13 +285,16 @@ struct CSVImportView: View {
         importTask = Task { await viewModel.load(url: url, fetch: appModel.fetchPrintings) }
     }
 
-    private func save() {
+    private func prepareReview() {
+        guard viewModel.canImport else { return }
         do {
-            importedQuantity = try CSVImportPersistence().save(
-                rows: viewModel.rows, to: destination, context: modelContext, commit: modelContext.save
+            operationViewModel = CardListOperationViewModel(
+                target: destination, csvItems: try CSVImportPersistence().preparedItems(viewModel.rows),
+                csvName: viewModel.filename.isEmpty ? "CSV" : viewModel.filename, operation: operation
             )
+            showReview = true
         } catch {
-            viewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+            viewModel.errorMessage = error.localizedDescription
         }
     }
 }

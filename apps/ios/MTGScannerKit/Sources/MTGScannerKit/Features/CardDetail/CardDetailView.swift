@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct CardDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: CardDetailViewModel
@@ -51,8 +52,21 @@ struct CardDetailView: View {
             )
         }
         .sheet(isPresented: $showAddToSheet) {
-            MoveToSheet(title: "Add To") { destination in
-                addCardTo(destination)
+            if let item = storedItem {
+                let sourceID = item.id
+                CopyMoveSheet(items: [item]) { result in
+                    if result.removedSourceIDs.contains(sourceID) {
+                        dismiss()
+                    } else {
+                        viewModel.card = item.toRecognizedCard()
+                        let verb = result.operation == .copy ? "Copied" : "Moved"
+                        showAddedMessage("\(verb) to \(result.destinationName)")
+                    }
+                }
+            } else {
+                MoveToSheet(title: "Add To") { destination in
+                    addCardTo(destination)
+                }
             }
         }
         .overlay { if let msg = addedMessage { ToastOverlay(message: msg, color: .blue) } }
@@ -165,7 +179,8 @@ struct CardDetailView: View {
                 .buttonStyle(.borderedProminent)
             }
             Button { showAddToSheet = true } label: {
-                Label("Add to Collection or Deck", systemImage: "plus.rectangle.on.folder")
+                Label(storedItem == nil ? "Add to Collection or Deck" : "Copy/Move",
+                      systemImage: "plus.rectangle.on.folder")
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)

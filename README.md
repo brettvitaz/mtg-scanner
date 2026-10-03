@@ -179,18 +179,28 @@ CSV import has no retry action. If card information cannot be loaded, check the
 server connection in Settings, then reopen the import. Ambiguous matches require
 choosing a printing or skipping the row.
 
-The review shows rows needing attention first. The summary counts matched card
-copies; **Cards to Import** opens the full list of included rows, and **Skipped**
-opens excluded rows. Tap any row to inspect
-the imported values, choose or change its printing, or skip/include it.
-**Skip All Unmatched** skips every row needing attention, including invalid rows,
-while keeping matched cards included. Use **Undo** to restore the most recent
-skipped batch, or restore individual rows from **Skipped**. Destination and file
-details share the review header. Included cards appear in one full list without
-a separate preview. At accessibility text
-sizes, the import action scrolls with the content.
-Row details use the original CSV row number, including the header and blank records.
+The review shows rows needing attention first. Choose **Add** to increase quantities
+or **Subtract** to remove available copies of exact printings and finishes.
+**Included Cards** opens the complete matched list; **Skipped** opens excluded rows.
+Tap a row to inspect its CSV values, choose a printing, or skip/include it.
+**Skip All Unmatched** skips all problem rows, including invalid rows. **Undo**
+restores the latest skipped batch. Row details use original CSV row numbers.
 
-The **Import N Cards** button becomes available after every included row
-has a matching printing. Skipped rows are not imported. Imports add quantities to
-existing cards; importing the same file again adds those quantities again.
+**Review Changes** becomes available after every included row has a matching
+printing. Review quantity changes and subtraction shortfalls before applying.
+After saving, **Undo** restores the original quantities until you leave the review.
+Repeating an operation applies its quantities again. At accessibility text sizes,
+the review and apply actions scroll with the content.
+
+### Copying and moving saved cards
+
+Results, collections, decks, card context menus, and saved-card details share a
+**Copy/Move** sheet. It defaults to Copy and the full quantity of each selected
+row. Adjust each row’s quantity to copy or move part of a stack, then choose an
+existing collection/deck or create a new destination. The source collection or
+deck is excluded from destinations.
+
+Copy leaves the source unchanged. Move leaves any remaining quantity in the
+source and removes fully transferred rows. Matching printings and foil finishes
+merge quantities in the destination. Cancel leaves cards and selection unchanged.
+Unsaved card details continue to offer Add To.

@@ -6,23 +6,25 @@ struct DeckDetailView: View {
     @Bindable var deck: Deck
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var showMoveSheet = false
-    @State private var showCopySheet = false
+    @State private var showCopyMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextCopyItem: CollectionItem?
-    @State private var contextMoveItem: CollectionItem?
+    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
+    @State private var showListOperation = false
     @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
     @State private var showSearch = false
+
+    private var isDeleted: Bool { deck.isDeleted || deck.modelContext == nil }
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: deck.items)
@@ -30,37 +32,30 @@ struct DeckDetailView: View {
 
     var body: some View {
         Group {
-            if deck.items.isEmpty {
+            if isDeleted {
+                ContentUnavailableView(
+                    "Deck Removed", systemImage: "rectangle.stack",
+                    description: Text("Finish the list action to return to Library.")
+                )
+            } else if deck.items.isEmpty {
                 emptyState
             } else {
                 cardListWithToolbar
             }
         }
-        .navigationTitle(deck.name)
+        .navigationTitle(isDeleted ? "Deck Removed" : deck.name)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
-        .toolbar { topToolbar }
-        .sheet(isPresented: $showMoveSheet) {
-            MoveToSheet(title: "Move To Collection") { destination in
-                moveSelectedItems(to: destination)
+        .toolbar { if !isDeleted { topToolbar } }
+        .sheet(isPresented: $showCopyMoveSheet) {
+            CopyMoveSheet(items: deck.items.filter { selectedItems.contains($0.id) }) { _ in
+                exitSelecting()
             }
         }
-        .sheet(isPresented: $showCopySheet) {
-            MoveToSheet(title: "Copy To Collection") { destination in
-                copySelectedItems(to: destination)
-            }
-        }
-        .sheet(item: $contextCopyItem) { item in
-            MoveToSheet(title: "Copy To") { destination in
-                copyItem(item, to: destination)
-                contextCopyItem = nil
-            }
-        }
-        .sheet(item: $contextMoveItem) { item in
-            MoveToSheet(title: "Move To") { destination in
-                moveItem(item, to: destination)
-                contextMoveItem = nil
+        .sheet(item: $contextTransferItem) { item in
+            CopyMoveSheet(items: [item]) { _ in
+                contextTransferItem = nil
             }
         }
         .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
@@ -89,6 +84,9 @@ struct DeckDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: deck.items)
         }
+        .sheet(isPresented: $showListOperation) {
+            CardListOperationView(target: .deck(deck))
+        }
         .sheet(isPresented: $showCSVImport) {
             CSVImportView(destination: .deck(deck))
         }
@@ -100,8 +98,11 @@ struct DeckDetailView: View {
                 deck.updatedAt = Date()
             }
         }
-        .task(id: deck.items.map(\.id)) {
-            await appModel.refreshPrices(for: deck.items)
+        .task(id: isDeleted ? [] : deck.items.map(\.id)) {
+            if !isDeleted { await appModel.refreshPrices(for: deck.items) }
+        }
+        .onChange(of: showListOperation) { _, presented in
+            if !presented && isDeleted { dismiss() }
         }
     }
 
@@ -140,7 +141,8 @@ struct DeckDetailView: View {
                     name: deck.name,
                     exportFile: $exportFile,
                     onSelect: enterSelecting,
-                    onImport: { showCSVImport = true }
+                    onImport: { showCSVImport = true },
+                    onListOperation: { showListOperation = true }
                 )
             }
         }
@@ -164,6 +166,8 @@ private extension DeckDetailView {
                 .multilineTextAlignment(.center)
             Button("Add Card") { showAddCard = true }
                 .buttonStyle(.borderedProminent)
+            Button("Apply a List") { showListOperation = true }
+                .buttonStyle(.bordered)
             Button("Import CSV") { showCSVImport = true }
                 .buttonStyle(.bordered)
         }
@@ -217,8 +221,7 @@ private extension DeckDetailView {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onCopy: { contextCopyItem = item },
-                onMove: { contextMoveItem = item },
+                onTransfer: { contextTransferItem = item },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -242,9 +245,7 @@ private extension DeckDetailView {
 private extension DeckDetailView {
     var bottomActionBar: some View {
         HStack {
-            actionButton("folder", "Move") { showMoveSheet = true }
-            Spacer()
-            actionButton("doc.on.doc", "Copy") { showCopySheet = true }
+            actionButton("doc.on.doc", "Copy/Move") { showCopyMoveSheet = true }
             Spacer()
             actionButton("trash", "Delete", role: .destructive) { showDeleteConfirmation = true }
         }
@@ -288,49 +289,6 @@ extension DeckDetailView {
         selectedItems = Set(displayedItems.map(\.id))
     }
 
-    func moveSelectedItems(to destination: MoveDestination) {
-        let items = deck.items.filter { selectedItems.contains($0.id) }
-        switch destination {
-        case .collection(let collection):
-            for item in items {
-                item.deck = nil
-                item.collection = collection
-            }
-            collection.updatedAt = Date()
-        case .deck(let targetDeck):
-            for item in items {
-                item.collection = nil
-                item.deck = targetDeck
-            }
-            targetDeck.updatedAt = Date()
-        }
-        deck.updatedAt = Date()
-        exitSelecting()
-    }
-
-    func copySelectedItems(to destination: MoveDestination) {
-        let items = deck.items.filter { selectedItems.contains($0.id) }
-        switch destination {
-        case .collection(let collection):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: collection.items, context: modelContext) {
-                    $0.collection = collection
-                }
-            }
-            collection.updatedAt = Date()
-        case .deck(let targetDeck):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: targetDeck.items, context: modelContext) {
-                    $0.deck = targetDeck
-                }
-            }
-            targetDeck.updatedAt = Date()
-        }
-        exitSelecting()
-    }
-
     func deleteSelectedItems() {
         let items = deck.items.filter { selectedItems.contains($0.id) }
         registerUndo(for: items)
@@ -356,36 +314,6 @@ extension DeckDetailView {
         } else {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
         }
-    }
-
-    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
-        let copy = item.duplicate()
-        switch destination {
-        case .collection(let collection):
-            mergeOrInsert(copy, into: collection.items, context: modelContext) {
-                $0.collection = collection
-            }
-            collection.updatedAt = Date()
-        case .deck(let targetDeck):
-            mergeOrInsert(copy, into: targetDeck.items, context: modelContext) {
-                $0.deck = targetDeck
-            }
-            targetDeck.updatedAt = Date()
-        }
-    }
-
-    func moveItem(_ item: CollectionItem, to destination: MoveDestination) {
-        switch destination {
-        case .collection(let collection):
-            item.deck = nil
-            item.collection = collection
-            collection.updatedAt = Date()
-        case .deck(let targetDeck):
-            item.collection = nil
-            item.deck = targetDeck
-            targetDeck.updatedAt = Date()
-        }
-        deck.updatedAt = Date()
     }
 
     func registerUndo(for items: [CollectionItem]) {

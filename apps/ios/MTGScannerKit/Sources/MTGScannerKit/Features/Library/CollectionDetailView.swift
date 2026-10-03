@@ -6,21 +6,25 @@ struct CollectionDetailView: View {
     @Bindable var collection: CardCollection
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var showMoveSheet = false
+    @State private var showCopyMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextCopyItem: CollectionItem?
+    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
+    @State private var showListOperation = false
     @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
     @State private var showSearch = false
+
+    private var isDeleted: Bool { collection.isDeleted || collection.modelContext == nil }
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
@@ -28,26 +32,30 @@ struct CollectionDetailView: View {
 
     var body: some View {
         Group {
-            if collection.items.isEmpty {
+            if isDeleted {
+                ContentUnavailableView(
+                    "Collection Removed", systemImage: "folder",
+                    description: Text("Finish the list action to return to Library.")
+                )
+            } else if collection.items.isEmpty {
                 emptyState
             } else {
                 cardListWithToolbar
             }
         }
-        .navigationTitle(collection.name)
+        .navigationTitle(isDeleted ? "Collection Removed" : collection.name)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
-        .toolbar { topToolbar }
-        .sheet(isPresented: $showMoveSheet) {
-            MoveToSheet(title: "Copy To Deck") { destination in
-                copySelectedItems(to: destination)
+        .toolbar { if !isDeleted { topToolbar } }
+        .sheet(isPresented: $showCopyMoveSheet) {
+            CopyMoveSheet(items: collection.items.filter { selectedItems.contains($0.id) }) { _ in
+                exitSelecting()
             }
         }
-        .sheet(item: $contextCopyItem) { item in
-            MoveToSheet(title: "Copy To") { destination in
-                copyItem(item, to: destination)
-                contextCopyItem = nil
+        .sheet(item: $contextTransferItem) { item in
+            CopyMoveSheet(items: [item]) { _ in
+                contextTransferItem = nil
             }
         }
         .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
@@ -76,6 +84,9 @@ struct CollectionDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: collection.items)
         }
+        .sheet(isPresented: $showListOperation) {
+            CardListOperationView(target: .collection(collection))
+        }
         .sheet(isPresented: $showCSVImport) {
             CSVImportView(destination: .collection(collection))
         }
@@ -87,8 +98,11 @@ struct CollectionDetailView: View {
                 collection.updatedAt = Date()
             }
         }
-        .task(id: collection.items.map(\.id)) {
-            await appModel.refreshPrices(for: collection.items)
+        .task(id: isDeleted ? [] : collection.items.map(\.id)) {
+            if !isDeleted { await appModel.refreshPrices(for: collection.items) }
+        }
+        .onChange(of: showListOperation) { _, presented in
+            if !presented && isDeleted { dismiss() }
         }
     }
 
@@ -127,7 +141,8 @@ struct CollectionDetailView: View {
                     name: collection.name,
                     exportFile: $exportFile,
                     onSelect: enterSelecting,
-                    onImport: { showCSVImport = true }
+                    onImport: { showCSVImport = true },
+                    onListOperation: { showListOperation = true }
                 )
             }
         }
@@ -139,11 +154,11 @@ struct CollectionDetailView: View {
         HStack {
             Button {
                 guard !selectedItems.isEmpty else { return }
-                showMoveSheet = true
+                showCopyMoveSheet = true
             } label: {
                 VStack(spacing: 2) {
-                    Image(systemName: "rectangle.stack")
-                    Text("Copy to Deck").font(.caption2)
+                    Image(systemName: "doc.on.doc")
+                    Text("Copy/Move").font(.caption2)
                 }
             }
             .disabled(selectedItems.isEmpty)
@@ -216,7 +231,7 @@ private extension CollectionDetailView {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onCopy: { contextCopyItem = item },
+                onTransfer: { contextTransferItem = item },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -247,6 +262,8 @@ private extension CollectionDetailView {
                 .multilineTextAlignment(.center)
             Button("Add Card") { showAddCard = true }
                 .buttonStyle(.borderedProminent)
+            Button("Apply a List") { showListOperation = true }
+                .buttonStyle(.bordered)
             Button("Import CSV") { showCSVImport = true }
                 .buttonStyle(.bordered)
         }
@@ -268,29 +285,6 @@ private extension CollectionDetailView {
 
     func selectAll() {
         selectedItems = Set(displayedItems.map(\.id))
-    }
-
-    func copySelectedItems(to destination: MoveDestination) {
-        let items = collection.items.filter { selectedItems.contains($0.id) }
-        switch destination {
-        case .collection(let targetCollection):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: targetCollection.items, context: modelContext) {
-                    $0.collection = targetCollection
-                }
-            }
-            targetCollection.updatedAt = Date()
-        case .deck(let deck):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: deck.items, context: modelContext) {
-                    $0.deck = deck
-                }
-            }
-            deck.updatedAt = Date()
-        }
-        exitSelecting()
     }
 
     func deleteSelectedItems() {
@@ -317,22 +311,6 @@ private extension CollectionDetailView {
             collection.updatedAt = Date()
         } else {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        }
-    }
-
-    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
-        let copy = item.duplicate()
-        switch destination {
-        case .collection(let targetCollection):
-            mergeOrInsert(copy, into: targetCollection.items, context: modelContext) {
-                $0.collection = targetCollection
-            }
-            targetCollection.updatedAt = Date()
-        case .deck(let deck):
-            mergeOrInsert(copy, into: deck.items, context: modelContext) {
-                $0.deck = deck
-            }
-            deck.updatedAt = Date()
         }
     }
 

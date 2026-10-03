@@ -55,7 +55,7 @@ struct CSVImportReviewedList: View {
             }
         }
         .modifier(CSVImportListStyle())
-        .navigationTitle(showSkipped ? "Skipped" : "Cards to Import")
+        .navigationTitle(showSkipped ? "Skipped" : "Included Cards")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

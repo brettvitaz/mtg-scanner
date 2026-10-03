@@ -7,8 +7,7 @@ import UIKit
 struct CollectionItemRow: View {
     @Bindable var item: CollectionItem
     var showQuantityStepper: Bool = false
-    var onCopy: (() -> Void)?
-    var onMove: (() -> Void)?
+    var onTransfer: (() -> Void)?
     var onDelete: (() -> Void)?
     var onSwipeDelete: (() -> Void)?
     var onToggleFoil: (() -> Void)?
@@ -279,12 +278,11 @@ extension CollectionItemRow {
 }
 
 private extension CollectionItemRow {
-    var hasContextMenu: Bool { onCopy != nil || onMove != nil || onDelete != nil || onToggleFoil != nil }
+    var hasContextMenu: Bool { onTransfer != nil || onDelete != nil || onToggleFoil != nil }
 
     @ViewBuilder
     var contextMenu: some View {
-        if let onCopy { Button(action: onCopy) { Label("Copy", systemImage: "doc.on.doc") } }
-        if let onMove { Button(action: onMove) { Label("Move", systemImage: "folder") } }
+        if let onTransfer { Button(action: onTransfer) { Label("Copy/Move", systemImage: "doc.on.doc") } }
         if let onToggleFoil {
             Button(action: onToggleFoil) {
                 Label(item.foil ? "Set as Non-Foil" : "Set as Foil", systemImage: "sparkles")

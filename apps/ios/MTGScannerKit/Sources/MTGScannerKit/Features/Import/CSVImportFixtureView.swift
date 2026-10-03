@@ -46,7 +46,10 @@ public struct CSVImportFixtureView: View {
         case "deck-empty": NavigationStack { DeckDetailView(deck: deck) }
         case "csv-import-detail":
             NavigationStack { CSVImportRowDetail(rowID: 3, viewModel: viewModel) }
-        default: CSVImportView(destination: .collection(collection), viewModel: viewModel)
+        default: CSVImportView(
+            destination: .collection(collection), viewModel: viewModel,
+            operation: route == "csv-import-subtract" ? .subtract : .add
+        )
         }
     }
 
@@ -67,7 +70,7 @@ public struct CSVImportFixtureView: View {
     private static func configureState(_ viewModel: CSVImportViewModel, route: String) {
         switch route {
         case "csv-import-undo": viewModel.skipAllUnmatched()
-        case "csv-import-ready": viewModel.rows = viewModel.readyRows
+        case "csv-import-ready", "csv-import-subtract": viewModel.rows = viewModel.readyRows
         case "csv-import-skipped":
             for index in viewModel.rows.indices { viewModel.rows[index].isSkipped = true }
         case "csv-import-loading":

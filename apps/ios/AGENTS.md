@@ -105,6 +105,7 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | Route | View | Notes |
 |-------|------|-------|
 | `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
+| `copy-move` | `CardListPricingFixtureView` | Copy/Move selector, per-row quantities, and destinations |
 | `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
 | `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |
 | `pricing-deck` | `CardListPricingFixtureView` | Populated deck with quantities and totals |
@@ -118,6 +119,14 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `csv-import-ready` / `csv-import-skipped` | `CSVImportFixtureView` | All-ready and all-skipped reviews |
 | `csv-import-loading` / `csv-import-error` / `csv-import-empty` | `CSVImportFixtureView` | Progress, file error, and file selection |
 | `csv-import-large` / `csv-import-detail` | `CSVImportFixtureView` | Large matched list and unresolved row details |
+| `csv-import-subtract` | `CSVImportFixtureView` | Subtract selection before reviewing changes |
+| `list-operation` | `CardListOperationFixtureView` | Target-first list selection |
+| `list-subtract` | `CardListOperationFixtureView` | Sale subtraction with quantity shortfalls |
+| `list-add-delete` | `CardListOperationFixtureView` | Add quantities and delete tool preview |
+| `list-operation-complete` | `CardListOperationFixtureView` | Saved operation with Undo |
+| `csv-subtract` | `CardListOperationFixtureView` | CSV subtraction review |
+| `list-deleted-collection` | `CardListOperationFixtureView` | Open collection safely handles tool deletion |
+| `list-deleted-deck` | `CardListOperationFixtureView` | Open deck safely handles tool deletion |
 | `collection-empty` | `CSVImportFixtureView` | Empty collection with CSV import entry point |
 | `deck-empty` | `CSVImportFixtureView` | Empty deck with CSV import entry point |
 

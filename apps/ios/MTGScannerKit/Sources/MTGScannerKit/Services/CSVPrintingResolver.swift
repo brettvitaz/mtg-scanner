@@ -18,9 +18,10 @@ struct CSVPrintingResolver {
            normalized(identifier) != normalized(printing.scryfallId ?? "") { return false }
         if let code = record.setCode {
             guard normalized(code) == normalized(printing.setCode) else { return false }
+        } else {
+            guard normalized(record.edition) == normalized(printing.setName ?? "")
+                    || normalized(record.edition) == normalized(printing.setCode) else { return false }
         }
-        guard normalized(record.edition) == normalized(printing.setName ?? "")
-                || normalized(record.edition) == normalized(printing.setCode) else { return false }
         if let number = record.collectorNumber {
             guard normalized(number) == normalized(printing.collectorNumber ?? "") else { return false }
         }

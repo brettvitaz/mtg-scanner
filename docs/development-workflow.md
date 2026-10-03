@@ -11,6 +11,39 @@ Keep the repo easy for both humans and coding agents to understand, run, and mod
 5. Run the smallest verification that proves the change.
 6. **Commit after each feature or change.**
 
+## GitHub pull requests and repository safeguards
+
+The default branch is `main`. Open a pull request from a task branch and use
+**Squash and merge**; merge commits and rebase merges are disabled. The squash
+commit defaults to the PR title and description, so describe what changed and why.
+GitHub automatically deletes the remote task branch after merging. Keep the local
+worktree and branch for manual review until cleanup is explicitly requested.
+
+Branch protection applies to administrators as well as collaborators. Pull requests
+must pass **Backend tests**, **Backend type checking**, and **Backend security scan**
+from GitHub Actions, be up to date with `main`, and resolve all review conversations.
+Force pushes, deletion of `main`, and merge commits are blocked. No approving review
+is required because the owner must be able to merge their own work; review every
+change using `.agents/rules/code-review.md`. Auto-merge is available when all
+requirements pass, and GitHub offers the update-branch button for stale PRs.
+There is currently no required iOS CI check; run the relevant iOS checks locally.
+
+CI uses read-only contents permissions, immutable action commit SHAs, 15-minute
+job timeouts, and cancels superseded runs on the same PR or branch. Repository
+settings require full commit SHA pins for actions, default workflow tokens to read
+access, and prevent Actions from approving PRs. Dependabot checks Python dependencies
+and GitHub Actions weekly; vulnerability alerts and security update PRs are enabled.
+Secret scanning and secret push protection are enabled.
+
+For another local checkout still using `master`, update its branch and tracking:
+
+```bash
+git branch -m master main
+git fetch origin
+git branch --set-upstream-to=origin/main main
+git remote set-head origin -a
+```
+
 ## Local development
 ### Backend
 - Python: 3.14 or newer. Local bootstrap and CI use the standard Python 3.14 interpreter.

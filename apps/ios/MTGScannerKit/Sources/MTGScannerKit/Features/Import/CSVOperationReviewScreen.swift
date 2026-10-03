@@ -16,9 +16,10 @@ struct CSVOperationReviewScreen: View {
                     }
                 }
                 .listRowBackground(Color.dsBackground)
+                .listRowSeparator(.hidden)
             }
             CardListOperationReview(viewModel: viewModel)
-                .listRowBackground(Color.dsSurface)
+                .listRowBackground(Color.dsBackground)
             if dynamicTypeSize.isAccessibilitySize {
                 Section { footer }.listRowInsets(EdgeInsets())
             }

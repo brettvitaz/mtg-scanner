@@ -119,7 +119,6 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `csv-import-ready` / `csv-import-skipped` | `CSVImportFixtureView` | All-ready and all-skipped reviews |
 | `csv-import-loading` / `csv-import-error` / `csv-import-empty` | `CSVImportFixtureView` | Progress, file error, and file selection |
 | `csv-import-large` / `csv-import-detail` | `CSVImportFixtureView` | Large matched list and unresolved row details |
-| `csv-import-subtract` | `CSVImportFixtureView` | Subtract selection before reviewing changes |
 | `list-operation` | `CardListOperationFixtureView` | Target-first list selection |
 | `list-subtract` | `CardListOperationFixtureView` | Sale subtraction with quantity shortfalls |
 | `list-add-delete` | `CardListOperationFixtureView` | Add quantities and delete tool preview |

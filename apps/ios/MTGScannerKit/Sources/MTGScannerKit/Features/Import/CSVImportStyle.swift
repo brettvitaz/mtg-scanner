@@ -14,8 +14,10 @@ enum CSVImportStyle {
 struct CSVImportListStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .listStyle(.insetGrouped)
-            .listSectionSpacing(Spacing.lg)
+            .listStyle(.plain)
+            .listSectionSpacing(Spacing.md)
+            .contentMargins(.top, Spacing.sm, for: .scrollContent)
+            .listRowSeparatorTint(Color.dsBorder)
             .scrollContentBackground(.hidden)
             .font(CSVImportStyle.body)
             .tint(Color.dsAccent)

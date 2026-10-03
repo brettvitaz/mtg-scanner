@@ -51,7 +51,7 @@ struct CSVImportReviewedList: View {
                 Text(showSkipped ? "No skipped rows." : "No ready cards.").foregroundStyle(.primary)
             }
             ForEach(rows) { row in
-                CSVImportRowLink(row: row, viewModel: viewModel).listRowBackground(Color.dsSurface)
+                CSVImportRowLink(row: row, viewModel: viewModel).listRowBackground(Color.dsBackground)
             }
         }
         .modifier(CSVImportListStyle())
@@ -99,7 +99,7 @@ struct CSVImportRowDetail: View {
                 identifierDetails(record)
             }
         }
-        .listRowBackground(Color.dsSurface)
+        .listRowBackground(Color.dsBackground)
     }
 
     @ViewBuilder
@@ -121,12 +121,12 @@ struct CSVImportRowDetail: View {
                 CSVImportField(title: "Set", value: printing.setName ?? printing.setCode)
                 if let number = printing.collectorNumber { CSVImportField(title: "Collector number", value: number) }
             }
-            .listRowBackground(Color.dsSurface)
+            .listRowBackground(Color.dsBackground)
         } else if let issue = row.issue {
             Section("Needs Attention") {
                 Label(issue, systemImage: "exclamationmark.circle").foregroundStyle(Color.dsTextPrimary)
             }
-            .listRowBackground(Color.dsSurface)
+            .listRowBackground(Color.dsBackground)
         }
     }
 
@@ -144,7 +144,7 @@ struct CSVImportRowDetail: View {
             }
         }
         .disabled(viewModel.isLoading)
-        .listRowBackground(Color.dsSurface)
+        .listRowBackground(Color.dsBackground)
     }
 
     private func finishChoosing() {

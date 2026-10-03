@@ -10,17 +10,14 @@ struct CSVImportView: View {
     @State private var viewModel = CSVImportViewModel()
     @State private var showFilePicker = false
     @State private var importTask: Task<Void, Never>?
-    @State private var operation: CardListOperation = .add
     @State private var operationViewModel: CardListOperationViewModel?
     @State private var showReview = false
 
     init(
-        destination: CardListReference, viewModel: CSVImportViewModel = CSVImportViewModel(),
-        operation: CardListOperation = .add
+        destination: CardListReference, viewModel: CSVImportViewModel = CSVImportViewModel()
     ) {
         self.destination = destination
         _viewModel = State(initialValue: viewModel)
-        _operation = State(initialValue: operation)
     }
 
     var body: some View {
@@ -55,13 +52,11 @@ struct CSVImportView: View {
             headerSection
             if let error = viewModel.errorMessage {
                 Section { Label(error, systemImage: "exclamationmark.circle") }
-                    .listRowBackground(Color.dsSurface)
+                    .listRowBackground(Color.dsBackground)
             }
             if !viewModel.rows.isEmpty && !viewModel.isLoading {
-                bulkUndoSection
                 attentionSection
-                readySection
-                skippedSection
+                groupedRowsSection
                 importNotesSection
             }
         }
@@ -80,27 +75,11 @@ struct CSVImportView: View {
                         .font(CSVImportStyle.metadata)
                 }
                 fileContext
-                operationPicker
             }
             .padding(.vertical, Spacing.xs)
         }
         .listRowBackground(Color.dsBackground)
         .listRowSeparator(.hidden)
-    }
-
-    private var operationPicker: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Picker("Operation", selection: $operation) {
-                ForEach(CardListOperation.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(minHeight: 44)
-            .disabled(viewModel.isLoading)
-            Text(operation == .add
-                 ? "Add copies to this list."
-                 : "Remove available copies of exact printings and finishes. Review shortfalls before applying.")
-                .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
-        }
     }
 
     private var statusTitle: String {
@@ -110,7 +89,7 @@ struct CSVImportView: View {
         let count = viewModel.attentionRows.count
         if count > 0 { return "\(count) \(count == 1 ? "row needs" : "rows need") attention" }
         guard let quantity = viewModel.readyQuantity, quantity > 0 else { return "No cards selected" }
-        return "\(quantity) \(quantity == 1 ? "card" : "cards") ready for review"
+        return "\(quantity) \(quantity == 1 ? "card" : "cards") matched"
     }
 
     private var statusSubtitle: String? {
@@ -118,7 +97,7 @@ struct CSVImportView: View {
         if viewModel.rows.isEmpty { return "Choose a CSV exported by this app." }
         if viewModel.totalQuantity == nil { return "Lower quantities in the CSV or skip rows." }
         if !viewModel.attentionRows.isEmpty, let quantity = viewModel.readyQuantity {
-            return "\(quantity) \(quantity == 1 ? "card is" : "cards are") ready for review."
+            return "\(quantity) \(quantity == 1 ? "card is" : "cards are") matched."
         }
         if viewModel.readyRows.isEmpty { return "Include a row from Skipped to review." }
         return nil
@@ -127,7 +106,8 @@ struct CSVImportView: View {
     @ViewBuilder
     private var fileContext: some View {
         if viewModel.filename.isEmpty {
-            Button("Choose CSV File") { showFilePicker = true }.frame(minHeight: 44)
+            Button("Choose CSV File") { showFilePicker = true }
+                .foregroundStyle(Color.dsAccent).frame(minHeight: 44)
         } else {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: Spacing.lg) { fileLabel; Spacer(minLength: 0); changeFileButton }
@@ -148,27 +128,10 @@ struct CSVImportView: View {
 
     private var changeFileButton: some View {
         Button("Change File") { showFilePicker = true }
+            .foregroundStyle(Color.dsAccent)
             .font(CSVImportStyle.metadata)
             .frame(minHeight: 44)
             .disabled(viewModel.isLoading)
-    }
-
-    @ViewBuilder
-    private var bulkUndoSection: some View {
-        if viewModel.bulkSkippedCount > 0 {
-            Section {
-                ViewThatFits(in: .horizontal) {
-                    HStack { skippedBatchLabel; Spacer(); undoButton }
-                    VStack(alignment: .leading) { skippedBatchLabel; undoButton }
-                }
-            }
-            .listRowBackground(Color.dsSurface)
-        }
-    }
-
-    private var skippedBatchLabel: some View {
-        Text("Skipped \(rowCount(viewModel.bulkSkippedCount))")
-            .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
     }
 
     private var undoButton: some View {
@@ -194,7 +157,7 @@ struct CSVImportView: View {
                 Text("Review or skip each row to continue.")
                     .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
             }
-            .listRowBackground(Color.dsSurface)
+            .listRowBackground(Color.dsBackground)
         }
     }
 
@@ -204,10 +167,9 @@ struct CSVImportView: View {
             .disabled(viewModel.isLoading)
     }
 
-    @ViewBuilder
-    private var readySection: some View {
-        if !viewModel.readyRows.isEmpty {
-            Section {
+    private var groupedRowsSection: some View {
+        Section {
+            if !viewModel.readyRows.isEmpty {
                 NavigationLink {
                     CSVImportReviewedList(viewModel: viewModel, showSkipped: false)
                 } label: {
@@ -216,27 +178,25 @@ struct CSVImportView: View {
                     )
                 }
             }
-            .listRowBackground(Color.dsSurface)
+            if viewModel.skippedCount > 0 { skippedRow }
         }
+        .listRowBackground(Color.dsBackground)
     }
 
-    @ViewBuilder
-    private var skippedSection: some View {
-        if viewModel.skippedCount > 0 {
-            Section {
-                NavigationLink {
-                    CSVImportReviewedList(viewModel: viewModel, showSkipped: true)
-                } label: {
-                    reviewGroupLabel("Skipped", count: viewModel.skippedCount, quantity: nil)
-                }
+    private var skippedRow: some View {
+        HStack(spacing: Spacing.lg) {
+            NavigationLink {
+                CSVImportReviewedList(viewModel: viewModel, showSkipped: true)
+            } label: {
+                reviewGroupLabel("Skipped", count: viewModel.skippedCount, quantity: nil)
             }
-            .listRowBackground(Color.dsSurface)
+            if viewModel.bulkSkippedCount > 0 { undoButton.buttonStyle(.borderless) }
         }
     }
 
     private func reviewGroupLabel(_ title: String, count: Int, quantity: Int?) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(title).font(CSVImportStyle.cardName).foregroundStyle(Color.dsTextPrimary)
+            Text(title).font(CSVImportStyle.cardName).foregroundStyle(Color.dsAccent)
             Text([rowCount(count), quantity.map { "\($0) cards" }].compactMap { $0 }.joined(separator: " · "))
                 .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
         }
@@ -246,10 +206,11 @@ struct CSVImportView: View {
         Section {
             if dynamicTypeSize.isAccessibilitySize { importButton }
         } footer: {
-            Text("Review quantity changes before applying. Repeating this operation applies its quantities again.")
+            Text("Next: choose Add or Subtract and review quantity changes.")
                 .font(CSVImportStyle.metadata).foregroundStyle(CSVImportStyle.secondaryText)
         }
         .listRowBackground(Color.dsBackground)
+        .listRowSeparator(.hidden)
     }
 
     private var importBar: some View {
@@ -290,7 +251,7 @@ struct CSVImportView: View {
         do {
             operationViewModel = CardListOperationViewModel(
                 target: destination, csvItems: try CSVImportPersistence().preparedItems(viewModel.rows),
-                csvName: viewModel.filename.isEmpty ? "CSV" : viewModel.filename, operation: operation
+                csvName: viewModel.filename.isEmpty ? "CSV" : viewModel.filename, operation: .add
             )
             showReview = true
         } catch {

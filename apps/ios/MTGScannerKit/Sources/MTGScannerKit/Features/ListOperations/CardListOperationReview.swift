@@ -18,11 +18,11 @@ struct CardListOperationReview: View {
 
     private var choices: some View {
         Section("Operation") {
-            Picker("Operation", selection: $viewModel.operation) {
-                ForEach(CardListOperation.allCases) { Text($0.rawValue).tag($0) }
+            if viewModel.isCSV {
+                operationPicker.pickerStyle(.inline).labelsHidden()
+            } else {
+                operationPicker.pickerStyle(.segmented)
             }
-            .pickerStyle(.segmented)
-            .frame(minHeight: 44)
             if !viewModel.isCSV {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Tool list afterward").font(.subheadline)
@@ -39,14 +39,26 @@ struct CardListOperationReview: View {
         .onChange(of: viewModel.deleteTool) { viewModel.refresh() }
     }
 
+    private var operationPicker: some View {
+        Picker("Operation", selection: $viewModel.operation) {
+            ForEach(CardListOperation.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .frame(minHeight: 44)
+    }
+
     @ViewBuilder
     private func preview(_ plan: CardListOperationPlan) -> some View {
         Section("What Will Happen") {
-            Text("\(plan.operation.rawValue) \(plan.toolName) \(plan.operation == .add ? "into" : "from") "
-                 + plan.target.name).font(.headline)
-            Text(plan.outcome)
-            LabeledContent("\(plan.target.name) total") {
+            if viewModel.isCSV {
+                Text(plan.outcome).font(CSVImportStyle.heading)
+            } else {
+                Text("\(plan.operation.rawValue) \(plan.toolName) \(plan.operation == .add ? "into" : "from") "
+                     + plan.target.name).font(.headline)
+                Text(plan.outcome)
+            }
+            LabeledContent(viewModel.isCSV ? "Total cards" : "\(plan.target.name) total") {
                 Text("\(plan.beforeQuantity) → \(plan.afterQuantity)").monospacedDigit()
+                    .foregroundStyle(viewModel.isCSV ? CSVImportStyle.secondaryText : Color.secondary)
             }
             if plan.unavailableQuantity > 0 {
                 Label(
@@ -125,7 +137,7 @@ struct CardListOperationFooter: View {
                 }
                 Button("Done", action: onDone).buttonStyle(.borderedProminent)
             } else {
-                if let plan = viewModel.plan, plan.unavailableQuantity > 0 {
+                if !viewModel.isCSV, let plan = viewModel.plan, plan.unavailableQuantity > 0 {
                     Label(
                         "\(plan.unavailableQuantity) requested copies unavailable",
                         systemImage: "exclamationmark.triangle"

@@ -78,10 +78,6 @@ struct CSVImportView: View {
             }
             Text("Resolve or skip every row before importing. Re-importing this file adds its quantities again.")
                 .font(.subheadline).foregroundStyle(.primary)
-            Button("Retry Unresolved Rows") {
-                importTask = Task { await viewModel.resolve(fetch: appModel.fetchPrintings) }
-            }
-            .disabled(viewModel.isLoading)
             ForEach(viewModel.rows) { row in reviewRow(row) }
         }
     }

@@ -174,3 +174,7 @@ vendor names such as “Masterpiece Series: Mythic Edition” and “Mystery Boo
 do not require manual selection. Without a set code, the edition must match the
 database's set name or code. Conflicting identifiers and unsupported finishes still
 require review.
+
+CSV import has no retry action. If card information cannot be loaded, check the
+server connection in Settings, then reopen the import. Ambiguous matches require
+choosing a printing or skipping the row.

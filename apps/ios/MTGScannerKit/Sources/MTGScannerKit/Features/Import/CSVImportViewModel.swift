@@ -89,7 +89,8 @@ final class CSVImportViewModel {
         } catch is CancellationError {
             return
         } catch {
-            rows[index].issue = "Could not load printings. Retry, choose a printing, or skip this row."
+            rows[index].issue = "Could not load card information. "
+                + "Check the server connection in Settings, then reopen this import."
         }
     }
 }

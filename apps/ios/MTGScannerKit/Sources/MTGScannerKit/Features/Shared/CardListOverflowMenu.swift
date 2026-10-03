@@ -8,6 +8,7 @@ struct CardListOverflowMenu: View {
     @Binding var exportFile: ExportActivityItem?
     let onSelect: () -> Void
     var onImport: (() -> Void)?
+    var onListOperation: (() -> Void)?
 
     var body: some View {
         Menu {
@@ -19,6 +20,11 @@ struct CardListOverflowMenu: View {
             if let onImport {
                 Button(action: onImport) {
                     Label("Import CSV", systemImage: "square.and.arrow.down")
+                }
+            }
+            if let onListOperation {
+                Button(action: onListOperation) {
+                    Label("Add or Subtract Cards", systemImage: "plus.forwardslash.minus")
                 }
             }
             Toggle(isOn: $showTotals) {

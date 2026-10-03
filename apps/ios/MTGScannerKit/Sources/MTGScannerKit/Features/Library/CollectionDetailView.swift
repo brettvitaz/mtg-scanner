@@ -6,6 +6,7 @@ struct CollectionDetailView: View {
     @Bindable var collection: CardCollection
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
@@ -18,9 +19,12 @@ struct CollectionDetailView: View {
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
+    @State private var showListOperation = false
     @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
     @State private var showSearch = false
+
+    private var isDeleted: Bool { collection.isDeleted || collection.modelContext == nil }
 
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
@@ -28,17 +32,22 @@ struct CollectionDetailView: View {
 
     var body: some View {
         Group {
-            if collection.items.isEmpty {
+            if isDeleted {
+                ContentUnavailableView(
+                    "Collection Removed", systemImage: "folder",
+                    description: Text("Finish the list action to return to Library.")
+                )
+            } else if collection.items.isEmpty {
                 emptyState
             } else {
                 cardListWithToolbar
             }
         }
-        .navigationTitle(collection.name)
+        .navigationTitle(isDeleted ? "Collection Removed" : collection.name)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
-        .toolbar { topToolbar }
+        .toolbar { if !isDeleted { topToolbar } }
         .sheet(isPresented: $showMoveSheet) {
             MoveToSheet(title: "Copy To Deck") { destination in
                 copySelectedItems(to: destination)
@@ -76,6 +85,9 @@ struct CollectionDetailView: View {
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filterState: filterState, items: collection.items)
         }
+        .sheet(isPresented: $showListOperation) {
+            CardListOperationView(target: .collection(collection))
+        }
         .sheet(isPresented: $showCSVImport) {
             CSVImportView(destination: .collection(collection))
         }
@@ -87,8 +99,11 @@ struct CollectionDetailView: View {
                 collection.updatedAt = Date()
             }
         }
-        .task(id: collection.items.map(\.id)) {
-            await appModel.refreshPrices(for: collection.items)
+        .task(id: isDeleted ? [] : collection.items.map(\.id)) {
+            if !isDeleted { await appModel.refreshPrices(for: collection.items) }
+        }
+        .onChange(of: showListOperation) { _, presented in
+            if !presented && isDeleted { dismiss() }
         }
     }
 
@@ -127,7 +142,8 @@ struct CollectionDetailView: View {
                     name: collection.name,
                     exportFile: $exportFile,
                     onSelect: enterSelecting,
-                    onImport: { showCSVImport = true }
+                    onImport: { showCSVImport = true },
+                    onListOperation: { showListOperation = true }
                 )
             }
         }
@@ -247,6 +263,8 @@ private extension CollectionDetailView {
                 .multilineTextAlignment(.center)
             Button("Add Card") { showAddCard = true }
                 .buttonStyle(.borderedProminent)
+            Button("Add or Subtract Cards") { showListOperation = true }
+                .buttonStyle(.bordered)
             Button("Import CSV") { showCSVImport = true }
                 .buttonStyle(.bordered)
         }

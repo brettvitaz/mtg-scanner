@@ -16,12 +16,12 @@ public struct ResultsView: View {
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var showMoveSheet = false
+    @State private var showCopyMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextCopyItem: CollectionItem?
+    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var openSwipeRowID: UUID?
     @State private var showSearch = false
@@ -47,15 +47,14 @@ public struct ResultsView: View {
                     .environment(appModel)
             }
         }
-        .sheet(isPresented: $showMoveSheet) {
-            MoveToSheet(title: "Copy To") { destination in
-                copySelectedItems(to: destination)
+        .sheet(isPresented: $showCopyMoveSheet) {
+            CopyMoveSheet(items: inboxItems.filter { selectedItems.contains($0.id) }) { _ in
+                exitSelecting()
             }
         }
-        .sheet(item: $contextCopyItem) { item in
-            MoveToSheet(title: "Copy To") { destination in
-                copyItem(item, to: destination)
-                contextCopyItem = nil
+        .sheet(item: $contextTransferItem) { item in
+            CopyMoveSheet(items: [item]) { _ in
+                contextTransferItem = nil
             }
         }
         .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
@@ -157,7 +156,7 @@ public struct ResultsView: View {
         } else {
             CollectionItemRow(
                 item: item,
-                onCopy: { contextCopyItem = item },
+                onTransfer: { contextTransferItem = item },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -217,7 +216,7 @@ public struct ResultsView: View {
 private extension ResultsView {
     var bottomActionBar: some View {
         HStack {
-            actionButton("doc.on.doc", "Copy") { showMoveSheet = true }
+            actionButton("doc.on.doc", "Copy/Move") { showCopyMoveSheet = true }
             Spacer()
             actionButton("sparkles", "Toggle Foil") { toggleSelectedFoil() }
             Spacer()
@@ -263,29 +262,6 @@ private extension ResultsView {
         selectedItems = Set(displayedItems.map(\.id))
     }
 
-    func copySelectedItems(to destination: MoveDestination) {
-        let items = inboxItems.filter { selectedItems.contains($0.id) }
-        switch destination {
-        case .collection(let collection):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: collection.items, context: modelContext) {
-                    $0.collection = collection
-                }
-            }
-            collection.updatedAt = Date()
-        case .deck(let deck):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: deck.items, context: modelContext) {
-                    $0.deck = deck
-                }
-            }
-            deck.updatedAt = Date()
-        }
-        exitSelecting()
-    }
-
     func deleteSelectedItems() {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
         registerUndo(for: items)
@@ -299,22 +275,6 @@ private extension ResultsView {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         registerUndo(for: [item])
         modelContext.delete(item)
-    }
-
-    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
-        let copy = item.duplicate()
-        switch destination {
-        case .collection(let collection):
-            mergeOrInsert(copy, into: collection.items, context: modelContext) {
-                $0.collection = collection
-            }
-            collection.updatedAt = Date()
-        case .deck(let deck):
-            mergeOrInsert(copy, into: deck.items, context: modelContext) {
-                $0.deck = deck
-            }
-            deck.updatedAt = Date()
-        }
     }
 
     func toggleFoil(_ item: CollectionItem) {

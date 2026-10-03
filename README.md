@@ -181,3 +181,16 @@ choosing a printing or skipping the row.
 
 The import review numbers displayed rows from 1, excluding the CSV header and
 blank records. Skipping a row keeps its position in the review list.
+
+### Copying and moving saved cards
+
+Results, collections, decks, card context menus, and saved-card details share a
+**Copy/Move** sheet. It defaults to Copy and the full quantity of each selected
+row. Adjust each row’s quantity to copy or move part of a stack, then choose an
+existing collection/deck or create a new destination. The source collection or
+deck is excluded from destinations.
+
+Copy leaves the source unchanged. Move leaves any remaining quantity in the
+source and removes fully transferred rows. Matching printings and foil finishes
+merge quantities in the destination. Cancel leaves cards and selection unchanged.
+Unsaved card details continue to offer Add To.

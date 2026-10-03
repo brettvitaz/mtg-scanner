@@ -9,12 +9,12 @@ struct CollectionDetailView: View {
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var showMoveSheet = false
+    @State private var showCopyMoveSheet = false
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextCopyItem: CollectionItem?
+    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
@@ -39,15 +39,14 @@ struct CollectionDetailView: View {
             CardDetailView(card: card)
         }
         .toolbar { topToolbar }
-        .sheet(isPresented: $showMoveSheet) {
-            MoveToSheet(title: "Copy To Deck") { destination in
-                copySelectedItems(to: destination)
+        .sheet(isPresented: $showCopyMoveSheet) {
+            CopyMoveSheet(items: collection.items.filter { selectedItems.contains($0.id) }) { _ in
+                exitSelecting()
             }
         }
-        .sheet(item: $contextCopyItem) { item in
-            MoveToSheet(title: "Copy To") { destination in
-                copyItem(item, to: destination)
-                contextCopyItem = nil
+        .sheet(item: $contextTransferItem) { item in
+            CopyMoveSheet(items: [item]) { _ in
+                contextTransferItem = nil
             }
         }
         .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
@@ -139,11 +138,11 @@ struct CollectionDetailView: View {
         HStack {
             Button {
                 guard !selectedItems.isEmpty else { return }
-                showMoveSheet = true
+                showCopyMoveSheet = true
             } label: {
                 VStack(spacing: 2) {
-                    Image(systemName: "rectangle.stack")
-                    Text("Copy to Deck").font(.caption2)
+                    Image(systemName: "doc.on.doc")
+                    Text("Copy/Move").font(.caption2)
                 }
             }
             .disabled(selectedItems.isEmpty)
@@ -216,7 +215,7 @@ private extension CollectionDetailView {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onCopy: { contextCopyItem = item },
+                onTransfer: { contextTransferItem = item },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -270,29 +269,6 @@ private extension CollectionDetailView {
         selectedItems = Set(displayedItems.map(\.id))
     }
 
-    func copySelectedItems(to destination: MoveDestination) {
-        let items = collection.items.filter { selectedItems.contains($0.id) }
-        switch destination {
-        case .collection(let targetCollection):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: targetCollection.items, context: modelContext) {
-                    $0.collection = targetCollection
-                }
-            }
-            targetCollection.updatedAt = Date()
-        case .deck(let deck):
-            for item in items {
-                let copy = item.duplicate()
-                mergeOrInsert(copy, into: deck.items, context: modelContext) {
-                    $0.deck = deck
-                }
-            }
-            deck.updatedAt = Date()
-        }
-        exitSelecting()
-    }
-
     func deleteSelectedItems() {
         let items = collection.items.filter { selectedItems.contains($0.id) }
         registerUndo(for: items)
@@ -317,22 +293,6 @@ private extension CollectionDetailView {
             collection.updatedAt = Date()
         } else {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        }
-    }
-
-    func copyItem(_ item: CollectionItem, to destination: MoveDestination) {
-        let copy = item.duplicate()
-        switch destination {
-        case .collection(let targetCollection):
-            mergeOrInsert(copy, into: targetCollection.items, context: modelContext) {
-                $0.collection = targetCollection
-            }
-            targetCollection.updatedAt = Date()
-        case .deck(let deck):
-            mergeOrInsert(copy, into: deck.items, context: modelContext) {
-                $0.deck = deck
-            }
-            deck.updatedAt = Date()
         }
     }
 

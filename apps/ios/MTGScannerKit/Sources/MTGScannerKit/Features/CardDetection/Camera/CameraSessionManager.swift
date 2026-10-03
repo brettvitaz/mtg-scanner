@@ -1,4 +1,5 @@
 import AVFoundation
+import OSLog
 import UIKit
 
 /// Manages the `AVCaptureSession` lifecycle for real-time card detection.
@@ -56,34 +57,44 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
     private var maxPhotoDimensions = CMVideoDimensions(width: 0, height: 0)
 
     private static let capturePointOfInterest = CGPoint(x: 0.5, y: 0.5)
-    private static let captureSettleTimeout: TimeInterval = 1.2
+    private var focusPoint = CGPoint(x: 0.5, y: 0.5)
+    private var focusSettlingState: FocusSettlingState?
+    private var focusObservations: [NSKeyValueObservation] = []
+    private var focusObservationGeneration = 0
     private static let captureSettlePollInterval: TimeInterval = 0.05
+    private static let focusLogger = Logger(subsystem: "com.mtgscanner", category: "CameraFocus")
 
     // MARK: - Setup
 
     /// Configures the capture session.
     ///
     /// Must be called once before `start()`. Safe to call from any queue.
-    func configure() {
+    func configure(camera: AutoScanCamera = .standard) {
         sessionQueue.async { [weak self] in
-            self?.configureOnSessionQueue()
+            self?.configureOnSessionQueue(camera: camera)
         }
     }
 
-    private func configureOnSessionQueue() {
+    private func configureOnSessionQueue(camera: AutoScanCamera) {
         session.beginConfiguration()
-        defer { session.commitConfiguration() }
+        defer {
+            session.commitConfiguration()
+            if let device = captureDevice {
+                observeAdjustments(device)
+                if !configureFocus(device, point: focusPoint) { print("[Camera] Could not configure continuous focus") }
+                print("[Camera] \(camera.rawValue): \(device.deviceType.rawValue), " +
+                      "minimum focus distance \(device.minimumFocusDistance) mm")
+            }
+        }
 
         session.sessionPreset = .hd1920x1080
 
         guard
-            let device = makeBackCameraDevice(),
+            let device = makeBackCameraDevice(camera: camera),
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else { return }
         session.addInput(input)
-        captureDevice = device
-        configureFocus(device)
 
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true
@@ -104,9 +115,14 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
             photoOutput.maxPhotoDimensions = largest
             maxPhotoDimensions = largest
         }
+        captureDevice = device
     }
 
-    private func makeBackCameraDevice() -> AVCaptureDevice? {
+    private func makeBackCameraDevice(camera: AutoScanCamera) -> AVCaptureDevice? {
+        let closeUp = camera == .automatic ? AutoScanCamera.closeUpDevice() : nil
+        if camera.preferredDeviceType(closeUpAvailable: closeUp != nil) == .builtInUltraWideCamera {
+            return closeUp
+        }
         for deviceType in Self.preferredBackCameraTypes {
             if let device = AVCaptureDevice.default(deviceType, for: .video, position: .back) {
                 return device
@@ -123,14 +139,15 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
 
     // MARK: - Photo Capture
 
-    /// Triggers a still photo capture and returns the captured upload payload via `completion`.
-    /// If a capture is already in flight, or the session is not yet running, `completion`
-    /// is called immediately with `nil`.
-    func capturePhoto(completion: @escaping @Sendable (RecognitionImagePayload?) -> Void) {
+    /// Waits briefly for focus, then captures even if continuous adjustment is still active.
+    /// Completion is delivered on the main queue, including cancellation and readiness failures.
+    func captureFocusedPhoto(
+        focusPoint: CGPoint?, completion: @escaping @Sendable (CameraCaptureResult) -> Void
+    ) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             guard self.isSessionReady, !self.isCaptureInFlight else {
-                DispatchQueue.main.async { completion(nil) }
+                DispatchQueue.main.async { completion(.failure(.unavailable)) }
                 return
             }
             self.isCaptureInFlight = true
@@ -143,7 +160,7 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
                 onDone: { [weak self] handler in self?.captureDidFinish(handler: handler) }
             )
             self._activeHandler = handler
-            self.lockFocusThenCapture(handler: handler)
+            self.captureWhenFocused(handler: handler, point: focusPoint ?? Self.capturePointOfInterest)
         }
     }
 
@@ -153,7 +170,6 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
         guard _activeHandler === handler else { return }
         isCaptureInFlight = false
         _activeHandler = nil
-        restoreContinuousAutoFocus()
     }
 
     /// Test-only accessor for queue-confined capture state.
@@ -177,91 +193,149 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
 
 }
 
+extension CameraSessionManager {
+    /// Runs on the session queue. Failed configuration leaves the target eligible for retry.
+    func prepareFocus(at point: CGPoint, configure: () -> Bool) -> Bool {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        if focusSettlingState != nil, !CameraFocus.needsRetargeting(from: focusPoint, to: point) {
+            return true
+        }
+        guard configure() else { return false }
+        focusPoint = point
+        focusSettlingState = FocusSettlingState(startedAt: ProcessInfo.processInfo.systemUptime)
+        return true
+    }
+
+    func focus(on point: CGPoint) {
+        sessionQueue.async { [weak self] in
+            guard let self, !self.isCaptureInFlight, let device = self.captureDevice else { return }
+            if !self.configureFocus(device, point: point) {
+                print("[Camera] Could not retarget continuous focus")
+            }
+        }
+    }
+}
+
 // MARK: - Focus helpers
 
 private extension CameraSessionManager {
 
-    func configureFocus(_ device: AVCaptureDevice) {
-        guard (try? device.lockForConfiguration()) != nil else { return }
-        configurePointsOfInterest(device)
-        if device.isFocusModeSupported(.continuousAutoFocus) {
-            device.focusMode = .continuousAutoFocus
+    func configureFocus(_ device: AVCaptureDevice, point: CGPoint) -> Bool {
+        prepareFocus(at: point) {
+            do {
+                try device.lockForConfiguration()
+            } catch {
+                Self.focusLogger.error("Focus configuration failed: \(error.localizedDescription, privacy: .public)")
+                return false
+            }
+            defer { device.unlockForConfiguration() }
+            configurePointsOfInterest(device, point: point)
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+            if device.isAutoFocusRangeRestrictionSupported {
+                device.autoFocusRangeRestriction = .near
+            }
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            return true
         }
-        if device.isAutoFocusRangeRestrictionSupported {
-            device.autoFocusRangeRestriction = .near
-        }
-        if device.isExposureModeSupported(.continuousAutoExposure) {
-            device.exposureMode = .continuousAutoExposure
-        }
-        device.unlockForConfiguration()
     }
 
-    func configurePointsOfInterest(_ device: AVCaptureDevice) {
+    func configurePointsOfInterest(_ device: AVCaptureDevice, point: CGPoint) {
         if device.isFocusPointOfInterestSupported {
-            device.focusPointOfInterest = Self.capturePointOfInterest
+            device.focusPointOfInterest = point
         }
         if device.isExposurePointOfInterestSupported {
-            device.exposurePointOfInterest = Self.capturePointOfInterest
+            device.exposurePointOfInterest = point
         }
     }
 
-    func lockFocusThenCapture(handler: PhotoCaptureHandler) {
+    func captureWhenFocused(handler: PhotoCaptureHandler, point: CGPoint) {
         guard !suppressCaptureForTesting else { return }
         guard let device = captureDevice else {
-            handler.issueCapture(to: photoOutput)
+            handler.fail(.unavailable)
             return
         }
-        var shouldWaitForSettle = false
-        do {
-            try device.lockForConfiguration()
-            configurePointsOfInterest(device)
-            if device.isFocusModeSupported(.autoFocus) {
-                device.focusMode = .autoFocus
-                shouldWaitForSettle = true
-            }
-            if device.isExposureModeSupported(.autoExpose) {
-                device.exposureMode = .autoExpose
-                shouldWaitForSettle = true
-            }
-            device.unlockForConfiguration()
-        } catch {
-            handler.issueCapture(to: photoOutput)
+        guard configureFocus(device, point: point) else {
+            handler.fail(.focusConfigurationFailed)
             return
         }
-        guard shouldWaitForSettle else {
-            handler.issueCapture(to: photoOutput)
-            return
-        }
-        waitForFocusAndExposureToSettle(handler: handler, startedAt: Date())
+        waitForFocus(
+            handler: handler, deadline: ProcessInfo.processInfo.systemUptime + 0.5
+        )
     }
 
-    func waitForFocusAndExposureToSettle(handler: PhotoCaptureHandler, startedAt: Date) {
+    func observeAdjustments(_ device: AVCaptureDevice) {
+        clearFocusWait()
+        let generation = focusObservationGeneration
+        focusObservations = [device.observe(\.isAdjustingFocus, options: [.new]) { [weak self] _, change in
+            guard change.newValue == true else { return }
+            self?.sessionQueue.async { [weak self] in
+                guard let self, self.focusObservationGeneration == generation else { return }
+                self.focusSettlingState?.recordAdjustment()
+            }
+        }]
+    }
+
+    func clearFocusWait() {
+        focusObservationGeneration &+= 1
+        focusObservations.removeAll()
+        focusSettlingState = nil
+    }
+
+    func waitForFocus(handler: PhotoCaptureHandler, deadline: TimeInterval) {
         guard handler.generation == captureGeneration, _activeHandler === handler else { return }
         guard let device = captureDevice else {
-            handler.issueCapture(to: photoOutput)
+            handler.fail(.unavailable)
             return
         }
-        let didSettle = !device.isAdjustingFocus && !device.isAdjustingExposure
-        let didTimeOut = Date().timeIntervalSince(startedAt) >= Self.captureSettleTimeout
-        guard !didSettle, !didTimeOut else {
-            handler.issueCapture(to: photoOutput)
+        guard let decision = focusSettlingState?.evaluate(
+            isAdjusting: device.isAdjustingFocus,
+            at: ProcessInfo.processInfo.systemUptime, deadline: deadline
+        ) else {
+            Self.focusLogger.error("Capture \(handler.generation): missing prepared focus state")
+            handler.fail(.focusConfigurationFailed)
             return
         }
-        sessionQueue.asyncAfter(deadline: .now() + Self.captureSettlePollInterval) { [weak self] in
-            self?.waitForFocusAndExposureToSettle(handler: handler, startedAt: startedAt)
+        switch decision {
+        case .settled:
+            logFocusCapture(handler: handler, device: device, deadline: deadline, settled: true)
+            handler.issueCapture(to: photoOutput)
+        case .captureAtDeadline:
+            logFocusCapture(handler: handler, device: device, deadline: deadline, settled: false)
+            handler.issueCapture(to: photoOutput)
+        case .waiting:
+            sessionQueue.asyncAfter(deadline: .now() + Self.captureSettlePollInterval) { [weak self] in
+                self?.waitForFocus(handler: handler, deadline: deadline)
+            }
         }
     }
 
-    func restoreContinuousAutoFocus() {
-        guard let device = captureDevice,
-              (try? device.lockForConfiguration()) != nil else { return }
-        if device.isFocusModeSupported(.continuousAutoFocus) {
-            device.focusMode = .continuousAutoFocus
+    func logFocusCapture(
+        handler: PhotoCaptureHandler, device: AVCaptureDevice, deadline: TimeInterval, settled: Bool
+    ) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let wait = String(format: "%.3f", now - (deadline - 0.5))
+        let age = String(format: "%.3f", now - (focusSettlingState?.startedAt ?? now))
+        let details = "capture=\(handler.generation) wait=\(wait)s targetAge=\(age)s " +
+            "point=(\(focusPoint.x),\(focusPoint.y)) lens=\(device.deviceType.rawValue) " +
+            "lensPosition=\(device.lensPosition) focusMode=\(device.focusMode.rawValue) " +
+            "adjustingFocus=\(device.isAdjustingFocus) adjustingExposure=\(device.isAdjustingExposure)"
+        if settled {
+            Self.focusLogger.notice("Focus settled: \(details, privacy: .public)")
+        } else {
+            Self.focusLogger.warning("Focus deadline fallback: \(details, privacy: .public)")
         }
-        if device.isExposureModeSupported(.continuousAutoExposure) {
-            device.exposureMode = .continuousAutoExposure
-        }
-        device.unlockForConfiguration()
+    }
+
+    func recordFocusReadiness() {
+        guard let device = captureDevice else { return }
+        focusSettlingState?.record(
+            isAdjusting: device.isAdjustingFocus,
+            at: ProcessInfo.processInfo.systemUptime
+        )
     }
 }
 
@@ -326,21 +400,34 @@ extension CameraSessionManager {
         sessionQueue.async { [weak self] in
             guard let self, !self.session.isRunning else { return }
             self.session.startRunning()
-            self.isSessionReady = true
+            self.isSessionReady = self.session.isRunning && self.captureDevice != nil
+            if self.focusSettlingState == nil, let device = self.captureDevice {
+                self.observeAdjustments(device)
+                if !self.configureFocus(device, point: self.focusPoint) {
+                    print("[Camera] Could not restore continuous focus")
+                }
+            }
         }
     }
 
+    func shutDown() {
+        sessionQueue.async { [self] in
+            onFrame = nil
+            onPixelBuffer = nil
+        }
+        stop()
+    }
+
     func stop() {
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
+        sessionQueue.async { [self] in
             self.isSessionReady = false
             if self.isCaptureInFlight {
                 self.captureGeneration &+= 1
                 self._activeHandler?.cancel()
                 self._activeHandler = nil
                 self.isCaptureInFlight = false
-                self.restoreContinuousAutoFocus()
             }
+            self.clearFocusWait()
             guard self.session.isRunning else { return }
             self.session.stopRunning()
         }
@@ -355,6 +442,7 @@ extension CameraSessionManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        recordFocusReadiness()
         onFrame?(sampleBuffer)
         if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
             onPixelBuffer?(pixelBuffer, sampleBuffer.presentationTimeStamp)

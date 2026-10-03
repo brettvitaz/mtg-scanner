@@ -31,7 +31,49 @@ final class CameraSessionManagerTests: XCTestCase {
 
     // MARK: - Camera/photo configuration helpers
 
-    func testPreferredBackCameraTypesPreferVirtualCloseRangeCapableDevices() {
+    func testInitialFocusConfigurationFailureRetriesUnchangedCenter() {
+        let manager = CameraSessionManager()
+        manager.sessionQueue.sync {
+            let center = CGPoint(x: 0.5, y: 0.5)
+            var attempts = 0
+            XCTAssertFalse(manager.prepareFocus(at: center) {
+                attempts += 1
+                return false
+            })
+            XCTAssertEqual(attempts, 1)
+            XCTAssertTrue(manager.prepareFocus(at: center) {
+                attempts += 1
+                return true
+            })
+            XCTAssertEqual(attempts, 2)
+            XCTAssertTrue(manager.prepareFocus(at: center) {
+                XCTFail("Prepared focus at an unchanged target should be reused")
+                return false
+            })
+        }
+    }
+
+    func testFailedRetargetPreservesPreparedPointAndRetriesNewTarget() {
+        let manager = CameraSessionManager()
+        manager.sessionQueue.sync {
+            let center = CGPoint(x: 0.5, y: 0.5)
+            let target = CGPoint(x: 0.2, y: 0.7)
+            XCTAssertTrue(manager.prepareFocus(at: center) { true })
+            XCTAssertFalse(manager.prepareFocus(at: target) { false })
+            XCTAssertTrue(manager.prepareFocus(at: center) {
+                XCTFail("A failed retarget must preserve the previously configured point")
+                return false
+            })
+            var didRetry = false
+            XCTAssertTrue(manager.prepareFocus(at: target) {
+                didRetry = true
+                return true
+            })
+            XCTAssertTrue(didRetry)
+        }
+    }
+
+    func testPreferredBackCameraTypesKeepPhysicalWideFirst() {
         XCTAssertEqual(
             CameraSessionManager.preferredBackCameraTypes,
             [
@@ -57,63 +99,101 @@ final class CameraSessionManagerTests: XCTestCase {
         XCTAssertEqual(largest?.height, 3024)
     }
 
+    func testFocusFailureResolvesOnceAndReleasesCaptureLock() throws {
+        let manager = makeReadyManager()
+        let failed = expectation(description: "Focus configuration failure completes capture")
+        failed.assertForOverFulfill = true
+        manager.captureFocusedPhoto(focusPoint: CGPoint(x: 0.2, y: 0.7)) { result in
+            guard case .failure(.focusConfigurationFailed) = result else {
+                return XCTFail("Expected focus configuration failure")
+            }
+            failed.fulfill()
+        }
+        try manager.sessionQueue.sync {
+            let handler = try XCTUnwrap(manager.activeHandlerForTesting() as? PhotoCaptureHandler)
+            handler.fail(.focusConfigurationFailed)
+            handler.fail(.focusConfigurationFailed)
+            XCTAssertFalse(manager.isCaptureInFlightForTesting())
+            XCTAssertNil(manager.activeHandlerForTesting())
+        }
+        wait(for: [failed], timeout: 1)
+        manager.stop()
+    }
+
+    func testShutDownCancelsOutstandingCaptureAndDisconnectsFrames() {
+        let manager = makeReadyManager()
+        let cancelled = expectation(description: "Shutdown resolves capture")
+        manager.sessionQueue.sync { manager.onFrame = { _ in XCTFail("Old camera delivered a frame") } }
+        manager.captureFocusedPhoto(focusPoint: nil) { result in
+            guard case .failure(.unavailable) = result else { return XCTFail("Expected cancelled capture") }
+            cancelled.fulfill()
+        }
+        manager.shutDown()
+        manager.sessionQueue.sync {
+            XCTAssertNil(manager.onFrame)
+            XCTAssertFalse(manager.isSessionReady)
+            XCTAssertFalse(manager.isCaptureInFlightForTesting())
+        }
+        wait(for: [cancelled], timeout: 1)
+    }
+
     // MARK: - Session not ready
 
-    func testCaptureBeforeSessionReadyFastFailsWithNil() {
+    func testCaptureBeforeSessionReadyFastFailsWithFailure() {
         let manager = CameraSessionManager()
         let exp = expectation(description: "capture fast-fails when session not ready")
-        nonisolated(unsafe) var receivedNil = false
+        nonisolated(unsafe) var receivedFailure = false
 
-        manager.capturePhoto { data in
-            receivedNil = (data == nil)
+        manager.captureFocusedPhoto(focusPoint: nil) { data in
+            receivedFailure = (try? data.get()) == nil
             exp.fulfill()
         }
         wait(for: [exp], timeout: 1.0)
 
-        XCTAssertTrue(receivedNil, "Capture before session is ready must receive nil")
+        XCTAssertTrue(receivedFailure, "Capture before session is ready must receive a failure")
     }
 
     // MARK: - Duplicate capture requests
 
-    func testSecondCaptureWhileInFlightFastFailsWithNil() {
+    func testSecondCaptureWhileInFlightFastFailsWithFailure() {
         let manager = makeReadyManager()
         nonisolated(unsafe) var firstCallbackFired = false
-        nonisolated(unsafe) var secondReceivedNil = false
+        nonisolated(unsafe) var secondReceivedFailure = false
 
         // First capture: accepted, stays in-flight (no hardware to complete it).
-        manager.capturePhoto { _ in firstCallbackFired = true }
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in firstCallbackFired = true }
         // Flush so isCaptureInFlight is set before the second enqueue.
         manager.sessionQueue.sync {}
 
         // Second capture: must be fast-failed synchronously on the session queue.
         let exp = expectation(description: "second capture fast-fails")
-        manager.capturePhoto { data in
-            secondReceivedNil = (data == nil)
+        manager.captureFocusedPhoto(focusPoint: nil) { data in
+            secondReceivedFailure = (try? data.get()) == nil
             exp.fulfill()
         }
         wait(for: [exp], timeout: 1.0)
 
         XCTAssertFalse(firstCallbackFired, "First capture completion must not be called by the fast-fail path")
-        XCTAssertTrue(secondReceivedNil, "Second capture while in-flight must receive nil")
+        XCTAssertTrue(secondReceivedFailure, "Second capture while in-flight must receive a failure")
 
         manager.stop()
     }
 
     // MARK: - stop() drains in-flight completion
 
-    func testStopResolvesInFlightCompletionWithNil() {
+    func testStopResolvesInFlightCompletionWithFailure() {
         let manager = makeReadyManager()
-        let exp = expectation(description: "completion resolved with nil by stop")
-        nonisolated(unsafe) var receivedNil = false
+        let exp = expectation(description: "completion resolved with a failure by stop")
+        nonisolated(unsafe) var receivedFailure = false
 
-        manager.capturePhoto { data in
-            receivedNil = (data == nil)
+        manager.captureFocusedPhoto(focusPoint: nil) { data in
+            receivedFailure = (try? data.get()) == nil
             exp.fulfill()
         }
         manager.stop()
 
         wait(for: [exp], timeout: 1.0)
-        XCTAssertTrue(receivedNil, "stop() must resolve pending completion with nil")
+        XCTAssertTrue(receivedFailure, "stop() must resolve pending completion with a failure")
     }
 
     // MARK: - isCaptureInFlight cleared after stop()
@@ -122,7 +202,7 @@ final class CameraSessionManagerTests: XCTestCase {
         let manager = makeReadyManager()
         let exp1 = expectation(description: "first capture drained by stop")
 
-        manager.capturePhoto { _ in exp1.fulfill() }
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in exp1.fulfill() }
         manager.stop()
         wait(for: [exp1], timeout: 1.0)
 
@@ -134,7 +214,7 @@ final class CameraSessionManagerTests: XCTestCase {
         // it is accepted (not fast-failed) by checking it stays pending after the
         // session queue drains — only stop() can resolve it, not the fast-fail path.
         nonisolated(unsafe) var secondCallbackFired = false
-        manager.capturePhoto { _ in secondCallbackFired = true }
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in secondCallbackFired = true }
 
         // Flush: if the second capture was fast-failed, its completion already ran.
         manager.sessionQueue.sync {}
@@ -157,7 +237,7 @@ final class CameraSessionManagerTests: XCTestCase {
 
         // Phase 1: start A, grab its handler, cancel A, re-arm, start B.
         let exp1 = expectation(description: "capture A drained by stop")
-        manager.capturePhoto { _ in exp1.fulfill() }
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in exp1.fulfill() }
         let handlerA = captureActiveHandler(from: manager)
         manager.stop()
         wait(for: [exp1], timeout: 1.0)
@@ -165,8 +245,11 @@ final class CameraSessionManagerTests: XCTestCase {
 
         // Phase 2: start B, verify stale-A completion doesn't disturb it.
         let exp2 = expectation(description: "capture B drained by second stop")
-        nonisolated(unsafe) var captureBReceivedNil = false
-        manager.capturePhoto { data in captureBReceivedNil = (data == nil); exp2.fulfill() }
+        nonisolated(unsafe) var captureBReceivedFailure = false
+        manager.captureFocusedPhoto(focusPoint: nil) { data in
+            captureBReceivedFailure = (try? data.get()) == nil
+            exp2.fulfill()
+        }
         manager.sessionQueue.sync {}
         let staleResult = fireStaleHandler(handlerA, on: manager)
 
@@ -179,12 +262,12 @@ final class CameraSessionManagerTests: XCTestCase {
         manager.stop()
         manager.sessionQueue.sync { manager.isSessionReady = true }
         wait(for: [exp2], timeout: 1.0)
-        XCTAssertTrue(captureBReceivedNil, "stop() must resolve capture B with nil")
+        XCTAssertTrue(captureBReceivedFailure, "stop() must resolve capture B with a failure")
 
         // Phase 4: after two stops, a third capture must be accepted.
         let exp3 = expectation(description: "third capture drained by stop")
         nonisolated(unsafe) var thirdFired = false
-        manager.capturePhoto { _ in thirdFired = true; exp3.fulfill() }
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in thirdFired = true; exp3.fulfill() }
         manager.stop()
         wait(for: [exp3], timeout: 1.0)
         XCTAssertTrue(thirdFired, "Third capture after two stops must be accepted and resolved")

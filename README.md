@@ -48,6 +48,27 @@ without starting automatic scanning. During the settling delay, the shutter capt
 Capture is disabled while a photo is being captured or prepared for recognition. If on-device
 cropping finds no card, the original photo is uploaded for recognition.
 
+Auto Scan automatically selects a fixed autofocus-capable ultra-wide camera when the
+device supports the 1080p video/photo pipeline. This keeps growing stacks in scanning
+stands within closer focusing range without a camera setting or lens switches during scanning.
+Phones without a suitable close-up lens use the main camera and may need a lower stack limit.
+Normal Scan uses the standard camera. Changing scan mode resets zoom and calibration.
+
+Continuous autofocus targets the detected card during the existing settling delay. Capture
+reuses that focus instead of starting another focus/exposure pass at the shutter. If the
+lens is still adjusting, an additional wait is limited to 0.5 seconds; the shutter then
+fires with continuous autofocus active. Exposure adjustment does not block capture. Photo resolution and quality prioritization are unchanged.
+
+Successful capture does not establish that focus settled or that the image is sharp.
+For physical testing, connect the iPhone to macOS Console and filter the app's logs by
+subsystem `com.mtgscanner`, category `CameraFocus`. Each shutter request that reaches
+capture logs either `Focus settled` or `Focus deadline fallback`, with capture number,
+wait duration, target age, lens/position, and separate focus/exposure adjustment flags.
+Configuration failures log the underlying error and show a retry message in the app;
+retrying an unchanged target attempts configuration again when no prepared state exists.
+See [ADR 0007](docs/decisions/adr-0007-auto-scan-focus-and-close-up-camera.md#physical-acceptance-check)
+for the physical acceptance check.
+
 ## Useful commands
 ```bash
 make bootstrap     # prepare local dependencies

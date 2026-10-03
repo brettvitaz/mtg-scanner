@@ -62,6 +62,8 @@ final class AutoScanViewModel {
     private var captureOperationID: UUID?
     var canCaptureManually: Bool { captureOperationID == nil }
     private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
+    private(set) var captureFocusPoint: CGPoint?
+    var captureFocusedPhoto: (@MainActor (CGPoint?) async -> CameraCaptureResult)?
     private var detectBox: (@Sendable (CGImage) async -> CGRect?)?
     private var settleTask: Task<Void, Never>?
     private let cropImage: @Sendable (UIImage, CardCropHint?) async -> CardCropResult
@@ -149,6 +151,7 @@ final class AutoScanViewModel {
     }
 
     private func resetSession() {
+        captureFocusPoint = nil
         scanSessionID = UUID()
         detectionZone = nil
         isCalibrated = false
@@ -249,6 +252,8 @@ final class AutoScanViewModel {
         guard isActive, sessionID == scanSessionID, boundingBox != nil, canCaptureManually else { return }
         switch captureState {
         case .watching:
+            captureFocusPoint = CameraFocus.point(fromYOLOBox: boundingBox)
+            if let captureFocusPoint { captureCoordinator?.focus(on: captureFocusPoint) }
             startSettleTimer()
         case .settling, .capturing:
             // Timer is already running (settling) or capture is in progress — don't interrupt.
@@ -284,20 +289,24 @@ final class AutoScanViewModel {
             if captureOperationID == operationID { captureOperationID = nil }
         }
         guard sessionID == scanSessionID else { return }
-        let payload: RecognitionImagePayload?
-        if let capturePhoto {
-            payload = await capturePhoto()
-        } else {
-            payload = await captureCoordinator?.capturePhoto()
-        }
+        let result = await captureResult()
         guard sessionID == scanSessionID else { return }
-        guard let payload else {
+        switch result {
+        case .success(let payload):
+            await processAutoCapturedPayload(payload, sessionID: sessionID)
+        case .failure(let failure):
             if isActive { presenceTracker.markCaptured() }
             captureState = .watching
-            statusMessage = isActive ? "Capture failed — watching…" : "Capture failed — tap Capture to retry."
-            return
+            statusMessage = failure.message
         }
-        await processAutoCapturedPayload(payload, sessionID: sessionID)
+    }
+
+    private func captureResult() async -> CameraCaptureResult {
+        if let captureFocusedPhoto { return await captureFocusedPhoto(captureFocusPoint) }
+        if let capturePhoto {
+            return await capturePhoto().map { .success($0) } ?? .failure(.unavailable)
+        }
+        return await captureCoordinator?.captureFocusedPhoto(focusPoint: captureFocusPoint) ?? .failure(.unavailable)
     }
 
     func processAutoCapturedPayload(_ payload: RecognitionImagePayload) async {

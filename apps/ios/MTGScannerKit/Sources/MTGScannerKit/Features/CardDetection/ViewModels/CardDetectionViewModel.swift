@@ -8,11 +8,17 @@ final class CardDetectionViewModel {
 
     var detectedCardCount: Int = 0
     var cameraPermissionDenied = false
+    var cameraPermissionGranted = false
     var zoomFactor: CGFloat = 1.0
     var torchLevel: Float = 0
 
     func handleDetectedCards(_ cards: [DetectedCard]) {
         detectedCardCount = cards.count
+    }
+
+    func updateCameraPermission(granted: Bool) {
+        cameraPermissionDenied = !granted
+        cameraPermissionGranted = granted
     }
 
     func requestCameraPermissionIfNeeded() {
@@ -21,13 +27,13 @@ final class CardDetectionViewModel {
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 Task { @MainActor in
-                    self?.cameraPermissionDenied = !granted
+                    self?.updateCameraPermission(granted: granted)
                 }
             }
         case .denied, .restricted:
-            cameraPermissionDenied = true
+            updateCameraPermission(granted: false)
         case .authorized:
-            break
+            updateCameraPermission(granted: true)
         @unknown default:
             break
         }

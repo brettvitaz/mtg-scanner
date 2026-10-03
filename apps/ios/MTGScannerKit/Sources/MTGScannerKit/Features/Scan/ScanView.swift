@@ -16,6 +16,7 @@ struct ScanView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
     @State private var photoLoadError: String?
+    @State private var captureError: String?
 
     var body: some View {
         ZStack {
@@ -52,10 +53,9 @@ struct ScanView: View {
             autoScanViewModel.debugSaveRawCapturesToPhotoLibrary = isEnabled
         }
 #endif
-        .onChange(of: detectionMode) { _, mode in
-            if mode != .auto {
-                autoScanViewModel.stop()
-            }
+        .onChange(of: cameraPreviewID) { _, _ in
+            autoScanViewModel.stop()
+            detectionViewModel.zoomFactor = 1
         }
         .onChange(of: isActive) { _, active in
             handleScanActivityChange(active)
@@ -67,6 +67,13 @@ struct ScanView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Enable camera access in Settings to use real-time card detection.")
+        }
+        .alert("Capture Failed", isPresented: Binding(
+            get: { captureError != nil }, set: { if !$0 { captureError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(captureError ?? "")
         }
         .alert("Photo Load Error", isPresented: photoLoadErrorBinding) {
             Button("OK", role: .cancel) {}
@@ -155,10 +162,15 @@ struct ScanView: View {
         .padding(.vertical, 16)
     }
 
+    private var cameraPreviewID: String {
+        "\(detectionMode.rawValue)-\(detectionViewModel.cameraPermissionGranted)"
+    }
+
     private var cameraPreview: some View {
         CameraPreviewRepresentable(
             detectionMode: $detectionMode,
             zoomFactor: detectionViewModel.zoomFactor,
+            camera: isAutoScanMode ? .automatic : .standard,
             onDetectedCardsChanged: { cards in
                 detectionViewModel.handleDetectedCards(cards)
             },
@@ -176,6 +188,7 @@ struct ScanView: View {
             torchLevel: detectionViewModel.torchLevel,
             exposureBias: Float(appModel.exposureBias)
         )
+        .id(cameraPreviewID)
         .accessibilityHidden(true)
     }
 
@@ -218,11 +231,16 @@ struct ScanView: View {
     private func captureCard() {
         triggerShutterFeedback()
         Task {
-            guard let payload = await captureCoordinator.capturePhoto() else { return }
+            let result = await captureCoordinator.captureFocusedPhoto(focusPoint: nil)
+            switch result {
+            case .success(let payload):
 #if DEBUG
-            await autoScanViewModel.saveRawCaptureIfEnabled(payload)
+                await autoScanViewModel.saveRawCaptureIfEnabled(payload)
 #endif
-            await enqueueForRecognition(payload)
+                await enqueueForRecognition(payload)
+            case .failure(let failure):
+                captureError = failure.message
+            }
         }
     }
 }

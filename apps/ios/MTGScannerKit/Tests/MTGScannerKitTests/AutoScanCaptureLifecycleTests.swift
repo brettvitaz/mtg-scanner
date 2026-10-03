@@ -240,6 +240,48 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         XCTAssertFalse(vm.isActive)
     }
 
+    func testFocusConfigurationFailureSkipsUploadAndAllowsManualRetry() async {
+        let queue = makeQueue()
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        vm.captureFocusedPhoto = { _ in .failure(.focusConfigurationFailed) }
+        vm.start()
+        vm.captureManually()
+        await waitForCapture(vm)
+        XCTAssertEqual(queue.pendingCount, 0)
+        XCTAssertNil(vm.lastCroppedImage)
+        XCTAssertEqual(vm.captureState, .watching)
+        XCTAssertTrue(vm.isActive)
+        XCTAssertEqual(vm.statusMessage, "Could not configure focus — tap Capture to retry.")
+        let payload = makePayload()
+        vm.captureFocusedPhoto = { _ in .success(payload) }
+        vm.captureManually()
+        await waitForCapture(vm)
+        XCTAssertEqual(queue.pendingCount, 1)
+        vm.stop()
+    }
+
+    func testSignalTargetsCardAndResetClearsFocusPoint() async {
+        let queue = makeQueue()
+        let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
+        vm.captureDelay = 0
+        let focused = expectation(description: "Capture receives the detected card focus point")
+        vm.captureFocusedPhoto = { point in
+            XCTAssertEqual(point?.x ?? 0, 0.4, accuracy: 0.001)
+            XCTAssertEqual(point?.y ?? 0, 0.5, accuracy: 0.001)
+            focused.fulfill()
+            return .failure(.focusConfigurationFailed)
+        }
+        vm.start()
+        vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
+        await fulfillment(of: [focused], timeout: 1)
+        await waitForCapture(vm)
+        XCTAssertNotNil(vm.captureFocusPoint)
+        vm.stop()
+        XCTAssertNil(vm.captureFocusPoint)
+        XCTAssertNil(vm.detectionZone)
+        XCTAssertFalse(vm.isCalibrated)
+    }
+
     private func makeViewModel(queue: RecognitionQueue, camera: SuspendedPhotoCapture) -> AutoScanViewModel {
         AutoScanViewModel(
             detectorProvider: { nil }, recognitionQueue: queue,

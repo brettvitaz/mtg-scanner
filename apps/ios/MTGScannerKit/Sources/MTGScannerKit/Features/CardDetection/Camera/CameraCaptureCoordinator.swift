@@ -6,11 +6,15 @@ import UIKit
 final class CameraCaptureCoordinator {
     weak var controller: CameraViewController?
 
-    func capturePhoto() async -> RecognitionImagePayload? {
-        guard let controller else { return nil }
+    func focus(on point: CGPoint) {
+        controller?.focus(on: point)
+    }
+
+    func captureFocusedPhoto(focusPoint: CGPoint?) async -> CameraCaptureResult {
+        guard let controller else { return .failure(.unavailable) }
         return await withCheckedContinuation { continuation in
-            controller.capturePhoto { payload in
-                continuation.resume(returning: payload)
+            controller.captureFocusedPhoto(focusPoint: focusPoint) { result in
+                continuation.resume(returning: result)
             }
         }
     }

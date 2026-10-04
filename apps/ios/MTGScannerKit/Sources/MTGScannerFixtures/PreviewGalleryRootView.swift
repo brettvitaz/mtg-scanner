@@ -15,6 +15,17 @@ public struct PreviewGalleryRootView: View {
 
     public init(route: String) {
         self.route = route
+        if route.hasPrefix("card-row-") { Self.cachePreviewArtwork() }
+    }
+
+    private static func cachePreviewArtwork() {
+        guard let resource = Bundle.module.url(forResource: "CardPreviewArtwork", withExtension: "jpg"),
+              let data = try? Data(contentsOf: resource),
+              let url = URL(string: "https://fixtures.invalid/card-preview.jpg"),
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                                             headerFields: ["Content-Type": "image/jpeg"]) else { return }
+        URLCache.shared.storeCachedResponse(CachedURLResponse(response: response, data: data),
+                                            for: URLRequest(url: url))
     }
 
     public var body: some View {
@@ -43,7 +54,7 @@ public struct PreviewGalleryRootView: View {
         case "card-edit", "card-detail":
             CardEditFixtureView(route: route)
         case "pricing-results", "pricing-collection", "pricing-deck",
-             "pricing-large", "pricing-filter", "copy-move":
+             "pricing-large", "pricing-filter", "copy-move", "card-row-preview", "card-row-list":
             CardListPricingFixtureView(route: route)
         case "list-operation", "list-subtract", "list-add-delete", "list-operation-complete",
              "csv-subtract", "list-deleted-collection", "list-deleted-deck":

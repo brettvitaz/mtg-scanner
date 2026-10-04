@@ -15,7 +15,7 @@ public struct CardListPricingFixtureView: View {
 
     public init(route: String) {
         self.route = route
-        fixtureItems = Self.items(large: route == "pricing-large")
+        fixtureItems = route.hasPrefix("card-row-") ? Self.previewItems() : Self.items(large: route == "pricing-large")
         do {
             let container = try ModelContainer(
                 for: CollectionItem.self, CardCollection.self, Deck.self,
@@ -24,7 +24,9 @@ public struct CardListPricingFixtureView: View {
             container.mainContext.insert(collection)
             container.mainContext.insert(deck)
             for item in fixtureItems {
-                if route == "pricing-collection" || route == "copy-move" { item.collection = collection }
+                if route == "pricing-collection" || route == "copy-move" || route == "card-row-list" {
+                    item.collection = collection
+                }
                 if route == "pricing-deck" { item.deck = deck }
                 container.mainContext.insert(item)
             }
@@ -48,12 +50,31 @@ public struct CardListPricingFixtureView: View {
     @ViewBuilder
     private var content: some View {
         switch route {
-        case "pricing-collection": NavigationStack { CollectionDetailView(collection: collection) }
+        case "pricing-collection", "card-row-list": NavigationStack { CollectionDetailView(collection: collection) }
         case "pricing-deck": NavigationStack { DeckDetailView(deck: deck) }
         case "copy-move": CopyMoveSheet(items: fixtureItems) { _ in }
+        case "card-row-preview":
+            GeometryReader { geometry in
+                let size = CardRowPreview.size(in: geometry.size)
+                CardRowPreview(item: fixtureItems[0])
+                    .frame(width: size.width, height: size.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.dsBackground)
+            }
         case "pricing-filter": FilterSheet(filterState: filterState, items: fixtureItems)
         default: ResultsView()
         }
+    }
+
+    private static func previewItems() -> [CollectionItem] {
+        [
+            CollectionItem(title: "Teferi’s Protection", edition: "Commander 2017", setCode: "C17",
+                           collectorNumber: "8", foil: true, rarity: "rare",
+                           imageUrl: "https://fixtures.invalid/card-preview.jpg",
+                           priceRetail: "$34.99", priceBuy: "$28.00", quantity: 2),
+            CollectionItem(title: "A very long card name to check wrapping without artwork",
+                           edition: "A long edition name for preview layout checks", quantity: 1)
+        ]
     }
 
     private static func items(large: Bool) -> [CollectionItem] {

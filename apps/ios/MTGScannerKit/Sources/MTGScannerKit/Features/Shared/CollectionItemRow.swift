@@ -25,17 +25,21 @@ struct CollectionItemRow: View {
     let actionRevealWidth: CGFloat = 80
 
     var body: some View {
-        swipeContent
+        contextualContent
             .background(widthReader)
             .onChange(of: openRowID.wrappedValue) { _, newID in
                 guard newID != item.id, swipeOffset != 0 else { return }
                 closeSwipe()
             }
-            .modifier(ContextMenuModifier(row: self))
             .accessibilityElement(children: showQuantityStepper ? .contain : .ignore)
             .accessibilityLabel(accessibilitySummary)
-            .accessibilityAction(named: Text("Delete")) { onSwipeDelete?() }
-            .accessibilityAction(named: Text("Toggle Foil")) { onSwipeToggleFoil?() }
+            .accessibilityActions {
+                if let onTransfer { Button("Copy/Move", action: onTransfer) }
+                if let onToggleFoil {
+                    Button(item.foil ? "Set as Non-Foil" : "Set as Foil", action: onToggleFoil)
+                }
+                if let onDelete { Button("Delete", role: .destructive, action: onDelete) }
+            }
     }
 }
 
@@ -278,27 +282,15 @@ extension CollectionItemRow {
 }
 
 private extension CollectionItemRow {
-    var hasContextMenu: Bool { onTransfer != nil || onDelete != nil || onToggleFoil != nil }
-
     @ViewBuilder
-    var contextMenu: some View {
-        if let onTransfer { Button(action: onTransfer) { Label("Copy/Move", systemImage: "doc.on.doc") } }
-        if let onToggleFoil {
-            Button(action: onToggleFoil) {
-                Label(item.foil ? "Set as Non-Foil" : "Set as Foil", systemImage: "sparkles")
-            }
-        }
-        if let onDelete {
-            Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") }
-        }
-    }
-
-    struct ContextMenuModifier: ViewModifier {
-        let row: CollectionItemRow
-
-        @ViewBuilder
-        func body(content: Content) -> some View {
-            if row.hasContextMenu { content.contextMenu { row.contextMenu } } else { content }
+    var contextualContent: some View {
+        let actions = CardRowMenuActions(
+            transfer: onTransfer, toggleFoil: onToggleFoil, delete: onDelete, navigate: onNavigate
+        )
+        if actions.isAvailable {
+            CardRowContextMenu(content: swipeContent, item: item, actions: actions, onPresent: closeSwipe)
+        } else {
+            swipeContent
         }
     }
 }

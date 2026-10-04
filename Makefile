@@ -73,7 +73,7 @@ ios-lint:
 	./scripts/lint-ios.sh
 
 IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-empty card-detail card-edit \
-	pricing-results pricing-collection pricing-deck pricing-large pricing-filter copy-move \
+	pricing-results pricing-collection pricing-deck pricing-large pricing-filter copy-move card-row-preview card-row-list \
 	list-operation list-subtract list-add-delete list-operation-complete csv-subtract \
 	list-deleted-collection list-deleted-deck \
 	csv-import-undo csv-import-ready csv-import-skipped csv-import-loading csv-import-error \

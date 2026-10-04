@@ -74,6 +74,7 @@ ios-lint:
 
 IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-empty card-detail card-edit \
 	pricing-results pricing-collection pricing-deck pricing-large pricing-filter copy-move \
+	undo-results undo-collection undo-deck undo-empty undo-bulk undo-navigation \
 	list-operation list-subtract list-add-delete list-operation-complete csv-subtract \
 	list-deleted-collection list-deleted-deck \
 	csv-import-undo csv-import-ready csv-import-skipped csv-import-loading csv-import-error \

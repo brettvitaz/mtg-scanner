@@ -10,6 +10,7 @@ public struct CardListPricingFixtureView: View {
     private let collection = CardCollection(name: "Trade Binder")
     private let deck = Deck(name: "Commander Deck")
     private let appModel = AppModel()
+    private let libraryViewModel = LibraryViewModel()
     private let container: ModelContainer?
     private let setupError: String?
 
@@ -24,11 +25,24 @@ public struct CardListPricingFixtureView: View {
             container.mainContext.insert(collection)
             container.mainContext.insert(deck)
             for item in fixtureItems {
-                if route == "pricing-collection" || route == "copy-move" { item.collection = collection }
-                if route == "pricing-deck" { item.deck = deck }
+                if ["pricing-collection", "copy-move", "undo-collection"].contains(route) {
+                    item.collection = collection
+                }
+                if route == "pricing-deck" || route == "undo-deck" { item.deck = deck }
                 container.mainContext.insert(item)
             }
             try container.mainContext.save()
+            if route.hasPrefix("undo-") {
+                let scope: CardDeleteUndoScope = route == "undo-collection" ? .collection(collection.id)
+                    : route == "undo-deck" ? .deck(deck.id) : .results
+                let count = route == "undo-empty" ? fixtureItems.count : route == "undo-bulk" ? 2 : 1
+                let deleted = Array(fixtureItems.prefix(count))
+                appModel.deleteUndo.register(deleted, in: scope)
+                for item in deleted { container.mainContext.delete(item) }
+                try container.mainContext.save()
+            }
+            appModel.modelContext = container.mainContext
+            libraryViewModel.modelContext = container.mainContext
             self.container = container
             setupError = nil
         } catch {
@@ -39,7 +53,8 @@ public struct CardListPricingFixtureView: View {
 
     public var body: some View {
         if let container {
-            content.modelContainer(container).environment(appModel)
+            content.modelContainer(container).environment(appModel).environment(libraryViewModel)
+                .environment(\.undoSelectedTab, route == "undo-collection" || route == "undo-deck" ? 2 : 1)
         } else {
             Text(setupError ?? "Unable to load pricing fixture.")
         }
@@ -48,8 +63,10 @@ public struct CardListPricingFixtureView: View {
     @ViewBuilder
     private var content: some View {
         switch route {
-        case "pricing-collection": NavigationStack { CollectionDetailView(collection: collection) }
-        case "pricing-deck": NavigationStack { DeckDetailView(deck: deck) }
+        case "pricing-collection", "undo-collection": NavigationStack { CollectionDetailView(collection: collection) }
+        case "pricing-deck", "undo-deck": NavigationStack { DeckDetailView(deck: deck) }
+        case "undo-navigation":
+            RootTabView().task { appModel.shouldShowResults = true }
         case "copy-move": CopyMoveSheet(items: fixtureItems) { _ in }
         case "pricing-filter": FilterSheet(filterState: filterState, items: fixtureItems)
         default: ResultsView()

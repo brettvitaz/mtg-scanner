@@ -5,7 +5,7 @@ extension UIWindow {
     open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
         super.motionEnded(motion, with: event)
         if motion == .motionShake {
-            NotificationCenter.default.post(name: .deviceDidShake, object: nil)
+            NotificationCenter.default.post(name: .deviceDidShake, object: self)
         }
     }
 }
@@ -20,7 +20,9 @@ struct ShakeDetector: ViewModifier {
     func body(content: Content) -> some View {
         content.onReceive(
             NotificationCenter.default.publisher(for: .deviceDidShake)
-        ) { _ in
+        ) { notification in
+            guard let window = notification.object as? UIWindow, window.isKeyWindow,
+                  window.windowScene?.activationState == .foregroundActive else { return }
             onShake()
         }
     }

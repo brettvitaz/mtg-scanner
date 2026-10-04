@@ -26,6 +26,12 @@ struct CollectionDetailView: View {
 
     private var isDeleted: Bool { collection.isDeleted || collection.modelContext == nil }
 
+    private var undoIsBlocked: Bool {
+        showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
+        || contextDeleteItem != nil || exportFile != nil || showFilterSheet
+        || showAddCard || showCSVImport || showListOperation || selectedCard != nil || isDeleted
+    }
+
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: collection.items)
     }
@@ -43,6 +49,7 @@ struct CollectionDetailView: View {
                 cardListWithToolbar
             }
         }
+        .cardDeleteUndo(scope: .collection(collection.id), name: collection.name, blocked: undoIsBlocked)
         .navigationTitle(isDeleted ? "Collection Removed" : collection.name)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
@@ -315,14 +322,6 @@ private extension CollectionDetailView {
     }
 
     func registerUndo(for items: [CollectionItem]) {
-        let deletedItems = items
-        let deletedCollection = collection
-        appModel.registerUndoAction {
-            for item in deletedItems {
-                modelContext.insert(item)
-            }
-            deletedCollection.updatedAt = Date()
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        }
+        appModel.deleteUndo.register(items, in: .collection(collection.id))
     }
 }

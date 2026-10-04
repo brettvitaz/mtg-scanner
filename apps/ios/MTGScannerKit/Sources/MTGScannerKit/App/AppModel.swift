@@ -57,8 +57,7 @@ public final class AppModel {
     /// When true, shows a connection-unavailable alert.
     var showConnectionAlert = false
     var connectionAlertMessage = ""
-    var showUndoAlert = false
-    private var latestUndoAction: (@MainActor () -> Void)?
+    let deleteUndo = CardDeleteUndoStore()
 
     /// Torch level to restore when returning to scan view (same session only, not persisted)
     var lastTorchLevel: Float = 0
@@ -367,24 +366,9 @@ extension AppModel {
     }
 }
 
-// MARK: - Undo
+// MARK: - Motion Burst Settings
 
 extension AppModel {
-    func registerUndoAction(_ action: @escaping @MainActor () -> Void) {
-        latestUndoAction = action
-    }
-
-    func undoLatestDelete() {
-        guard latestUndoAction != nil else { return }
-        showUndoAlert = true
-    }
-
-    func confirmUndo() {
-        guard let latestUndoAction else { return }
-        latestUndoAction()
-        self.latestUndoAction = nil
-    }
-
     func resetMotionBurstSettings() {
         motionBurstPreset = .balanced
         motionBurstMotionThreshold = 0.015

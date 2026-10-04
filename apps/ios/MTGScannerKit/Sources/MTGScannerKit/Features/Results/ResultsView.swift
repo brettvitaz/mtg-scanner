@@ -26,6 +26,12 @@ public struct ResultsView: View {
     @State private var openSwipeRowID: UUID?
     @State private var showSearch = false
 
+    private var undoIsBlocked: Bool {
+        showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
+        || contextDeleteItem != nil || exportFile != nil || showFilterSheet
+        || !appModel.resultsNavigationPath.isEmpty
+    }
+
     private var displayedItems: [CollectionItem] {
         filterState.apply(to: inboxItems)
     }
@@ -40,6 +46,7 @@ public struct ResultsView: View {
                     cardListWithToolbar
                 }
             }
+            .cardDeleteUndo(scope: .results, name: "Results", blocked: undoIsBlocked)
             .navigationTitle("Results")
             .toolbar { topToolbar }
             .navigationDestination(for: RecognizedCard.self) { card in
@@ -322,13 +329,7 @@ private extension ResultsView {
     }
 
     func registerUndo(for items: [CollectionItem]) {
-        let deletedItems = items
-        appModel.registerUndoAction {
-            for item in deletedItems {
-                modelContext.insert(item)
-            }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        }
+        appModel.deleteUndo.register(items, in: .results)
     }
 }
 

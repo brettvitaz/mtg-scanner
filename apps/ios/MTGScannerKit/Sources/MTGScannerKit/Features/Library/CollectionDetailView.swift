@@ -36,20 +36,27 @@ struct CollectionDetailView: View {
     }
 
     var body: some View {
-        Group {
-            if isDeleted {
-                ContentUnavailableView(
-                    "Collection Removed", systemImage: "folder",
-                    description: Text("Finish the list action to return to Library.")
-                )
-            } else if collection.items.isEmpty {
-                emptyState
-            } else {
-                cardListWithToolbar
+        VStack(spacing: 0) {
+            CardListTitleHeader(title: isDeleted ? "Collection Removed" : collection.name)
+            Group {
+                if isDeleted {
+                    ContentUnavailableView(
+                        "Collection Removed", systemImage: "folder",
+                        description: Text("Finish the list action to return to Library.")
+                    )
+                } else if collection.items.isEmpty {
+                    emptyState
+                } else {
+                    cardListWithToolbar
+                }
             }
         }
         .cardDeleteUndo(scope: .collection(collection.id), name: collection.name, blocked: undoIsBlocked)
-        .navigationTitle(isDeleted ? "Collection Removed" : collection.name)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(isSelecting)
+        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
@@ -138,15 +145,12 @@ struct CollectionDetailView: View {
                     Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                 }
                 .accessibilityLabel(showSearch ? "Close search" : "Search")
-                Button { showAddCard = true } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Add card manually")
                 CardListOverflowMenu(
                     items: collection.items,
                     name: collection.name,
                     exportFile: $exportFile,
                     onSelect: enterSelecting,
+                    onAdd: { showAddCard = true },
                     onImport: { showCSVImport = true },
                     onListOperation: { showListOperation = true }
                 )
@@ -192,9 +196,33 @@ private extension CollectionDetailView {
     // MARK: - Card List
 
     var cardListWithToolbar: some View {
-        let items = displayedItems
-        return VStack(spacing: 0) {
-            if !isSelecting {
+        List(selection: $selectedItems) {
+            Section {
+                ForEach(displayedItems) { cardRowView(for: $0) }
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .overlay {
+            if displayedItems.isEmpty {
+                CardListNoMatchesView(filterState: filterState)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.dsBackground)
+        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .safeAreaInset(edge: .top, spacing: 0) { cardListHeader }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isSelecting { bottomActionBar }
+        }
+    }
+
+    @ViewBuilder
+    var cardListHeader: some View {
+        if !isSelecting {
+            VStack(spacing: 0) {
                 if showSearch {
                     ListSearchField(text: $filterState.searchText)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -202,31 +230,12 @@ private extension CollectionDetailView {
                 SortFilterChipRow(
                     filterState: filterState,
                     showFilterSheet: $showFilterSheet,
-                    displayedItems: items,
+                    displayedItems: displayedItems,
                     totalQuantity: collection.items.totalQuantity
                 )
             }
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(items) { cardRowView(for: $0) }
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            }
-            .overlay {
-                if displayedItems.isEmpty {
-                    CardListNoMatchesView(filterState: filterState)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             .background(Color.dsBackground)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
-            if isSelecting { bottomActionBar }
         }
-        .background(Color.dsBackground)
     }
 
     @ViewBuilder
@@ -261,7 +270,7 @@ private extension CollectionDetailView {
                 .foregroundStyle(.secondary)
             Text("No cards in this collection")
                 .font(.title3.bold())
-            Text("Add cards using the + button, or move cards here from the Results tab.")
+            Text("Tap Add Card below, or move cards here from the Results tab.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

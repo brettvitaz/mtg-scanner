@@ -15,7 +15,7 @@ public struct PreviewGalleryRootView: View {
 
     public init(route: String) {
         self.route = route
-        if route.hasPrefix("card-row-") { Self.cachePreviewArtwork() }
+        if route.hasPrefix("card-row-") || route.hasPrefix("selection-") { Self.cachePreviewArtwork() }
     }
 
     private static func cachePreviewArtwork() {
@@ -55,6 +55,8 @@ public struct PreviewGalleryRootView: View {
             CardEditFixtureView(route: route)
         case "pricing-results", "pricing-collection", "pricing-deck",
              "pricing-large", "pricing-filter", "copy-move", "card-row-preview", "card-row-list":
+            CardListPricingFixtureView(route: route)
+        case "selection-results", "selection-collection", "selection-deck":
             CardListPricingFixtureView(route: route)
         case "undo-results", "undo-collection", "undo-deck", "undo-empty", "undo-bulk", "undo-navigation":
             CardListPricingFixtureView(route: route)
@@ -97,4 +99,16 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Results (fixture data)") {
     PreviewGalleryRootView(route: "results")
+}
+
+#Preview("Selection Results") {
+    PreviewGalleryRootView(route: "selection-results")
+}
+
+#Preview("Selection Collection") {
+    PreviewGalleryRootView(route: "selection-collection")
+}
+
+#Preview("Selection Deck") {
+    PreviewGalleryRootView(route: "selection-deck")
 }

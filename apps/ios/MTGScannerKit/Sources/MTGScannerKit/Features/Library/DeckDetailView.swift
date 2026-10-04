@@ -36,20 +36,27 @@ struct DeckDetailView: View {
     }
 
     var body: some View {
-        Group {
-            if isDeleted {
-                ContentUnavailableView(
-                    "Deck Removed", systemImage: "rectangle.stack",
-                    description: Text("Finish the list action to return to Library.")
-                )
-            } else if deck.items.isEmpty {
-                emptyState
-            } else {
-                cardListWithToolbar
+        VStack(spacing: 0) {
+            CardListTitleHeader(title: isDeleted ? "Deck Removed" : deck.name)
+            Group {
+                if isDeleted {
+                    ContentUnavailableView(
+                        "Deck Removed", systemImage: "rectangle.stack",
+                        description: Text("Finish the list action to return to Library.")
+                    )
+                } else if deck.items.isEmpty {
+                    emptyState
+                } else {
+                    cardListWithToolbar
+                }
             }
         }
         .cardDeleteUndo(scope: .deck(deck.id), name: deck.name, blocked: undoIsBlocked)
-        .navigationTitle(isDeleted ? "Deck Removed" : deck.name)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(isSelecting)
+        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
@@ -138,15 +145,12 @@ struct DeckDetailView: View {
                     Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                 }
                 .accessibilityLabel(showSearch ? "Close search" : "Search")
-                Button { showAddCard = true } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Add card manually")
                 CardListOverflowMenu(
                     items: deck.items,
                     name: deck.name,
                     exportFile: $exportFile,
                     onSelect: enterSelecting,
+                    onAdd: { showAddCard = true },
                     onImport: { showCSVImport = true },
                     onListOperation: { showListOperation = true }
                 )
@@ -166,7 +170,7 @@ private extension DeckDetailView {
                 .foregroundStyle(.secondary)
             Text("No cards in this deck")
                 .font(.title3.bold())
-            Text("Add cards using the + button, or move cards here from the Results tab or a collection.")
+            Text("Tap Add Card below, or move cards here from the Results tab or a collection.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -182,9 +186,33 @@ private extension DeckDetailView {
     }
 
     var cardListWithToolbar: some View {
-        let items = displayedItems
-        return VStack(spacing: 0) {
-            if !isSelecting {
+        List(selection: $selectedItems) {
+            Section {
+                ForEach(displayedItems) { cardRowView(for: $0) }
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .overlay {
+            if displayedItems.isEmpty {
+                CardListNoMatchesView(filterState: filterState)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.dsBackground)
+        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .safeAreaInset(edge: .top, spacing: 0) { cardListHeader }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isSelecting { bottomActionBar }
+        }
+    }
+
+    @ViewBuilder
+    var cardListHeader: some View {
+        if !isSelecting {
+            VStack(spacing: 0) {
                 if showSearch {
                     ListSearchField(text: $filterState.searchText)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -192,31 +220,12 @@ private extension DeckDetailView {
                 SortFilterChipRow(
                     filterState: filterState,
                     showFilterSheet: $showFilterSheet,
-                    displayedItems: items,
+                    displayedItems: displayedItems,
                     totalQuantity: deck.items.totalQuantity
                 )
             }
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(items) { cardRowView(for: $0) }
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            }
-            .overlay {
-                if displayedItems.isEmpty {
-                    CardListNoMatchesView(filterState: filterState)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             .background(Color.dsBackground)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
-            if isSelecting { bottomActionBar }
         }
-        .background(Color.dsBackground)
     }
 
     @ViewBuilder

@@ -1,9 +1,7 @@
 import SwiftUI
-import UIKit
 
 /// Shared row for Results, Collection detail, and Deck detail.
 /// Pass `onSwipeDelete` / `onSwipeToggleFoil` to enable the respective swipe action.
-/// Pass `openRowID` to coordinate single-open-row behaviour across a list.
 struct CollectionItemRow: View {
     @Bindable var item: CollectionItem
     var showQuantityStepper: Bool = false
@@ -13,25 +11,26 @@ struct CollectionItemRow: View {
     var onToggleFoil: (() -> Void)?
     var onSwipeToggleFoil: (() -> Void)?
     var onNavigate: (() -> Void)?
-    var openRowID: Binding<UUID?> = .constant(nil)
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State var swipeOffset: CGFloat = 0
-    @State var rowWidth: CGFloat = 390
-    @State var gestureBaseOffset: CGFloat = 0
-    @State var crossedCommit = false
-
-    let actionRevealWidth: CGFloat = 80
 
     var body: some View {
         contextualContent
-            .background(widthReader)
-            .onAppear(perform: resetSwipe)
-            .onDisappear(perform: resetSwipe)
-            .onChange(of: openRowID.wrappedValue) { _, newID in
-                guard newID != item.id, swipeOffset != 0 else { return }
-                closeSwipe()
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                if let onSwipeDelete {
+                    Button(role: .destructive, action: onSwipeDelete) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                if let onSwipeToggleFoil {
+                    Button(action: onSwipeToggleFoil) {
+                        Label(item.foil ? "Set as Non-Foil" : "Set as Foil", systemImage: "sparkles")
+                    }
+                    .tint(.blue)
+                }
             }
             .accessibilityElement(children: showQuantityStepper ? .contain : .ignore)
             .accessibilityLabel(accessibilitySummary)
@@ -45,41 +44,9 @@ struct CollectionItemRow: View {
     }
 }
 
-// MARK: - Swipe structure + row content
+// MARK: - Row content
 
 private extension CollectionItemRow {
-    var hasSwipeAction: Bool { onSwipeDelete != nil || onSwipeToggleFoil != nil }
-
-    @ViewBuilder
-    var swipeContent: some View {
-        if hasSwipeAction {
-            ZStack {
-                trailingActionLayer
-                leadingActionLayer
-                rowContent
-                    .offset(x: swipeOffset)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: min(abs(swipeOffset) / 10, 8),
-                            style: .continuous
-                        )
-                    )
-            }
-            .gesture(
-                HorizontalPanGesture(
-                    onBegan: { gestureBaseOffset = swipeOffset },
-                    onChanged: { translation in handleDragChanged(translation: translation) },
-                    onEnded: { translation, velocity in
-                        handleDragEnded(translation: translation, velocity: velocity)
-                    },
-                    onCancelled: closeSwipe
-                )
-            )
-        } else {
-            rowContent
-        }
-    }
-
     var rowContent: some View {
         HStack(spacing: Spacing.sm) {
             navigationButton
@@ -93,9 +60,7 @@ private extension CollectionItemRow {
     }
 
     var navigationButton: some View {
-        Button {
-            if swipeOffset != 0 { closeSwipe() } else { onNavigate?() }
-        } label: {
+        Button { onNavigate?() } label: {
             navigationContent.contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -131,12 +96,6 @@ private extension CollectionItemRow {
 
     var hairlineDivider: some View {
         Rectangle().fill(Color.dsBorder).frame(height: 0.5)
-    }
-
-    var widthReader: some View {
-        GeometryReader { proxy in
-            Color.clear.onAppear { rowWidth = proxy.size.width }
-        }
     }
 }
 
@@ -290,9 +249,9 @@ private extension CollectionItemRow {
             transfer: onTransfer, toggleFoil: onToggleFoil, delete: onDelete, navigate: onNavigate
         )
         if actions.isAvailable {
-            CardRowContextMenu(content: swipeContent, item: item, actions: actions, onPresent: closeSwipe)
+            CardRowContextMenu(content: rowContent, item: item, actions: actions)
         } else {
-            swipeContent
+            rowContent
         }
     }
 }

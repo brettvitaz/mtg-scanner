@@ -6,7 +6,6 @@ struct CardRowContextMenu<Content: View>: UIViewControllerRepresentable {
     let content: Content
     let item: CollectionItem
     let actions: CardRowMenuActions
-    let onPresent: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
@@ -42,7 +41,6 @@ struct CardRowContextMenu<Content: View>: UIViewControllerRepresentable {
             _ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint
         ) -> UIContextMenuConfiguration? {
             guard parent.actions.isAvailable else { return nil }
-            parent.onPresent()
             let item = parent.item
             let actions = parent.actions
             let bounds = interaction.view?.window?.bounds.size ?? CGSize(width: 390, height: 844)

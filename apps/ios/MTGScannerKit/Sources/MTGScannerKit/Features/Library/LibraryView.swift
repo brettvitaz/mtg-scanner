@@ -119,13 +119,11 @@ struct LibraryView: View {
             if collections.isEmpty {
                 emptyRow("No collections yet")
             } else {
-                ForEach(filteredCollections) { collection in
+                ForEach(filteredCollections, id: \.id) { collection in
                     collectionRow(for: collection)
                 }
                 .onDelete { offsets in
-                    for index in offsets {
-                        libraryViewModel.deleteCollection(filteredCollections[index])
-                    }
+                    libraryViewModel.deleteCollections(at: offsets, from: filteredCollections)
                 }
                 if filteredCollections.isEmpty {
                     emptyRow("No results for \"\(searchText)\"")
@@ -139,13 +137,11 @@ struct LibraryView: View {
             if decks.isEmpty {
                 emptyRow("No decks yet")
             } else {
-                ForEach(filteredDecks) { deck in
+                ForEach(filteredDecks, id: \.id) { deck in
                     deckRow(for: deck)
                 }
                 .onDelete { offsets in
-                    for index in offsets {
-                        libraryViewModel.deleteDeck(filteredDecks[index])
-                    }
+                    libraryViewModel.deleteDecks(at: offsets, from: filteredDecks)
                 }
                 if filteredDecks.isEmpty {
                     emptyRow("No results for \"\(searchText)\"")
@@ -186,12 +182,7 @@ struct LibraryView: View {
 private extension LibraryView {
     func collectionRow(for collection: CardCollection) -> some View {
         NavigationLink(value: collection) {
-            LibraryItemRow(
-                iconSystemName: "folder.fill",
-                name: collection.name,
-                cardCount: collection.items.totalQuantity,
-                updatedAt: collection.updatedAt
-            )
+            LibraryCollectionRow(collection: collection)
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
@@ -207,12 +198,7 @@ private extension LibraryView {
 
     func deckRow(for deck: Deck) -> some View {
         NavigationLink(value: deck) {
-            LibraryItemRow(
-                iconSystemName: "rectangle.stack.fill",
-                name: deck.name,
-                cardCount: deck.items.totalQuantity,
-                updatedAt: deck.updatedAt
-            )
+            LibraryDeckRow(deck: deck)
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)

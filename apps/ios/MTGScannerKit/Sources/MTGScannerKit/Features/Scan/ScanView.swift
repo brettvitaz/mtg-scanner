@@ -286,12 +286,6 @@ private extension ScanView {
         await autoScanViewModel.enqueueCapturedImage(payload, cropEnabled: appModel.onDeviceCropEnabled)
     }
 
-    func lockOrientation(_ mask: UIInterfaceOrientationMask) {
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
-        let prefs = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
-        scene.requestGeometryUpdate(prefs)
-    }
-
     private func storeAndTurnOffTorch() {
         if detectionViewModel.torchLevel > 0 {
             appModel.lastTorchLevel = detectionViewModel.torchLevel
@@ -320,13 +314,11 @@ private extension ScanView {
 
     private func onAppearHandler() {
         detectionViewModel.requestCameraPermissionIfNeeded()
-        lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
         configureAutoScan()
         UIApplication.shared.isIdleTimerDisabled = true
     }
 
     private func onDisappearHandler() {
-        lockOrientation([.portrait, .landscapeLeft, .landscapeRight])
         UIApplication.shared.isIdleTimerDisabled = false
         storeAndTurnOffTorch()
         autoScanViewModel.stop()

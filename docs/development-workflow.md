@@ -56,6 +56,7 @@ git remote set-head origin -a
 ### iOS
 - Start by editing the Swift files under `apps/ios/MTGScannerKit/Sources/MTGScannerKit/`.
 - Keep UI state and network logic simple and obvious.
+- iPhone uses portrait throughout the app, including scanning, sheets, and fullscreen card artwork. iPad supports portrait and landscape left/right. The orientation policy lives in the app shell’s `Info.plist`; camera sensor buffers and imported images retain their existing orientation handling.
 - Avoid introducing package managers or generated project complexity until the app shape stabilizes.
 
 ### Collection and deck quantity operations

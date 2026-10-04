@@ -105,6 +105,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | Route | View | Notes |
 |-------|------|-------|
 | `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
+| `card-row-list` | `CardListPricingFixtureView` | Hold rows to review sample artwork, missing data, and native actions |
+| `card-row-preview` | `CardListPricingFixtureView` | Foil preview with cached sample artwork |
 | `copy-move` | `CardListPricingFixtureView` | Copy/Move selector, per-row quantities, and destinations |
 | `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
 | `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |

@@ -132,3 +132,20 @@ The retired `.claude/` settings, skill aliases, and agent definitions are remove
 Their permissions and hooks are not converted into new Codex permissions or
 hooks. The worktree requirement remains in `AGENTS.md`. Historical work-effort
 logs can retain former filenames as records of completed work.
+
+### Card row previews
+
+In Results, collections, and decks, hold a card row to preview a large full-card
+image. The successful preview omits repeated collection details. Missing or failed
+artwork shows compact card identification; loading uses the same portrait frame.
+VoiceOver retains card identity, printing, finish, and artwork status. Tap the
+preview to open card detail, or choose Copy/Move, Set as Foil / Set as Non-Foil,
+or Delete. Delete retains its confirmation and foil changes retain existing duplicate handling.
+Previews are disabled during multiselect. Native menu appearance follows the
+installed OS; iOS 18 remains supported.
+
+Use `make ios-snapshot ROUTE=card-row-preview` for the image-only preview fixture.
+For sample artwork and missing-data review, launch `card-row-list` (cached
+fixture image, no network required). For native menu and gesture review, launch `pricing-results`,
+`pricing-collection`, or `pricing-deck` and hold a row. Check light/dark,
+large text, horizontal swipes, quantity controls, and preview-to-detail navigation.

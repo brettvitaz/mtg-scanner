@@ -35,6 +35,20 @@ public final class LibraryViewModel {
         deck.updatedAt = Date()
     }
 
+    func deleteCollections(at offsets: IndexSet, from collections: [CardCollection]) {
+        let targets = offsets.map { collections[$0] }
+        for collection in targets {
+            deleteCollection(collection)
+        }
+    }
+
+    func deleteDecks(at offsets: IndexSet, from decks: [Deck]) {
+        let targets = offsets.map { decks[$0] }
+        for deck in targets {
+            deleteDeck(deck)
+        }
+    }
+
     func deleteCollection(_ collection: CardCollection) {
         guard let modelContext else { return }
         modelContext.delete(collection)

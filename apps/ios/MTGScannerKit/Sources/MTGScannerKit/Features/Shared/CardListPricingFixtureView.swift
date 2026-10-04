@@ -16,7 +16,7 @@ public struct CardListPricingFixtureView: View {
 
     public init(route: String) {
         self.route = route
-        fixtureItems = route.hasPrefix("card-row-") ? Self.previewItems() : Self.items(large: route == "pricing-large")
+        fixtureItems = Self.items(for: route)
         do {
             let container = try ModelContainer(
                 for: CollectionItem.self, CardCollection.self, Deck.self,
@@ -25,10 +25,12 @@ public struct CardListPricingFixtureView: View {
             container.mainContext.insert(collection)
             container.mainContext.insert(deck)
             for item in fixtureItems {
-                if ["pricing-collection", "copy-move", "undo-collection", "card-row-list"].contains(route) {
+                if [
+                    "pricing-collection", "copy-move", "undo-collection", "card-row-list", "selection-collection"
+                ].contains(route) {
                     item.collection = collection
                 }
-                if route == "pricing-deck" || route == "undo-deck" { item.deck = deck }
+                if ["pricing-deck", "undo-deck", "selection-deck"].contains(route) { item.deck = deck }
                 container.mainContext.insert(item)
             }
             try container.mainContext.save()
@@ -66,6 +68,8 @@ public struct CardListPricingFixtureView: View {
         case "pricing-collection", "undo-collection", "card-row-list":
             NavigationStack { CollectionDetailView(collection: collection) }
         case "pricing-deck", "undo-deck": NavigationStack { DeckDetailView(deck: deck) }
+        case "selection-results", "selection-collection", "selection-deck":
+            RootTabView().task { appModel.shouldShowResults = true }
         case "undo-navigation":
             RootTabView().task { appModel.shouldShowResults = true }
         case "copy-move": CopyMoveSheet(items: fixtureItems) { _ in }
@@ -79,6 +83,24 @@ public struct CardListPricingFixtureView: View {
             }
         case "pricing-filter": FilterSheet(filterState: filterState, items: fixtureItems)
         default: ResultsView()
+        }
+    }
+
+    private static func items(for route: String) -> [CollectionItem] {
+        if route.hasPrefix("selection-") { return selectionItems() }
+        if route.hasPrefix("card-row-") { return previewItems() }
+        return items(large: route == "pricing-large")
+    }
+
+    private static func selectionItems() -> [CollectionItem] {
+        (1...30).map { index in
+            CollectionItem(
+                title: "Card \(index): A long card name for selection layout checks",
+                edition: "Commander 2017", setCode: "C17", collectorNumber: String(index),
+                foil: index.isMultiple(of: 3), rarity: "rare",
+                imageUrl: "https://fixtures.invalid/card-preview.jpg",
+                priceRetail: "$34.99", priceBuy: "$28.00", quantity: index.isMultiple(of: 2) ? 2 : 1
+            )
         }
     }
 

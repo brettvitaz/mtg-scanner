@@ -111,6 +111,7 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
 | `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |
 | `pricing-deck` | `CardListPricingFixtureView` | Populated deck with quantities and totals |
+| `selection-results` / `selection-collection` / `selection-deck` | `CardListPricingFixtureView` | 30-card lists in the production tab shell; for collections/decks, open Library and the list. Review the fixed title at rest and while scrolling in both modes; selection hides Back. Add Card is in More options |
 | `undo-results` / `undo-collection` / `undo-deck` | `CardListPricingFixtureView` | Saved deletion with page-local Undo |
 | `undo-empty` / `undo-bulk` | `CardListPricingFixtureView` | Last-row and bulk-delete undo |
 | `undo-navigation` | `CardListPricingFixtureView` | Real tab navigation with a pending Results deletion |

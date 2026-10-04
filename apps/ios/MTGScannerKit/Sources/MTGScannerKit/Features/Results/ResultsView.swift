@@ -39,15 +39,22 @@ public struct ResultsView: View {
     public var body: some View {
         @Bindable var appModel = appModel
         NavigationStack(path: $appModel.resultsNavigationPath) {
-            Group {
-                if inboxItems.isEmpty {
-                    emptyState
-                } else {
-                    cardListWithToolbar
+            VStack(spacing: 0) {
+                CardListTitleHeader(title: "Results")
+                Group {
+                    if inboxItems.isEmpty {
+                        emptyState
+                    } else {
+                        cardListWithToolbar
+                    }
                 }
             }
             .cardDeleteUndo(scope: .results, name: "Results", blocked: undoIsBlocked)
-            .navigationTitle("Results")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(isSelecting)
+            .toolbarBackground(Color.dsBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar { topToolbar }
             .navigationDestination(for: RecognizedCard.self) { card in
                 CardDetailView(card: card)
@@ -118,8 +125,33 @@ public struct ResultsView: View {
     // MARK: - Card List
 
     private var cardListWithToolbar: some View {
-        VStack(spacing: 0) {
-            if !isSelecting {
+        List(selection: $selectedItems) {
+            Section {
+                ForEach(displayedItems) { cardRowView(for: $0) }
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .overlay {
+            if displayedItems.isEmpty {
+                CardListNoMatchesView(filterState: filterState)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.dsBackground)
+        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .safeAreaInset(edge: .top, spacing: 0) { cardListHeader }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isSelecting { bottomActionBar }
+        }
+    }
+
+    @ViewBuilder
+    private var cardListHeader: some View {
+        if !isSelecting {
+            VStack(spacing: 0) {
                 if showSearch {
                     ListSearchField(text: $filterState.searchText)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -131,29 +163,8 @@ public struct ResultsView: View {
                     totalQuantity: inboxItems.totalQuantity
                 )
             }
-            List(selection: $selectedItems) {
-                Section {
-                    ForEach(displayedItems) { cardRowView(for: $0) }
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            }
-            .overlay {
-                if displayedItems.isEmpty {
-                    CardListNoMatchesView(filterState: filterState)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             .background(Color.dsBackground)
-            .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
-
-            if isSelecting {
-                bottomActionBar
-            }
         }
-        .background(Color.dsBackground)
     }
 
     @ViewBuilder

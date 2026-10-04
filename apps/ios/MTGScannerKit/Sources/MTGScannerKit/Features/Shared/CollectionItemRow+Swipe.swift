@@ -128,6 +128,7 @@ extension CollectionItemRow {
         ) {
             swipeOffset = -rowWidth
         } completion: {
+            resetSwipe()
             onSwipeDelete?()
         }
     }
@@ -139,6 +140,17 @@ extension CollectionItemRow {
             swipeOffset = 0
         }
         if openRowID.wrappedValue == item.id { openRowID.wrappedValue = nil }
+    }
+
+    func resetSwipe() {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            swipeOffset = 0
+            gestureBaseOffset = 0
+            crossedCommit = false
+            if openRowID.wrappedValue == item.id { openRowID.wrappedValue = nil }
+        }
     }
 
     func closeSwipe() {

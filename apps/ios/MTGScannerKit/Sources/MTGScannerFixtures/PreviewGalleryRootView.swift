@@ -56,6 +56,8 @@ public struct PreviewGalleryRootView: View {
         case "pricing-results", "pricing-collection", "pricing-deck",
              "pricing-large", "pricing-filter", "copy-move", "card-row-preview", "card-row-list":
             CardListPricingFixtureView(route: route)
+        case "undo-results", "undo-collection", "undo-deck", "undo-empty", "undo-bulk", "undo-navigation":
+            CardListPricingFixtureView(route: route)
         case "list-operation", "list-subtract", "list-add-delete", "list-operation-complete",
              "csv-subtract", "list-deleted-collection", "list-deleted-deck":
             CardListOperationFixtureView(route: route)

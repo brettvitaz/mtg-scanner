@@ -162,6 +162,18 @@ The backend selects its recognition provider from environment variables.
 
 See [services/api/.env.example](services/api/.env.example) for a concrete backend setup.
 
+### Undoing card deletions
+
+Card deletions in Results, collections, and decks can be restored with the toolbar's
+**Undo Delete** button. Shake to Undo shows a confirmation naming the deleted card
+or number of entries and their destination, when enabled in iOS Accessibility settings.
+Undo applies only to the visible originating list, including when that list is empty.
+Restored rows appear with their swipe actions closed.
+Each list retains its latest deletion when you navigate away and return during the
+same app session; another deletion in that list replaces it. Undo is unavailable on
+Scanner, Settings, Library root, card details, and while a sheet or text editor is open.
+It does not survive relaunch or restore deleted collections or decks.
+
 ### Correcting card identities
 
 Open a card from Results, a collection, or a deck, then tap **Edit**. Use **Change Card** to search by name or **Change Printing** to select another edition. Choose the finish and tap **Save**. **Cancel** or dismissing the sheet discards the draft. Quantity stays unchanged. If the printing and finish already exist in the same collection or deck, confirm **Merge** to combine quantities, or cancel to keep editing. Results allows separate duplicate rows.

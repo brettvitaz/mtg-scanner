@@ -27,6 +27,8 @@ struct CollectionItemRow: View {
     var body: some View {
         contextualContent
             .background(widthReader)
+            .onAppear(perform: resetSwipe)
+            .onDisappear(perform: resetSwipe)
             .onChange(of: openRowID.wrappedValue) { _, newID in
                 guard newID != item.id, swipeOffset != 0 else { return }
                 closeSwipe()

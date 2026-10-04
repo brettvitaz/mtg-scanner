@@ -111,6 +111,9 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
 | `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |
 | `pricing-deck` | `CardListPricingFixtureView` | Populated deck with quantities and totals |
+| `undo-results` / `undo-collection` / `undo-deck` | `CardListPricingFixtureView` | Saved deletion with page-local Undo |
+| `undo-empty` / `undo-bulk` | `CardListPricingFixtureView` | Last-row and bulk-delete undo |
+| `undo-navigation` | `CardListPricingFixtureView` | Real tab navigation with a pending Results deletion |
 | `pricing-filter` | `CardListPricingFixtureView` | CK buying toggle and Retail/Buylist price filters |
 | `pricing-large` | `CardListPricingFixtureView` | Large monetary totals for layout checks |
 | `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |

@@ -208,6 +208,10 @@ the review and apply actions scroll with the content.
 
 ### Copying and moving saved cards
 
+In Results, collection detail, and deck detail, enter **Select** mode and tap
+anywhere on a card row to select or deselect it. The selection circle and bulk
+actions reflect the current selection.
+
 Results, collections, decks, card context menus, and saved-card details share a
 **Copy/Move** sheet. It defaults to Copy and the full quantity of each selected
 row. Adjust each row’s quantity to copy or move part of a stack, then choose an

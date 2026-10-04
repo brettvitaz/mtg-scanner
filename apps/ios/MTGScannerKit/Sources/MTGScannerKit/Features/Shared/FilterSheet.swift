@@ -172,6 +172,7 @@ struct FilterSheet: View {
             Text(label)
             Spacer()
             TextField("Any", value: value, format: .number)
+                .autocorrectionDisabled(true)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 80)

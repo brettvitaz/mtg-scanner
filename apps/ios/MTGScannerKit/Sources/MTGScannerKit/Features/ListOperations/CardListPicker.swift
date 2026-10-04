@@ -32,6 +32,7 @@ struct CardListPicker: View {
         .navigationTitle(role.rawValue)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, prompt: "Find a collection or deck")
+        .autocorrectionDisabled(true)
         .overlay {
             if lists.isEmpty {
                 ContentUnavailableView(

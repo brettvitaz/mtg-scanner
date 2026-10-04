@@ -12,6 +12,7 @@ struct ListSearchField: View {
                 .font(.system(size: 14))
                 .foregroundStyle(Color.dsTextSecondary)
             TextField(prompt, text: $text)
+                .autocorrectionDisabled(true)
                 .font(.geist(.body))
                 .foregroundStyle(Color.dsTextPrimary)
                 .focused($focused)

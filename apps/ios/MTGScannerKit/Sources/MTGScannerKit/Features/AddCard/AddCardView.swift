@@ -90,6 +90,7 @@ struct AddCardView: View {
             }
         }
         .searchable(text: $viewModel.searchText, prompt: "Card name")
+        .autocorrectionDisabled(true)
         .onChange(of: viewModel.searchText) { _, _ in
             viewModel.updateSearch(using: appModel)
         }
@@ -130,6 +131,7 @@ struct AddCardView: View {
             get: { viewModel.printingFilterText },
             set: { viewModel.printingFilterText = $0 }
         ), prompt: "Filter by set, code, or number")
+        .autocorrectionDisabled(true)
     }
 
     // MARK: - Stage 3: Confirm & Add

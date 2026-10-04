@@ -16,11 +16,11 @@ final class LibraryDeletionTests: XCTestCase {
         defer { window.isHidden = true }
 
         try await assertNames(["Alpha", "Bravo", "Charlie", "Delta"], in: window)
-        model.deleteCollections(at: IndexSet(integer: 0), from: collections)
+        model.deleteCollection(collections[0])
         try await assertNames(["Bravo", "Charlie", "Delta"], absent: ["Alpha"], in: window)
-        model.deleteCollections(at: IndexSet(integer: 1), from: Array(collections.dropFirst()))
+        model.deleteCollection(collections[2])
         try await assertNames(["Bravo", "Delta"], absent: ["Alpha", "Charlie"], in: window)
-        model.deleteCollections(at: IndexSet(integer: 1), from: [collections[1], collections[3]])
+        model.deleteCollection(collections[3])
         try await assertNames(["Bravo"], absent: ["Alpha", "Charlie", "Delta"], in: window)
         model.renameCollection(collections[1], to: "Renamed")
         try await assertNames(["Renamed"], absent: ["Bravo"], in: window)
@@ -37,11 +37,11 @@ final class LibraryDeletionTests: XCTestCase {
         defer { window.isHidden = true }
 
         try await assertNames(["Alpha", "Bravo", "Charlie", "Delta"], in: window)
-        model.deleteDecks(at: IndexSet(integer: 0), from: decks)
+        model.deleteDeck(decks[0])
         try await assertNames(["Bravo", "Charlie", "Delta"], absent: ["Alpha"], in: window)
-        model.deleteDecks(at: IndexSet(integer: 1), from: Array(decks.dropFirst()))
+        model.deleteDeck(decks[2])
         try await assertNames(["Bravo", "Delta"], absent: ["Alpha", "Charlie"], in: window)
-        model.deleteDecks(at: IndexSet(integer: 1), from: [decks[1], decks[3]])
+        model.deleteDeck(decks[3])
         try await assertNames(["Bravo"], absent: ["Alpha", "Charlie", "Delta"], in: window)
         model.renameDeck(decks[1], to: "Renamed")
         try await assertNames(["Renamed"], absent: ["Bravo"], in: window)
@@ -49,7 +49,7 @@ final class LibraryDeletionTests: XCTestCase {
         try await assertNames(["No decks yet"], absent: ["Renamed"], in: window)
     }
 
-    func testDeletingFilteredCollectionOffsetsPreservesOtherCollectionsAndContents() throws {
+    func testDeletingFilteredCollectionsPreservesOtherCollectionsAndContents() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let collections = makeCollections(in: context)
@@ -60,7 +60,9 @@ final class LibraryDeletionTests: XCTestCase {
         let model = LibraryViewModel()
         model.modelContext = context
 
-        model.deleteCollections(at: IndexSet([0, 2]), from: [collections[0], collections[2], collections[3]])
+        let filtered = [collections[0], collections[2], collections[3]]
+        model.deleteCollection(filtered[0])
+        model.deleteCollection(filtered[2])
         try context.save()
 
         let remaining = try context.fetch(FetchDescriptor<CardCollection>())
@@ -71,7 +73,7 @@ final class LibraryDeletionTests: XCTestCase {
         XCTAssertEqual(survivor.items.totalQuantity, 3)
     }
 
-    func testDeletingFilteredDeckOffsetsPreservesOtherDecksAndContents() throws {
+    func testDeletingFilteredDecksPreservesOtherDecksAndContents() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let decks = makeDecks(in: context)
@@ -82,7 +84,9 @@ final class LibraryDeletionTests: XCTestCase {
         let model = LibraryViewModel()
         model.modelContext = context
 
-        model.deleteDecks(at: IndexSet([0, 2]), from: [decks[0], decks[2], decks[3]])
+        let filtered = [decks[0], decks[2], decks[3]]
+        model.deleteDeck(filtered[0])
+        model.deleteDeck(filtered[2])
         try context.save()
 
         let remaining = try context.fetch(FetchDescriptor<Deck>())
@@ -91,20 +95,6 @@ final class LibraryDeletionTests: XCTestCase {
         let survivor = try XCTUnwrap(remaining.first { $0.id == survivorID })
         XCTAssertEqual(survivor.items.map(\.title), ["Island"])
         XCTAssertEqual(survivor.items.totalQuantity, 2)
-    }
-
-    func testDeletingEmptyOffsetsLeavesCollectionsAndDecksUnchanged() throws {
-        let container = try makeContainer()
-        let collections = makeCollections(in: container.mainContext)
-        let decks = makeDecks(in: container.mainContext)
-        let model = LibraryViewModel()
-        model.modelContext = container.mainContext
-
-        model.deleteCollections(at: IndexSet(), from: collections)
-        model.deleteDecks(at: IndexSet(), from: decks)
-
-        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<CardCollection>()), 4)
-        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<Deck>()), 4)
     }
 
     private func makeContainer() throws -> ModelContainer {

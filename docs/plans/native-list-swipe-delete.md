@@ -105,3 +105,20 @@ Every changed production/test file and deletion was reviewed against
 | API contract | N/A | iOS interaction-only change; no backend/schema/provider edits. |
 | Artifacts and observability | N/A | No recognition/detection changes. UI evidence and test logs retained separately. |
 | Static analysis | PASS | Strict SwiftLint has zero violations; no suppressions; `git diff --check` passes. |
+
+## Main merge verification — 2026-10-04
+
+Merged main at `77d6a74` (whole-row selection, PR #115). Resolved the shared-row
+conflict by retaining `mainContent`'s conditional navigation button and the row's
+rectangular content shape. The navigation button invokes its callback directly;
+custom swipe-state references remain removed.
+
+Post-resolution app build, strict SwiftLint, full iOS 18.6 tests, and diff checks
+passed. On the iPad Pro 13-inch / iPadOS 26.4.1 collection fixture, tapping row
+whitespace selected Island and enabled bulk actions; tapping its title deselected
+it and disabled those actions. Selection-mode rows exposed no swipe actions.
+Logs are retained as `tmp/swipe-delete-review/merge-main-*.log`.
+
+Review gate: correctness, simplicity, scope, meaningful tests, safety, and static
+analysis PASS. API contract and recognition/detection artifacts N/A (UI-only
+merge resolution). The earlier gesture-testing limitations still apply.

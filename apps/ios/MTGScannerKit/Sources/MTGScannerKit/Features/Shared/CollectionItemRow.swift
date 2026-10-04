@@ -82,23 +82,29 @@ private extension CollectionItemRow {
 
     var rowContent: some View {
         HStack(spacing: Spacing.sm) {
-            navigationButton
+            mainContent
             if showQuantityStepper { compactQuantityStepper }
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.md)
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
         .background(rowBackground)
         .overlay(alignment: .bottom) { hairlineDivider }
     }
 
-    var navigationButton: some View {
-        Button {
-            if swipeOffset != 0 { closeSwipe() } else { onNavigate?() }
-        } label: {
-            navigationContent.contentShape(Rectangle())
+    @ViewBuilder
+    var mainContent: some View {
+        if let onNavigate {
+            Button {
+                if swipeOffset != 0 { closeSwipe() } else { onNavigate() }
+            } label: {
+                navigationContent.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else {
+            navigationContent
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder

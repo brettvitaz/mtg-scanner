@@ -20,7 +20,6 @@ struct DeckDetailView: View {
     @State private var showAddCard = false
     @State private var showCSVImport = false
     @State private var showListOperation = false
-    @State private var openSwipeRowID: UUID?
     @State private var selectedCard: RecognizedCard?
     @State private var showSearch = false
 
@@ -242,8 +241,7 @@ private extension DeckDetailView {
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
                 onSwipeToggleFoil: { toggleFoil(item) },
-                onNavigate: { selectedCard = item.toRecognizedCard() },
-                openRowID: $openSwipeRowID
+                onNavigate: { selectedCard = item.toRecognizedCard() }
             )
         }
     }

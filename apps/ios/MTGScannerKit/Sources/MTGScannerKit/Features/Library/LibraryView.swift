@@ -122,9 +122,6 @@ struct LibraryView: View {
                 ForEach(filteredCollections, id: \.id) { collection in
                     collectionRow(for: collection)
                 }
-                .onDelete { offsets in
-                    libraryViewModel.deleteCollections(at: offsets, from: filteredCollections)
-                }
                 if filteredCollections.isEmpty {
                     emptyRow("No results for \"\(searchText)\"")
                 }
@@ -139,9 +136,6 @@ struct LibraryView: View {
             } else {
                 ForEach(filteredDecks, id: \.id) { deck in
                     deckRow(for: deck)
-                }
-                .onDelete { offsets in
-                    libraryViewModel.deleteDecks(at: offsets, from: filteredDecks)
                 }
                 if filteredDecks.isEmpty {
                     emptyRow("No results for \"\(searchText)\"")
@@ -184,6 +178,11 @@ private extension LibraryView {
         NavigationLink(value: collection) {
             LibraryCollectionRow(collection: collection)
         }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                libraryViewModel.deleteCollection(collection)
+            } label: { Label("Delete", systemImage: "trash") }
+        }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
@@ -199,6 +198,11 @@ private extension LibraryView {
     func deckRow(for deck: Deck) -> some View {
         NavigationLink(value: deck) {
             LibraryDeckRow(deck: deck)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                libraryViewModel.deleteDeck(deck)
+            } label: { Label("Delete", systemImage: "trash") }
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)

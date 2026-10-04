@@ -45,18 +45,14 @@ final class CardRowContextMenuTests: XCTestCase {
         XCTAssertEqual(calls, ["transfer", "foil", "delete"])
     }
 
-    func testPreviewClosesSwipeWithoutNavigatingAndCommitNavigatesAfterCompletion() throws {
-        var presented = 0
+    func testPreviewDoesNotNavigateAndCommitNavigatesAfterCompletion() throws {
         var navigated = 0
-        let row = makeRow(actions: CardRowMenuActions(transfer: {}, navigate: { navigated += 1 })) {
-            presented += 1
-        }
+        let row = makeRow(actions: CardRowMenuActions(transfer: {}, navigate: { navigated += 1 }))
         let coordinator = row.makeCoordinator()
         let interaction = UIContextMenuInteraction(delegate: coordinator)
         let configuration = try XCTUnwrap(coordinator.contextMenuInteraction(
             interaction, configurationForMenuAtLocation: .zero
         ))
-        XCTAssertEqual(presented, 1)
         XCTAssertEqual(navigated, 0)
         let animator = CommitAnimator()
         coordinator.contextMenuInteraction(
@@ -107,11 +103,11 @@ final class CardRowContextMenuTests: XCTestCase {
     }
 
     private func makeRow(
-        actions: CardRowMenuActions, onPresent: @escaping () -> Void = {}
+        actions: CardRowMenuActions
     ) -> CardRowContextMenu<Text> {
         CardRowContextMenu(
             content: Text("Card"), item: CollectionItem(title: "Island", edition: "Foundations"),
-            actions: actions, onPresent: onPresent
+            actions: actions
         )
     }
 }

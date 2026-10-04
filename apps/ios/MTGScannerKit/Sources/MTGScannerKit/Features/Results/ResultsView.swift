@@ -23,7 +23,6 @@ public struct ResultsView: View {
     @State private var showFilterSheet = false
     @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
-    @State private var openSwipeRowID: UUID?
     @State private var showSearch = false
 
     private var undoIsBlocked: Bool {
@@ -179,8 +178,7 @@ public struct ResultsView: View {
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
                 onSwipeToggleFoil: { toggleFoil(item) },
-                onNavigate: { appModel.resultsNavigationPath.append(item.toRecognizedCard()) },
-                openRowID: $openSwipeRowID
+                onNavigate: { appModel.resultsNavigationPath.append(item.toRecognizedCard()) }
             )
             .simultaneousGesture(TapGesture(count: 2).onEnded { toggleFoil(item) })
         }

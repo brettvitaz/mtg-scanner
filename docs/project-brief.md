@@ -32,6 +32,7 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
   - Results list with card thumbnails from Scryfall
   - Card detail view with metadata, edition picker, Card Kingdom links, and correction editing
   - Settings flow
+- All text inputs disable keyboard autocorrection so uncommon MTG names remain as entered; matching card search results remain available.
 - Binder mode: detects binder page via `VNDetectRectanglesRequest`, subdivides into 3x3 grid
 - Detection stabilized with EMA smoothing and presence hysteresis (`CardTracker`)
 - ATS is temporarily permissive for local MVP iteration

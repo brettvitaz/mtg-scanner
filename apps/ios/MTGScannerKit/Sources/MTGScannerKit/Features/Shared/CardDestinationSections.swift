@@ -60,6 +60,7 @@ struct CardDestinationSections: View {
     @ViewBuilder
     private func newNameAlert(onCreate: @escaping (String) -> Void) -> some View {
         TextField("Name", text: $newName)
+            .autocorrectionDisabled(true)
         Button("Create") {
             let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }

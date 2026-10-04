@@ -15,6 +15,7 @@ struct CSVPrintingPicker: View {
                     Text("Choose the exact printing for \(record.quantity) \(record.foil ? "foil" : "nonfoil") copies.")
                         .foregroundStyle(.primary)
                     TextField("Search card name", text: $viewModel.searchText)
+                        .autocorrectionDisabled(true)
                         .onChange(of: viewModel.searchText) { _, _ in viewModel.updateSearch(using: appModel) }
                     ForEach(viewModel.searchResults, id: \.self) { name in
                         Button(name) { viewModel.selectedName = name }
@@ -55,6 +56,7 @@ struct CSVPrintingPicker: View {
     private var printingSection: some View {
         Section(viewModel.selectedName ?? record.title) {
             TextField("Filter by set or collector number", text: $viewModel.printingFilterText)
+                .autocorrectionDisabled(true)
             if let error = viewModel.errorMessage {
                 Text(error).foregroundStyle(.primary)
                 Button("Retry") {

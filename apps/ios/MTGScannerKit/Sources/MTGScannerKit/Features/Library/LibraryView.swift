@@ -54,21 +54,25 @@ struct LibraryView: View {
         .toolbar { libraryToolbar }
         .alert("New Collection", isPresented: $showNewCollection) {
             TextField("Name", text: $newName)
+                .autocorrectionDisabled(true)
             Button("Create") { createCollection() }
             Button("Cancel", role: .cancel) {}
         }
         .alert("New Deck", isPresented: $showNewDeck) {
             TextField("Name", text: $newName)
+                .autocorrectionDisabled(true)
             Button("Create") { createDeck() }
             Button("Cancel", role: .cancel) {}
         }
         .alert("Rename Collection", isPresented: $showRenameCollection) {
             TextField("Name", text: $editingName)
+                .autocorrectionDisabled(true)
             Button("Save") { renameCollection() }
             Button("Cancel", role: .cancel) {}
         }
         .alert("Rename Deck", isPresented: $showRenameDeck) {
             TextField("Name", text: $editingName)
+                .autocorrectionDisabled(true)
             Button("Save") { renameDeck() }
             Button("Cancel", role: .cancel) {}
         }

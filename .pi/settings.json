@@ -1,0 +1,6 @@
+{
+  "packages": [
+    { "source": "npm:pi-agent-browser-native", "autoload": false, "extensions": ["!**"], "skills": ["!**"] },
+    { "source": "npm:pi-lens", "autoload": false, "extensions": ["!**"], "skills": ["!**"] }
+  ]
+}

@@ -101,9 +101,9 @@ Simulator fixtures: `make ios-snapshot ROUTE=list-subtract`, `ROUTE=list-operati
 
 ## Design workflow
 
-The repository uses the consolidated [Impeccable 4.4.0 skill](../.agents/skills/impeccable/SKILL.md),
-vendored from upstream commit `114ea1d3838fca73b253af45f873b9c4f5f213c8`.
-The launcher pins engine 0.1.7 and verifies its release checksum on first download.
+The repository uses the consolidated [Impeccable 4.5.0 skill](../.agents/skills/impeccable/SKILL.md),
+vendored from upstream commit `508d7e8955de3b3caf2d8676e85206723d41a887`.
+The launcher pins engine 0.1.11 and verifies its release checksum on first download.
 Use `$impeccable shape <feature>` for planning; the former standalone `$shape` skill
 has been removed. Use `$impeccable init` for product context (`teach` remains an alias),
 `$impeccable document` to record the existing design system, and `$impeccable <feature>`
@@ -116,9 +116,12 @@ be recorded in `DESIGN.md`, preserving existing product facts and design constra
 A missing new-format context file does not authorize a redesign or fabricated context.
 Use the skill's native iOS references for SwiftUI work.
 
-Local packaging corrections: the engine pin follows the current release, the
-asset-producer fallback reference resolves within the skill, and Codex UI metadata
-uses the supported short-description length and `$impeccable` prompt syntax.
+The vendored payload comes from the official `skill-v4.5.0` release bundle.
+Its SHA-256 is `a6877c158ec90c63560728553d2e737081afa8a79b86c507fa8d15a81fffd475`.
+The existing upstream license is retained because the bundle omits it.
+Local packaging corrections: Codex UI metadata uses the supported short-description
+length and `$impeccable` prompt syntax, and trailing whitespace in upstream Markdown
+is removed. The upstream fallback reference now resolves without a local correction.
 Upstream helper scripts are vendored; no application code changes are included.
 
 ## Agent instructions

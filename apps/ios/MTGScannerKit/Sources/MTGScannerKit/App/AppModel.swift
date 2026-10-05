@@ -45,6 +45,8 @@ public final class AppModel {
         didSet { UserDefaults.standard.set(exposureBias, forKey: exposureBiasKey) }
     }
     var isRecognizing = false
+    /// Cards recognised since Results was last opened. Drives the Results tab badge.
+    var scanSessionCount = 0
     var statusMessage = "Point camera at cards to scan."
     var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.

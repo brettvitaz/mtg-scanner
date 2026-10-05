@@ -23,6 +23,10 @@ final class RecognitionQueue {
     /// Called when a card is successfully identified. The callback receives each recognized card.
     var onCardIdentified: ((RecognizedCard) -> Void)?
 
+    /// Called once per successful upload, with every card that upload returned.
+    /// A retried upload calls this only if the retry eventually succeeds.
+    var onScanBatch: (([RecognizedCard]) -> Void)?
+
     // MARK: - Configuration
 
     var maxConcurrent: Int = 2
@@ -187,6 +191,9 @@ final class RecognitionQueue {
 
     private func persist(result: RecognitionResult, modelContext: ModelContext?, capturedAt: Date) {
         guard let modelContext else { return }
+        if !result.cards.isEmpty {
+            onScanBatch?(result.cards)
+        }
         for card in result.cards {
             let item = CollectionItem(from: card, correction: nil)
             item.addedAt = capturedAt

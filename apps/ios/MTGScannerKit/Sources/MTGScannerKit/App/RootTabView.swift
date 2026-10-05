@@ -22,6 +22,7 @@ public struct RootTabView: View {
                 .tabItem {
                     Label("Results", systemImage: "list.bullet.rectangle")
                 }
+                .badge(ScanSessionCounter.badgeText(for: appModel.scanSessionCount))
                 .tag(1)
 
             LibraryView()
@@ -43,6 +44,11 @@ public struct RootTabView: View {
         )
         .sheet(isPresented: $showsScanModePicker) {
             ScanModePickerSheet(selectedMode: $scanMode)
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == 1 {
+                appModel.scanSessionCount = 0
+            }
         }
         .onChange(of: appModel.shouldShowResults) { _, newValue in
             if newValue {

@@ -315,7 +315,17 @@ private extension ScanView {
     private func onAppearHandler() {
         detectionViewModel.requestCameraPermissionIfNeeded()
         configureAutoScan()
+        wireScanBatchCounter()
         UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    /// Keeps the Results tab badge in step with what actually reached Results.
+    private func wireScanBatchCounter() {
+        let queue = autoScanViewModel.recognitionQueue
+        guard queue.onScanBatch == nil else { return }
+        queue.onScanBatch = { [weak appModel] cards in
+            appModel?.scanSessionCount += cards.count
+        }
     }
 
     private func onDisappearHandler() {

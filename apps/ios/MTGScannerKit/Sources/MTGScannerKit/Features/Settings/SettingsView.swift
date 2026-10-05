@@ -41,12 +41,28 @@ private struct SettingsForm: View {
     var body: some View {
         Form {
             apiSection
+            resultsSection
             recognitionSection
             autoScanSection
             motionBurstSection
 #if DEBUG
             diagnosticsSection
 #endif
+        }
+    }
+
+    private var resultsSection: some View {
+        Section {
+            Picker("Tab Count", selection: $appModel.resultsCountMode) {
+                ForEach(ResultsCountMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+        } header: {
+            Text("Results")
+        } footer: {
+            Text("This Session counts cards scanned since your last reset. "
+                 + "All Results counts cards currently in Results.")
         }
     }
 

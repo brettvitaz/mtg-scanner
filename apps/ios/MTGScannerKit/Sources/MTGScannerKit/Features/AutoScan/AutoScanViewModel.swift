@@ -42,6 +42,8 @@ final class AutoScanViewModel {
     let recognitionQueue: RecognitionQueue
     let identifiedCardsViewModel: IdentifiedCardsViewModel
 
+    var onCardIdentified: ((RecognizedCard) -> Void)?
+
     // MARK: - Configuration
 
     var captureDelay: TimeInterval = 2.0
@@ -126,6 +128,7 @@ final class AutoScanViewModel {
         recognitionQueue.onCardIdentified = { [weak self] card in
             let identifiedCard = IdentifiedCard(from: card)
             self?.identifiedCardsViewModel.addCard(identifiedCard)
+            self?.onCardIdentified?(card)
         }
     }
 

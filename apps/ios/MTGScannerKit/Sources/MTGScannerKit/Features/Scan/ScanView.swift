@@ -89,6 +89,9 @@ struct ScanView: View {
     // MARK: - Setup
 
     private func configureAutoScan() {
+        autoScanViewModel.onCardIdentified = { [weak appModel] _ in
+            appModel?.recordScannedCard()
+        }
         autoScanViewModel.captureCoordinator = captureCoordinator
         autoScanViewModel.modelContext = appModel.modelContext
         autoScanViewModel.apiBaseURL = appModel.apiBaseURL

@@ -1,13 +1,23 @@
+import SwiftData
 import SwiftUI
 import UIKit
 
 public struct RootTabView: View {
     @Environment(AppModel.self) private var appModel
+    @Query(filter: #Predicate<CollectionItem> { $0.collection == nil && $0.deck == nil })
+    private var inboxItems: [CollectionItem]
     @State private var selectedTab = 0
     @State private var scanMode: DetectionMode = .scan
     @State private var showsScanModePicker = false
 
     public init() {}
+
+#if DEBUG
+    init(previewScanModePicker: Bool) {
+        _selectedTab = State(initialValue: 1)
+        _showsScanModePicker = State(initialValue: previewScanModePicker)
+    }
+#endif
 
     public var body: some View {
         @Bindable var appModel = appModel
@@ -22,6 +32,12 @@ public struct RootTabView: View {
                 .tabItem {
                     Label("Results", systemImage: "list.bullet.rectangle")
                 }
+                .badge(appModel.resultsCountMode.badge(
+                    sessionCount: appModel.scanSessionCount, resultQuantity: inboxItems.totalQuantity
+                ))
+                .accessibilityValue(appModel.resultsCountMode.accessibilityValue(
+                    sessionCount: appModel.scanSessionCount, resultQuantity: inboxItems.totalQuantity
+                ))
                 .tag(1)
 
             LibraryView()
@@ -60,22 +76,44 @@ public struct RootTabView: View {
     }
 }
 
-private struct ScanModePickerSheet: View {
+struct ScanModePickerSheet: View {
+    @Environment(AppModel.self) private var appModel
+    @State private var showsResetConfirmation = false
     @Binding var selectedMode: DetectionMode
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Scan Mode")
-                .font(.headline)
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("Scan Mode")
+                    .font(.headline)
 
-            HStack(spacing: 16) {
-                modeButton(.scan)
-                modeButton(.auto)
+                HStack(spacing: 16) {
+                    modeButton(.scan)
+                    modeButton(.auto)
+                }
+
+                Divider()
+                HStack {
+                    Text("Session Count")
+                    Spacer()
+                    Text(appModel.scanSessionCount, format: .number)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Button("Reset Scan Count") { showsResetConfirmation = true }
+                    .frame(minHeight: 44)
+                    .disabled(appModel.scanSessionCount == 0)
             }
+            .padding(24)
         }
-        .padding(24)
-        .presentationDetents([.height(220)])
+        .presentationDetents([.medium, .large])
+        .alert("Reset scan count?", isPresented: $showsResetConfirmation) {
+            Button("Reset", role: .destructive) { appModel.resetScanCount() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your results will be kept.")
+        }
     }
 
     private func modeButton(_ mode: DetectionMode) -> some View {

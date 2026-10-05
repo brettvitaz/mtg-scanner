@@ -118,6 +118,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `pricing-filter` | `CardListPricingFixtureView` | CK buying toggle and Retail/Buylist price filters |
 | `pricing-large` | `CardListPricingFixtureView` | Large monetary totals for layout checks |
 | `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |
+| `scan-count` / `scan-count-zero` / `scan-count-overflow` | `ResultsCountFixtureView` | Production tab badge at 24, zero, and 1000 cards |
+| `scan-count-reset` / `scan-count-settings` | `ResultsCountFixtureView` | Session reset sheet and Results count picker |
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
 | `csv-import` | `CSVImportFixtureView` | Matched, ambiguous, and invalid rows; problems-first review |

@@ -48,6 +48,16 @@ without starting automatic scanning. During the settling delay, the shutter capt
 Capture is disabled while a photo is being captured or prepared for recognition. If on-device
 cropping finds no card, the original photo is uploaded for recognition.
 
+The **Results** tab badge defaults to **This Session**, counting cards added by camera
+or photo recognition since the last reset, including repeated scans. It persists
+across app launches. Tap the selected **Scan** tab again to open the Scan Mode sheet
+and choose **Reset Scan Count**; this keeps your results. Cards finishing recognition
+after reset contribute to the new count. Moving or deleting results does not reduce
+the session count. In **Settings → Results → Tab Count**, choose **All Results** to
+show the current inbox's total card quantity, or **Off** to hide the badge. Manual
+additions and CSV imports contribute only to All Results. Zero counts are hidden;
+counts above 999 display as **999+**. Changing modes does not reset the session.
+
 Auto Scan automatically selects a fixed autofocus-capable ultra-wide camera when the
 device supports the 1080p video/photo pipeline. This keeps growing stacks in scanning
 stands within closer focusing range without a camera setting or lens switches during scanning.

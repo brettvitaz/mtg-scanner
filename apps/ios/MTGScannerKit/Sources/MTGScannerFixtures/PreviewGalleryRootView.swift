@@ -51,6 +51,8 @@ public struct PreviewGalleryRootView: View {
             }
 
         #if DEBUG
+        case "scan-count", "scan-count-zero", "scan-count-overflow", "scan-count-reset", "scan-count-settings":
+            ResultsCountFixtureView(route: route)
         case "card-edit", "card-detail":
             CardEditFixtureView(route: route)
         case "pricing-results", "pricing-collection", "pricing-deck",

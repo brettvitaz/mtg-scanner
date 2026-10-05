@@ -44,6 +44,12 @@ public final class AppModel {
     var exposureBias: Double {
         didSet { UserDefaults.standard.set(exposureBias, forKey: exposureBiasKey) }
     }
+    var resultsCountMode: ResultsCountMode {
+        didSet { UserDefaults.standard.set(resultsCountMode.rawValue, forKey: "results_count_mode") }
+    }
+    private(set) var scanSessionCount: Int {
+        didSet { UserDefaults.standard.set(scanSessionCount, forKey: "scan_session_count") }
+    }
     var isRecognizing = false
     var statusMessage = "Point camera at cards to scan."
     var lastUploadedFilename: String?
@@ -103,6 +109,10 @@ public final class AppModel {
         )
         let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
         self.exposureBias = storedBias ?? 0.0
+        resultsCountMode = ResultsCountMode(
+            rawValue: UserDefaults.standard.string(forKey: "results_count_mode") ?? ""
+        ) ?? .session
+        scanSessionCount = max(0, UserDefaults.standard.integer(forKey: "scan_session_count"))
         loadCorrections()
     }
 
@@ -159,32 +169,32 @@ public final class AppModel {
         cardCropImages = [:]
         lastUploadedFilename = filename
 
+        let result: RecognitionResult?
         if onDeviceCropEnabled {
             statusMessage = "Detecting cards…"
             let cropResult = await cropService.detectAndCrop(image: payload.displayImage)
             lastDetectedCrops = cropResult.crops
             if !cropResult.crops.isEmpty {
-                await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
+                result = await recognizeViaBatch(crops: cropResult.crops, baseFilename: filename)
             } else {
-                await uploadFullImage(payload: payload, filename: filename)
+                result = await uploadFullImage(payload: payload, filename: filename)
             }
         } else {
             statusMessage = "Uploading full image…"
-            await uploadFullImage(payload: payload, filename: filename)
+            result = await uploadFullImage(payload: payload, filename: filename)
         }
 
         isRecognizing = false
-        persistRecognizedCards()
-        shouldShowResults = true
+        finishRecognition(result)
     }
 
     // MARK: - Private recognition helpers
 
-    private func uploadFullImage(payload: RecognitionImagePayload, filename: String) async {
+    private func uploadFullImage(payload: RecognitionImagePayload, filename: String) async -> RecognitionResult? {
         await recognizeViaSingleImage(data: payload.uploadData, filename: filename, contentType: payload.contentType)
     }
 
-    private func recognizeViaBatch(crops: [UIImage], baseFilename: String) async {
+    private func recognizeViaBatch(crops: [UIImage], baseFilename: String) async -> RecognitionResult? {
         let stem = (baseFilename as NSString).deletingPathExtension
         var cropPairs: [(data: Data, filename: String)] = []
         for (i, crop) in crops.enumerated() {
@@ -194,39 +204,42 @@ public final class AppModel {
         }
 
         guard !cropPairs.isEmpty else {
-            // All crop encodings failed — fall back.
-            statusMessage = "Crop encoding failed, uploading full image…"
-            return
+            statusMessage = "Crop encoding failed. Try scanning again."
+            return nil
         }
 
         statusMessage = "Uploading \(cropPairs.count) crop(s)…"
 
         do {
-            latestResult = try await apiClient.recognizeBatch(
+            let result = try await apiClient.recognizeBatch(
                 crops: cropPairs,
                 baseURL: apiBaseURL
             )
-            associateCropsWithCards()
             statusMessage = "Recognition finished (\(cropPairs.count) crop(s)). Open Results to inspect."
+            return result
         } catch {
             statusMessage = "Batch recognition failed: \(error.localizedDescription)"
+            return nil
         }
     }
 
-    private func recognizeViaSingleImage(data: Data, filename: String, contentType: String) async {
+    private func recognizeViaSingleImage(
+        data: Data, filename: String, contentType: String
+    ) async -> RecognitionResult? {
         statusMessage = "Uploading full image…"
 
         do {
-            latestResult = try await apiClient.recognizeImage(
+            let result = try await apiClient.recognizeImage(
                 data: data,
                 filename: filename,
                 contentType: contentType,
                 baseURL: apiBaseURL
             )
-            associateCropsWithCards()
             statusMessage = "Recognition finished. Open Results to inspect the response."
+            return result
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
+            return nil
         }
     }
 
@@ -244,6 +257,14 @@ public final class AppModel {
 
     // MARK: - Persistence
 
+    func finishRecognition(_ result: RecognitionResult?) {
+        guard let result, !Task.isCancelled else { return }
+        latestResult = result
+        associateCropsWithCards()
+        persistRecognizedCards()
+        shouldShowResults = true
+    }
+
     /// Insert recognized cards into SwiftData as inbox items (no collection or deck).
     private func persistRecognizedCards() {
         guard let modelContext else { return }
@@ -251,6 +272,7 @@ public final class AppModel {
             let correction = corrections[card.id]
             let item = CollectionItem(from: card, correction: correction)
             modelContext.insert(item)
+            recordScannedCard()
         }
     }
 
@@ -400,5 +422,15 @@ public enum MotionBurstPreset: String, CaseIterable, Sendable {
         case .conservative: return .conservative
         case .custom: return .balanced // Custom uses stored values
         }
+    }
+}
+
+extension AppModel {
+    func recordScannedCard() {
+        scanSessionCount += 1
+    }
+
+    func resetScanCount() {
+        scanSessionCount = 0
     }
 }

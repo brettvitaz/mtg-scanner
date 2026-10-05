@@ -1,8 +1,8 @@
 # Code Review
 
-**This review is mandatory.** Every code change must be reviewed against ALL criteria below before committing. When performing the review, explicitly state each criterion and whether it passes or fails. Any failure must be fixed before committing.
+**This review is mandatory.** Every code change must be reviewed against ALL criteria below before handoff. When performing the review, explicitly state each criterion and whether it passes or fails. Any failure must be fixed before handoff.
 
-When reviewing code — whether self-reviewing before commit or evaluating changes — check each of these criteria. If any criterion fails, the change should be fixed before merging.
+When reviewing code — whether self-reviewing before handoff or evaluating changes — check each of these criteria. If any criterion fails, the change should be fixed before merging.
 
 ## 1. Correctness
 - Does the code do what the spec or task description says?
@@ -23,7 +23,7 @@ When reviewing code — whether self-reviewing before commit or evaluating chang
 - No "while I'm here" cleanup of unrelated code.
 
 ## 4. Tests exist and are meaningful
-- Does every new public method have at least one test?
+- Does every behavior change have a test that fails if that behavior breaks (or a snapshot route, for purely visual behavior)?
 - Do tests exercise real code paths?
 - Are edge cases tested?
 - Would the tests fail if the implementation were broken?

@@ -18,7 +18,7 @@ An optional brief path may follow this skill. Get an independent review of the f
 Create a todo list with one item per step before you start, and keep it updated.
 
 1. Load the `requesting-code-review` skill and read its `code-reviewer.md` template, both in full. Follow them, with the changes below.
-2. Requirements: use the Behavior section of the brief (the given path, or the only file in `tmp/feature-briefs/`). If there is no brief, ask the user for the requirements.
+2. Requirements: use the Behavior section of the brief at the path the user gave. If no path was given, ask the user for the brief path or the requirements. Do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there.
 3. Build the diff from `BASE=$(git merge-base origin/main HEAD)`:
    - `git diff $BASE -- <feature paths>` covers committed and uncommitted changes to tracked files.
    - For each untracked file from `git ls-files --others --exclude-standard`, add `git diff --no-index /dev/null <file>`.

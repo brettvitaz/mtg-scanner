@@ -5,7 +5,7 @@ description: Implement an approved feature brief written by feature-design, veri
 
 # Feature build
 
-The path to an approved brief follows this skill. If no path is given and `tmp/feature-briefs/` holds exactly one file, use it; otherwise ask. Implement only the approved design. If something in it cannot be built as approved, stop and ask; do not change the design on your own.
+The path to an approved brief follows this skill. Use only a brief path the user gives. If there is none, ask for it; do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there. Implement only the approved design. If something in it cannot be built as approved, stop and ask; do not change the design on your own.
 
 ## Rules
 

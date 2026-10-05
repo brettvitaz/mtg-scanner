@@ -30,9 +30,9 @@ Create a todo list with one item per step before you start, and keep it updated.
 8. Final checks: rerun the baseline checks to new log files, then `git diff --check`.
 9. Run `git status --short`. Every changed or new path must be part of this feature. List any that are not, and do not delete them without asking.
 10. Go through `.agents/rules/code-review.md` one criterion at a time: PASS, FAIL, or N/A with a reason. Fix every FAIL this change caused, then rerun the affected checks.
-11. Commit the feature as one commit whose message says what changed and why, following `docs/feature-workflow.md`.
+11. Commit the feature's changes with messages that say what changed and why. Several commits are fine, since PRs are squash-merged. Do not include unrelated changes in them; list anything unrelated in the handoff instead.
 12. Hand off with:
-    - Absolute worktree path, branch, and commit hash.
+    - Absolute worktree path, branch, and commit hashes.
     - A table of Behavior item, its test, and the result.
     - Baseline and final check results, with log paths.
     - Snapshot PNG paths.

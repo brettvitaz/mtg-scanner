@@ -134,6 +134,11 @@ Their permissions and hooks are not converted into new Codex permissions or
 hooks. The worktree requirement remains in `AGENTS.md`. Historical work-effort
 logs can retain former filenames as records of completed work.
 
+`.pi/settings.json` disables the browser-automation and pi-lens packages for
+pi sessions in this repo. Neither applies to iOS or backend work, and together
+they added about 15K prompt tokens per session. Verify changes with the `make`
+targets in `AGENTS.md` instead. Remove a package entry to restore it.
+
 ### Card row previews
 
 In Results, collections, and decks, hold a card row to preview a large full-card

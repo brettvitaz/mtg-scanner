@@ -27,6 +27,19 @@ This keeps the token footprint small for local agents with ~65k context windows.
 8. Keep docs concise; avoid creating instruction sprawl.
 9. Leave the worktree, branch, and review artifacts available for manual review. Remove them only on an explicit cleanup request, following `AGENTS.md`; a merge does not authorize cleanup.
 
+## Feature workflow skills
+Three repo skills in `.agents/skills/` run this workflow in phases. Invoke them
+with `/skill:<name>` in pi or `$<name>` in Codex. Text after the skill name is
+passed through unchanged.
+
+1. `feature-design <request>` agrees on a design with the user, stops for
+   approval, then saves the approved design to `tmp/feature-briefs/<name>.md`.
+2. `feature-build <brief path>` runs the baseline checks, implements the brief
+   (in pi, through the `worker` subagent), verifies tests, snapshots, and docs,
+   reviews against `.agents/rules/code-review.md`, and commits.
+3. `feature-review [brief path]` sends the branch diff to one reviewer subagent,
+   checks each finding, and reports without fixing.
+
 ## Feature thread template
 Each implementation thread should define:
 - Goal

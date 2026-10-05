@@ -18,13 +18,13 @@ An optional brief path may follow this skill. Get an independent review of the f
 Create a todo list with one item per step before you start, and keep it updated.
 
 1. Load the `requesting-code-review` skill and read its `code-reviewer.md` template, both in full. Follow them, with the changes below.
-2. Requirements: use the Behavior section of the brief at the path the user gave. If no path was given, ask the user for the brief path or the requirements. Do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there.
-3. Build the diff from `BASE=$(git merge-base origin/main HEAD)`:
-   - `git diff $BASE -- <feature paths>` covers committed and uncommitted changes to tracked files.
-   - For each untracked file from `git ls-files --others --exclude-standard`, add `git diff --no-index /dev/null <file>`.
+2. Requirements: use the Behavior section of the brief at the path the user gave. Do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there. If no path was given, build a numbered requirements list from the commit messages since the merge base, the pull request description (`gh pr view`) if one exists, and any design notes for this feature in `docs/plans/`. Show the list to the user, ask what is missing or wrong, and use the corrected list.
+3. Write the diff to a file with git itself, from `BASE=$(git merge-base origin/main HEAD)`. Do not type or copy the diff yourself.
+   - `mkdir -p tmp && git diff $BASE -- <feature paths> > tmp/review.diff` covers committed and uncommitted changes to tracked files.
+   - For each untracked file from `git ls-files --others --exclude-standard`, append `git diff --no-index /dev/null <file> >> tmp/review.diff`.
    - Leave out paths that are not part of the feature, such as `.pi/`, `tmp/`, or vendored skills. Ask if unsure.
 4. Dispatch one reviewer:
-   - pi on an omlx model: the `reviewer-local` agent, with `checkpointBeforeDeadlineMs: 300000`.
+   - pi on an omlx model: `subagent({ agent: "reviewer-local", task: <task>, checkpointBeforeDeadlineMs: 300000 })`.
    - pi on a cloud model: the `reviewer` agent.
    - Any other harness: its general-purpose subagent.
    - In pi, call `subagents_enable` first if the `subagent` tool is missing.
@@ -32,7 +32,7 @@ Create a todo list with one item per step before you start, and keep it updated.
 5. Write the reviewer's task from the template:
    - **What Was Implemented:** one sentence from the brief.
    - **Requirements:** the Behavior list, word for word.
-   - **Git range:** replace it with the full diff from step 3, pasted inline. If the diff is over 1,500 lines, list the files and the exact `git diff` commands for the reviewer to run instead. Give the absolute worktree path so it can read context.
+   - **Git range:** replace it with the absolute path of `tmp/review.diff` and tell the reviewer to read that file in full; it is the exact change under review. Do not paste or retype the diff. Give the absolute worktree path so it can read context.
    - **Review focus, only this:** "Does the code correctly implement each requirement, and would a test fail if any requirement broke?" Tell it to skip style unless it hides a bug, and to use `.agents/rules/code-review.md` and `.agents/rules/testing.md` as the standard.
    - Tell it not to run builds or tests, and include the check results from the build handoff if you have them.
    - Ask only what reading the code can answer. Do not ask whether code compiles, renders, or passes tests.

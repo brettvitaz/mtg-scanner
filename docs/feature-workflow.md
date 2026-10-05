@@ -59,7 +59,7 @@ Context to read:
 - [specific files for this task]
 
 Setup:
-- Create worktree: git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>
+- Create worktree: git fetch origin && git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description> origin/main
 - Run applicable baseline verification before making changes
 - Preserve the worktree and branch for manual review; do not clean up automatically
 

@@ -1,7 +1,7 @@
 # Testing Rules
 
 ## Test quality
-- Every public method or type should have at least one test.
+- Every behavior change needs a test that fails if that behavior breaks. For purely visual behavior, use a snapshot route (see `apps/ios/AGENTS.md`).
 - Tests must exercise real code paths — no tests that only verify mocks or hardcoded values.
 - A test must fail if the implementation is broken. Ask: "If I deleted the implementation body, would this test fail?"
 - Do not write tests that test language features rather than your logic.
@@ -13,11 +13,12 @@
 - For detection/recognition: test with real sample images from `samples/test/` when possible.
 
 ## Python (pytest)
+- Tests live in `services/api/tests/`. Run them with `make api-test` or `pytest services/api/tests/`.
 - Use `FastAPI.TestClient` for endpoint tests.
 - Use `monkeypatch` for environment variable overrides.
 - Use `tmp_path` for isolated file system operations.
 - Tests must not require network access or API credentials — use the mock provider.
-- Schema validation uses jsonschema `Draft202012Validator`.
+- Schema validation: `test_schema_examples.py` validates examples with jsonschema `Draft202012Validator`.
 - Fixtures go in `conftest.py` for shared state.
 
 ## Swift (XCTest)

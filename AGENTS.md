@@ -53,8 +53,8 @@ not automatically applied glob rules. Paths below are relative to the repo root.
 All repository changes, including documentation and instructions, MUST be made
 in a task-specific git worktree, never directly on main/master.
 
-1. Fetch the remote and verify the main project branch is up to date before starting. If it is behind or diverged, notify the user for resolution. If freshness cannot be verified, report that limitation.
-2. Create a worktree with a short, descriptive name: `git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description>` (e.g., `add-binder-detection`, `fix-crop-rotation`).
+1. Run `git fetch origin` before starting. If the fetch fails, report that the base may be stale. A local `main` that is behind `origin/main` is normal after squash merges; report it, but do not update it.
+2. Create a worktree from `origin/main` with a short, descriptive name: `git worktree add ../mtg-scanner-worktrees/<task-description> -b <task-description> origin/main` (e.g., `add-binder-detection`, `fix-crop-rotation`).
 3. If already in a worktree for this task, proceed there. Do not reuse another task's worktree or modify its work.
 4. Set up only the dependencies needed for the task and do all work in the worktree.
 5. Leave the worktree, branch, local configuration, and review artifacts available for the user's manual review after completing implementation and verification.
@@ -94,20 +94,20 @@ check passed if it failed or was not run.
 
 ### Code review gate
 
-Review every changed file before committing or handing off work. Use
+Review every changed file before handing off work. Use
 `.agents/rules/code-review.md` as the canonical checklist rather than maintaining
 a duplicate here. Explicitly report pass/fail for each applicable criterion;
 mark inapplicable criteria N/A with a reason (e.g., runtime tests for prose-only
-changes). Fix failures introduced by the change before committing.
+changes). Fix failures introduced by the change before handoff.
 
 Lint fixes must address the underlying design issue. Do not suppress or bypass a
 lint rule without explicit approval.
 
 ### Commit discipline
 
-- One logical change per commit. Do not bundle unrelated changes.
+- One logical change per commit. Do not bundle unrelated changes. Several commits per task are fine; pull requests are squash-merged.
 - Commit messages must state what changed and why, not just "fix" or "update."
-- Run the applicable verification above before committing. Do not commit code that fails its own tests.
+- Intermediate commits must at least build. Run the full applicable verification above before handoff. Never commit code that fails tests you have already run.
 
 ### Scope guard
 
@@ -145,7 +145,7 @@ PYTHONPATH=services/api python evals/run_eval.py
 
 - Write the simplest code that satisfies the requirements.
 - Prefer flat control flow over deep nesting. Functions should be < 30 lines where practical.
-- Use clear names instead of comments. If a function needs a comment to explain what it does, rename it.
+- Prefer names that make what code does obvious. Use comments for why, and for behavior a name cannot express.
 - No speculative code — do not add parameters, protocols, or abstractions "for future use."
 - No dead code, commented-out code, or TODO placeholders in committed work.
 - Type annotations are expected in both Python and Swift.
@@ -171,28 +171,9 @@ PYTHONPATH=services/api python evals/run_eval.py
 
 ## Testing
 
-### Backend (pytest)
-
-- Tests live in `services/api/tests/`.
-- Use `FastAPI.TestClient` for endpoint tests.
-- Use `monkeypatch` for environment overrides, `tmp_path` for isolated file system.
-- Mock provider returns fixture data — tests do not require network access or API keys.
-- Schema validation: `test_schema_examples.py` validates examples against JSON Schema Draft 2020-12.
-- Run with: `make api-test` or `pytest services/api/tests/`.
-
-### iOS (XCTest)
-
-- `final class <Feature>Tests: XCTestCase` naming pattern.
-- Every public method or type should have at least one test.
-- Tests must exercise real code paths — no tests that only verify mocks or hardcoded values.
-- Use `XCTAssertEqual` with `accuracy:` parameter for floating-point comparisons.
-
-### Test quality rules
-
-- Given specific inputs, verify specific outputs.
-- Test edge cases: empty input, boundary values, nil/optional paths.
-- A test must fail if the implementation is broken. Ask: "If I deleted the implementation body, would this test fail?"
-- Do not write tests that test language features rather than your logic.
+`.agents/rules/testing.md` is the canonical testing standard; read it before writing
+or reviewing tests. The core rule: every behavior change needs a test that fails if
+that behavior breaks.
 
 ## Contract-first changes
 
@@ -233,7 +214,8 @@ Update docs alongside code when behavior or configuration changes. Record import
 
 ## Context compaction rules
 
-When the user asks to compact context, first update `docs/agent-state.md`.
+When the user asks to compact context, first write the current state to
+`tmp/agent-state.md` (gitignored).
 
 The compacted context must preserve:
 

@@ -20,7 +20,7 @@
 
 ## Naming
 - Follow Swift API Design Guidelines.
-- Descriptive names over comments. If a function needs a comment, rename it.
+- Prefer names that make what code does obvious. Use comments for why, and for behavior a name cannot express.
 - Use MARK comments (`// MARK: - Section`) to organize class members.
 
 ## Structure

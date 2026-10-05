@@ -67,6 +67,8 @@ public struct PreviewGalleryRootView: View {
              "csv-import-error", "csv-import-empty", "csv-import-large", "csv-import-detail",
              "collection-empty", "deck-empty":
             CSVImportFixtureView(route: route)
+        case "results-badge", "results-badge-overflow":
+            ResultsBadgeFixtureView(count: route == "results-badge" ? 7 : 1_000)
         #endif
 
         case "results":
@@ -99,6 +101,14 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Results (fixture data)") {
     PreviewGalleryRootView(route: "results")
+}
+
+#Preview("Results badge") {
+    PreviewGalleryRootView(route: "results-badge")
+}
+
+#Preview("Results badge (overflow)") {
+    PreviewGalleryRootView(route: "results-badge-overflow")
 }
 
 #Preview("Selection Results") {

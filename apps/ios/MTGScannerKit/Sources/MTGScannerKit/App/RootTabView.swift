@@ -9,6 +9,13 @@ public struct RootTabView: View {
 
     public init() {}
 
+    #if DEBUG
+    /// Opens on a given tab so snapshot routes can picture the tab bar in a known state.
+    public init(initialTab: Int) {
+        _selectedTab = State(initialValue: initialTab)
+    }
+    #endif
+
     public var body: some View {
         @Bindable var appModel = appModel
         TabView(selection: $selectedTab) {
@@ -47,7 +54,7 @@ public struct RootTabView: View {
         }
         .onChange(of: selectedTab) { _, newTab in
             if newTab == 1 {
-                appModel.scanSessionCount = 0
+                appModel.clearScanSessionCount()
             }
         }
         .onChange(of: appModel.shouldShowResults) { _, newValue in

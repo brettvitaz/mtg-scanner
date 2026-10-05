@@ -180,6 +180,24 @@ public final class AppModel {
         shouldShowResults = true
     }
 
+    // MARK: - Results tab badge
+
+    /// Starts counting recognised cards into `scanSessionCount` for one upload queue.
+    ///
+    /// Wiring happens once per queue: `ScanView` re-runs its `onAppear` on every visit to
+    /// the Scan tab, and a second subscription would count every batch twice.
+    func connectScanCounter(to queue: RecognitionQueue) {
+        guard queue.onScanBatch == nil else { return }
+        queue.onScanBatch = { [weak self] cards in
+            self?.scanSessionCount += cards.count
+        }
+    }
+
+    /// Empties the tally. Only opening the Results tab does this.
+    func clearScanSessionCount() {
+        scanSessionCount = 0
+    }
+
     // MARK: - Private recognition helpers
 
     private func uploadFullImage(payload: RecognitionImagePayload, filename: String) async {

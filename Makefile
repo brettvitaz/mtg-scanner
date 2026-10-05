@@ -72,7 +72,8 @@ ios-test-matrix: ios-test ios-test-current ios-test-tablet
 ios-lint:
 	./scripts/lint-ios.sh
 
-IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-empty card-detail card-edit \
+IOS_SNAPSHOT_ROUTES ?= settings scan results results-badge results-badge-overflow csv-import collection-empty \
+	deck-empty card-detail card-edit \
 	pricing-results pricing-collection pricing-deck pricing-large pricing-filter copy-move card-row-preview card-row-list \
 	selection-results selection-collection selection-deck \
 	undo-results undo-collection undo-deck undo-empty undo-bulk undo-navigation \

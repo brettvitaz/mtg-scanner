@@ -34,7 +34,7 @@ Create a todo list with one item per step before you start, and keep it updated.
    - **Requirements:** the Behavior list, word for word.
    - **Git range:** replace it with the absolute path of `tmp/review.diff` and tell the reviewer to read that file in full; it is the exact change under review. Do not paste or retype the diff. Give the absolute worktree path so it can read context.
    - **Review focus, only this:** "Does the code correctly implement each requirement, and would a test fail if any requirement broke?" Tell it to skip style unless it hides a bug, and to use `.agents/rules/code-review.md` and `.agents/rules/testing.md` as the standard.
-   - Tell it not to run builds or tests, and include the check results from the build handoff if you have them.
+   - Tell it not to run builds or tests. Include the latest check results: from the build handoff if it is in this session, otherwise from the newest check logs in `tmp/` (for example `tmp/final-*.log`), read for exit status and failures. Say which files you read; if there are none, say the checks were not found, not that they failed.
    - Ask only what reading the code can answer. Do not ask whether code compiles, renders, or passes tests.
    - Keep the template's read-only rule, no-subagents rule, "Declined to judge" section, and output format.
 6. When the review returns, check each Critical and Important finding yourself by reading the cited code.

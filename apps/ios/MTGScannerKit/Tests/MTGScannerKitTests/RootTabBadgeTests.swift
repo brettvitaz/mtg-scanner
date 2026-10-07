@@ -6,6 +6,32 @@ import XCTest
 
 @MainActor
 final class RootTabBadgeTests: XCTestCase {
+    func testNativeResultsSelectionClearsBadgeAndSuppressesLateCards() async throws {
+        let app = AppModel()
+        app.selectTab(3)
+        app.recordScannedCard()
+        let context = try makeScanCountContext()
+        let library = LibraryViewModel()
+        library.modelContext = context
+        app.modelContext = context
+        let view = RootTabView().environment(app).environment(library).modelContainer(context.container)
+        let window = makeWindow(view: view)
+        defer { closeScanCountWindow(window) }
+        let tabBar = try await waitForBadge(in: window, badge: "1", accessibility: "1 newly scanned card")
+        let controller = try XCTUnwrap(findTabController(window.rootViewController))
+        let resultsController = try XCTUnwrap(controller.viewControllers?[1])
+        // Deliver the callback UIKit sends after user selection to SwiftUI's binding coordinator.
+        controller.selectedViewController = resultsController
+        controller.delegate?.tabBarController?(controller, didSelect: resultsController)
+        try await waitForScanCount { app.selectedTab == 1 }
+        XCTAssertEqual(app.selectedTab, 1)
+        XCTAssertEqual(app.newlyScannedCardCount, 0)
+        _ = try await waitForBadge(in: window, badge: nil, accessibility: "")
+        XCTAssertNil(tabBar.items?[1].badgeValue)
+        app.recordScannedCard()
+        XCTAssertEqual(app.newlyScannedCardCount, 0)
+    }
+
     func testNativeBadgeExposesExactCountAndClearsOnProgrammaticNavigation() async throws {
         let app = AppModel()
         app.selectTab(3)
@@ -68,6 +94,15 @@ final class RootTabBadgeTests: XCTestCase {
         if let tabBar = view as? UITabBar { return tabBar }
         for subview in view.subviews {
             if let tabBar = findTabBar(in: subview) { return tabBar }
+        }
+        return nil
+    }
+
+    private func findTabController(_ controller: UIViewController?) -> UITabBarController? {
+        guard let controller else { return nil }
+        if let tab = controller as? UITabBarController { return tab }
+        for child in controller.children {
+            if let tab = findTabController(child) { return tab }
         }
         return nil
     }

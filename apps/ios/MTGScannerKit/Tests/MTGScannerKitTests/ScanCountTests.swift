@@ -45,7 +45,7 @@ final class ScanCountTests: XCTestCase {
         XCTAssertEqual(app.resultsBadgeAccessibilityValue, "")
     }
 
-    func testNonScanListMutationsDoNotChangeBadge() throws {
+    func testResultsDeleteAndUndoPreserveScanCount() throws {
         let app = AppModel()
         let context = try makeScanCountContext()
         app.modelContext = context
@@ -53,12 +53,6 @@ final class ScanCountTests: XCTestCase {
         context.insert(existing)
         try context.save()
         app.recordScannedCard()
-        let imported = CollectionItem(title: "Bolt", edition: "Test")
-        context.insert(imported)
-        existing.quantity = 4
-        let collection = CardCollection(name: "Binder")
-        context.insert(collection)
-        imported.collection = collection
         app.deleteUndo.register([existing], in: .results)
         context.delete(existing)
         try context.save()

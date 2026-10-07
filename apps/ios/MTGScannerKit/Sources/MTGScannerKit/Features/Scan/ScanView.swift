@@ -11,12 +11,21 @@ struct ScanView: View {
     let isActive: Bool
     @State private var detectionViewModel = CardDetectionViewModel()
     @State private var captureCoordinator = CameraCaptureCoordinator()
-    @State private var autoScanViewModel = AutoScanViewModel()
+    @State private var autoScanViewModel: AutoScanViewModel
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
     @State private var photoLoadError: String?
     @State private var captureError: String?
+
+    init(
+        detectionMode: Binding<DetectionMode>, isActive: Bool,
+        autoScanViewModel: AutoScanViewModel = AutoScanViewModel()
+    ) {
+        _detectionMode = detectionMode
+        self.isActive = isActive
+        _autoScanViewModel = State(initialValue: autoScanViewModel)
+    }
 
     var body: some View {
         ZStack {

@@ -34,6 +34,8 @@ passed through unchanged.
 
 1. `feature-design <request>` agrees on a design with the user, stops for
    approval, then saves the approved design to `tmp/feature-briefs/<name>.md`.
+   In Codex, run it in Plan mode: only Plan mode has the interactive question
+   prompt.
 2. `feature-build <brief path>` runs the baseline checks, implements the brief
    in the same session, verifies tests, snapshots, and docs, reviews against
    `.agents/rules/code-review.md`, and commits.

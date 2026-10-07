@@ -26,7 +26,7 @@ Create a todo list with one item per step before you start, and keep it updated.
    - `PRODUCT.md`.
 2. Read the code the feature will change.
 3. If the feature changes UI, load the `impeccable` skill before presenting a design. Run its setup step, `.agents/skills/impeccable/scripts/impeccable context --target <main file you will change>`, follow its directives, then follow `reference/shape.md` and any platform reference it points to.
-4. Ask clarifying questions one at a time, and wait for each answer. Where there is a real choice, offer two or three options with a recommendation. After each answer, add it to a **Decisions** list, quoting the user's words. Stop asking when the user-visible behavior is settled.
+4. Ask clarifying questions, one question per message, and wait for each answer before asking the next. Never list several questions at once. Use the harness's question tool when it has one: `ask_user_question` in pi, `request_user_input` in Codex (available in Plan mode). Otherwise ask in plain text. Where there is a real choice, offer two or three options with a recommendation, as multiple choice when the tool supports it. After each answer, add it to a **Decisions** list, quoting the user's words. Stop asking when the user-visible behavior is settled.
 5. Present the design with these sections:
    - **Decisions**: the list from step 4, word for word.
    - **Behavior**: a numbered list of what the user will see and do. These are the requirements.

@@ -30,6 +30,7 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
   - Batch upload of cropped card images to backend
   - Fallback to single-image upload when no cards detected
   - Results list with card thumbnails from Scryfall
+  - Results tab badge counts newly scanned cards across scan runs until Results is opened. Each recognized card inserted into Results counts once, including repeated copies; pending and failed scans do not count. Opening Results clears the badge, and completions while Results is selected are already seen. The count survives backgrounding and resets on app relaunch. Counts above 99 display as 99+, with the exact count available to VoiceOver. Manual additions, imports, and list edits do not affect this scan count; there is no setting.
   - Card detail view with metadata, edition picker, Card Kingdom links, and correction editing
   - Settings flow
 - All text inputs disable keyboard autocorrection so uncommon MTG names remain as entered; matching card search results remain available.

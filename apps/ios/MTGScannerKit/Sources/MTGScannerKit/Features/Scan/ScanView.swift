@@ -89,6 +89,7 @@ struct ScanView: View {
     // MARK: - Setup
 
     private func configureAutoScan() {
+        autoScanViewModel.appModel = appModel
         autoScanViewModel.captureCoordinator = captureCoordinator
         autoScanViewModel.modelContext = appModel.modelContext
         autoScanViewModel.apiBaseURL = appModel.apiBaseURL

@@ -49,6 +49,7 @@ final class AutoScanViewModel {
     // MARK: - Wiring (set by ScanView after init)
 
     weak var captureCoordinator: CameraCaptureCoordinator?
+    weak var appModel: AppModel?
     var modelContext: ModelContext?
     var apiBaseURL: String = ""
 #if DEBUG
@@ -124,6 +125,7 @@ final class AutoScanViewModel {
 
     private func setupRecognitionCallback() {
         recognitionQueue.onCardIdentified = { [weak self] card in
+            self?.appModel?.recordScannedCard()
             let identifiedCard = IdentifiedCard(from: card)
             self?.identifiedCardsViewModel.addCard(identifiedCard)
         }

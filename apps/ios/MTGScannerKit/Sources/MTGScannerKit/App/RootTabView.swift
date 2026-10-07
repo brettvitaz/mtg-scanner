@@ -3,7 +3,6 @@ import UIKit
 
 public struct RootTabView: View {
     @Environment(AppModel.self) private var appModel
-    @State private var selectedTab = 0
     @State private var scanMode: DetectionMode = .scan
     @State private var showsScanModePicker = false
 
@@ -11,8 +10,8 @@ public struct RootTabView: View {
 
     public var body: some View {
         @Bindable var appModel = appModel
-        TabView(selection: $selectedTab) {
-            ScanView(detectionMode: $scanMode, isActive: selectedTab == 0)
+        TabView(selection: Binding(get: { appModel.selectedTab }, set: appModel.selectTab)) {
+            ScanView(detectionMode: $scanMode, isActive: appModel.selectedTab == 0)
                 .tabItem {
                     Label(scanMode.displayName, systemImage: scanMode.systemImage)
                 }
@@ -22,6 +21,7 @@ public struct RootTabView: View {
                 .tabItem {
                     Label("Results", systemImage: "list.bullet.rectangle")
                 }
+                .badge(appModel.resultsBadgeText)
                 .tag(1)
 
             LibraryView()
@@ -37,7 +37,7 @@ public struct RootTabView: View {
                 .tag(3)
         }
         .background(
-            ScanTabTapObserver(tabIndex: 0) {
+            TabBarObserver(tabIndex: 0, resultsAccessibilityValue: appModel.resultsBadgeAccessibilityValue) {
                 showsScanModePicker = true
             }
         )
@@ -46,17 +46,17 @@ public struct RootTabView: View {
         }
         .onChange(of: appModel.shouldShowResults) { _, newValue in
             if newValue {
-                selectedTab = 1
+                appModel.selectTab(1)
                 appModel.shouldShowResults = false
             }
         }
         .alert("Server Unavailable", isPresented: $appModel.showConnectionAlert) {
             Button("OK", role: .cancel) {}
-            Button("Settings") { selectedTab = 3 }
+            Button("Settings") { appModel.selectTab(3) }
         } message: {
             Text(appModel.connectionAlertMessage)
         }
-        .environment(\.undoSelectedTab, selectedTab)
+        .environment(\.undoSelectedTab, appModel.selectedTab)
     }
 }
 
@@ -102,19 +102,22 @@ private struct ScanModePickerSheet: View {
     }
 }
 
-private struct ScanTabTapObserver: UIViewRepresentable {
+private struct TabBarObserver: UIViewRepresentable {
     let tabIndex: Int
+    let resultsAccessibilityValue: String
     let onTap: () -> Void
 
     func makeUIView(context: Context) -> ObserverView {
         let view = ObserverView()
         view.tabIndex = tabIndex
+        view.resultsAccessibilityValue = resultsAccessibilityValue
         view.onTap = onTap
         return view
     }
 
     func updateUIView(_ view: ObserverView, context: Context) {
         view.tabIndex = tabIndex
+        view.resultsAccessibilityValue = resultsAccessibilityValue
         view.onTap = onTap
         DispatchQueue.main.async {
             view.installTapRecognizerIfPossible()
@@ -123,6 +126,7 @@ private struct ScanTabTapObserver: UIViewRepresentable {
 
     final class ObserverView: UIView, UIGestureRecognizerDelegate {
         var tabIndex = 0
+        var resultsAccessibilityValue = ""
         var onTap: () -> Void = {}
         private weak var observedTabBar: UITabBar?
         private lazy var tapRecognizer: ScanTabTapGestureRecognizer = {
@@ -150,6 +154,10 @@ private struct ScanTabTapObserver: UIViewRepresentable {
         func installTapRecognizerIfPossible() {
             tapRecognizer.tabIndex = tabIndex
             guard let tabBar = findTabBarController(from: window?.rootViewController)?.tabBar else { return }
+            // SwiftUI's tabItem label does not forward accessibilityValue to UITabBarItem.
+            if let items = tabBar.items, items.indices.contains(1) {
+                items[1].accessibilityValue = resultsAccessibilityValue
+            }
             guard observedTabBar !== tabBar else { return }
 
             observedTabBar?.removeGestureRecognizer(tapRecognizer)

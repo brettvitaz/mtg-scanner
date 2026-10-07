@@ -5,6 +5,9 @@
 - Tests must exercise real code paths — no tests that only verify mocks or hardcoded values.
 - A test must fail if the implementation is broken. Ask: "If I deleted the implementation body, would this test fail?"
 - Do not write tests that test language features rather than your logic.
+- Put logic that a test must reach in a model, view model, or service, not in a SwiftUI view body or view modifier. The view calls it; the test calls the same method.
+- Check that the code under test can actually change the result. A test of "stopping does not clear X" proves nothing if the stop code has no access to X.
+- When a test waits for async work, poll for the expected condition with a limit, then fail with a message (see `waitForCapture` in `AutoScanCaptureLifecycleTests.swift`). Do not wait a fixed time and hope the work finished.
 
 ## What to test
 - Given specific inputs, verify specific outputs (value-based assertions).

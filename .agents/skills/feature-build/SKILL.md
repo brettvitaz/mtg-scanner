@@ -21,10 +21,8 @@ Create a todo list with one item per step before you start, and keep it updated.
 1. Read the brief in full. Then read, as whole files, the nested `AGENTS.md` and the `.agents/rules/` files for each subsystem the brief touches, plus `.agents/rules/testing.md` and `.agents/rules/code-review.md`.
 2. Run `git fetch origin` and `git rev-list --left-right --count HEAD...origin/main`. If this branch is behind `origin/main`, tell the user. Do not rebase without asking.
 3. Baseline. Run the checks `AGENTS.md` lists for each touched subsystem, one at a time, each to its own log, for example `make ios-test > tmp/baseline-ios-test.log 2>&1; echo "exit=$?"`. Record any failures. Do not edit code until every baseline check has finished.
-4. Implement the brief, including every test in its Test map.
-   - In pi, dispatch the `worker` subagent (call `subagents_enable` first if the `subagent` tool is missing). Paste the full brief into its task, list the instruction files it must read in full, and tell it to implement exactly the brief, run the relevant checks, and report every file it changed. Run one worker and wait for it. Do not pass `timeoutMs`; on an omlx model, pass `checkpointBeforeDeadlineMs: 300000`.
-   - In any other harness, implement it yourself.
-5. Review the implementation yourself: `git diff`, plus `git status --short` for new files. Confirm that every Behavior item has the test named in the Test map, and that removing the behavior would make that test fail. Add any missing tests.
+4. Implement the brief yourself, in this session, including every test in its Test map. Do not hand the implementation to a subagent. If a subagent is used for anything else, give it file paths to read; never retype or paste the brief or a diff.
+5. Review the implementation yourself: `git diff`, plus `git status --short` for new files. Confirm that every Behavior item has the test named in the Test map, and that the code change the Test map names would make that test fail. Add any missing tests.
 6. Visual check, for UI changes. Add each snapshot route from the brief, following all five steps of "Adding a new route" in `apps/ios/AGENTS.md`. Run `make ios-snapshot ROUTE=<name>`, open each PNG with your read tool, and describe what you see. Fix anything that does not match the brief.
 7. Update the docs listed in the brief, and any other docs whose described behavior or configuration changed.
 8. Final checks: rerun the baseline checks to new log files, then `git diff --check`.

@@ -35,8 +35,8 @@ passed through unchanged.
 1. `feature-design <request>` agrees on a design with the user, stops for
    approval, then saves the approved design to `tmp/feature-briefs/<name>.md`.
 2. `feature-build <brief path>` runs the baseline checks, implements the brief
-   (in pi, through the `worker` subagent), verifies tests, snapshots, and docs,
-   reviews against `.agents/rules/code-review.md`, and commits.
+   in the same session, verifies tests, snapshots, and docs, reviews against
+   `.agents/rules/code-review.md`, and commits.
 3. `feature-review [brief path]` sends the branch diff to one reviewer subagent,
    checks each finding, and reports without fixing.
 

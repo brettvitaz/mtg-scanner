@@ -5,7 +5,7 @@ description: Implement an approved feature brief written by feature-design, veri
 
 # Feature build
 
-The path to an approved brief follows this skill. Use only a brief path the user gives. If there is none, ask for it; do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there. Implement only the approved design. If something in it cannot be built as approved, stop and ask; do not change the design on your own.
+The path to an approved brief follows this skill. Use only a brief path the user gives. If there is none, ask for it; do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there. Implement only the approved design, and do not change it on your own. If something in it cannot be built as approved, stop and ask. If an item can be built but cannot do what it is for (for example, a test that no code change could make fail), build the rest, then report that item in the handoff with the reason and a proposed fix.
 
 ## Rules
 
@@ -35,6 +35,7 @@ Create a todo list with one item per step before you start, and keep it updated.
     - Baseline and final check results, with log paths.
     - Snapshot PNG paths.
     - Every deviation from the brief, and why.
+    - Brief items that cannot do what they are for, each with a proposed fix.
     - Anything unverified.
     - Commands to inspect or run the change.
     - The next step: `/skill:feature-review` in pi, or `$feature-review` in Codex.

@@ -2,6 +2,21 @@
 
 Measured October 7, 2026. **Native catalog and price installation are feasible; direct OpenAI recognition works. The complete provider and App Store release gates are not yet satisfied.** The Python server still serves normal app scanning. This increment adds an opt-in diagnostic runner, not a production migration.
 
+## Branch integration workflow
+
+All migration increments integrate into **`ios-serverless-migration`** before main.
+This feature branch starts from `origin/main` and is independent of Claude's
+`standalone-ios` working branch. Create migration task worktrees from
+`origin/ios-serverless-migration` and target their PRs at `ios-serverless-migration`.
+This user-requested migration base overrides the generic `origin/main` worktree
+base for these tasks. Retain worktrees and review artifacts until cleanup is
+explicitly requested. Only the completed, verified feature branch will target
+`main`; individual migration PRs must target the feature branch.
+
+Existing CI runs on pushes and PRs targeting `ios-serverless-migration` as well
+as `main`, with jobs and permissions unchanged. The repository default branch
+remains `main`. Claude's working branch and its changes are outside this workflow.
+
 ## Acceptance and results
 
 | Gate | Result | Evidence |

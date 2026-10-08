@@ -238,11 +238,11 @@ extension CardDetailView {
 
     private func refreshPrice() async {
         guard let item = storedItem else {
-            await viewModel.loadPrice(using: appModel)
+            await viewModel.loadPrice(using: appModel.priceSource)
             return
         }
         let request = PriceFetchRequest(item: item)
-        await viewModel.loadPrice(using: appModel)
+        await viewModel.loadPrice(using: appModel.priceSource)
         guard let price = viewModel.cardPrice else { return }
         item.apply(price: price, matching: request)
     }

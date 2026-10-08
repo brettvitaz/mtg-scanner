@@ -62,7 +62,6 @@ public final class AppModel {
     /// Torch level to restore when returning to scan view (same session only, not persisted)
     var lastTorchLevel: Float = 0
 
-    private let apiClient = APIClient()
     private let cropService = CardCropService()
     private let correctionsStoreKey = "card_corrections"
     private let apiBaseURLStoreKey = "api_base_url"
@@ -147,7 +146,7 @@ public final class AppModel {
         resultsNavigationPath = NavigationPath()
 
         do {
-            try await apiClient.checkHealth(baseURL: apiBaseURL)
+            try await APIClient(baseURL: apiBaseURL).checkHealth()
         } catch {
             connectionAlertMessage = "Cannot reach the server at \(apiBaseURL). Check your connection and API settings."
             showConnectionAlert = true
@@ -202,9 +201,9 @@ public final class AppModel {
         statusMessage = "Uploading \(cropPairs.count) crop(s)…"
 
         do {
-            latestResult = try await apiClient.recognizeBatch(
+            latestResult = try await cardRecognizer.recognizeBatch(
                 crops: cropPairs,
-                baseURL: apiBaseURL
+                contentType: "image/jpeg"
             )
             associateCropsWithCards()
             statusMessage = "Recognition finished (\(cropPairs.count) crop(s)). Open Results to inspect."
@@ -217,11 +216,10 @@ public final class AppModel {
         statusMessage = "Uploading full image…"
 
         do {
-            latestResult = try await apiClient.recognizeImage(
+            latestResult = try await cardRecognizer.recognizeImage(
                 data: data,
                 filename: filename,
-                contentType: contentType,
-                baseURL: apiBaseURL
+                contentType: contentType
             )
             associateCropsWithCards()
             statusMessage = "Recognition finished. Open Results to inspect the response."
@@ -285,27 +283,17 @@ private extension AppModel {
     }
 }
 
-// MARK: - Card Search and Printings
+// MARK: - Card Services
 
 extension AppModel {
-    func searchCardNames(query: String) async throws -> [String] {
-        return try await apiClient.searchCardNames(query: query, baseURL: apiBaseURL)
-    }
-
-    func fetchPrintings(name: String) async throws -> [CardPrinting] {
-        return try await apiClient.fetchPrintings(name: name, baseURL: apiBaseURL)
-    }
+    var cardRecognizer: any CardRecognizer { APIClient(baseURL: apiBaseURL) }
+    var cardCatalog: any CardCatalog { APIClient(baseURL: apiBaseURL) }
+    var priceSource: any PriceSource { APIClient(baseURL: apiBaseURL) }
 }
 
 // MARK: - Prices
 
 extension AppModel {
-    func fetchPrice(name: String, scryfallId: String?, isFoil: Bool) async throws -> CardPrice {
-        return try await apiClient.fetchPrice(
-            name: name, scryfallId: scryfallId, isFoil: isFoil, baseURL: apiBaseURL
-        )
-    }
-
     func refreshPrices(for items: [CollectionItem]) async {
         for item in items {
             guard !Task.isCancelled else { return }
@@ -316,7 +304,7 @@ extension AppModel {
     func refreshPrice(for item: CollectionItem) async {
         let request = PriceFetchRequest(item: item)
         do {
-            let price = try await fetchPrice(
+            let price = try await priceSource.fetchPrice(
                 name: request.name, scryfallId: request.scryfallId, isFoil: request.isFoil
             )
             guard !Task.isCancelled else { return }

@@ -16,7 +16,9 @@ struct CSVPrintingPicker: View {
                         .foregroundStyle(.primary)
                     TextField("Search card name", text: $viewModel.searchText)
                         .autocorrectionDisabled(true)
-                        .onChange(of: viewModel.searchText) { _, _ in viewModel.updateSearch(using: appModel) }
+                        .onChange(of: viewModel.searchText) { _, _ in
+                            viewModel.updateSearch(using: appModel.cardCatalog)
+                        }
                     ForEach(viewModel.searchResults, id: \.self) { name in
                         Button(name) { viewModel.selectedName = name }
                     }
@@ -42,7 +44,7 @@ struct CSVPrintingPicker: View {
         viewModel.errorMessage = nil
         viewModel.printings = []
         do {
-            let printings = try await appModel.fetchPrintings(name: viewModel.selectedName ?? record.title)
+            let printings = try await appModel.cardCatalog.fetchPrintings(name: viewModel.selectedName ?? record.title)
             try Task.checkCancellation()
             viewModel.printings = printings
         } catch {

@@ -125,16 +125,16 @@ final class AutoScanViewModelTests: XCTestCase {
         // Verify that triggerCapture returns cleanly when captureCoordinator is nil,
         // without calling enqueue and without leaving the state machine stuck.
         nonisolated(unsafe) var capturedIsCropped: Bool?
-        let queue2 = RecognitionQueue(
-            recognize: { _, _, _, _ in
+        let queue2 = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in
                 capturedIsCropped = false
                 return RecognitionResult(cards: [])
             },
-            recognizeBatch: { _, _, _ in
+            recognizeBatch: { _, _ in
                 capturedIsCropped = true
                 return RecognitionResult(cards: [])
             }
-        )
+        ))
 
         let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue2)
         vm.captureDelay = 0.05
@@ -165,13 +165,13 @@ final class AutoScanViewModelTests: XCTestCase {
         // A second signal while settling should NOT overwrite the stored bounding box.
         // We verify state stays .settling (already covered) and no crash occurs.
         nonisolated(unsafe) var batchCallCount = 0
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in RecognitionResult(cards: []) },
+            recognizeBatch: { _, _ in
                 batchCallCount += 1
                 return RecognitionResult(cards: [])
             }
-        )
+        ))
         let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
         vm.captureDelay = 60
         vm.start()
@@ -303,10 +303,10 @@ final class AutoScanViewModelTests: XCTestCase {
     }
 
     private func makeStubQueue() -> RecognitionQueue {
-        RecognitionQueue(
-            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
-        )
+        RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in RecognitionResult(cards: []) },
+            recognizeBatch: { _, _ in RecognitionResult(cards: []) }
+        ))
     }
 
     private func makeCameraPayload(rawBytes: Data) -> RecognitionImagePayload {

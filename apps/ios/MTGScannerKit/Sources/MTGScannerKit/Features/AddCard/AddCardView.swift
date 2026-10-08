@@ -45,7 +45,7 @@ struct AddCardView: View {
         .task {
             viewModel.isFoil = initialFoil
             guard let initialName else { return }
-            viewModel.selectName(initialName, using: appModel)
+            viewModel.selectName(initialName, using: appModel.cardCatalog)
             navigationPath = [.printings]
         }
     }
@@ -61,7 +61,7 @@ struct AddCardView: View {
                 ContentUnavailableView {
                     Label(error, systemImage: "wifi.exclamationmark")
                 } actions: {
-                    Button("Retry") { viewModel.updateSearch(using: appModel) }
+                    Button("Retry") { viewModel.updateSearch(using: appModel.cardCatalog) }
                 }
             } else if viewModel.searchResults.isEmpty && viewModel.searchText.count >= 2 {
                 Text("No cards found.")
@@ -74,7 +74,7 @@ struct AddCardView: View {
             } else {
                 List(viewModel.searchResults, id: \.self) { name in
                     Button(name) {
-                        viewModel.selectName(name, using: appModel)
+                        viewModel.selectName(name, using: appModel.cardCatalog)
                         navigationPath.append(.printings)
                     }
                     .foregroundStyle(.primary)
@@ -92,7 +92,7 @@ struct AddCardView: View {
         .searchable(text: $viewModel.searchText, prompt: "Card name")
         .autocorrectionDisabled(true)
         .onChange(of: viewModel.searchText) { _, _ in
-            viewModel.updateSearch(using: appModel)
+            viewModel.updateSearch(using: appModel.cardCatalog)
         }
     }
 
@@ -110,7 +110,7 @@ struct AddCardView: View {
                     Label(message, systemImage: "rectangle.stack")
                 } actions: {
                     if viewModel.errorMessage != nil, let name = viewModel.selectedName {
-                        Button("Retry") { viewModel.selectName(name, using: appModel) }
+                        Button("Retry") { viewModel.selectName(name, using: appModel.cardCatalog) }
                     }
                 }
             } else {

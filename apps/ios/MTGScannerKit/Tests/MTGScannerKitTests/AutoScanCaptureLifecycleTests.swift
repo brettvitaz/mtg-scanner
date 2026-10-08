@@ -219,18 +219,18 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
     func testFullPhotoFallbackPreservesOriginalUploadBytes() async {
         let payload = makePayload()
         let recognized = expectation(description: "Full photo recognized")
-        let queue = RecognitionQueue(
-            recognize: { data, _, contentType, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { data, _, contentType in
                 XCTAssertEqual(data, payload.uploadData)
                 XCTAssertEqual(contentType, payload.contentType)
                 recognized.fulfill()
                 return RecognitionResult(cards: [])
             },
-            recognizeBatch: { _, _, _ in
+            recognizeBatch: { _, _ in
                 XCTFail("No card crop: should upload the full photo")
                 return RecognitionResult(cards: [])
             }
-        )
+        ))
         let vm = AutoScanViewModel(
             detectorProvider: { nil }, recognitionQueue: queue, capturePhoto: { payload }
         )
@@ -290,10 +290,10 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
     }
 
     private func makeQueue() -> RecognitionQueue {
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in RecognitionResult(cards: []) }
-        )
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in RecognitionResult(cards: []) },
+            recognizeBatch: { _, _ in RecognitionResult(cards: []) }
+        ))
         queue.maxConcurrent = 0
         return queue
     }

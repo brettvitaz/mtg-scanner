@@ -2,18 +2,16 @@ import XCTest
 @testable import MTGScannerKit
 
 final class APIClientHealthTests: XCTestCase {
-    private let client = APIClient()
-
     // MARK: - Invalid URL
 
     func testCheckHealth_emptyBaseURL_throwsInvalidBaseURL() async {
-        await XCTAssertThrowsErrorAsync(try await client.checkHealth(baseURL: "")) { error in
+        await XCTAssertThrowsErrorAsync(try await APIClient(baseURL: "").checkHealth()) { error in
             XCTAssertEqual(error as? APIClient.APIError, .invalidBaseURL)
         }
     }
 
     func testCheckHealth_malformedBaseURL_throwsInvalidBaseURL() async {
-        await XCTAssertThrowsErrorAsync(try await client.checkHealth(baseURL: "not a url")) { error in
+        await XCTAssertThrowsErrorAsync(try await APIClient(baseURL: "not a url").checkHealth()) { error in
             XCTAssertEqual(error as? APIClient.APIError, .invalidBaseURL)
         }
     }

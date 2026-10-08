@@ -43,8 +43,12 @@ parity fixtures.
 Extract protocols from `Services/APIClient.swift`: `CardRecognizer`
 (`recognizeImage`, `recognizeBatch`), `CardCatalog` (`searchCardNames`,
 `fetchPrintings`), and `PriceSource` (`fetchPrice`). `APIClient` becomes the first
-implementation. View models depend on the protocols through `@Environment`. No
-behavior change.
+implementation. `AppModel`, which views already read from `@Environment`, exposes
+`cardRecognizer`, `cardCatalog`, and `priceSource`; it is the one place that picks
+the implementation. View models and `RecognitionQueue` take the protocols, not
+`AppModel`. The services are not separate environment values because `AppModel`
+also uses them (recognition, price refresh) and the HTTP ones depend on its
+mutable server URL. No behavior change.
 
 ### Phase 1 — On-device card database
 

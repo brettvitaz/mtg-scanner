@@ -213,7 +213,7 @@ private struct SettingsForm: View {
         let baseURL = appModel.apiBaseURL
         Task {
             do {
-                try await APIClient().checkHealth(baseURL: baseURL)
+                try await APIClient(baseURL: baseURL).checkHealth()
                 connectionStatus = .success
             } catch {
                 connectionStatus = .failure(error.localizedDescription)

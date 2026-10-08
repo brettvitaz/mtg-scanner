@@ -243,7 +243,7 @@ struct CSVImportView: View {
 
     private func load(_ url: URL) {
         importTask?.cancel()
-        importTask = Task { await viewModel.load(url: url, fetch: appModel.fetchPrintings) }
+        importTask = Task { await viewModel.load(url: url, fetch: appModel.cardCatalog.fetchPrintings) }
     }
 
     private func prepareReview() {

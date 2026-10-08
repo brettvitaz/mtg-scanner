@@ -1,6 +1,7 @@
 import Foundation
 
-struct APIClient {
+/// Card services backed by the FastAPI backend at `baseURL`.
+struct APIClient: CardRecognizer, CardCatalog, PriceSource {
     enum APIError: LocalizedError {
         case invalidBaseURL
         case invalidResponse
@@ -15,14 +16,16 @@ struct APIClient {
         }
     }
 
+    let baseURL: String
+    private static let promptVersion = "card-recognition.md"
+    private static let searchLimit = 20
+
     // MARK: - Single-image route
 
     func recognizeImage(
         data: Data,
         filename: String,
-        contentType: String,
-        baseURL: String,
-        promptVersion: String = "card-recognition.md"
+        contentType: String
     ) async throws -> RecognitionResult {
         guard let url = URL(string: baseURL)?.appending(path: "/api/v1/recognitions") else {
             throw APIError.invalidBaseURL
@@ -36,7 +39,7 @@ struct APIClient {
             data: data,
             filename: filename,
             contentType: contentType,
-            promptVersion: promptVersion,
+            promptVersion: Self.promptVersion,
             boundary: boundary
         )
 
@@ -51,9 +54,7 @@ struct APIClient {
     /// are merged into a single `RecognitionResult` by the server.
     func recognizeBatch(
         crops: [(data: Data, filename: String)],
-        contentType: String = "image/jpeg",
-        baseURL: String,
-        promptVersion: String = "card-recognition.md"
+        contentType: String
     ) async throws -> RecognitionResult {
         guard let url = URL(string: baseURL)?.appending(path: "/api/v1/recognitions/batch") else {
             throw APIError.invalidBaseURL
@@ -66,7 +67,7 @@ struct APIClient {
         request.httpBody = makeBatchMultipartBody(
             crops: crops,
             contentType: contentType,
-            promptVersion: promptVersion,
+            promptVersion: Self.promptVersion,
             boundary: boundary
         )
 
@@ -75,7 +76,7 @@ struct APIClient {
 
     // MARK: - Health check
 
-    func checkHealth(baseURL: String) async throws {
+    func checkHealth() async throws {
         guard let url = URL(string: baseURL),
               url.scheme == "http" || url.scheme == "https" else {
             throw APIError.invalidBaseURL
@@ -91,7 +92,7 @@ struct APIClient {
 
     // MARK: - Printings route
 
-    func fetchPrintings(name: String, baseURL: String) async throws -> [CardPrinting] {
+    func fetchPrintings(name: String) async throws -> [CardPrinting] {
         guard var components = URLComponents(string: baseURL) else {
             throw APIError.invalidBaseURL
         }
@@ -116,14 +117,14 @@ struct APIClient {
 
     // MARK: - Card name search route
 
-    func searchCardNames(query: String, limit: Int = 20, baseURL: String) async throws -> [String] {
+    func searchCardNames(query: String) async throws -> [String] {
         guard var components = URLComponents(string: baseURL) else {
             throw APIError.invalidBaseURL
         }
         components.path += "/api/v1/cards/search"
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "limit", value: "\(limit)")
+            URLQueryItem(name: "limit", value: "\(Self.searchLimit)")
         ]
         guard let url = components.url else {
             throw APIError.invalidBaseURL
@@ -147,8 +148,7 @@ struct APIClient {
     func fetchPrice(
         name: String,
         scryfallId: String?,
-        isFoil: Bool,
-        baseURL: String
+        isFoil: Bool
     ) async throws -> CardPrice {
         guard var components = URLComponents(string: baseURL) else {
             throw APIError.invalidBaseURL

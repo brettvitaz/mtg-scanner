@@ -315,6 +315,7 @@ private extension ScanView {
     private func onAppearHandler() {
         detectionViewModel.requestCameraPermissionIfNeeded()
         configureAutoScan()
+        appModel.connectScanCounter(to: autoScanViewModel.recognitionQueue)
         UIApplication.shared.isIdleTimerDisabled = true
     }
 

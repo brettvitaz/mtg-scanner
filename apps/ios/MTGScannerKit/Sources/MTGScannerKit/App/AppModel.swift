@@ -45,6 +45,8 @@ public final class AppModel {
         didSet { UserDefaults.standard.set(exposureBias, forKey: exposureBiasKey) }
     }
     var isRecognizing = false
+    /// Cards recognised since Results was last opened. Drives the Results tab badge.
+    var scanSessionCount = 0
     var statusMessage = "Point camera at cards to scan."
     var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.
@@ -176,6 +178,24 @@ public final class AppModel {
         isRecognizing = false
         persistRecognizedCards()
         shouldShowResults = true
+    }
+
+    // MARK: - Results tab badge
+
+    /// Starts counting recognised cards into `scanSessionCount` for one upload queue.
+    ///
+    /// Wiring happens once per queue: `ScanView` re-runs its `onAppear` on every visit to
+    /// the Scan tab, and a second subscription would count every batch twice.
+    func connectScanCounter(to queue: RecognitionQueue) {
+        guard queue.onScanBatch == nil else { return }
+        queue.onScanBatch = { [weak self] cards in
+            self?.scanSessionCount += cards.count
+        }
+    }
+
+    /// Empties the tally. Only opening the Results tab does this.
+    func clearScanSessionCount() {
+        scanSessionCount = 0
     }
 
     // MARK: - Private recognition helpers

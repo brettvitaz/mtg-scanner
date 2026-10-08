@@ -48,6 +48,10 @@ without starting automatic scanning. During the settling delay, the shutter capt
 Capture is disabled while a photo is being captured or prepared for recognition. If on-device
 cropping finds no card, the original photo is uploaded for recognition.
 
+The Results tab badge counts the cards recognized since you last opened the Results tab,
+in either scan mode. Opening Results clears the count. The badge is hidden at zero and
+shows "999+" above 999.
+
 Auto Scan automatically selects a fixed autofocus-capable ultra-wide camera when the
 device supports the 1080p video/photo pipeline. This keeps growing stacks in scanning
 stands within closer focusing range without a camera setting or lens switches during scanning.

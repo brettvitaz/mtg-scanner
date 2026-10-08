@@ -104,6 +104,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 | Route | View | Notes |
 |-------|------|-------|
+| `results-badge` | `ResultsBadgeFixtureView` | Library tab selected with a "7" badge on the Results tab icon |
+| `results-badge-overflow` | `ResultsBadgeFixtureView` | Same, with the "999+" badge above 999 |
 | `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
 | `card-row-list` | `CardListPricingFixtureView` | Hold rows to review sample artwork, missing data, and native actions |
 | `card-row-preview` | `CardListPricingFixtureView` | Foil preview with cached sample artwork |

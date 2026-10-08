@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, standalone-ios]
   pull_request:
-    branches: [main]
+    branches: [main, standalone-ios]
 
 permissions:
   contents: read

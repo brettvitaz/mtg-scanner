@@ -1,4 +1,4 @@
-# ADR 0008: Measure serverless migration before production integration
+# ADR 0009: Measure serverless migration before production integration
 
 Date: 2026-10-07
 Status: Accepted for Phase 1 diagnostics

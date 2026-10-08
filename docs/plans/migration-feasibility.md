@@ -2,6 +2,22 @@
 
 Measured October 7, 2026. **Native catalog and price installation are feasible; direct OpenAI recognition works. The complete provider and App Store release gates are not yet satisfied.** The Python server still serves normal app scanning. This increment adds an opt-in diagnostic runner, not a production migration.
 
+## Branch integration workflow
+
+All serverless migration work integrates into **`standalone-ios`** before main.
+Create each migration task worktree from `origin/standalone-ios`, and target its
+PR at `standalone-ios`. This migration-specific base follows the user's explicit
+instruction and overrides the generic `origin/main` worktree base for these tasks.
+Retain task worktrees and review artifacts until cleanup is explicitly requested.
+The existing CI workflow runs on pushes and PRs targeting `standalone-ios` as well
+as `main`; GitHub repository default branch remains `main`.
+The consolidated feature branch will target `main` after all increments are
+complete and verified. Individual migration PRs must not target `main`.
+
+The feature branch already contains the migration plan and Phase 0 service
+protocols. This diagnostic increment layers on those foundations. Its ADR is
+numbered 0009 to preserve the feature branch's existing standalone-app ADR 0008.
+
 ## Acceptance and results
 
 | Gate | Result | Evidence |
@@ -159,3 +175,11 @@ All changed files were reviewed against `.agents/rules/code-review.md`:
 | Static analysis | Pass: SwiftLint and mypy pass; no added suppressions |
 
 No criteria are inapplicable for this change. Release authentication, complete recognition accuracy, all-provider success and production background/low-disk lifecycle remain deferred by the Phase 1 scope, not counted as implemented behavior.
+
+After incorporating the feature branch's Phase 0 foundations, `make ios-build`
+and `make ios-lint` passed (0 violations in 205 files), and `make ios-test`
+passed 598 tests with 0 failures. Logs and test summary are retained
+in `tmp/feature-base-ios-*`. CI YAML was parsed and reviewed: only branch trigger
+filters changed; jobs and permissions are preserved. The ADR renumbering and
+branch workflow documentation pass the canonical review criteria; runtime tests
+for those prose-only changes are N/A.

@@ -38,7 +38,8 @@ let package = Package(
             dependencies: ["MTGScannerKit", "MTGScannerFixtures"],
             path: "Tests/MTGScannerKitTests",
             resources: [
-                .process("CropEvaluationFixtures")
+                .process("CropEvaluationFixtures"),
+                .process("FeasibilityFixtures")
             ]
         )
     ]

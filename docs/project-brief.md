@@ -94,3 +94,10 @@ Implement the crop-first batch scan flow described in `docs/plans/ios-crop-first
 - Keep contracts versioned
 - Preserve agent-friendly structure and readability
 - Use the repo as the primary source of project continuity
+
+## Serverless migration feasibility
+
+Phase 1 adds opt-in iPhone diagnostics while normal scanning retains the Python API.
+Native catalog/price import and OpenAI transport are demonstrated; other providers
+and distribution permissions remain unresolved. See [the measured report](plans/migration-feasibility.md)
+and [ADR 0008](decisions/adr-0008-serverless-migration-feasibility.md).

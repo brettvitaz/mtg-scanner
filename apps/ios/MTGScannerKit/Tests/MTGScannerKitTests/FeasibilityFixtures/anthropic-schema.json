@@ -1,0 +1,49 @@
+{
+  "model": "fixture",
+  "max_tokens": 4096,
+  "system": "prompt",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Analyze this Magic: The Gathering card image and extract the card information."
+        },
+        {
+          "type": "image",
+          "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": "AQ=="
+          }
+        },
+        {
+          "type": "text",
+          "text": "Close-up of the bottom-left corner of the same card. Use this close-up for two purposes: 1) Look at the far LEFT edge for the Planeswalker icon (five-tined glyph) to determine list_reprint. 2) Read the separator character between the set code and language code (e.g., 'WAR \u2022 EN' or 'WAR \u2605 EN') to determine foil status. The separator is either a bullet (\u2022) for non-foil or a star (\u2605) for foil."
+        },
+        {
+          "type": "image",
+          "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": "Ag=="
+          }
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "card_recognition",
+      "description": "Extract structured information from a Magic: The Gathering card image",
+      "input_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "tool_choice": {
+    "type": "tool",
+    "name": "card_recognition"
+  }
+}

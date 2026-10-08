@@ -47,6 +47,11 @@ struct MTGScannerApp: App {
 
     private var rootTabView: some View {
         RootTabView()
+            .task {
+                #if DEBUG
+                await FeasibilityProbe.runIfRequested()
+                #endif
+            }
             .environment(appModel)
             .environment(libraryViewModel)
             .modelContainer(modelContainer)

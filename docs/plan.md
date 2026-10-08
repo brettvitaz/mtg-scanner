@@ -81,3 +81,10 @@ Camera capture with live card detection overlays, photo picker, upload client, r
 - **Card boundary detection:** Both on-device (YOLOv8n for table, Vision rectangles for binder) and server-side (OpenCV contour-based).
 - **Request model:** Synchronous request/response works for MVP. Batch endpoint handles multi-card images.
 - **Metadata for evaluation:** Artifacts store uploaded images, crops, raw recognition output, validation details, and response JSON.
+
+## Serverless migration
+
+Phase 1 adds opt-in iPhone diagnostics while normal scanning retains the Python API.
+Native catalog/price import and OpenAI transport are demonstrated; other providers
+and distribution permissions remain unresolved. See [the measured report](plans/migration-feasibility.md)
+and [ADR 0008](decisions/adr-0008-serverless-migration-feasibility.md).

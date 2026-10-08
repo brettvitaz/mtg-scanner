@@ -27,14 +27,11 @@ final class RecognitionQueue {
 
     var maxConcurrent: Int = 2
 
+    /// Each job keeps the recognizer that was current when it was enqueued, including for retries.
+    var cardRecognizer: any CardRecognizer
+
     // MARK: - Private
 
-    typealias RecognizeFunction = @Sendable (Data, String, String, String) async throws -> RecognitionResult
-    typealias CroppedBatch = [(data: Data, filename: String)]
-    typealias RecognizeBatchFunction = @Sendable (CroppedBatch, String, String) async throws -> RecognitionResult
-
-    private let recognize: RecognizeFunction
-    private let recognizeBatch: RecognizeBatchFunction
     private var activeCount = 0
     private var pendingJobs: [Job] = []
     private var failedJobs: [Job] = []
@@ -44,7 +41,7 @@ final class RecognitionQueue {
         let id: UUID = UUID()
         let payload: RecognitionImagePayload
         let filename: String
-        let apiBaseURL: String
+        let cardRecognizer: any CardRecognizer
         let modelContext: ModelContext?
         let isCropped: Bool
         let capturedAt: Date
@@ -53,18 +50,8 @@ final class RecognitionQueue {
 
     // MARK: - Init
 
-    init(
-        recognize: @escaping RecognizeFunction = { data, filename, contentType, baseURL in
-            try await APIClient().recognizeImage(
-                data: data, filename: filename, contentType: contentType, baseURL: baseURL
-            )
-        },
-        recognizeBatch: @escaping RecognizeBatchFunction = { crops, contentType, baseURL in
-            try await APIClient().recognizeBatch(crops: crops, contentType: contentType, baseURL: baseURL)
-        }
-    ) {
-        self.recognize = recognize
-        self.recognizeBatch = recognizeBatch
+    init(cardRecognizer: any CardRecognizer = APIClient(baseURL: "")) {
+        self.cardRecognizer = cardRecognizer
     }
 
     // MARK: - Public API
@@ -72,12 +59,11 @@ final class RecognitionQueue {
     func enqueue(
         payload: RecognitionImagePayload,
         isCropped: Bool = false,
-        apiBaseURL: String,
         modelContext: ModelContext?
     ) {
         let filename = "scan-\(UUID().uuidString.prefix(8)).\(payload.preferredFilenameExtension)"
         let job = Job(
-            payload: payload, filename: filename, apiBaseURL: apiBaseURL,
+            payload: payload, filename: filename, cardRecognizer: cardRecognizer,
             modelContext: modelContext, isCropped: isCropped, capturedAt: Date()
         )
         pendingJobs.append(job)
@@ -85,12 +71,12 @@ final class RecognitionQueue {
         drainIfPossible()
     }
 
-    func enqueue(image: UIImage, isCropped: Bool = false, apiBaseURL: String, modelContext: ModelContext?) {
+    func enqueue(image: UIImage, isCropped: Bool = false, modelContext: ModelContext?) {
         guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else {
             failedCount += 1
             return
         }
-        enqueue(payload: payload, isCropped: isCropped, apiBaseURL: apiBaseURL, modelContext: modelContext)
+        enqueue(payload: payload, isCropped: isCropped, modelContext: modelContext)
     }
 
     func cancelAll() {
@@ -176,13 +162,14 @@ final class RecognitionQueue {
 
     private func callAPI(data: Data, contentType: String, job: Job) async throws -> RecognitionResult {
         if job.isCropped {
-            return try await recognizeBatch(
-                [(data: data, filename: job.filename)],
-                contentType,
-                job.apiBaseURL
+            return try await job.cardRecognizer.recognizeBatch(
+                crops: [(data: data, filename: job.filename)],
+                contentType: contentType
             )
         }
-        return try await recognize(data, job.filename, contentType, job.apiBaseURL)
+        return try await job.cardRecognizer.recognizeImage(
+            data: data, filename: job.filename, contentType: contentType
+        )
     }
 
     private func persist(result: RecognitionResult, modelContext: ModelContext?, capturedAt: Date) {

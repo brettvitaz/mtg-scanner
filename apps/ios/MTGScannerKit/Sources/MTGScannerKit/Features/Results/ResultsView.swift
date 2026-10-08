@@ -320,10 +320,11 @@ private extension ResultsView {
     }
 
     func fetchPrices(for requests: [PriceFetchRequest]) async -> [(UUID, CardPrice?)] {
-        await withTaskGroup(of: (UUID, CardPrice?).self) { group in
+        let priceSource = appModel.priceSource
+        return await withTaskGroup(of: (UUID, CardPrice?).self) { group in
             for req in requests {
                 group.addTask {
-                    let price = try? await self.appModel.fetchPrice(
+                    let price = try? await priceSource.fetchPrice(
                         name: req.name, scryfallId: req.scryfallId, isFoil: req.isFoil
                     )
                     return (req.id, price)

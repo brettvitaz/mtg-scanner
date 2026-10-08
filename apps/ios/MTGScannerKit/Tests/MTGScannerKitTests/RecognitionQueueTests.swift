@@ -17,14 +17,14 @@ final class RecognitionQueueTests: XCTestCase {
 
     func testEnqueueIncrementsPendingCount() {
         let queue = makeFailingQueue()
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        queue.enqueue(image: makeImage(), modelContext: nil)
         XCTAssertEqual(queue.pendingCount, 1)
     }
 
     func testEnqueueMultipleIncrementsCorrectly() {
         let queue = makeFailingQueue()
         for _ in 0..<3 {
-            queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+            queue.enqueue(image: makeImage(), modelContext: nil)
         }
         XCTAssertEqual(queue.pendingCount, 3)
     }
@@ -33,7 +33,7 @@ final class RecognitionQueueTests: XCTestCase {
 
     func testFailedJobsIncrementFailedCount() async throws {
         let queue = makeFailingQueue()
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(200))
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertEqual(queue.failedCount, 1)
@@ -42,11 +42,11 @@ final class RecognitionQueueTests: XCTestCase {
 
     func testRetryOnce() async throws {
         nonisolated(unsafe) var callCount = 0
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             callCount += 1
             throw URLError(.networkConnectionLost)
-        })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        }))
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(200))
         // Should have been called twice: original + 1 retry
         XCTAssertEqual(callCount, 2)
@@ -56,23 +56,42 @@ final class RecognitionQueueTests: XCTestCase {
     // MARK: - Success
 
     func testSuccessfulJobIncrementsCompletedCount() async throws {
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in RecognitionResult(cards: []) })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        let queue = makeSucceedingQueue()
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(queue.completedCount, 1)
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertEqual(queue.failedCount, 0)
     }
 
+    func testJobKeepsRecognizerFromEnqueueTimeThroughRetry() async throws {
+        nonisolated(unsafe) var originalCallCount = 0
+        nonisolated(unsafe) var replacementCalled = false
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
+            originalCallCount += 1
+            if originalCallCount == 1 { throw URLError(.networkConnectionLost) }
+            return RecognitionResult(cards: [])
+        }))
+        queue.enqueue(image: makeImage(), modelContext: nil)
+        queue.cardRecognizer = StubCardRecognizer(recognize: { _, _, _ in
+            replacementCalled = true
+            return RecognitionResult(cards: [])
+        })
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(originalCallCount, 2, "Original attempt and retry use the enqueue-time recognizer")
+        XCTAssertFalse(replacementCalled)
+        XCTAssertEqual(queue.completedCount, 1)
+    }
+
     // MARK: - Cropped vs Uncropped Routing
 
     func testUncroppedJobCallsSingleEndpoint() async throws {
         nonisolated(unsafe) var singleCalled = false
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in singleCalled = true; return RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in XCTFail("batch should not be called"); return RecognitionResult(cards: []) }
-        )
-        queue.enqueue(image: makeImage(), isCropped: false, apiBaseURL: "http://localhost", modelContext: nil)
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in singleCalled = true; return RecognitionResult(cards: []) },
+            recognizeBatch: { _, _ in XCTFail("batch should not be called"); return RecognitionResult(cards: []) }
+        ))
+        queue.enqueue(image: makeImage(), isCropped: false, modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(singleCalled)
     }
@@ -83,18 +102,18 @@ final class RecognitionQueueTests: XCTestCase {
         nonisolated(unsafe) var receivedFilename: String?
         nonisolated(unsafe) var receivedContentType: String?
 
-        let queue = RecognitionQueue(
-            recognize: { data, filename, contentType, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { data, filename, contentType in
                 receivedData = data
                 receivedFilename = filename
                 receivedContentType = contentType
                 return RecognitionResult(cards: [])
             },
-            recognizeBatch: { _, _, _ in
+            recognizeBatch: { _, _ in
                 XCTFail("batch should not be called")
                 return RecognitionResult(cards: [])
             }
-        )
+        ))
 
         queue.enqueue(
             payload: makePayload(
@@ -103,7 +122,6 @@ final class RecognitionQueueTests: XCTestCase {
                 preferredFilenameExtension: "png"
             ),
             isCropped: false,
-            apiBaseURL: "http://localhost",
             modelContext: nil
         )
 
@@ -115,29 +133,29 @@ final class RecognitionQueueTests: XCTestCase {
 
     func testCroppedJobCallsBatchEndpoint() async throws {
         nonisolated(unsafe) var batchCalled = false
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in XCTFail("single should not be called"); return RecognitionResult(cards: []) },
-            recognizeBatch: { crops, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in XCTFail("single should not be called"); return RecognitionResult(cards: []) },
+            recognizeBatch: { crops, _ in
                 batchCalled = true
                 XCTAssertEqual(crops.count, 1)
                 return RecognitionResult(cards: [])
             }
-        )
-        queue.enqueue(image: makeImage(), isCropped: true, apiBaseURL: "http://localhost", modelContext: nil)
+        ))
+        queue.enqueue(image: makeImage(), isCropped: true, modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(batchCalled)
     }
 
     func testRetryPreservesCroppedFlag() async throws {
         nonisolated(unsafe) var batchCallCount = 0
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in XCTFail("single should not be called"); return RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in XCTFail("single should not be called"); return RecognitionResult(cards: []) },
+            recognizeBatch: { _, _ in
                 batchCallCount += 1
                 throw URLError(.networkConnectionLost)
             }
-        )
-        queue.enqueue(image: makeImage(), isCropped: true, apiBaseURL: "http://localhost", modelContext: nil)
+        ))
+        queue.enqueue(image: makeImage(), isCropped: true, modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         // Original attempt + 1 retry, both via batch.
         XCTAssertEqual(batchCallCount, 2)
@@ -146,11 +164,11 @@ final class RecognitionQueueTests: XCTestCase {
 
     func testDefaultEnqueueIsUncropped() async throws {
         nonisolated(unsafe) var singleCalled = false
-        let queue = RecognitionQueue(
-            recognize: { _, _, _, _ in singleCalled = true; return RecognitionResult(cards: []) },
-            recognizeBatch: { _, _, _ in XCTFail("batch should not be called"); return RecognitionResult(cards: []) }
-        )
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(
+            recognize: { _, _, _ in singleCalled = true; return RecognitionResult(cards: []) },
+            recognizeBatch: { _, _ in XCTFail("batch should not be called"); return RecognitionResult(cards: []) }
+        ))
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(singleCalled)
     }
@@ -171,15 +189,15 @@ final class RecognitionQueueTests: XCTestCase {
         }
 
         let counter = Counter()
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             await counter.increment()
             try await Task.sleep(for: .milliseconds(50))
             await counter.decrement()
             return RecognitionResult(cards: [])
-        })
+        }))
         queue.maxConcurrent = 2
         for _ in 0..<6 {
-            queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+            queue.enqueue(image: makeImage(), modelContext: nil)
         }
         try await Task.sleep(for: .milliseconds(500))
         let peak = await counter.peak
@@ -194,13 +212,13 @@ final class RecognitionQueueTests: XCTestCase {
 final class RecognitionQueueCancelTests: XCTestCase {
 
     func testCancelAllClearsPendingCount() async throws {
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             try await Task.sleep(for: .seconds(10))
             return RecognitionResult(cards: [])
-        })
+        }))
         queue.maxConcurrent = 1
         for _ in 0..<4 {
-            queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+            queue.enqueue(image: makeImage(), modelContext: nil)
         }
         queue.cancelAll()
         XCTAssertEqual(queue.pendingCount, 0)
@@ -208,33 +226,33 @@ final class RecognitionQueueCancelTests: XCTestCase {
 
     func testCancelAllAllowsNewJobsAfterCancel() async throws {
         nonisolated(unsafe) var isCancelled = false
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             if !isCancelled {
                 try await Task.sleep(for: .seconds(10))
             }
             return RecognitionResult(cards: [])
-        })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        }))
+        queue.enqueue(image: makeImage(), modelContext: nil)
         isCancelled = true
         queue.cancelAll()
         try await Task.sleep(for: .milliseconds(100))
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(queue.completedCount, 1)
         XCTAssertEqual(queue.pendingCount, 0)
     }
 
     func testCancelAllPreservesCompletedCount() async throws {
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in RecognitionResult(cards: []) })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        let queue = makeSucceedingQueue()
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(queue.completedCount, 1)
 
-        let longQueue = RecognitionQueue(recognize: { _, _, _, _ in
+        let longQueue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             try await Task.sleep(for: .seconds(10))
             return RecognitionResult(cards: [])
-        })
-        longQueue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        }))
+        longQueue.enqueue(image: makeImage(), modelContext: nil)
         longQueue.cancelAll()
         XCTAssertEqual(longQueue.completedCount, 0)
         XCTAssertEqual(queue.completedCount, 1)
@@ -242,22 +260,22 @@ final class RecognitionQueueCancelTests: XCTestCase {
 
     func testCancelAllPreservesFailedCount() async throws {
         let queue = makeFailingQueue()
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(queue.failedCount, 1)
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        queue.enqueue(image: makeImage(), modelContext: nil)
         queue.cancelAll()
         XCTAssertEqual(queue.failedCount, 1)
     }
 
     func testCapturedAtPreservedOnRetry() async throws {
         nonisolated(unsafe) var callCount = 0
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             callCount += 1
             if callCount == 1 { throw URLError(.networkConnectionLost) }
             return RecognitionResult(cards: [])
-        })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        }))
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(callCount, 2, "Should have been called twice (original + retry)")
         XCTAssertEqual(queue.completedCount, 1)
@@ -269,7 +287,14 @@ final class RecognitionQueueCancelTests: XCTestCase {
 
 @MainActor
 private func makeFailingQueue() -> RecognitionQueue {
-    RecognitionQueue(recognize: { _, _, _, _ in throw URLError(.notConnectedToInternet) })
+    RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
+        throw URLError(.notConnectedToInternet)
+    }))
+}
+
+@MainActor
+private func makeSucceedingQueue() -> RecognitionQueue {
+    RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in RecognitionResult(cards: []) }))
 }
 
 private func makeImage() -> UIImage {
@@ -300,7 +325,7 @@ final class RecognitionQueueRetryTests: XCTestCase {
 
     func testRetryFailedMovesJobsToPending() async throws {
         let queue = makeFailingQueue()
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(queue.failedCount, 1)
         XCTAssertEqual(queue.pendingCount, 0)
@@ -312,12 +337,12 @@ final class RecognitionQueueRetryTests: XCTestCase {
 
     func testRetryFailedJobsProcessAfterRetry() async throws {
         nonisolated(unsafe) var callCount = 0
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             callCount += 1
             if callCount <= 2 { throw URLError(.networkConnectionLost) }
             return RecognitionResult(cards: [])
-        })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        }))
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(queue.failedCount, 1)
 
@@ -330,7 +355,7 @@ final class RecognitionQueueRetryTests: XCTestCase {
     func testClearFailedRemovesAllFailedJobs() async throws {
         let queue = makeFailingQueue()
         for _ in 0..<3 {
-            queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+            queue.enqueue(image: makeImage(), modelContext: nil)
         }
         try await Task.sleep(for: .milliseconds(400))
         XCTAssertEqual(queue.failedCount, 3)
@@ -342,11 +367,11 @@ final class RecognitionQueueRetryTests: XCTestCase {
 
     func testRetryFailedResetsRetryCount() async throws {
         nonisolated(unsafe) var callCount = 0
-        let queue = RecognitionQueue(recognize: { _, _, _, _ in
+        let queue = RecognitionQueue(cardRecognizer: StubCardRecognizer(recognize: { _, _, _ in
             callCount += 1
             throw URLError(.networkConnectionLost)
-        })
-        queue.enqueue(image: makeImage(), apiBaseURL: "http://localhost", modelContext: nil)
+        }))
+        queue.enqueue(image: makeImage(), modelContext: nil)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(callCount, 2)
         XCTAssertEqual(queue.failedCount, 1)

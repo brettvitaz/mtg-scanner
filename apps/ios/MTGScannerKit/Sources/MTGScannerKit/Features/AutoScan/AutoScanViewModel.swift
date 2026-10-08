@@ -50,7 +50,6 @@ final class AutoScanViewModel {
 
     weak var captureCoordinator: CameraCaptureCoordinator?
     var modelContext: ModelContext?
-    var apiBaseURL: String = ""
 #if DEBUG
     var debugSaveRawCapturesToPhotoLibrary = false
     var rawCaptureSaver: RawCaptureSaving = RawCaptureDebugSaver()
@@ -202,7 +201,7 @@ final class AutoScanViewModel {
             }.value
             if crops.crops.isEmpty {
                 recognitionQueue.enqueue(
-                    payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                    payload: payload, isCropped: false, modelContext: modelContext
                 )
                 return
             }
@@ -210,12 +209,12 @@ final class AutoScanViewModel {
             for crop in crops.crops {
                 guard let cropPayload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
                 recognitionQueue.enqueue(
-                    payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
+                    payload: cropPayload, isCropped: true, modelContext: modelContext
                 )
             }
         } else {
             recognitionQueue.enqueue(
-                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                payload: payload, isCropped: false, modelContext: modelContext
             )
         }
     }
@@ -364,11 +363,11 @@ private extension AutoScanViewModel {
         if let cropped,
            let cropPayload = RecognitionImagePayload.generatedJPEG(from: cropped) {
             recognitionQueue.enqueue(
-                payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
+                payload: cropPayload, isCropped: true, modelContext: modelContext
             )
         } else {
             recognitionQueue.enqueue(
-                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                payload: payload, isCropped: false, modelContext: modelContext
             )
         }
     }

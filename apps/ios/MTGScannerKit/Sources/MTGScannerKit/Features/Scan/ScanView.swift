@@ -33,8 +33,8 @@ struct ScanView: View {
         }
         .onAppear(perform: onAppearHandler)
         .onDisappear(perform: onDisappearHandler)
-        .onChange(of: appModel.apiBaseURL) { _, url in
-            autoScanViewModel.apiBaseURL = url
+        .onChange(of: appModel.apiBaseURL) { _, _ in
+            autoScanViewModel.recognitionQueue.cardRecognizer = appModel.cardRecognizer
         }
         .onChange(of: appModel.modelContext) { _, ctx in
             autoScanViewModel.modelContext = ctx
@@ -91,7 +91,7 @@ struct ScanView: View {
     private func configureAutoScan() {
         autoScanViewModel.captureCoordinator = captureCoordinator
         autoScanViewModel.modelContext = appModel.modelContext
-        autoScanViewModel.apiBaseURL = appModel.apiBaseURL
+        autoScanViewModel.recognitionQueue.cardRecognizer = appModel.cardRecognizer
         autoScanViewModel.captureDelay = appModel.autoScanCaptureDelay
         autoScanViewModel.presenceTracker.confidenceThreshold = Float(appModel.autoScanConfidenceThreshold)
         autoScanViewModel.recognitionQueue.maxConcurrent = appModel.maxConcurrentUploads

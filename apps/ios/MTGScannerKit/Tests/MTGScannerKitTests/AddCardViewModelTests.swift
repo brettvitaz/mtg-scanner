@@ -135,7 +135,7 @@ final class AddCardViewModelTests: XCTestCase {
         vm.lastSearchedQuery = "light"
         vm.searchText = "light"
 
-        vm.updateSearch(using: AppModel())
+        vm.updateSearch(using: AppModel().cardCatalog)
 
         XCTAssertFalse(vm.isSearching)
         XCTAssertNil(vm.searchTask)

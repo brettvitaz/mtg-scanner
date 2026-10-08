@@ -46,7 +46,7 @@ final class AddCardViewModel {
 
     // MARK: - Actions
 
-    func updateSearch(using appModel: AppModel) {
+    func updateSearch(using catalog: any CardCatalog) {
         searchTask?.cancel()
         searchError = nil
         isSearching = false
@@ -60,14 +60,14 @@ final class AddCardViewModel {
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled, query == searchText else { return }
-            await search(query, using: appModel)
+            await search(query, using: catalog)
         }
     }
 
-    private func search(_ query: String, using appModel: AppModel) async {
+    private func search(_ query: String, using catalog: any CardCatalog) async {
         isSearching = true
         do {
-            let results = try await appModel.searchCardNames(query: query)
+            let results = try await catalog.searchCardNames(query: query)
             guard !Task.isCancelled, query == searchText else { return }
             searchResults = results
             lastSearchedQuery = query
@@ -79,7 +79,7 @@ final class AddCardViewModel {
         isSearching = false
     }
 
-    func selectName(_ name: String, using appModel: AppModel) {
+    func selectName(_ name: String, using catalog: any CardCatalog) {
         printingTask?.cancel()
         selectedName = name
         printings = []
@@ -88,7 +88,7 @@ final class AddCardViewModel {
         errorMessage = nil
         printingTask = Task {
             do {
-                let results = try await appModel.fetchPrintings(name: name)
+                let results = try await catalog.fetchPrintings(name: name)
                 guard !Task.isCancelled, selectedName == name else { return }
                 printings = results
             } catch {

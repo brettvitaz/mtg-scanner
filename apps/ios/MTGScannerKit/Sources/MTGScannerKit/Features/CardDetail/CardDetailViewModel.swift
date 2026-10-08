@@ -119,7 +119,7 @@ final class CardDetailViewModel {
         return nil
     }
 
-    func loadPrice(using appModel: AppModel) async {
+    func loadPrice(using priceSource: any PriceSource) async {
         let name = displayTitle
         guard !name.isEmpty else { return }
         let scryfallId = displayPrinting.scryfallId
@@ -128,7 +128,7 @@ final class CardDetailViewModel {
         let isRefresh = cardPrice != nil
         if !isRefresh { isLoadingPrice = true }
         do {
-            let price = try await appModel.fetchPrice(
+            let price = try await priceSource.fetchPrice(
                 name: name, scryfallId: scryfallId, isFoil: requestedFoil
             )
             guard matchesPriceRequest(name: name, printing: requestedPrinting, foil: requestedFoil) else { return }

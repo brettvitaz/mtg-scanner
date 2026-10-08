@@ -178,7 +178,7 @@ final class CardEditDraftTests: XCTestCase {
         let item = CollectionItem(title: "Original", edition: "Original set")
         let draft = CardEditDraft(card: item.toRecognizedCard())
         let picker = AddCardViewModel()
-        picker.selectName("Lightning Bolt", using: appModel)
+        picker.selectName("Lightning Bolt", using: appModel.cardCatalog)
         await picker.printingTask?.value
         XCTAssertEqual(picker.errorMessage, "Failed to load printings.")
         XCTAssertFalse(picker.isLoadingPrintings)
@@ -193,11 +193,11 @@ final class CardEditDraftTests: XCTestCase {
         appModel.apiBaseURL = "invalid://cards"
         let picker = AddCardViewModel()
         picker.searchText = "Bolt"
-        picker.updateSearch(using: appModel)
+        picker.updateSearch(using: appModel.cardCatalog)
         await picker.searchTask?.value
         XCTAssertEqual(picker.searchError, "Could not search cards.")
         XCTAssertFalse(picker.isSearching)
-        picker.updateSearch(using: appModel)
+        picker.updateSearch(using: appModel.cardCatalog)
         XCTAssertNil(picker.searchError)
         await picker.searchTask?.value
         XCTAssertNotNil(picker.searchError)

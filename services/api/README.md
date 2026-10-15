@@ -164,7 +164,7 @@ Retries acknowledge the same UUID without replacing the original evidence. Stora
 failures return an error so the iOS outbox can retry. Evidence remains after a result
 is removed; no automatic cleanup, model training, or training-data management UI is included.
 
-## Docker on Synology
+## Docker
 
-See [Synology deployment](../../docs/deploy-synology.md) for the Docker build,
-persistent storage, HTTPS reverse proxy, verification, and rollback procedures.
+See [Running the API with Docker](../../docs/docker.md) for container configuration,
+persistent storage, verification, and updates.

@@ -17,7 +17,8 @@ COPY packages/schemas packages/schemas
 COPY scripts/*.py scripts/
 COPY services/api/data/pricing/model_prices.json services/api/data/pricing/model_prices.json
 
-RUN mkdir -p services/api/logs && chown scanner:scanner services/api/logs
+RUN mkdir -p services/api/logs services/.artifacts \
+    && chown scanner:scanner services/api/logs services/.artifacts services/api/data/pricing
 
 ARG SOURCE_REVISION=local
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION

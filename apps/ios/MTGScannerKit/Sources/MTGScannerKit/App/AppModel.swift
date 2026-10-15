@@ -52,6 +52,8 @@ public final class AppModel {
     /// Crop images keyed by the corresponding RecognizedCard.id.
     var cardCropImages: [UUID: UIImage] = [:]
     var shouldShowResults = false
+    private(set) var selectedTab = AppTab.scan
+    private(set) var newlyScannedCardCount = 0
     /// Navigation path for the Results tab — reset to dismiss detail views.
     var resultsNavigationPath = NavigationPath()
     /// When true, shows a connection-unavailable alert.
@@ -104,6 +106,28 @@ public final class AppModel {
         let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
         self.exposureBias = storedBias ?? 0.0
         loadCorrections()
+    }
+
+    // MARK: - Results badge
+
+    var resultsBadgeText: String? {
+        guard newlyScannedCardCount > 0 else { return nil }
+        return newlyScannedCardCount > 99 ? "99+" : String(newlyScannedCardCount)
+    }
+
+    var resultsBadgeAccessibilityValue: String {
+        guard newlyScannedCardCount > 0 else { return "" }
+        return newlyScannedCardCount == 1 ? "1 newly scanned card" : "\(newlyScannedCardCount) newly scanned cards"
+    }
+
+    func recordScannedCard() {
+        guard selectedTab != .results else { return }
+        newlyScannedCardCount += 1
+    }
+
+    func selectTab(_ tab: AppTab) {
+        selectedTab = tab
+        if tab == .results { newlyScannedCardCount = 0 }
     }
 
     // MARK: - Recognition entry points

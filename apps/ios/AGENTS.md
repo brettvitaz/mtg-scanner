@@ -119,6 +119,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `pricing-large` | `CardListPricingFixtureView` | Large monetary totals for layout checks |
 | `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
+| `scan-count-zero` / `scan-count-new` / `scan-count-overflow` | `ScanCountFixtureView` | Production tab shell on Settings: no badge with older Results, 12 newly scanned cards, or 1,000 cards displayed as 99+ |
+| `scan-count-navigation` | `ScanCountFixtureView` | Open Results to clear 12; leave and simulate a new scan. Open Results button also checks programmatic navigation |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
 | `csv-import` | `CSVImportFixtureView` | Matched, ambiguous, and invalid rows; problems-first review |
 | `csv-import-undo` | `CSVImportFixtureView` | Bulk skip feedback with Undo |

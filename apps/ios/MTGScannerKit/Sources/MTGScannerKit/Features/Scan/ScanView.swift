@@ -9,14 +9,25 @@ struct ScanView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Binding var detectionMode: DetectionMode
     let isActive: Bool
-    @State private var detectionViewModel = CardDetectionViewModel()
+    @State private var detectionViewModel: CardDetectionViewModel
     @State private var captureCoordinator = CameraCaptureCoordinator()
-    @State private var autoScanViewModel = AutoScanViewModel()
+    @State private var autoScanViewModel: AutoScanViewModel
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shutterFlash = false
     @State private var photoLoadError: String?
     @State private var captureError: String?
+
+    init(
+        detectionMode: Binding<DetectionMode>, isActive: Bool,
+        autoScanViewModel: AutoScanViewModel = AutoScanViewModel(),
+        detectionViewModel: CardDetectionViewModel = CardDetectionViewModel()
+    ) {
+        _detectionMode = detectionMode
+        self.isActive = isActive
+        _autoScanViewModel = State(initialValue: autoScanViewModel)
+        _detectionViewModel = State(initialValue: detectionViewModel)
+    }
 
     var body: some View {
         ZStack {
@@ -89,6 +100,7 @@ struct ScanView: View {
     // MARK: - Setup
 
     private func configureAutoScan() {
+        autoScanViewModel.appModel = appModel
         autoScanViewModel.captureCoordinator = captureCoordinator
         autoScanViewModel.modelContext = appModel.modelContext
         autoScanViewModel.apiBaseURL = appModel.apiBaseURL

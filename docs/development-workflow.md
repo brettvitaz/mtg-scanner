@@ -89,6 +89,14 @@ legacy identities must be corrected before applying.
 Simulator fixtures: `make ios-snapshot ROUTE=list-subtract`, `ROUTE=list-operation`,
 `ROUTE=list-add-delete`, `ROUTE=list-operation-complete`, and `ROUTE=csv-subtract`.
 
+## Scan navigation
+
+Leaving Scan or Auto Scan stops new automatic captures and turns off the torch.
+A photo capture already accepted by the camera, cropping, and queued recognition
+continue; successful identifications appear in Results. Returning to Scan does
+not restart Auto Scan. Its explicit Stop/reset still discards an unfinished
+capture, and the recognition badge's Cancel action cancels queued uploads.
+
 ## Contract-first changes
 - Update versioned schemas under `packages/schemas/v1/`.
 - Add or update matching examples under `packages/schemas/examples/v1/`.

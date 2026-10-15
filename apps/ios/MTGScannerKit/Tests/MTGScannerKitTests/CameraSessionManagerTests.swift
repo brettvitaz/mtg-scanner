@@ -304,3 +304,107 @@ final class CameraSessionManagerTests: XCTestCase {
         return StaleFireResult(handlerB: handlerB, guardHeld: guardHeld, inFlight: inFlight)
     }
 }
+
+// MARK: - Navigation lifecycle
+
+extension CameraSessionManagerTests {
+    func testNavigationPausePreservesAcceptedPhotoAndRejectsNewCapture() throws {
+        let manager = makeReadyManager()
+        let finished = expectation(description: "Original capture finishes without cancellation")
+        manager.captureFocusedPhoto(focusPoint: nil) { result in
+            guard case .failure(.focusConfigurationFailed) = result else {
+                return XCTFail("Navigation must not cancel the accepted photo")
+            }
+            finished.fulfill()
+        }
+        let handler = try manager.sessionQueue.sync {
+            try XCTUnwrap(manager.activeHandlerForTesting() as? PhotoCaptureHandler)
+        }
+        manager.pauseForNavigation()
+        manager.pauseForNavigation()
+        manager.sessionQueue.sync {
+            XCTAssertTrue(manager.isCaptureInFlightForTesting())
+            XCTAssertTrue(manager.activeHandlerForTesting() === handler)
+            XCTAssertFalse(manager.isSessionReady)
+        }
+        let rejected = expectation(description: "Offscreen captures rejected")
+        manager.captureFocusedPhoto(focusPoint: nil) { result in
+            guard case .failure(.unavailable) = result else { return XCTFail("Expected unavailable") }
+            rejected.fulfill()
+        }
+        manager.sessionQueue.sync { handler.fail(.focusConfigurationFailed) }
+        wait(for: [finished, rejected], timeout: 1)
+        manager.sessionQueue.sync {
+            XCTAssertFalse(manager.isCaptureInFlightForTesting())
+            XCTAssertFalse(manager.isSessionReady)
+        }
+    }
+
+    @MainActor
+    func testCameraViewDisappearanceDoesNotCancelAcceptedPhoto() throws {
+        let manager = makeReadyManager()
+        let controller = CameraViewController(sessionManager: manager)
+        let completed = expectation(description: "Photo finishes after view disappearance")
+        manager.captureFocusedPhoto(focusPoint: nil) { result in
+            guard case .failure(.focusConfigurationFailed) = result else {
+                return XCTFail("View disappearance cancelled the photo")
+            }
+            completed.fulfill()
+        }
+        let handler = try manager.sessionQueue.sync {
+            try XCTUnwrap(manager.activeHandlerForTesting() as? PhotoCaptureHandler)
+        }
+        controller.viewWillDisappear(false)
+        manager.sessionQueue.sync {
+            XCTAssertTrue(manager.activeHandlerForTesting() === handler)
+            handler.fail(.focusConfigurationFailed)
+        }
+        wait(for: [completed], timeout: 1)
+    }
+
+    func testReturnToCameraCancelsDeferredStop() throws {
+        let manager = makeReadyManager()
+        let completed = expectation(description: "Capture completes after returning")
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in completed.fulfill() }
+        let handler = try manager.sessionQueue.sync {
+            try XCTUnwrap(manager.activeHandlerForTesting() as? PhotoCaptureHandler)
+        }
+        manager.pauseForNavigation()
+        manager.start()
+        manager.sessionQueue.sync {
+            // Simulate configured hardware readiness, as in makeReadyManager().
+            manager.isSessionReady = true
+            handler.fail(.focusConfigurationFailed)
+            XCTAssertTrue(manager.isSessionReady, "Completion must not stop the visible camera")
+        }
+        wait(for: [completed], timeout: 1)
+        manager.stop()
+    }
+
+    func testNavigationPauseKeepsFocusUntilPhotoFinishes() throws {
+        let manager = makeReadyManager()
+        let point = CGPoint(x: 0.5, y: 0.5)
+        manager.sessionQueue.sync {
+            XCTAssertTrue(manager.prepareFocus(at: point) { true })
+        }
+        let completed = expectation(description: "Photo finishes")
+        manager.captureFocusedPhoto(focusPoint: nil) { _ in completed.fulfill() }
+        let handler = try manager.sessionQueue.sync {
+            try XCTUnwrap(manager.activeHandlerForTesting() as? PhotoCaptureHandler)
+        }
+        manager.pauseForNavigation()
+        manager.sessionQueue.sync {
+            XCTAssertTrue(manager.prepareFocus(at: point) {
+                XCTFail("Navigation cleared focus while the photo was still waiting")
+                return true
+            })
+            handler.fail(.focusConfigurationFailed)
+            var reconfigured = false
+            XCTAssertTrue(manager.prepareFocus(at: point) { reconfigured = true; return true })
+            XCTAssertTrue(reconfigured, "Finishing an offscreen photo must release the focus observers")
+        }
+        wait(for: [completed], timeout: 1)
+        manager.stop()
+    }
+
+}

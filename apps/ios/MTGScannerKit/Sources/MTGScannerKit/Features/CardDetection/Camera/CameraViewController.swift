@@ -31,7 +31,7 @@ final class CameraViewController: UIViewController {
 
     // MARK: - Private
 
-    private let sessionManager = CameraSessionManager()
+    private let sessionManager: CameraSessionManager
     private let engine = CardDetectionEngine()
     private var renderer: DetectionOverlayRenderer?
     private var isVisible = false
@@ -42,6 +42,16 @@ final class CameraViewController: UIViewController {
     private let detectionLayer = CALayer()
     private var zoomFactorAtGestureStart: CGFloat = 1.0
     private static let maxZoomFactor: CGFloat = 5.0
+
+    init(sessionManager: CameraSessionManager = CameraSessionManager()) {
+        self.sessionManager = sessionManager
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        sessionManager = CameraSessionManager()
+        super.init(coder: coder)
+    }
 
     // MARK: - Lifecycle
 
@@ -66,7 +76,7 @@ final class CameraViewController: UIViewController {
         super.viewWillDisappear(animated)
         isVisible = false
         sessionManager.setTorchLevel(0)
-        sessionManager.stop()
+        sessionManager.pauseForNavigation()
         renderer?.clear()
     }
 

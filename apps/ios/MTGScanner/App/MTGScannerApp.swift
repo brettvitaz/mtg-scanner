@@ -55,7 +55,7 @@ struct MTGScannerApp: App {
     #endif
 
     private static func productionContainer() -> ModelContainer {
-        let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self])
+        let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self, RecognitionFeedbackEvent.self])
         let configuration = ModelConfiguration(isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
@@ -88,7 +88,6 @@ struct MTGScannerApp: App {
             .environment(libraryViewModel)
             .modelContainer(modelContainer)
             .onAppear {
-                appModel.modelContext = modelContainer.mainContext
                 libraryViewModel.modelContext = modelContainer.mainContext
             }
     }

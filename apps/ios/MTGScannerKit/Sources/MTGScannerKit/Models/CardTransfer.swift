@@ -126,6 +126,7 @@ enum CardTransfer {
             match.quantity += quantity
         } else if operation == .move && quantity == available {
             item.quantity = quantity
+            item.clearResultEvidence()
             destination.assign(item)
             return true
         } else {

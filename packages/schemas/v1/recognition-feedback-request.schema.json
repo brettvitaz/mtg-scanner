@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recognition feedback request",
+  "type": "object",
+  "required": [
+    "event_id",
+    "created_at",
+    "original_recognition",
+    "previous_identification",
+    "corrected_identification",
+    "scan_jpeg"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "original_recognition": {
+      "type": "object"
+    },
+    "previous_identification": {
+      "type": "object",
+      "required": [
+        "title",
+        "edition",
+        "foil"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "edition": {
+          "type": "string"
+        },
+        "foil": {
+          "type": "boolean"
+        },
+        "set_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collector_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scryfall_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "corrected_identification": {
+      "type": "object",
+      "required": [
+        "title",
+        "edition",
+        "foil"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "edition": {
+          "type": "string"
+        },
+        "foil": {
+          "type": "boolean"
+        },
+        "set_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collector_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scryfall_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "scan_jpeg": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "contentMediaType": "image/jpeg",
+      "maxLength": 4000000
+    }
+  },
+  "additionalProperties": false
+}

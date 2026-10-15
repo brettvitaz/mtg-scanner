@@ -10,20 +10,33 @@ struct CardDetailView: View {
     @State private var showEditor = false
     @State private var showAddToSheet = false
     @State private var addedMessage: String?
+    private let resultScope: Bool
+    private let initialZoom: CGFloat
+    private let editorDraft: CardEditDraft?
 
-    init(card: RecognizedCard) {
-        self.init(viewModel: CardDetailViewModel(card: card, cropImage: nil))
+    init(card: RecognizedCard, resultScope: Bool = false, showingScan: Bool = false,
+         showImageViewer: Bool = false, initialZoom: CGFloat = 1, editorDraft: CardEditDraft? = nil) {
+        self.init(viewModel: CardDetailViewModel(card: card, cropImage: nil), resultScope: resultScope,
+                  showingScan: showingScan, showImageViewer: showImageViewer,
+                  initialZoom: initialZoom, editorDraft: editorDraft)
     }
 
-    init(viewModel: CardDetailViewModel) {
+    init(viewModel: CardDetailViewModel, resultScope: Bool = false, showingScan: Bool = false,
+         showImageViewer: Bool = false, initialZoom: CGFloat = 1, editorDraft: CardEditDraft? = nil) {
+        self.editorDraft = editorDraft
+        viewModel.showingCropImage = showingScan
         _viewModel = State(initialValue: viewModel)
+        _showFullscreenImage = State(initialValue: showImageViewer)
+        self.resultScope = resultScope
+        self.initialZoom = initialZoom
     }
 
     var body: some View {
         @Bindable var viewModel = viewModel
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                CardImageSection(viewModel: viewModel, appModel: appModel, showFullscreen: $showFullscreenImage)
+                ResultCardImage(imageURL: viewModel.displayImageUrl, scan: resultScan,
+                                showingScan: $viewModel.showingCropImage) { showFullscreenImage = true }
                 identitySection
                 detailsSection
                 priceSection
@@ -43,12 +56,13 @@ struct CardDetailView: View {
         .fullScreenCover(isPresented: $showFullscreenImage) {
             FullscreenImageView(
                 imageUrl: viewModel.showingCropImage ? nil : viewModel.displayImageUrl,
-                uiImage: viewModel.showingCropImage ? appModel.cardCropImages[viewModel.card.id] : nil
+                uiImage: viewModel.showingCropImage ? resultScan : nil, initialZoom: initialZoom
             )
         }
         .sheet(isPresented: $showEditor) {
             EditCardView(
-                draft: CardEditDraft(card: currentCard, printing: viewModel.selectedPrinting),
+                draft: editorDraft ?? CardEditDraft(card: currentCard, printing: viewModel.selectedPrinting),
+                scan: resultScan,
                 onSave: saveEdit,
                 requiresMerge: { draft in
                     guard let item = storedItem else { return false }
@@ -222,6 +236,10 @@ extension CardDetailView {
         return try? modelContext.fetch(descriptor).first
     }
 
+    private var resultScan: UIImage? {
+        resultScope ? storedItem?.resultScanImage : nil
+    }
+
     private var currentCard: RecognizedCard {
         storedItem?.toRecognizedCard() ?? viewModel.card
     }
@@ -243,7 +261,8 @@ extension CardDetailView {
             draft.errorMessage = "This card is no longer available."
             return false
         }
-        guard draft.save(item: item, context: modelContext, merge: merge) else { return false }
+        guard draft.save(item: item, context: modelContext, merge: merge,
+                         feedbackBaseURL: appModel.apiBaseURL) else { return false }
         viewModel.card = item.toRecognizedCard()
         viewModel.selectedPrinting = draft.printing
         viewModel.editTitle = item.title
@@ -252,6 +271,7 @@ extension CardDetailView {
         viewModel.editFoil = item.foil
         viewModel.cardPrice = nil
         viewModel.saveCorrection(to: appModel)
+        Task { await appModel.retryRecognitionFeedback() }
         Task { await refreshPrice() }
         return true
     }

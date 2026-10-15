@@ -22,7 +22,7 @@ struct RecognitionResult: Codable {
     ])
 }
 
-struct RecognizedCard: Codable, Identifiable {
+struct RecognizedCard: Codable, Identifiable, Sendable {
     let id: UUID
     let title: String?
     let edition: String?

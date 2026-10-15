@@ -32,6 +32,9 @@ final class CardFinishTests: XCTestCase {
         app.buttons["card-detail-edit"].tap()
         let foil = app.switches["card-edit-foil"]
         XCTAssertTrue(foil.waitForExistence(timeout: 5))
+        // The artwork section can leave Options below the visible editor area.
+        app.collectionViews.firstMatch.swipeUp()
+        XCTAssertTrue(foil.isHittable)
         XCTAssertEqual(foil.value as? String, "0")
         // SwiftUI exposes the whole row as a switch; its center is outside the thumb.
         foil.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()

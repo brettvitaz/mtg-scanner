@@ -3,9 +3,22 @@ import SwiftUI
 import UIKit
 
 public struct ResultsView: View {
-    public init() {}
+    private let makeSelectionBar: (CardSelectionActionBar) -> AnyView
+
+    public init() {
+        makeSelectionBar = { AnyView($0) }
+    }
+
+    init(selection: Set<UUID>, makeSelectionBar: @escaping (CardSelectionActionBar) -> AnyView = { AnyView($0) }) {
+        self.makeSelectionBar = makeSelectionBar
+        let state = CardListSelectionState()
+        state.isSelecting = !selection.isEmpty
+        state.selectedItems = selection
+        _selection = State(initialValue: state)
+    }
 
     init(selection: CardListSelectionState) {
+        makeSelectionBar = { AnyView($0) }
         _selection = State(initialValue: selection)
     }
 
@@ -25,6 +38,7 @@ public struct ResultsView: View {
     @State private var showFilterSheet = false
     @State private var contextDeleteItem: CollectionItem?
     @State private var showSearch = false
+    @State private var showFinishSaveError = false
 
     private var undoIsBlocked: Bool {
         selection.transferRequest != nil || showDeleteConfirmation
@@ -57,7 +71,7 @@ public struct ResultsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar { topToolbar }
             .navigationDestination(for: RecognizedCard.self) { card in
-                CardDetailView(card: card)
+                CardDetailView(card: card, resultScope: true)
                     .environment(appModel)
             }
         }
@@ -85,6 +99,11 @@ public struct ResultsView: View {
             Button("Cancel", role: .cancel) { contextDeleteItem = nil }
         } message: {
             Text("This card will be removed from Results.")
+        }
+        .alert("Could not save finish", isPresented: $showFinishSaveError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your changes could not be saved. Please try again.")
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -227,7 +246,7 @@ public struct ResultsView: View {
 
 extension ResultsView {
     var bottomActionBar: some View {
-        CardSelectionActionBar(
+        makeSelectionBar(CardSelectionActionBar(
             isEmpty: selection.selectedItems.isEmpty,
             onTransfer: {
                 selection.transferRequest = CardTransferRequest(
@@ -236,7 +255,7 @@ extension ResultsView {
             },
             onToggleFoil: toggleSelectedFoil,
             onDelete: { showDeleteConfirmation = true }
-        )
+        ))
     }
 }
 
@@ -275,16 +294,14 @@ private extension ResultsView {
     }
 
     func toggleFoil(_ item: CollectionItem) {
-        item.toggleFoilUnconditionally()
+        guard saveFinishChanges([item]) else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Task { await appModel.refreshPrice(for: item) }
     }
 
     func toggleSelectedFoil() {
         let items = inboxItems.filter { selection.selectedItems.contains($0.id) }
-        for item in items {
-            item.toggleFoilUnconditionally()
-        }
+        guard saveFinishChanges(items) else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let fetchRequests = items.map { PriceFetchRequest(item: $0) }
         Task {
@@ -297,6 +314,18 @@ private extension ResultsView {
                 else { continue }
                 item.apply(price: price, matching: request)
             }
+        }
+    }
+
+    private func saveFinishChanges(_ items: [CollectionItem]) -> Bool {
+        do {
+            try ResultCorrectionSave.toggleFoil(items: items, context: modelContext, baseURL: appModel.apiBaseURL)
+            Task { await appModel.retryRecognitionFeedback() }
+            return true
+        } catch {
+            print("[Results] Could not save finish correction: \(error)")
+            showFinishSaveError = true
+            return false
         }
     }
 

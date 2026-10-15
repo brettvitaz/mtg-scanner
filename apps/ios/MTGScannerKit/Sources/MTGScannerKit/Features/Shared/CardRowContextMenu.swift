@@ -7,7 +7,9 @@ struct CardRowContextMenu<Content: View>: UIViewControllerRepresentable {
     let item: CollectionItem
     let actions: CardRowMenuActions
 
-    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+    func makeCoordinator() -> CardRowContextMenuCoordinator {
+        CardRowContextMenuCoordinator(item: item, actions: actions)
+    }
 
     func makeUIViewController(context: Context) -> UIHostingController<Content> {
         let controller = UIHostingController(rootView: content)
@@ -18,7 +20,8 @@ struct CardRowContextMenu<Content: View>: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIHostingController<Content>, context: Context) {
-        context.coordinator.parent = self
+        context.coordinator.item = item
+        context.coordinator.actions = actions
         controller.rootView = content
         controller.view.invalidateIntrinsicContentSize()
     }
@@ -31,39 +34,44 @@ struct CardRowContextMenu<Content: View>: UIViewControllerRepresentable {
         ))
     }
 
-    @MainActor
-    final class Coordinator: NSObject, UIContextMenuInteractionDelegate {
-        var parent: CardRowContextMenu
+}
 
-        init(parent: CardRowContextMenu) { self.parent = parent }
+@MainActor
+final class CardRowContextMenuCoordinator: NSObject, UIContextMenuInteractionDelegate {
+    var item: CollectionItem
+    var actions: CardRowMenuActions
 
-        func contextMenuInteraction(
-            _ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint
-        ) -> UIContextMenuConfiguration? {
-            guard parent.actions.isAvailable else { return nil }
-            let item = parent.item
-            let actions = parent.actions
-            let bounds = interaction.view?.window?.bounds.size ?? CGSize(width: 390, height: 844)
-            return UIContextMenuConfiguration(identifier: item.id.uuidString as NSString) {
-                let controller = UIHostingController(rootView: CardRowPreview(item: item))
-                controller.view.backgroundColor = .clear
-                controller.preferredContentSize = CardRowPreview.size(
-                    in: bounds, hasArtwork: item.imageUrl.flatMap(URL.init(string:)) != nil
-                )
-                return controller
-            } actionProvider: { _ in
-                actions.menu(isFoil: item.foil)
-            }
+    init(item: CollectionItem, actions: CardRowMenuActions) {
+        self.item = item
+        self.actions = actions
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard actions.isAvailable else { return nil }
+        let item = item
+        let actions = actions
+        let bounds = interaction.view?.window?.bounds.size ?? CGSize(width: 390, height: 844)
+        return UIContextMenuConfiguration(identifier: item.id.uuidString as NSString) {
+            let controller = UIHostingController(rootView: CardRowPreview(item: item))
+            controller.view.backgroundColor = .clear
+            controller.preferredContentSize = CardRowPreview.size(
+                in: bounds, hasArtwork: item.imageUrl.flatMap(URL.init(string:)) != nil
+            )
+            return controller
+        } actionProvider: { _ in
+            actions.menu(isFoil: item.foil)
         }
+    }
 
-        func contextMenuInteraction(
-            _ interaction: UIContextMenuInteraction,
-            willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration,
-            animator: any UIContextMenuInteractionCommitAnimating
-        ) {
-            let navigate = parent.actions.navigate
-            animator.addCompletion { navigate?() }
-        }
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration,
+        animator: any UIContextMenuInteractionCommitAnimating
+    ) {
+        let navigate = actions.navigate
+        animator.addCompletion { navigate?() }
     }
 }
 

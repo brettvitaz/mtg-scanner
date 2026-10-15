@@ -158,6 +158,12 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `undo-navigation` | `CardListPricingFixtureView` | Real tab navigation with a pending Results deletion |
 | `pricing-filter` | `CardListPricingFixtureView` | CK buying toggle and Retail/Buylist price filters |
 | `pricing-large` | `CardListPricingFixtureView` | Large monetary totals for layout checks |
+| `result-scan-artwork` | `ResultScanFixtureView` | Persisted result, artwork first; cached sample artwork |
+| `result-scan-image` | `ResultScanFixtureView` | Persisted captured scan with full card bounds |
+| `result-scan-zoom` | `ResultScanFixtureView` | Native scan viewer enlarged around collector number, with Close |
+| `result-scan-edit` | `ResultScanFixtureView` | Result editor with Scan selected once |
+| `result-scan-missing` | `ResultScanFixtureView` | Legacy result, editable with artwork only |
+| `collection-scan-excluded` / `deck-scan-excluded` | `ResultScanFixtureView` | Destination details without scan controls |
 | `card-edit` | `CardEditFixtureView` | Prefilled draft editor with Save/Cancel |
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan-count-zero` / `scan-count-new` / `scan-count-overflow` | `ScanCountFixtureView` | Production tab shell on Settings: no badge with older Results, 12 newly scanned cards, or 1,000 cards displayed as 99+ |

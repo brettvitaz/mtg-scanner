@@ -34,3 +34,10 @@ def test_llm_output_example_matches_schema() -> None:
     schema = _load_json(SCHEMAS_DIR / "v1" / "llm-output.schema.json")
     example = _load_json(EXAMPLES_DIR / "llm-output.sample.json")
     Draft202012Validator(schema).validate(example)
+
+
+def test_recognition_feedback_examples_match_schemas() -> None:
+    for name in ["recognition-feedback-request", "recognition-feedback-response"]:
+        schema = _load_json(SCHEMAS_DIR / "v1" / f"{name}.schema.json")
+        example = _load_json(EXAMPLES_DIR / f"{name}.sample.json")
+        Draft202012Validator(schema).validate(example)

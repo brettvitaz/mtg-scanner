@@ -3,8 +3,13 @@ import SwiftUI
 struct EditCardView: View {
     @Environment(\.dismiss) private var dismiss
     @State var draft: CardEditDraft
+    var scan: UIImage?
+    var initialScanSelected = false
     let onSave: (CardEditDraft, Bool) -> Bool
     let requiresMerge: (CardEditDraft) -> Bool
+    @State private var showingScan = false
+    @State private var showImageViewer = false
+    @State private var didSelectInitialImage = false
     @State private var picker: CardEditPicker?
     @State private var showMergeConfirmation = false
 
@@ -12,7 +17,10 @@ struct EditCardView: View {
         @Bindable var draft = draft
         NavigationStack {
             List {
-                Section { CardPrintingImage(printing: draft.printing) }
+                Section {
+                    ResultCardImage(imageURL: draft.printing.imageUrl.flatMap(URL.init(string:)), scan: scan,
+                                    showingScan: $showingScan) { showImageViewer = true }
+                }
                 Section("Card") {
                     Text(draft.printing.name).font(.headline)
                     PrintingRow(printing: draft.printing)
@@ -31,6 +39,15 @@ struct EditCardView: View {
             .navigationTitle("Edit Card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { editorToolbar }
+        }
+        .onAppear {
+            guard !didSelectInitialImage else { return }
+            didSelectInitialImage = true
+            showingScan = initialScanSelected
+        }
+        .fullScreenCover(isPresented: $showImageViewer) {
+            FullscreenImageView(imageUrl: showingScan ? nil : draft.printing.imageUrl.flatMap(URL.init(string:)),
+                                uiImage: showingScan ? scan : nil)
         }
         .sheet(item: $picker) { selection in
             AddCardView(

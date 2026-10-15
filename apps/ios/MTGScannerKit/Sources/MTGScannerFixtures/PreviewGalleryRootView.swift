@@ -15,6 +15,7 @@ public struct PreviewGalleryRootView: View {
 
     public init(route: String) {
         self.route = route
+        if route.hasPrefix("result-scan-") || route.hasSuffix("scan-excluded") { Self.cacheResultArtwork() }
         if route.hasPrefix("card-row-") || route.hasPrefix("selection-") { Self.cachePreviewArtwork() }
     }
 
@@ -22,6 +23,16 @@ public struct PreviewGalleryRootView: View {
         guard let resource = Bundle.module.url(forResource: "CardPreviewArtwork", withExtension: "jpg"),
               let data = try? Data(contentsOf: resource),
               let url = URL(string: "https://fixtures.invalid/card-preview.jpg"),
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                                             headerFields: ["Content-Type": "image/jpeg"]) else { return }
+        URLCache.shared.storeCachedResponse(CachedURLResponse(response: response, data: data),
+                                            for: URLRequest(url: url))
+    }
+
+    private static func cacheResultArtwork() {
+        guard let resource = Bundle.module.url(forResource: "ResultScanSample", withExtension: "jpg"),
+              let data = try? Data(contentsOf: resource),
+              let url = URL(string: "https://fixtures.invalid/result-artwork.jpg"),
               let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
                                              headerFields: ["Content-Type": "image/jpeg"]) else { return }
         URLCache.shared.storeCachedResponse(CachedURLResponse(response: response, data: data),
@@ -53,6 +64,12 @@ public struct PreviewGalleryRootView: View {
         #if DEBUG
         case "scan-count-zero", "scan-count-new", "scan-count-overflow", "scan-count-navigation":
             ScanCountFixtureView(route: route)
+        case "result-scan-artwork", "result-scan-image", "result-scan-zoom", "result-scan-edit",
+             "result-scan-missing", "collection-scan-excluded", "deck-scan-excluded":
+            if let resource = Bundle.module.url(forResource: "ResultScanSample", withExtension: "jpg"),
+               let data = try? Data(contentsOf: resource) {
+                ResultScanFixtureView(route: route, scanData: data)
+            }
         case "card-edit", "card-detail":
             CardEditFixtureView(route: route)
         case "pricing-results", "pricing-collection", "pricing-deck",
@@ -116,6 +133,34 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Selection Deck") {
     PreviewGalleryRootView(route: "selection-deck")
+}
+
+#Preview("result-scan-artwork") {
+    PreviewGalleryRootView(route: "result-scan-artwork")
+}
+
+#Preview("result-scan-image") {
+    PreviewGalleryRootView(route: "result-scan-image")
+}
+
+#Preview("result-scan-zoom") {
+    PreviewGalleryRootView(route: "result-scan-zoom")
+}
+
+#Preview("result-scan-edit") {
+    PreviewGalleryRootView(route: "result-scan-edit")
+}
+
+#Preview("result-scan-missing") {
+    PreviewGalleryRootView(route: "result-scan-missing")
+}
+
+#Preview("collection-scan-excluded") {
+    PreviewGalleryRootView(route: "collection-scan-excluded")
+}
+
+#Preview("deck-scan-excluded") {
+    PreviewGalleryRootView(route: "deck-scan-excluded")
 }
 
 #Preview("copy-cards") {

@@ -53,6 +53,25 @@ final class UITestSessionTests: XCTestCase {
         XCTAssertThrowsError(try UITestSession(runID: runID, mode: .resume))
     }
 
+    func testFeedbackEvidencePersistsInIsolatedTestStore() throws {
+        defer { try? UITestSession.cleanup(runID: runID) }
+        let (_, sample) = try feedbackFixture()
+        do {
+            let session = try UITestSession(runID: runID, mode: .fresh)
+            let item = CardItemSnapshot(sample).makeItem()
+            session.container.mainContext.insert(item)
+            let draft = CardEditDraft(card: item.toRecognizedCard())
+            draft.isFoil = true
+            XCTAssertTrue(draft.save(item: item, context: session.container.mainContext, merge: false))
+        }
+        let resumed = try UITestSession(runID: runID, mode: .resume)
+        let events = try resumed.container.mainContext.fetch(FetchDescriptor<RecognitionFeedbackEvent>())
+        XCTAssertEqual(events.count, 1)
+        let payload = try XCTUnwrap(events.first).payload()
+        XCTAssertEqual(payload.scanJPEG, sample.resultScanJPEG)
+        XCTAssertTrue(payload.correctedIdentification.foil)
+    }
+
     @discardableResult
     private func changeSavedFinish() throws -> UUID {
         let session = try UITestSession(runID: runID, mode: .fresh)

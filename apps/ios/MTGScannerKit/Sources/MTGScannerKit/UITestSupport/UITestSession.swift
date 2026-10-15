@@ -31,7 +31,7 @@ public final class UITestSession {
         }
         self.preferences = preferences
         appModel = AppModel(preferences: preferences)
-        let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self])
+        let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self, RecognitionFeedbackEvent.self])
         let configuration = mode == .cleanup
             ? ModelConfiguration(isStoredInMemoryOnly: true) : ModelConfiguration(url: store)
         container = try ModelContainer(for: schema, configurations: [configuration])

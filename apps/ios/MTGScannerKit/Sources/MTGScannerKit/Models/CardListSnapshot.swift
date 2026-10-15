@@ -8,6 +8,8 @@ struct CardItemSnapshot: Equatable, Identifiable {
     let qtyBuying: Int?
     let addedAt: Date
     var quantity: Int
+    let resultScanJPEG: Data?
+    let originalRecognition: Data?
 
     init(_ item: CollectionItem) {
         id = item.id
@@ -17,6 +19,8 @@ struct CardItemSnapshot: Equatable, Identifiable {
         qtyBuying = item.qtyBuying
         addedAt = item.addedAt
         quantity = item.quantity
+        resultScanJPEG = item.resultScanJPEG
+        originalRecognition = item.originalRecognition
     }
 
     func matches(_ other: Self) -> Bool {
@@ -44,17 +48,26 @@ struct CardItemSnapshot: Equatable, Identifiable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id && lhs.quantity == rhs.quantity && lhs.addedAt == rhs.addedAt
             && lhs.card.foil == rhs.card.foil && lhs.printingMetadata == rhs.printingMetadata
+            && lhs.resultScanJPEG == rhs.resultScanJPEG && lhs.originalRecognition == rhs.originalRecognition
             && lhs.priceRetail == rhs.priceRetail && lhs.priceBuy == rhs.priceBuy && lhs.qtyBuying == rhs.qtyBuying
     }
 
-    func makeItem() -> CollectionItem {
-        let item = CollectionItem(from: card)
-        item.id = id
+    func restoreValues(on item: CollectionItem) {
+        item.apply(printing: CardPrinting(card: card), foil: card.foil ?? false)
+        item.setCode = card.setCode
         item.priceRetail = priceRetail
         item.priceBuy = priceBuy
         item.qtyBuying = qtyBuying
         item.addedAt = addedAt
         item.quantity = quantity
+        item.resultScanJPEG = resultScanJPEG
+        item.originalRecognition = originalRecognition
+    }
+
+    func makeItem() -> CollectionItem {
+        let item = CollectionItem(from: card)
+        item.id = id
+        restoreValues(on: item)
         return item
     }
 }

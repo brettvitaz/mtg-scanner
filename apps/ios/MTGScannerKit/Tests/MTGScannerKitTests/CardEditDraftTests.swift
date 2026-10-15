@@ -101,6 +101,28 @@ final class CardEditDraftTests: XCTestCase {
         XCTAssertEqual(item.deck?.id, deck.id)
     }
 
+    func testFailedMergePreservesBothRowsAndOriginalIdentification() throws {
+        let context = try context()
+        let deck = Deck(name: "Deck")
+        context.insert(deck)
+        let item = CollectionItem(title: "Wrong", edition: "Old", quantity: 3)
+        let existing = CollectionItem(from: printing(), foil: false, quantity: 5)
+        for card in [item, existing] {
+            card.deck = deck
+            context.insert(card)
+        }
+        try context.save()
+        let draft = CardEditDraft(card: item.toRecognizedCard())
+        draft.select(printing(), foil: false)
+        XCTAssertFalse(draft.save(item: item, context: context, merge: true,
+                                  commit: { throw URLError(.cannotWriteToFile) }))
+        XCTAssertEqual(item.title, "Wrong")
+        XCTAssertEqual(item.quantity, 3)
+        XCTAssertEqual(existing.quantity, 5)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CollectionItem>()), 2)
+        XCTAssertEqual(deck.items.count, 2)
+    }
+
     func testInboxAllowsDuplicateCards() throws {
         let context = try context()
         let item = CollectionItem(title: "Wrong", edition: "Old")

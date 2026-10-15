@@ -7,6 +7,7 @@ import XCTest
 final class PriceFilterFieldTests: XCTestCase {
     private var diagnosticWindow: UIWindow?
     private var diagnosticEditor: PriceFilterEditor?
+    private var renderedDrafts: [PriceFilterEditor.Field: String] = [:]
     func testFirstSeparatorRemainsVisibleWhileEditing() async throws {
         let (window, editor) = host()
         defer { close(window) }
@@ -81,12 +82,15 @@ final class PriceFilterFieldTests: XCTestCase {
         field.insertText("1")
         notifyEdit(field)
         try await wait { editor.drafts[.minRetail] == "1" }
+        // The model changes synchronously; let SwiftUI render the typed state before clearing it.
+        try await wait("typed draft to render") { self.renderedDrafts[.minRetail] == "1" }
         window.layoutIfNeeded()
         XCTAssertEqual(field.bounds.width, width, accuracy: 0.5)
         XCTAssertEqual(next.convert(next.bounds, to: window).midY - field.convert(field.bounds, to: window).midY,
                        rowSpacing, accuracy: 0.5)
         editor.clear(.minRetail)
-        try await wait { field.text == "" }
+        XCTAssertEqual(editor.drafts[.minRetail], "")
+        try await wait("cleared draft to reach the field") { field.text == "" }
         XCTAssertEqual(field.bounds.width, width, accuracy: 0.5)
         XCTAssertTrue(field.isFirstResponder)
     }
@@ -108,9 +112,9 @@ final class PriceFilterFieldTests: XCTestCase {
     private func host(state: CardFilterState = CardFilterState()) -> (UIWindow, PriceFilterEditor) {
         let editor = PriceFilterEditor(filterState: state, locale: Locale(identifier: "en_US"))
         editor.move(to: .minRetail)
-        let sheet = FilterSheet(filterState: state, items: [
-            CollectionItem(title: "Island", edition: "Test", priceRetail: "$1.00")
-        ], priceEditor: editor)
+        let sheet = HostedPriceFilter(filterState: state, editor: editor) { [weak self] drafts in
+            self?.renderedDrafts = drafts
+        }
         let window = makeWindow(view: sheet)
         diagnosticWindow = window
         diagnosticEditor = editor
@@ -163,7 +167,8 @@ final class PriceFilterFieldTests: XCTestCase {
         return fields[index]
     }
 
-    private func wait(file: StaticString = #filePath, line: UInt = #line, _ condition: () -> Bool) async throws {
+    private func wait(_ description: String = "price editor to settle", file: StaticString = #filePath,
+                      line: UInt = #line, _ condition: () -> Bool) async throws {
         for _ in 0..<150 {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(20))
@@ -171,12 +176,25 @@ final class PriceFilterFieldTests: XCTestCase {
         let fields = diagnosticWindow.map { descendants($0).compactMap { $0 as? UITextField }.map {
             "\($0.text ?? "nil") focused=\($0.isFirstResponder)"
         } } ?? []
-        XCTFail("Price editor did not settle. Fields: \(fields); drafts: \(diagnosticEditor?.drafts ?? [:])",
+        XCTFail("Timed out waiting for \(description). Fields: \(fields); drafts: \(diagnosticEditor?.drafts ?? [:])",
                 file: file, line: line)
         throw NSError(domain: "PriceFilterFieldTests", code: 1)
     }
 
     private func descendants(_ view: UIView) -> [UIView] {
         view.subviews.flatMap { [$0] + descendants($0) }
+    }
+}
+
+private struct HostedPriceFilter: View {
+    let filterState: CardFilterState
+    let editor: PriceFilterEditor
+    let didRenderDrafts: ([PriceFilterEditor.Field: String]) -> Void
+
+    var body: some View {
+        FilterSheet(filterState: filterState, items: [
+            CollectionItem(title: "Island", edition: "Test", priceRetail: "$1.00")
+        ], priceEditor: editor)
+        .onChange(of: editor.drafts, initial: true) { _, drafts in didRenderDrafts(drafts) }
     }
 }

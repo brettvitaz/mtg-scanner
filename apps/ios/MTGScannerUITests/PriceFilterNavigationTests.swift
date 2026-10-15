@@ -35,10 +35,13 @@ final class PriceFilterNavigationTests: XCTestCase {
         defer { app.terminate() }
         let minimum = openFilter(in: app)
         minimum.tap()
+        waitForKeyboardLayout(in: app)
+        XCTAssertEqual(minimum.value as? String, "")
         minimum.typeText("1.2.3")
         app.buttons["price-filter-done"].tap()
         XCTAssertTrue(error(in: app).waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["price-filter-done"].exists)
+        waitForKeyboardLayout(in: app)
         minimum.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 5) + ".50")
         app.buttons["price-filter-done"].tap()
         XCTAssertTrue(app.buttons["price-filter-done"].waitForNonExistence(timeout: 3))
@@ -197,7 +200,8 @@ final class PriceFilterNavigationTests: XCTestCase {
             let toolbar = app.buttons["price-keyboard-done"]
             let stable = frame == previousFrame
             previousFrame = frame
-            return stable && field.isHittable && toolbar.isHittable && frame.maxY <= toolbar.frame.minY
+            return stable && field.isHittable && field.placeholderValue != "Any"
+                && toolbar.isHittable && frame.maxY <= toolbar.frame.minY
         }
         let ready = XCTNSPredicateExpectation(predicate: settled, object: nil)
         let result = XCTWaiter.wait(for: [ready], timeout: 5)
@@ -230,7 +234,7 @@ final class PriceFilterNavigationTests: XCTestCase {
     private func revealMinimum(in app: XCUIApplication) -> XCUIElement {
         let minimum = app.textFields["Min Retail"]
         for _ in 0..<8 {
-            if minimum.isHittable { return minimum }
+            if minimum.isHittable, app.frame.contains(minimum.frame) { return minimum }
             app.swipeUp()
         }
         XCTFail("Min Retail did not become visible")

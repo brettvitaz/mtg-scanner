@@ -58,6 +58,10 @@ Or via Makefile: `make ios-test`
 - For interactive changes, run the relevant UI workflow with `make ios-ui-test` alongside logic tests and screenshot inspection. If existing coverage cannot exercise the changed interaction, add a workflow using the production controls, stable accessibility identifiers, and bounded condition waits. Report commands, results, artifacts, and coverage gaps.
 - The initial UI workflow covers saved-card Non-foil → Foil, Save dismissal, and persistence after termination/relaunch. It does not cover other interactions.
 
+- Native price-field interaction tests live in `MTGScannerTests/` and require the app host:
+  `make ios-test IOS_TEST_SCHEME=MTGScanner`. This also runs `MTGScannerUITests/` for price toolbar, Return, and sheet flows.
+  The package runner has no application for dispatching UIKit actions. Set `IOS_TEST_SIMULATOR_ID` to an isolated simulator
+  when another task is using the default device.
 - `final class <Feature>Tests: XCTestCase` naming.
 - Use `XCTUnwrap` for required optional values in tests; SwiftLint also checks test files.
 - Use `XCTAssertEqual(_:_:accuracy:)` for CGFloat/Double comparisons.
@@ -157,6 +161,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `undo-empty` / `undo-bulk` | `CardListPricingFixtureView` | Last-row and bulk-delete undo |
 | `undo-navigation` | `CardListPricingFixtureView` | Real tab navigation with a pending Results deletion |
 | `pricing-filter` | `CardListPricingFixtureView` | CK buying toggle and Retail/Buylist price filters |
+| `pricing-filter-editing` | `CardListPricingFixtureView` | Unformatted draft with focused field and Previous/Next/Done keyboard toolbar |
+| `pricing-filter-invalid` | `CardListPricingFixtureView` | Invalid draft with inline error; completion stays focused until corrected |
 | `pricing-large` | `CardListPricingFixtureView` | Large monetary totals for layout checks |
 | `result-scan-artwork` | `ResultScanFixtureView` | Persisted result, artwork first; cached sample artwork |
 | `result-scan-image` | `ResultScanFixtureView` | Persisted captured scan with full card bounds |

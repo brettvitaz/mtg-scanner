@@ -5,6 +5,7 @@ import SwiftUI
 /// Fixture routes for totals and CK availability using the production list screens.
 public struct CardListPricingFixtureView: View {
     @State private var filterState = CardFilterState()
+    private let priceEditor: PriceFilterEditor?
     private let fixtureItems: [CollectionItem]
     private let route: String
     private let collection = CardCollection(name: "Trade Binder")
@@ -16,6 +17,9 @@ public struct CardListPricingFixtureView: View {
 
     public init(route: String) {
         self.route = route
+        let state = CardFilterState()
+        _filterState = State(initialValue: state)
+        priceEditor = Self.makePriceEditor(route: route, state: state)
         fixtureItems = Self.items(for: route)
         do {
             let container = try ModelContainer(
@@ -53,6 +57,16 @@ public struct CardListPricingFixtureView: View {
         }
     }
 
+    private static func makePriceEditor(route: String, state: CardFilterState) -> PriceFilterEditor? {
+        guard ["pricing-filter-editing", "pricing-filter-invalid"].contains(route) else { return nil }
+        state.priceRetailMin = 12.5
+        let editor = PriceFilterEditor(filterState: state)
+        editor.drafts[.minRetail] = route == "pricing-filter-invalid" ? "1.2.3" : ".50"
+        if route == "pricing-filter-invalid" { editor.commit(.minRetail) }
+        editor.move(to: .minRetail)
+        return editor
+    }
+
     public var body: some View {
         if let container {
             content.modelContainer(container).environment(appModel).environment(libraryViewModel)
@@ -80,7 +94,8 @@ public struct CardListPricingFixtureView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.dsBackground)
             }
-        case "pricing-filter": FilterSheet(filterState: filterState, items: fixtureItems)
+        case "pricing-filter", "pricing-filter-editing", "pricing-filter-invalid":
+            FilterSheet(filterState: filterState, items: fixtureItems, priceEditor: priceEditor)
         default: ResultsView()
         }
     }

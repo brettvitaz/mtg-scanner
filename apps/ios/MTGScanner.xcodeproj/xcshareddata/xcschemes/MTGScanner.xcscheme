@@ -26,7 +26,11 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES">
+      shouldUseLaunchSchemeArgsEnv = "NO">
+      <CommandLineArguments>
+         <CommandLineArgument argument="-UI_PREVIEW_ROUTE" isEnabled="YES"/>
+         <CommandLineArgument argument="pricing-filter" isEnabled="YES"/>
+      </CommandLineArguments>
       <Testables>
          <TestableReference
             skipped = "NO">
@@ -36,6 +40,12 @@
                BuildableName = "MTGScannerTests.xctest"
                BlueprintName = "MTGScannerTests"
                ReferencedContainer = "container:MTGScanner.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="F10000000000000000000005"
+               BuildableName="MTGScannerUITests.xctest" BlueprintName="MTGScannerUITests"
+               ReferencedContainer="container:MTGScanner.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>

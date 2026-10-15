@@ -1,8 +1,9 @@
 included:
   - apps/ios/MTGScannerKit/Sources
   - apps/ios/MTGScannerKit/Tests
-  - apps/ios/MTGScanner/App
+  - apps/ios/MTGScannerTests
   - apps/ios/MTGScannerUITests
+  - apps/ios/MTGScanner/App
 
 excluded:
   - .build

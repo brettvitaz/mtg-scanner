@@ -59,6 +59,42 @@ git remote set-head origin -a
 - iPhone uses portrait throughout the app, including scanning, sheets, and fullscreen card artwork. iPad supports portrait and landscape left/right. The orientation policy lives in the app shell’s `Info.plist`; camera sensor buffers and imported images retain their existing orientation handling.
 - Avoid introducing package managers or generated project complexity until the app shape stabilizes.
 
+### Repeatable iOS UI workflows
+
+Run `make ios-ui-test` for the offline saved-card finish workflow on iPhone 16 /
+iOS 18.6. It opens a saved non-foil card in the production detail screen, edits it
+to Foil, saves, checks dismissal, then terminates/relaunches and verifies the saved
+finish. No backend, network access, or API keys are required.
+
+```bash
+make ios-test
+make ios-ui-test IOS_UI_TEST_RESULT_BUNDLE=tmp/card-finish-review.xcresult
+open tmp/card-finish-review.xcresult
+xcrun xcresulttool export attachments --path tmp/card-finish-review.xcresult --output-path tmp/card-finish-review
+```
+
+Use a new result path each time. Without an override, each run retains a unique
+`tmp/ios-ui-tests-<timestamp>-<UUID>.xcresult`. A failed workflow returns a nonzero
+command status and preserves diagnostics. Named initial, editor, saved, and relaunch
+screenshots remain available on success. Inspect those PNGs alongside logic checks;
+use existing `card-detail` / `card-edit` snapshot routes for further visual iteration.
+
+Override `IOS_UI_TEST_DESTINATION` with a pinned simulator destination or use
+`IOS_UI_TEST_FILTER=MTGScannerUITests/CardFinishTests/testEditFinishPersistsAfterRelaunch`
+to select a test. The dedicated scheme is separate from the logic-test scheme.
+
+Each test chooses a UUID. DEBUG launch support creates only that run's disk store
+and preferences suite. Fresh mode resets and seeds; resume reopens saved data without
+reseeding; teardown cleanup removes only that run. Interrupted tests may leave isolated
+resources; later runs get a new UUID. A local URL protocol supplies deterministic
+price responses and fails visibly for unexpected requests. See `apps/ios/AGENTS.md`
+for exact paths and launch keys.
+
+For interactive changes, agents must run relevant UI workflows alongside logic tests
+and inspect screenshots. Add a workflow when existing tests cannot exercise the changed
+interaction. Report commands, results, artifacts, and coverage gaps. The initial finish
+workflow provides no coverage of other interactions; this foundation adds no CI jobs.
+
 ### Collection and deck quantity operations
 
 Open a collection or deck, then choose **Apply a List** from More options

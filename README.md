@@ -185,6 +185,8 @@ Tap the scan to pinch zoom and pan around the collector number, then tap **Close
 Scans are JPEGs with a maximum long edge of 1,000 pixels, quality 85%, preserving the full
 crop and aspect ratio without upscaling. Older results, manual additions, and unusable or
 missing crops show artwork only and remain editable.
+Full-image uploads also retain the detected crop when one detected region maps to
+one recognized card; ambiguous results do not receive an assumed scan association.
 
 Scans stay in Results: copies retain evidence on the original only, full moves remove it,
 and partial moves keep it with the remaining result. Deletion Undo restores the result's scan.

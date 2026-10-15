@@ -344,6 +344,13 @@ class RecognitionService:
                 validation_result, image_bytes, enriched_metadata
             )
         final_response = validation_result.response if validation_result else single_result.response
+        # Preserve full-image recognition while returning evidence only for an unambiguous card.
+        if (
+            self._card_detector is not None and detection_result is not None
+            and detection_result.count == 1 and len(final_response.cards) == 1
+        ):
+            crop_bytes, _ = self._card_detector.crop_region(image_bytes, detection_result.regions[0])
+            final_response = _attach_crop_images(final_response, [crop_bytes])
         total_usage = accumulate_usage([single_result.usage, single_correction_usage])
         logger.info(
             "Recognition complete: %d cards from '%s' via %s",

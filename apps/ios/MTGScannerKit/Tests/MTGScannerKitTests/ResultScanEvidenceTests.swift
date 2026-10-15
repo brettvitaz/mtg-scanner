@@ -5,6 +5,43 @@ import XCTest
 
 @MainActor
 final class ResultScanEvidenceTests: XCTestCase {
+    func testSingleEndpointResponsePersistsScanAndCapturesCorrectionAfterRestart() throws {
+        let resource = try XCTUnwrap(Bundle.module.url(forResource: "hand-held-single-response", withExtension: "json"))
+        let response = try JSONDecoder().decode(RecognitionResult.self, from: Data(contentsOf: resource))
+        let card = try XCTUnwrap(response.cards.first)
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "single-result.store")
+        do {
+            let container = try store(url)
+            let app = AppModel()
+            app.modelContext = container.mainContext
+            app.latestResult = response
+            app.persistRecognizedCards()
+            try container.mainContext.save()
+        }
+        let container = try store(url)
+        let context = container.mainContext
+        let items = try context.fetch(FetchDescriptor<CollectionItem>())
+        XCTAssertEqual(items.count, 1)
+        let item = try XCTUnwrap(items.first)
+        XCTAssertNotNil(item.resultScanImage)
+        XCTAssertEqual(item.resultScanJPEG, ResultScanEvidence.prepare(base64: card.cropImageData))
+        let original = try JSONDecoder().decode(RecognizedCard.self, from: XCTUnwrap(item.originalRecognition))
+        XCTAssertEqual(original.title, card.title)
+        XCTAssertNil(original.cropImageData)
+        let draft = CardEditDraft(card: item.toRecognizedCard())
+        draft.isFoil = !item.foil
+        XCTAssertTrue(draft.save(item: item, context: context, merge: false,
+                                feedbackBaseURL: "https://feedback.example"))
+        let events = try context.fetch(FetchDescriptor<RecognitionFeedbackEvent>())
+        XCTAssertEqual(events.count, 1)
+        let payload = try XCTUnwrap(events.first).payload()
+        XCTAssertEqual(payload.scanJPEG, item.resultScanJPEG)
+        XCTAssertEqual(payload.originalRecognition.title, card.title)
+        XCTAssertNotEqual(payload.previousIdentification.foil, payload.correctedIdentification.foil)
+    }
+
     func testManualPersistenceReopensWithEachResponseCrop() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

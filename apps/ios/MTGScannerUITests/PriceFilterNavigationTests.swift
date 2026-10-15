@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 @MainActor
@@ -78,7 +79,7 @@ final class PriceFilterNavigationTests: XCTestCase {
             let clear = app.buttons["Clear " + label]
             XCTAssertTrue(clear.waitForExistence(timeout: 3))
             clear.tap()
-            XCTAssertEqual(field.value as? String, "Any")
+            XCTAssertEqual(field.value as? String, "")
             XCTAssertTrue(clear.waitForNonExistence(timeout: 3))
             field.typeText("3")
             XCTAssertEqual(field.value as? String, "3")
@@ -97,7 +98,7 @@ final class PriceFilterNavigationTests: XCTestCase {
         XCTAssertTrue(error(in: app).waitForExistence(timeout: 5))
         app.buttons["Clear Min Retail"].tap()
         XCTAssertTrue(error(in: app).waitForNonExistence(timeout: 3))
-        XCTAssertEqual(app.textFields["Min Retail"].value as? String, "Any")
+        XCTAssertEqual(app.textFields["Min Retail"].value as? String, "")
         XCTAssertTrue(app.keyboards.firstMatch.exists)
         app.textFields["Min Retail"].typeText(".50")
         XCTAssertEqual(app.textFields["Min Retail"].value as? String, ".50")
@@ -117,11 +118,105 @@ final class PriceFilterNavigationTests: XCTestCase {
         XCTAssertEqual(app.textFields["Min Retail"].value as? String, "0.50")
     }
 
+    func testEmptyFocusTypingAndClearKeepLayoutStable() {
+        continueAfterFailure = false
+        let app = launch("pricing-filter")
+        defer { app.terminate() }
+        let field = revealMinimum(in: app)
+        XCTAssertEqual(field.value as? String, "Any")
+        capture("Empty-unfocused")
+        field.tap()
+        waitForKeyboardLayout(in: app)
+        XCTAssertEqual(field.value as? String, "")
+        capture("Empty-focused")
+        let width = field.frame.width
+        let height = field.frame.height
+        field.typeText("1")
+        XCTAssertEqual(field.frame.width, width, accuracy: 0.5)
+        XCTAssertEqual(field.frame.height, height, accuracy: 0.5)
+        capture("First-character")
+        app.buttons["Clear Min Retail"].tap()
+        XCTAssertEqual(field.value as? String, "")
+        XCTAssertEqual(field.frame.width, width, accuracy: 0.5)
+        XCTAssertEqual(field.frame.height, height, accuracy: 0.5)
+        waitForKeyboardLayout(in: app, allowingIPadKeyboardIssue: true)
+        capture("Cleared-focused")
+        field.typeText(".50")
+        app.textFields["Max Retail"].tap()
+        XCTAssertEqual(field.value as? String, "0.50")
+        XCTAssertEqual(app.textFields["Max Retail"].value as? String, "")
+    }
+
+    func testLargestTextKeepsKeyboardNavigationAndClearAvailable() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-UI_PREVIEW_ROUTE", "pricing-filter-editing",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        waitForKeyboardLayout(in: app)
+        defer { app.terminate() }
+        let field = app.textFields["Min Retail"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(field.frame.height, 40, "The test must exercise accessibility-sized text")
+        let next = app.buttons["price-next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 3))
+        XCTAssertTrue(next.isHittable)
+        app.buttons["Clear Min Retail"].tap()
+        XCTAssertEqual(field.value as? String, "")
+        field.typeText("2")
+        next.tap()
+        XCTAssertEqual(field.value as? String, "2.00")
+        app.buttons["price-previous"].tap()
+        app.buttons["price-keyboard-done"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 3))
+    }
+
+    private func capture(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func launch(_ route: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-UI_PREVIEW_ROUTE", route]
         app.launch()
+        if route == "pricing-filter-editing" || route == "pricing-filter-invalid" {
+            waitForKeyboardLayout(in: app)
+        }
         return app
+    }
+
+    private func waitForKeyboardLayout(in app: XCUIApplication, allowingIPadKeyboardIssue: Bool = false) {
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        var previousFrame = CGRect.zero
+        let settled = NSPredicate { _, _ in
+            let field = app.textFields["Min Retail"]
+            let frame = field.frame
+            let toolbar = app.buttons["price-keyboard-done"]
+            let stable = frame == previousFrame
+            previousFrame = frame
+            return stable && field.isHittable && toolbar.isHittable && frame.maxY <= toolbar.frame.minY
+        }
+        let ready = XCTNSPredicateExpectation(predicate: settled, object: nil)
+        let result = XCTWaiter.wait(for: [ready], timeout: 5)
+        if result != .completed { capture("Keyboard-layout-timeout") }
+        XCTAssertEqual(result, .completed)
+        let keyboardReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in app.keyboards.firstMatch.keys["1"].isHittable }, object: nil
+        )
+        let keyboardResult = XCTWaiter.wait(for: [keyboardReady], timeout: 5)
+        let assertKeyboardVisible = {
+            XCTAssertEqual(keyboardResult, .completed, "Software keyboard keys must remain tappable")
+        }
+        if allowingIPadKeyboardIssue, UIDevice.current.userInterfaceIdiom == .pad {
+            XCTExpectFailure("iPadOS can minimize the keyboard after Clear in a SwiftUI List; deferred") {
+                assertKeyboardVisible()
+            }
+        } else {
+            assertKeyboardVisible()
+        }
     }
 
     private func openFilter(in app: XCUIApplication) -> XCUIElement {

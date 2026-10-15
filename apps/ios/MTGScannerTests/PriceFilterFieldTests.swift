@@ -53,7 +53,7 @@ final class PriceFilterFieldTests: XCTestCase {
         let (window, editor) = host()
         defer { close(window) }
         let first = try await priceField(.minRetail, in: window)
-        first.becomeFirstResponder()
+        try await wait { first.isFirstResponder }
         first.insertText(".50")
         notifyEdit(first)
         try await wait { editor.drafts[.minRetail] == ".50" }
@@ -68,6 +68,41 @@ final class PriceFilterFieldTests: XCTestCase {
         try await wait { second.isFirstResponder && editor.errors[.maxRetail] != nil }
         XCTAssertEqual(editor.focusedField, .maxRetail)
         XCTAssertEqual(second.text, "1.2.3")
+    }
+
+    func testTypingAndClearingKeepFieldAndRowGeometryStable() async throws {
+        let (window, editor) = host()
+        defer { close(window) }
+        let field = try await priceField(.minRetail, in: window)
+        let next = try await priceField(.maxRetail, in: window)
+        try await wait { field.isFirstResponder }
+        let width = field.bounds.width
+        let rowSpacing = next.convert(next.bounds, to: window).midY - field.convert(field.bounds, to: window).midY
+        field.insertText("1")
+        notifyEdit(field)
+        try await wait { editor.drafts[.minRetail] == "1" }
+        window.layoutIfNeeded()
+        XCTAssertEqual(field.bounds.width, width, accuracy: 0.5)
+        XCTAssertEqual(next.convert(next.bounds, to: window).midY - field.convert(field.bounds, to: window).midY,
+                       rowSpacing, accuracy: 0.5)
+        editor.clear(.minRetail)
+        try await wait { field.text == "" }
+        XCTAssertEqual(field.bounds.width, width, accuracy: 0.5)
+        XCTAssertTrue(field.isFirstResponder)
+    }
+
+    func testEmptyPlaceholderDisappearsDuringFocusAndReturnsAfterLeaving() async throws {
+        let (window, editor) = host()
+        defer { close(window) }
+        let field = try await priceField(.minRetail, in: window)
+        try await wait { field.isFirstResponder && (field.placeholder ?? "").isEmpty }
+        XCTAssertEqual(field.placeholder ?? "", "")
+        XCTAssertTrue(editor.move(to: .maxRetail))
+        try await wait { !field.isFirstResponder && field.placeholder == "Any" }
+        XCTAssertEqual(field.placeholder, "Any")
+        XCTAssertTrue(editor.move(to: .minRetail))
+        try await wait { field.isFirstResponder && (field.placeholder ?? "").isEmpty }
+        XCTAssertEqual(field.placeholder ?? "", "")
     }
 
     private func host(state: CardFilterState = CardFilterState()) -> (UIWindow, PriceFilterEditor) {

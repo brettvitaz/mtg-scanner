@@ -7,15 +7,16 @@ struct FilterSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var priceEditor: PriceFilterEditor
+    @State private var pendingInitialPriceFocus: PriceFilterEditor.Field?
     @FocusState private var focusedPrice: PriceFilterEditor.Field?
 
     init(filterState: CardFilterState, items: [CollectionItem], priceEditor: PriceFilterEditor? = nil) {
         self.filterState = filterState
         self.items = items
-        _priceEditor = State(initialValue: priceEditor ?? PriceFilterEditor(filterState: filterState))
+        let editor = priceEditor ?? PriceFilterEditor(filterState: filterState)
+        _priceEditor = State(initialValue: editor)
+        _pendingInitialPriceFocus = State(initialValue: editor.focusedField)
     }
-
-    private var usesKeyboardInset: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     private var availableSets: [String] {
         Array(Set(items.map(\.edition))).sorted()
@@ -36,6 +37,7 @@ struct FilterSheet: View {
                 filterList
                     .task {
                         if let field = priceEditor.focusedField {
+                            // Reveal the lazy row before requesting native text-field focus.
                             proxy.scrollTo(field, anchor: .center)
                             focusedPrice = field
                         }
@@ -43,16 +45,10 @@ struct FilterSheet: View {
                     .onReceive(NotificationCenter.default.publisher(
                         for: UIResponder.keyboardDidShowNotification
                     )) { _ in
-                        if let field = focusedPrice { proxy.scrollTo(field, anchor: .center) }
+                        guard let field = pendingInitialPriceFocus else { return }
+                        pendingInitialPriceFocus = nil
+                        if focusedPrice == field { proxy.scrollTo(field, anchor: .center) }
                     }
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            // iPad can omit native keyboard toolbar items; retain the same actions above its keyboard.
-            if usesKeyboardInset, focusedPrice != nil {
-                HStack { keyboardButtons }
-                    .padding(.horizontal)
-                    .background(.bar)
             }
         }
     }
@@ -70,6 +66,14 @@ struct FilterSheet: View {
             }
         }
         .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Keep controls available when SwiftUI omits native keyboard toolbar items.
+            if focusedPrice != nil {
+                HStack { keyboardButtons }
+                    .padding(.horizontal)
+                    .background(.bar)
+            }
+        }
         .navigationTitle("Filter")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -82,9 +86,6 @@ struct FilterSheet: View {
                 Button("Done") { if priceEditor.finish() { dismiss() } }
                     .accessibilityIdentifier("price-filter-done")
                     .bold()
-            }
-            ToolbarItemGroup(placement: .keyboard) {
-                if !usesKeyboardInset { keyboardButtons }
             }
         }
         .onChange(of: focusedPrice) { _, field in
@@ -234,7 +235,7 @@ struct FilterSheet: View {
             HStack {
                 Text(field.rawValue)
                 Spacer()
-                TextField("Any", text: Binding(
+                TextField(focusedPrice == field ? "" : "Any", text: Binding(
                     get: { priceEditor.drafts[field] ?? "" },
                     set: { priceEditor.drafts[field] = $0 }
                 ))
@@ -247,7 +248,9 @@ struct FilterSheet: View {
                     .focused($focusedPrice, equals: field)
                     .submitLabel(field.next == nil ? .done : .next)
                     .onSubmit { priceEditor.submit() }
-                if !(priceEditor.drafts[field] ?? "").isEmpty {
+                if (priceEditor.drafts[field] ?? "").isEmpty {
+                    clearPriceButton(field).hidden()
+                } else {
                     clearPriceButton(field)
                 }
             }

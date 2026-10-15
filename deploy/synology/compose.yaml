@@ -10,6 +10,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8001:8000"
+      - "192.168.168.251:8001:8000"
     environment:
       MTG_SCANNER_API_HOST: 0.0.0.0
       MTG_SCANNER_API_PORT: "8000"

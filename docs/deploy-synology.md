@@ -110,8 +110,10 @@ Create a rule with your chosen HTTPS hostname and certificate as the source,
 and **HTTP**, hostname **127.0.0.1**, port **8001** as the destination.
 Configure the iOS app's API base URL to `https://<your-hostname>`.
 
-Port 8000 belongs to Portainer. Port 8001 is bound only to NAS loopback;
-`http://192.168.168.251:8001` intentionally does not accept LAN connections.
+Port 8000 belongs to Portainer. Port 8001 is bound to both NAS loopback and
+the NAS LAN address `192.168.168.251`. For direct LAN access, set the iOS API
+base URL to `http://192.168.168.251:8001`. The reverse proxy can continue using
+`127.0.0.1:8001` as its destination.
 No DSM proxy or certificate settings are changed by this deployment.
 
 ## Verification

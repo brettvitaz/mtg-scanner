@@ -9,7 +9,7 @@ struct ScanView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Binding var detectionMode: DetectionMode
     let isActive: Bool
-    @State private var detectionViewModel = CardDetectionViewModel()
+    @State private var detectionViewModel: CardDetectionViewModel
     @State private var captureCoordinator = CameraCaptureCoordinator()
     @State private var autoScanViewModel: AutoScanViewModel
 
@@ -20,11 +20,13 @@ struct ScanView: View {
 
     init(
         detectionMode: Binding<DetectionMode>, isActive: Bool,
-        autoScanViewModel: AutoScanViewModel = AutoScanViewModel()
+        autoScanViewModel: AutoScanViewModel = AutoScanViewModel(),
+        detectionViewModel: CardDetectionViewModel = CardDetectionViewModel()
     ) {
         _detectionMode = detectionMode
         self.isActive = isActive
         _autoScanViewModel = State(initialValue: autoScanViewModel)
+        _detectionViewModel = State(initialValue: detectionViewModel)
     }
 
     var body: some View {

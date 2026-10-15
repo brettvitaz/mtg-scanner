@@ -52,7 +52,7 @@ public final class AppModel {
     /// Crop images keyed by the corresponding RecognizedCard.id.
     var cardCropImages: [UUID: UIImage] = [:]
     var shouldShowResults = false
-    private(set) var selectedTab = 0
+    private(set) var selectedTab = AppTab.scan
     private(set) var newlyScannedCardCount = 0
     /// Navigation path for the Results tab — reset to dismiss detail views.
     var resultsNavigationPath = NavigationPath()
@@ -121,13 +121,13 @@ public final class AppModel {
     }
 
     func recordScannedCard() {
-        guard selectedTab != 1 else { return }
+        guard selectedTab != .results else { return }
         newlyScannedCardCount += 1
     }
 
-    func selectTab(_ tab: Int) {
+    func selectTab(_ tab: AppTab) {
         selectedTab = tab
-        if tab == 1 { newlyScannedCardCount = 0 }
+        if tab == .results { newlyScannedCardCount = 0 }
     }
 
     // MARK: - Recognition entry points

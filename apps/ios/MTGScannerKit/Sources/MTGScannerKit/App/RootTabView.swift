@@ -11,33 +11,35 @@ public struct RootTabView: View {
     public var body: some View {
         @Bindable var appModel = appModel
         TabView(selection: Binding(get: { appModel.selectedTab }, set: appModel.selectTab)) {
-            ScanView(detectionMode: $scanMode, isActive: appModel.selectedTab == 0)
+            ScanView(detectionMode: $scanMode, isActive: appModel.selectedTab == .scan)
                 .tabItem {
                     Label(scanMode.displayName, systemImage: scanMode.systemImage)
                 }
-                .tag(0)
+                .tag(AppTab.scan)
 
             ResultsView()
                 .tabItem {
                     Label("Results", systemImage: "list.bullet.rectangle")
                 }
                 .badge(appModel.resultsBadgeText)
-                .tag(1)
+                .tag(AppTab.results)
 
             LibraryView()
                 .tabItem {
                     Label("Library", systemImage: "books.vertical")
                 }
-                .tag(2)
+                .tag(AppTab.library)
 
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
-                .tag(3)
+                .tag(AppTab.settings)
         }
         .background(
-            TabBarObserver(tabIndex: 0, resultsAccessibilityValue: appModel.resultsBadgeAccessibilityValue) {
+            TabBarObserver(
+                tabIndex: AppTab.scan.rawValue, resultsAccessibilityValue: appModel.resultsBadgeAccessibilityValue
+            ) {
                 showsScanModePicker = true
             }
         )
@@ -46,17 +48,17 @@ public struct RootTabView: View {
         }
         .onChange(of: appModel.shouldShowResults) { _, newValue in
             if newValue {
-                appModel.selectTab(1)
+                appModel.selectTab(.results)
                 appModel.shouldShowResults = false
             }
         }
         .alert("Server Unavailable", isPresented: $appModel.showConnectionAlert) {
             Button("OK", role: .cancel) {}
-            Button("Settings") { appModel.selectTab(3) }
+            Button("Settings") { appModel.selectTab(.settings) }
         } message: {
             Text(appModel.connectionAlertMessage)
         }
-        .environment(\.undoSelectedTab, appModel.selectedTab)
+        .environment(\.undoSelectedTab, appModel.selectedTab.rawValue)
     }
 }
 
@@ -125,7 +127,7 @@ private struct TabBarObserver: UIViewRepresentable {
     }
 
     final class ObserverView: UIView, UIGestureRecognizerDelegate {
-        var tabIndex = 0
+        var tabIndex = AppTab.scan.rawValue
         var resultsAccessibilityValue = ""
         var onTap: () -> Void = {}
         private weak var observedTabBar: UITabBar?
@@ -155,8 +157,8 @@ private struct TabBarObserver: UIViewRepresentable {
             tapRecognizer.tabIndex = tabIndex
             guard let tabBar = findTabBarController(from: window?.rootViewController)?.tabBar else { return }
             // SwiftUI's tabItem label does not forward accessibilityValue to UITabBarItem.
-            if let items = tabBar.items, items.indices.contains(1) {
-                items[1].accessibilityValue = resultsAccessibilityValue
+            if let items = tabBar.items, items.indices.contains(AppTab.results.rawValue) {
+                items[AppTab.results.rawValue].accessibilityValue = resultsAccessibilityValue
             }
             guard observedTabBar !== tabBar else { return }
 
@@ -198,7 +200,7 @@ private struct TabBarObserver: UIViewRepresentable {
     }
 
     private final class ScanTabTapGestureRecognizer: UITapGestureRecognizer {
-        var tabIndex = 0
+        var tabIndex = AppTab.scan.rawValue
         private(set) var touchStartedOnSelectedTab = false
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {

@@ -12,7 +12,7 @@ public struct ScanCountFixtureView: View {
 
     public init(route: String) {
         isNavigationRoute = route == "scan-count-navigation"
-        appModel.selectTab(3)
+        appModel.selectTab(.settings)
         do {
             let container = try ModelContainer(
                 for: CollectionItem.self, CardCollection.self, Deck.self,

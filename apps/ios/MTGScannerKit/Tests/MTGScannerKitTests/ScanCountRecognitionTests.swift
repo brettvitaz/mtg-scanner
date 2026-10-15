@@ -103,9 +103,9 @@ final class ScanCountRecognitionTests: XCTestCase {
         await vm.enqueueCapturedImage(payload(), cropEnabled: false)
         try await gate.waitUntilStarted()
         app.recordScannedCard()
-        app.selectTab(1)
+        app.selectTab(.results)
         vm.stop()
-        if !resultsStillSelected { app.selectTab(3) }
+        if !resultsStillSelected { app.selectTab(.settings) }
         await gate.finish(Self.cards())
         await waitForQueue(queue)
         XCTAssertEqual(app.newlyScannedCardCount, expectedCount)

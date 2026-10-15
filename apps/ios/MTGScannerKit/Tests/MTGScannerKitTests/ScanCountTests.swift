@@ -7,7 +7,7 @@ final class ScanCountTests: XCTestCase {
     func testCountsAccumulateAcrossOtherTabVisits() {
         let app = AppModel()
         XCTAssertNil(app.resultsBadgeText)
-        for tab in [0, 2, 3, 0] {
+        for tab in [AppTab.scan, .library, .settings, .scan] {
             app.selectTab(tab)
             app.recordScannedCard()
         }
@@ -18,11 +18,11 @@ final class ScanCountTests: XCTestCase {
     func testOpeningResultsClearsAndSuppressesCountUntilLeaving() {
         let app = AppModel()
         app.recordScannedCard()
-        app.selectTab(1)
+        app.selectTab(.results)
         XCTAssertNil(app.resultsBadgeText)
         app.recordScannedCard()
         XCTAssertEqual(app.newlyScannedCardCount, 0)
-        app.selectTab(2)
+        app.selectTab(.library)
         app.recordScannedCard()
         XCTAssertEqual(app.newlyScannedCardCount, 1)
     }
@@ -41,7 +41,7 @@ final class ScanCountTests: XCTestCase {
         assertBadge(app, count: 99, badge: "99", accessibility: "99 newly scanned cards")
         assertBadge(app, count: 100, badge: "99+", accessibility: "100 newly scanned cards")
         assertBadge(app, count: 1_000, badge: "99+", accessibility: "1000 newly scanned cards")
-        app.selectTab(1)
+        app.selectTab(.results)
         XCTAssertEqual(app.resultsBadgeAccessibilityValue, "")
     }
 

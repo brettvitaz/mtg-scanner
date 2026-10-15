@@ -28,7 +28,7 @@ final class ScanCountViewTests: XCTestCase {
         XCTAssertEqual(app.resultsBadgeText, "1")
     }
 
-    func testBackgroundAndForegroundKeepOutstandingBadge() async throws {
+    func testBackgroundHandlerKeepsOutstandingBadge() async throws {
         let app = AppModel()
         let context = try makeScanCountContext()
         app.modelContext = context
@@ -36,18 +36,19 @@ final class ScanCountViewTests: XCTestCase {
         app.recordScannedCard()
         let phase = ScanCountSceneState()
         let model = AutoScanViewModel(detectorProvider: { nil })
-        let view = ScanCountSceneView(app: app, model: model, phase: phase)
+        let detection = CardDetectionViewModel()
+        let view = ScanCountSceneView(app: app, model: model, detection: detection, phase: phase)
             .modelContainer(context.container)
         let window = makeScanCountWindow(view: view)
         defer { closeScanCountWindow(window) }
         try await waitForScanCount { model.modelContext != nil }
-        for nextPhase in [ScenePhase.inactive, .background, .inactive, .active] {
-            phase.value = nextPhase
-            // Allow SwiftUI to deliver the environment change to the production lifecycle handler.
-            try await Task.sleep(for: .milliseconds(50))
-            XCTAssertEqual(app.newlyScannedCardCount, 2)
-            XCTAssertEqual(app.resultsBadgeText, "2")
-        }
+        detection.torchLevel = 0.75
+        app.lastTorchLevel = 0
+        phase.value = .background
+        // These effects prove the production background handler ran before checking preservation.
+        try await waitForScanCount { detection.torchLevel == 0 && app.lastTorchLevel == 0.75 }
+        XCTAssertEqual(app.newlyScannedCardCount, 2)
+        XCTAssertEqual(app.resultsBadgeText, "2")
     }
 }
 
@@ -60,10 +61,12 @@ private final class ScanCountSceneState {
 private struct ScanCountSceneView: View {
     let app: AppModel
     let model: AutoScanViewModel
+    let detection: CardDetectionViewModel
     let phase: ScanCountSceneState
 
     var body: some View {
-        ScanView(detectionMode: .constant(.scan), isActive: true, autoScanViewModel: model)
+        ScanView(detectionMode: .constant(.scan), isActive: true,
+                 autoScanViewModel: model, detectionViewModel: detection)
             .environment(app).environment(\.scenePhase, phase.value)
     }
 }

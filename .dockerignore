@@ -1,0 +1,22 @@
+# Only runtime inputs enter the build context; credentials and datasets stay outside.
+**
+!Dockerfile
+!services/
+!services/api/
+!services/api/pyproject.toml
+!services/api/app/
+!services/api/app/**
+!services/api/data/
+!services/api/data/pricing/
+!services/api/data/pricing/model_prices.json
+!prompts/
+!prompts/**
+!packages/
+!packages/schemas/
+!packages/schemas/**
+!scripts/
+!scripts/*.py
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.*

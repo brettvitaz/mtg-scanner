@@ -163,3 +163,8 @@ Events are stored atomically under the configured artifacts directory's
 Retries acknowledge the same UUID without replacing the original evidence. Storage
 failures return an error so the iOS outbox can retry. Evidence remains after a result
 is removed; no automatic cleanup, model training, or training-data management UI is included.
+
+## Docker on Synology
+
+See [Synology deployment](../../docs/deploy-synology.md) for the Docker build,
+persistent storage, HTTPS reverse proxy, verification, and rollback procedures.

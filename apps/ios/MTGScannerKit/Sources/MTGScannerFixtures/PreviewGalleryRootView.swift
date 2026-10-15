@@ -56,8 +56,11 @@ public struct PreviewGalleryRootView: View {
         case "card-edit", "card-detail":
             CardEditFixtureView(route: route)
         case "pricing-results", "pricing-collection", "pricing-deck",
-             "pricing-large", "pricing-filter", "copy-move", "card-row-preview", "card-row-list":
+             "pricing-large", "pricing-filter", "card-row-preview", "card-row-list":
             CardListPricingFixtureView(route: route)
+        case "copy-move", "copy-cards", "move-cards", "transfer-destinations",
+             "transfer-destinations-empty", "transfer-quantities", "transfer-error":
+            CardTransferFixtureView(route: route == "copy-move" ? "copy-cards" : route)
         case "selection-results", "selection-collection", "selection-deck":
             CardListPricingFixtureView(route: route)
         case "undo-results", "undo-collection", "undo-deck", "undo-empty", "undo-bulk", "undo-navigation":
@@ -113,4 +116,28 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Selection Deck") {
     PreviewGalleryRootView(route: "selection-deck")
+}
+
+#Preview("copy-cards") {
+    PreviewGalleryRootView(route: "copy-cards")
+}
+
+#Preview("move-cards") {
+    PreviewGalleryRootView(route: "move-cards")
+}
+
+#Preview("transfer-destinations") {
+    PreviewGalleryRootView(route: "transfer-destinations")
+}
+
+#Preview("transfer-destinations-empty") {
+    PreviewGalleryRootView(route: "transfer-destinations-empty")
+}
+
+#Preview("transfer-quantities") {
+    PreviewGalleryRootView(route: "transfer-quantities")
+}
+
+#Preview("transfer-error") {
+    PreviewGalleryRootView(route: "transfer-error")
 }

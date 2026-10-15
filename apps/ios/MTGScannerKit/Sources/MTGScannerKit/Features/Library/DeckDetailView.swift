@@ -3,19 +3,21 @@ import SwiftUI
 import UIKit
 
 struct DeckDetailView: View {
+    init(deck: Deck, selection: CardListSelectionState = CardListSelectionState()) {
+        self.deck = deck
+        _selection = State(initialValue: selection)
+    }
+
     @Bindable var deck: Deck
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var isSelecting = false
-    @State private var selectedItems: Set<UUID> = []
-    @State private var showCopyMoveSheet = false
+    @State private var selection = CardListSelectionState()
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
@@ -26,7 +28,7 @@ struct DeckDetailView: View {
     private var isDeleted: Bool { deck.isDeleted || deck.modelContext == nil }
 
     private var undoIsBlocked: Bool {
-        showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
+        selection.transferRequest != nil || showDeleteConfirmation
         || contextDeleteItem != nil || exportFile != nil || showFilterSheet
         || showAddCard || showCSVImport || showListOperation || selectedCard != nil || isDeleted
     }
@@ -54,24 +56,19 @@ struct DeckDetailView: View {
         .cardDeleteUndo(scope: .deck(deck.id), name: deck.name, blocked: undoIsBlocked)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(isSelecting)
+        .navigationBarBackButtonHidden(selection.isSelecting)
         .toolbarBackground(Color.dsBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
         .toolbar { if !isDeleted { topToolbar } }
-        .sheet(isPresented: $showCopyMoveSheet) {
-            CopyMoveSheet(items: deck.items.filter { selectedItems.contains($0.id) }) { _ in
-                exitSelecting()
+        .sheet(item: $selection.transferRequest) { request in
+            CardTransferSheet(items: request.items, operation: request.operation) { _ in
+                if request.isBulk { exitSelecting() }
             }
         }
-        .sheet(item: $contextTransferItem) { item in
-            CopyMoveSheet(items: [item]) { _ in
-                contextTransferItem = nil
-            }
-        }
-        .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete \(selection.selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -124,12 +121,12 @@ struct DeckDetailView: View {
     @ToolbarContentBuilder
     private var topToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            if isSelecting {
+            if selection.isSelecting {
                 Button("Select All") { selectAll() }
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            if isSelecting {
+            if selection.isSelecting {
                 Menu {
                     ExportMenuContent(items: deck.items, name: deck.name, exportFile: $exportFile)
                 } label: {
@@ -186,7 +183,7 @@ private extension DeckDetailView {
     }
 
     var cardListWithToolbar: some View {
-        List(selection: $selectedItems) {
+        List(selection: $selection.selectedItems) {
             Section {
                 ForEach(displayedItems) { cardRowView(for: $0) }
                     .listRowInsets(EdgeInsets())
@@ -202,16 +199,16 @@ private extension DeckDetailView {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.dsBackground)
-        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .environment(\.editMode, selection.isSelecting ? .constant(.active) : .constant(.inactive))
         .safeAreaInset(edge: .top, spacing: 0) { cardListHeader }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isSelecting { bottomActionBar }
+            if selection.isSelecting { bottomActionBar }
         }
     }
 
     @ViewBuilder
     var cardListHeader: some View {
-        if !isSelecting {
+        if !selection.isSelecting {
             VStack(spacing: 0) {
                 if showSearch {
                     ListSearchField(text: $filterState.searchText)
@@ -230,13 +227,13 @@ private extension DeckDetailView {
 
     @ViewBuilder
     func cardRowView(for item: CollectionItem) -> some View {
-        if isSelecting {
+        if selection.isSelecting {
             CollectionItemRow(item: item)
         } else {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onTransfer: { contextTransferItem = item },
+                onTransfer: { selection.transferRequest = CardTransferRequest(items: [item], operation: $0) },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -256,31 +253,17 @@ private extension DeckDetailView {
 
 // MARK: - Bottom Action Bar
 
-private extension DeckDetailView {
+extension DeckDetailView {
     var bottomActionBar: some View {
-        HStack {
-            actionButton("doc.on.doc", "Copy/Move") { showCopyMoveSheet = true }
-            Spacer()
-            actionButton("trash", "Delete", role: .destructive) { showDeleteConfirmation = true }
-        }
-        .padding(.horizontal, 30)
-        .padding(.vertical, 12)
-        .background(.bar)
-    }
-
-    func actionButton(
-        _ icon: String, _ label: String, role: ButtonRole? = nil, action: @escaping () -> Void
-    ) -> some View {
-        Button(role: role) {
-            guard !selectedItems.isEmpty else { return }
-            action()
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                Text(label).font(.caption2)
-            }
-        }
-        .disabled(selectedItems.isEmpty)
+        CardSelectionActionBar(
+            isEmpty: selection.selectedItems.isEmpty,
+            onTransfer: {
+                selection.transferRequest = CardTransferRequest(
+                    items: deck.items.filter { selection.selectedItems.contains($0.id) }, operation: $0, isBulk: true
+                )
+            },
+            onDelete: { showDeleteConfirmation = true }
+        )
     }
 }
 
@@ -290,21 +273,21 @@ extension DeckDetailView {
     func enterSelecting() {
         showSearch = false
         filterState.searchText = ""
-        selectedItems = []
-        isSelecting = true
+        selection.selectedItems = []
+        selection.isSelecting = true
     }
 
     func exitSelecting() {
-        isSelecting = false
-        selectedItems = []
+        selection.isSelecting = false
+        selection.selectedItems = []
     }
 
     func selectAll() {
-        selectedItems = Set(displayedItems.map(\.id))
+        selection.selectedItems = Set(displayedItems.map(\.id))
     }
 
     func deleteSelectedItems() {
-        let items = deck.items.filter { selectedItems.contains($0.id) }
+        let items = deck.items.filter { selection.selectedItems.contains($0.id) }
         registerUndo(for: items)
         for item in items {
             modelContext.delete(item)

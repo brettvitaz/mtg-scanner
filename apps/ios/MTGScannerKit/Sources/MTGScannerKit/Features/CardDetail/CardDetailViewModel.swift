@@ -16,6 +16,7 @@ final class CardDetailViewModel {
     var selectedPrinting: CardPrinting?
     var cardPrice: CardPrice?
     var isLoadingPrice = false
+    var transferOperation: CardTransferOperation?
 
     // Editable correction fields
     var editTitle: String

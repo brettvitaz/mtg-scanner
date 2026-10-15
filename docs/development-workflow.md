@@ -56,6 +56,7 @@ git remote set-head origin -a
 ### iOS
 - Start by editing the Swift files under `apps/ios/MTGScannerKit/Sources/MTGScannerKit/`.
 - Keep UI state and network logic simple and obvious.
+- Transfer interaction tests use ViewInspector, a test-only Swift package dependency, to invoke production SwiftUI controls and check selection handling. Run them with `make ios-test`; the app target does not depend on ViewInspector.
 - iPhone uses portrait throughout the app, including scanning, sheets, and fullscreen card artwork. iPad supports portrait and landscape left/right. The orientation policy lives in the app shell’s `Info.plist`; camera sensor buffers and imported images retain their existing orientation handling.
 - Avoid introducing package managers or generated project complexity until the app shape stabilizes.
 
@@ -156,7 +157,7 @@ In Results, collections, and decks, hold a card row to preview a large full-card
 image. The successful preview omits repeated collection details. Missing or failed
 artwork shows compact card identification; loading uses the same portrait frame.
 VoiceOver retains card identity, printing, finish, and artwork status. Tap the
-preview to open card detail, or choose Copy/Move, Set as Foil / Set as Non-Foil,
+preview to open card detail, or choose Copy…, Move…, Set as Foil / Set as Non-Foil,
 or Delete. Delete retains its confirmation and foil changes retain existing duplicate handling.
 Previews are disabled during multiselect. Native menu appearance follows the
 installed OS; iOS 18 remains supported.

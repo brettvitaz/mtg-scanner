@@ -67,6 +67,56 @@ final class PriceFilterNavigationTests: XCTestCase {
         XCTAssertEqual(app.textFields["Max Buylist"].value as? String, "3.00")
     }
 
+    func testEachClearButtonEmptiesOnlyItsFieldAndKeepsEditing() {
+        continueAfterFailure = false
+        let app = launch("pricing-filter-editing")
+        defer { app.terminate() }
+        let labels = ["Min Retail", "Max Retail", "Min Buylist", "Max Buylist"]
+        for (index, label) in labels.enumerated() {
+            let field = app.textFields[label]
+            if index > 0 { field.typeText("2") }
+            let clear = app.buttons["Clear " + label]
+            XCTAssertTrue(clear.waitForExistence(timeout: 3))
+            clear.tap()
+            XCTAssertEqual(field.value as? String, "Any")
+            XCTAssertTrue(clear.waitForNonExistence(timeout: 3))
+            field.typeText("3")
+            XCTAssertEqual(field.value as? String, "3")
+            XCTAssertTrue(clear.exists)
+            if index < 3 { app.buttons["price-next"].tap() }
+        }
+        XCTAssertEqual(app.textFields["Min Retail"].value as? String, "3.00")
+        XCTAssertEqual(app.textFields["Max Retail"].value as? String, "3.00")
+        XCTAssertEqual(app.textFields["Min Buylist"].value as? String, "3.00")
+    }
+
+    func testClearRemovesInvalidDraftErrorAndKeepsKeyboardOpen() {
+        continueAfterFailure = false
+        let app = launch("pricing-filter-invalid")
+        defer { app.terminate() }
+        XCTAssertTrue(error(in: app).waitForExistence(timeout: 5))
+        app.buttons["Clear Min Retail"].tap()
+        XCTAssertTrue(error(in: app).waitForNonExistence(timeout: 3))
+        XCTAssertEqual(app.textFields["Min Retail"].value as? String, "Any")
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        app.textFields["Min Retail"].typeText(".50")
+        XCTAssertEqual(app.textFields["Min Retail"].value as? String, ".50")
+    }
+
+    func testClearingAnotherFieldMovesEditingToThatField() {
+        continueAfterFailure = false
+        let app = launch("pricing-filter-editing")
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["price-next"].waitForExistence(timeout: 5))
+        app.buttons["price-next"].tap()
+        app.textFields["Max Retail"].typeText("2")
+        app.buttons["price-next"].tap()
+        app.buttons["Clear Max Retail"].tap()
+        app.textFields["Max Retail"].typeText("4")
+        XCTAssertEqual(app.textFields["Max Retail"].value as? String, "4")
+        XCTAssertEqual(app.textFields["Min Retail"].value as? String, "0.50")
+    }
+
     private func launch(_ route: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-UI_PREVIEW_ROUTE", route]

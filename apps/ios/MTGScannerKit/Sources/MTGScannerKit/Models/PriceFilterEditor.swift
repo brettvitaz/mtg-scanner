@@ -100,6 +100,12 @@ final class PriceFilterEditor {
         return invalid.isEmpty
     }
 
+    func clear(_ field: Field) {
+        drafts[field] = ""
+        commit(field)
+        focusedField = field
+    }
+
     func reset() {
         filterState.reset()
         drafts = Dictionary(uniqueKeysWithValues: Field.allCases.map { ($0, "") })

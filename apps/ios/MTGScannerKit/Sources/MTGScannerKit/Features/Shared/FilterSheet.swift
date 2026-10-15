@@ -247,6 +247,9 @@ struct FilterSheet: View {
                     .focused($focusedPrice, equals: field)
                     .submitLabel(field.next == nil ? .done : .next)
                     .onSubmit { priceEditor.submit() }
+                if !(priceEditor.drafts[field] ?? "").isEmpty {
+                    clearPriceButton(field)
+                }
             }
             if let error = priceEditor.errors[field] {
                 Text(error)
@@ -255,6 +258,20 @@ struct FilterSheet: View {
                     .accessibilityLabel("\(field.rawValue): \(error)")
             }
         }
+    }
+
+    private func clearPriceButton(_ field: PriceFilterEditor.Field) -> some View {
+        Button {
+            priceEditor.clear(field)
+            focusedPrice = field
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Clear \(field.rawValue)")
+        .foregroundStyle(.secondary)
+        .buttonStyle(.plain)
     }
 
     private func colorBackground(_ color: ColorFilter) -> Color {

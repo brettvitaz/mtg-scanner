@@ -111,6 +111,60 @@ final class PriceFilterEditorTests: XCTestCase {
         XCTAssertEqual(reopened.drafts[.maxRetail], "")
     }
 
+    func testClearEachFieldRemovesItsDraftAndBoundWhilePreservingOtherFilters() {
+        for field in PriceFilterEditor.Field.allCases {
+            let state = CardFilterState()
+            for candidate in PriceFilterEditor.Field.allCases { state[keyPath: candidate.bound] = 7 }
+            state.foilOnly = true
+            let editor = PriceFilterEditor(filterState: state, locale: Locale(identifier: "en_US"))
+            editor.drafts[field] = "9.50"
+            editor.clear(field)
+            XCTAssertEqual(editor.drafts[field], "")
+            XCTAssertNil(state[keyPath: field.bound])
+            XCTAssertNil(editor.errors[field])
+            XCTAssertEqual(editor.focusedField, field)
+            XCTAssertTrue(state.foilOnly)
+            for other in PriceFilterEditor.Field.allCases where other != field {
+                XCTAssertEqual(state[keyPath: other.bound], 7)
+                XCTAssertEqual(editor.drafts[other], "7.00")
+            }
+        }
+    }
+
+    func testClearInvalidEntryRemovesItsErrorAndPreservesOtherErrors() {
+        let state = CardFilterState()
+        state.priceRetailMin = 7
+        state.priceRetailMax = 9
+        let editor = PriceFilterEditor(filterState: state)
+        editor.drafts[.minRetail] = "bad"
+        editor.drafts[.maxRetail] = "also bad"
+        XCTAssertFalse(editor.commit(.minRetail))
+        XCTAssertFalse(editor.commit(.maxRetail))
+        editor.clear(.minRetail)
+        XCTAssertEqual(editor.drafts[.minRetail], "")
+        XCTAssertNil(editor.errors[.minRetail])
+        XCTAssertNil(state.priceRetailMin)
+        XCTAssertEqual(editor.drafts[.maxRetail], "also bad")
+        XCTAssertNotNil(editor.errors[.maxRetail])
+        XCTAssertEqual(state.priceRetailMax, 9)
+        XCTAssertEqual(editor.focusedField, .minRetail)
+    }
+
+    func testClearAnotherFieldFocusesItWithoutCommittingThePreviousDraft() {
+        let state = CardFilterState()
+        state.priceRetailMin = 7
+        state.priceRetailMax = 9
+        let editor = PriceFilterEditor(filterState: state)
+        editor.move(to: .minRetail)
+        editor.drafts[.minRetail] = "10"
+        editor.clear(.maxRetail)
+        XCTAssertEqual(editor.focusedField, .maxRetail)
+        XCTAssertNil(state.priceRetailMax)
+        XCTAssertEqual(editor.drafts[.maxRetail], "")
+        XCTAssertEqual(state.priceRetailMin, 7)
+        XCTAssertEqual(editor.drafts[.minRetail], "10")
+    }
+
     func testResetClearsDraftsErrorsNumericBoundsAndOtherFilters() {
         let state = CardFilterState()
         state.foilOnly = true

@@ -26,6 +26,9 @@ text unchanged while typing. Leaving a field formats valid input to two decimal
 places using the current locale, without a currency symbol. An empty field removes
 that bound. Invalid entries remain visible with an inline error and keep the last
 valid bound; correct or clear them before continuing or closing with Done.
+Each nonempty price field has an × button that immediately clears its text, error,
+and bound. Focus stays in the cleared field with the keyboard open. Other price
+bounds and filters are preserved.
 
 The keyboard toolbar moves through Min Retail, Max Retail, Min Buylist, and Max
 Buylist with Previous/Next arrows. Its checkmark completes the current entry and

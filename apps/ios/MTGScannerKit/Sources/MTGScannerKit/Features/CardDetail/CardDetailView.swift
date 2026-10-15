@@ -9,11 +9,14 @@ struct CardDetailView: View {
     @State private var showFullscreenImage = false
     @State private var showEditor = false
     @State private var showAddToSheet = false
-    @State private var transferOperation: CardTransferOperation?
     @State private var addedMessage: String?
 
     init(card: RecognizedCard) {
-        _viewModel = State(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
+        self.init(viewModel: CardDetailViewModel(card: card, cropImage: nil))
+    }
+
+    init(viewModel: CardDetailViewModel) {
+        _viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {
@@ -55,7 +58,7 @@ struct CardDetailView: View {
         .sheet(isPresented: $showAddToSheet) {
             MoveToSheet(title: "Add To") { destination in addCardTo(destination) }
         }
-        .sheet(item: $transferOperation) { operation in
+        .sheet(item: $viewModel.transferOperation) { operation in
             if let item = storedItem {
                 let sourceID = item.id
                 CardTransferSheet(items: [item], operation: operation) { result in
@@ -195,7 +198,7 @@ struct CardDetailView: View {
     private func transferButton(
         _ title: String, symbol: String, operation: CardTransferOperation
     ) -> some View {
-        Button { transferOperation = operation } label: {
+        Button { viewModel.transferOperation = operation } label: {
             Label(title, systemImage: symbol)
                 .frame(maxWidth: .infinity, minHeight: 44)
         }

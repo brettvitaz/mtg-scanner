@@ -37,12 +37,16 @@ struct CardDestinationSections: View {
             }
         }
         .alert("New Collection", isPresented: $showNewCollection) {
-            newNameAlert { onSelect(.collection(CardCollection(name: $0))) }
+            newNameAlert(onCreate: createCollection)
         }
         .alert("New Deck", isPresented: $showNewDeck) {
-            newNameAlert { onSelect(.deck(Deck(name: $0))) }
+            newNameAlert(onCreate: createDeck)
         }
     }
+
+    func createCollection(named name: String) { onSelect(.collection(CardCollection(name: name))) }
+
+    func createDeck(named name: String) { onSelect(.deck(Deck(name: name))) }
 
     private func destinationButton(_ destination: MoveDestination, symbol: String) -> some View {
         Button { onSelect(destination) } label: {

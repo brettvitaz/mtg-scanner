@@ -69,7 +69,7 @@ struct CardTransferSheet: View {
                     .frame(minHeight: 44)
                 }
                 .foregroundStyle(.primary)
-                .accessibilityLabel("Destination, \(model.destination?.name ?? "Choose Collection or Deck")")
+                .accessibilityLabel("Destination, \(destinationDescription)")
             }
             Section {
                 Text(model.summary)
@@ -95,6 +95,11 @@ struct CardTransferSheet: View {
         .disabled(!model.canSubmit)
         .padding()
         .background(.bar)
+    }
+
+    private var destinationDescription: String {
+        guard let destination = model.destination else { return "Choose Collection or Deck" }
+        return "\(destination.name), \(destination.typeName)"
     }
 }
 

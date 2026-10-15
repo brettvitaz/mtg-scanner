@@ -5,6 +5,10 @@ import UIKit
 public struct ResultsView: View {
     public init() {}
 
+    init(selection: CardListSelectionState) {
+        _selection = State(initialValue: selection)
+    }
+
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @Query(
@@ -14,9 +18,7 @@ public struct ResultsView: View {
     )
     private var inboxItems: [CollectionItem]
 
-    @State private var isSelecting = false
-    @State private var selectedItems: Set<UUID> = []
-    @State private var transferRequest: CardTransferRequest?
+    @State private var selection = CardListSelectionState()
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
@@ -25,7 +27,7 @@ public struct ResultsView: View {
     @State private var showSearch = false
 
     private var undoIsBlocked: Bool {
-        transferRequest != nil || showDeleteConfirmation
+        selection.transferRequest != nil || showDeleteConfirmation
         || contextDeleteItem != nil || exportFile != nil || showFilterSheet
         || !appModel.resultsNavigationPath.isEmpty
     }
@@ -50,7 +52,7 @@ public struct ResultsView: View {
             .cardDeleteUndo(scope: .results, name: "Results", blocked: undoIsBlocked)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(isSelecting)
+            .navigationBarBackButtonHidden(selection.isSelecting)
             .toolbarBackground(Color.dsBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar { topToolbar }
@@ -59,12 +61,12 @@ public struct ResultsView: View {
                     .environment(appModel)
             }
         }
-        .sheet(item: $transferRequest) { request in
+        .sheet(item: $selection.transferRequest) { request in
             CardTransferSheet(items: request.items, operation: request.operation) { _ in
                 if request.isBulk { exitSelecting() }
             }
         }
-        .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete \(selection.selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -118,7 +120,7 @@ public struct ResultsView: View {
     // MARK: - Card List
 
     private var cardListWithToolbar: some View {
-        List(selection: $selectedItems) {
+        List(selection: $selection.selectedItems) {
             Section {
                 ForEach(displayedItems) { cardRowView(for: $0) }
                     .listRowInsets(EdgeInsets())
@@ -134,16 +136,16 @@ public struct ResultsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.dsBackground)
-        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .environment(\.editMode, selection.isSelecting ? .constant(.active) : .constant(.inactive))
         .safeAreaInset(edge: .top, spacing: 0) { cardListHeader }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isSelecting { bottomActionBar }
+            if selection.isSelecting { bottomActionBar }
         }
     }
 
     @ViewBuilder
     private var cardListHeader: some View {
-        if !isSelecting {
+        if !selection.isSelecting {
             VStack(spacing: 0) {
                 if showSearch {
                     ListSearchField(text: $filterState.searchText)
@@ -162,12 +164,12 @@ public struct ResultsView: View {
 
     @ViewBuilder
     private func cardRowView(for item: CollectionItem) -> some View {
-        if isSelecting {
+        if selection.isSelecting {
             CollectionItemRow(item: item)
         } else {
             CollectionItemRow(
                 item: item,
-                onTransfer: { transferRequest = CardTransferRequest(items: [item], operation: $0) },
+                onTransfer: { selection.transferRequest = CardTransferRequest(items: [item], operation: $0) },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -183,12 +185,12 @@ public struct ResultsView: View {
     @ToolbarContentBuilder
     private var topToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            if isSelecting {
+            if selection.isSelecting {
                 Button("Select All") { selectAll() }
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            if isSelecting {
+            if selection.isSelecting {
                 Menu {
                     ExportMenuContent(items: inboxItems, name: "results", exportFile: $exportFile)
                 } label: {
@@ -223,13 +225,13 @@ public struct ResultsView: View {
 
 // MARK: - Bottom Action Bar
 
-private extension ResultsView {
+extension ResultsView {
     var bottomActionBar: some View {
         CardSelectionActionBar(
-            isEmpty: selectedItems.isEmpty,
+            isEmpty: selection.selectedItems.isEmpty,
             onTransfer: {
-                transferRequest = CardTransferRequest(
-                    items: inboxItems.filter { selectedItems.contains($0.id) }, operation: $0, isBulk: true
+                selection.transferRequest = CardTransferRequest(
+                    items: inboxItems.filter { selection.selectedItems.contains($0.id) }, operation: $0, isBulk: true
                 )
             },
             onToggleFoil: toggleSelectedFoil,
@@ -244,21 +246,21 @@ private extension ResultsView {
     func enterSelecting() {
         showSearch = false
         filterState.searchText = ""
-        selectedItems = []
-        isSelecting = true
+        selection.selectedItems = []
+        selection.isSelecting = true
     }
 
     func exitSelecting() {
-        isSelecting = false
-        selectedItems = []
+        selection.isSelecting = false
+        selection.selectedItems = []
     }
 
     func selectAll() {
-        selectedItems = Set(displayedItems.map(\.id))
+        selection.selectedItems = Set(displayedItems.map(\.id))
     }
 
     func deleteSelectedItems() {
-        let items = inboxItems.filter { selectedItems.contains($0.id) }
+        let items = inboxItems.filter { selection.selectedItems.contains($0.id) }
         registerUndo(for: items)
         for item in items {
             modelContext.delete(item)
@@ -279,7 +281,7 @@ private extension ResultsView {
     }
 
     func toggleSelectedFoil() {
-        let items = inboxItems.filter { selectedItems.contains($0.id) }
+        let items = inboxItems.filter { selection.selectedItems.contains($0.id) }
         for item in items {
             item.toggleFoilUnconditionally()
         }

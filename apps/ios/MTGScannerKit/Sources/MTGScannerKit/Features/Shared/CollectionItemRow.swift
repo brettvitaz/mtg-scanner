@@ -34,16 +34,19 @@ struct CollectionItemRow: View {
             }
             .accessibilityElement(children: showQuantityStepper ? .contain : .ignore)
             .accessibilityLabel(accessibilitySummary)
-            .accessibilityActions {
-                if let onTransfer {
-                    Button("Copy…") { onTransfer(.copy) }
-                    Button("Move…") { onTransfer(.move) }
-                }
-                if let onToggleFoil {
-                    Button(item.foil ? "Set as Non-Foil" : "Set as Foil", action: onToggleFoil)
-                }
-                if let onDelete { Button("Delete", role: .destructive, action: onDelete) }
-            }
+            .accessibilityActions { accessibilityButtons }
+    }
+
+    @ViewBuilder
+    var accessibilityButtons: some View {
+        if let onTransfer {
+            Button("Copy…") { onTransfer(.copy) }
+            Button("Move…") { onTransfer(.move) }
+        }
+        if let onToggleFoil {
+            Button(item.foil ? "Set as Non-Foil" : "Set as Foil", action: onToggleFoil)
+        }
+        if let onDelete { Button("Delete", role: .destructive, action: onDelete) }
     }
 }
 

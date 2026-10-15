@@ -6,15 +6,15 @@ import XCTest
 final class AutoScanCaptureLifecycleTests: XCTestCase {
     private let box = CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6)
 
-    func testManualCaptureWhileStoppedEnqueuesWithoutStartingOrCalibrating() async {
+    func testManualCaptureWhileStoppedEnqueuesWithoutStartingOrCalibrating() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
         vm.captureManually()
         XCTAssertFalse(vm.canCaptureManually)
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertFalse(vm.isActive)
         XCTAssertFalse(vm.isCalibrated)
@@ -23,51 +23,49 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         XCTAssertTrue(vm.statusMessage.contains("Tap Start"))
     }
 
-    func testManualCaptureWhileWatchingResumesAndAcceptsNextCard() async {
+    func testManualCaptureWhileWatchingResumesAndAcceptsNextCard() async throws {
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: makeQueue(), camera: camera)
         vm.start()
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertTrue(vm.isActive)
         XCTAssertEqual(vm.captureState, .watching)
         vm.captureDelay = 60
         vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
-        await Task.yield()
-        await Task.yield()
+        try await waitUntil("Card did not enter settling") { vm.captureState == .settling }
         XCTAssertEqual(vm.captureState, .settling)
         vm.stop()
     }
 
-    func testManualCaptureOverridesSettlingAndRepeatedTapsCaptureOnce() async {
+    func testManualCaptureOverridesSettlingAndRepeatedTapsCaptureOnce() async throws {
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: makeQueue(), camera: camera)
-        vm.captureDelay = 0.01
+        vm.captureDelay = 60
         vm.start()
         vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
-        await Task.yield()
-        await Task.yield()
+        try await waitUntil("Card did not enter settling") { vm.captureState == .settling }
         XCTAssertEqual(vm.captureState, .settling)
         vm.captureManually()
         vm.captureManually()
-        await waitForPhoto(camera)
-        try? await Task.sleep(for: .milliseconds(50))
+        try await waitForPhoto(camera)
+        XCTAssertEqual(vm.captureState, .capturing)
         XCTAssertEqual(camera.callCount, 1)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(camera.callCount, 1)
         vm.stop()
     }
 
-    func testStopRestartDiscardsOutstandingPhotoAndHoldsCaptureLock() async {
+    func testStopRestartDiscardsOutstandingPhotoAndHoldsCaptureLock() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
         vm.start()
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         vm.stop()
         vm.start()
         let restartedStatus = vm.statusMessage
@@ -75,22 +73,29 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         XCTAssertFalse(vm.canCaptureManually)
         XCTAssertEqual(camera.callCount, 1)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertNil(vm.lastCroppedImage)
         XCTAssertNil(vm.detectionZone)
         XCTAssertEqual(vm.statusMessage, restartedStatus)
         XCTAssertTrue(vm.isActive)
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         vm.stop()
     }
 
-    func testOldSignalCannotSettleRestartedSessionAndStartIsIdempotent() async {
+    func testOldSignalCannotSettleRestartedSessionAndStartIsIdempotent() async throws {
         let vm = AutoScanViewModel(detector: nil)
+        let unexpectedCapture = expectation(description: "Old signal must not capture")
+        unexpectedCapture.isInverted = true
+        vm.captureDelay = 0
+        vm.captureFocusedPhoto = { _ in
+            unexpectedCapture.fulfill()
+            return .failure(.unavailable)
+        }
         vm.start()
         let oldSession = vm.scanSessionID
         vm.stop()
@@ -99,35 +104,34 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         vm.start()
         XCTAssertEqual(vm.scanSessionID, newSession)
         vm.presenceTracker.onNewCardSignal?(box, oldSession)
-        await Task.yield()
-        await Task.yield()
+        await fulfillment(of: [unexpectedCapture], timeout: 0.05)
         XCTAssertEqual(vm.captureState, .watching)
+        vm.captureDelay = 60
         vm.presenceTracker.onNewCardSignal?(box, newSession)
-        await Task.yield()
-        await Task.yield()
+        try await waitUntil("Card did not enter settling") { vm.captureState == .settling }
         XCTAssertEqual(vm.captureState, .settling)
         vm.stop()
     }
 
-    func testFailedManualCaptureCanBeRetriedWhileStopped() async {
+    func testFailedManualCaptureCanBeRetriedWhileStopped() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         camera.finish(nil)
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertTrue(vm.statusMessage.contains("retry"))
         XCTAssertFalse(vm.isActive)
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
     }
 
-    func testStopRestartDuringCropDiscardsCalibrationPreviewAndRecognition() async {
+    func testStopRestartDuringCropDiscardsCalibrationPreviewAndRecognition() async throws {
         let queue = makeQueue()
         let crop = SuspendedCrop()
         let payload = makePayload()
@@ -139,16 +143,11 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         )
         vm.start()
         vm.captureManually()
-        for _ in 0..<1000 {
-            if await crop.hasStarted { break }
-            await Task.yield()
-        }
-        let hasStarted = await crop.hasStarted
-        XCTAssertTrue(hasStarted)
+        try await waitUntil("Crop did not start") { await crop.hasStarted }
         vm.stop()
         vm.start()
         await crop.finish(payload.displayImage)
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertNil(vm.lastCroppedImage)
         XCTAssertFalse(vm.isCalibrated)
@@ -157,7 +156,7 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         vm.stop()
     }
 
-    func testManualCaptureUsesCropAndCalibratesOnlyWhileActive() async {
+    func testManualCaptureUsesCropAndCalibratesOnlyWhileActive() async throws {
         let queue = makeQueue()
         let payload = makePayload()
         let detectedBox = box
@@ -171,7 +170,7 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         )
         vm.start()
         vm.captureManually()
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertNotNil(vm.lastCroppedImage)
         XCTAssertTrue(vm.isCalibrated)
@@ -179,7 +178,7 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         vm.stop()
     }
 
-    func testStoppedManualCaptureUsesCropWithoutCalibration() async {
+    func testStoppedManualCaptureUsesCropWithoutCalibration() async throws {
         let queue = makeQueue()
         let payload = makePayload()
         let detectedBox = box
@@ -189,7 +188,7 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
             cropImage: { image, _ in CardCropResult(crops: [image], detectedCount: 1) }
         )
         vm.captureManually()
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertNotNil(vm.lastCroppedImage)
         XCTAssertFalse(vm.isCalibrated)
@@ -197,7 +196,7 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         XCTAssertFalse(vm.isActive)
     }
 
-    func testRestartedAutomaticSignalCapturesOnceAfterDelay() async {
+    func testRestartedAutomaticSignalCapturesOnceAfterDelay() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
@@ -207,16 +206,16 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         vm.stop()
         vm.start()
         vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         XCTAssertEqual(camera.callCount, 1)
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertEqual(vm.captureState, .watching)
         vm.stop()
     }
 
-    func testFullPhotoFallbackPreservesOriginalUploadBytes() async {
+    func testFullPhotoFallbackPreservesOriginalUploadBytes() async throws {
         let payload = makePayload()
         let recognized = expectation(description: "Full photo recognized")
         let queue = RecognitionQueue(
@@ -236,17 +235,17 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         )
         vm.captureManually()
         await fulfillment(of: [recognized], timeout: 1)
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertFalse(vm.isActive)
     }
 
-    func testFocusConfigurationFailureSkipsUploadAndAllowsManualRetry() async {
+    func testFocusConfigurationFailureSkipsUploadAndAllowsManualRetry() async throws {
         let queue = makeQueue()
         let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
         vm.captureFocusedPhoto = { _ in .failure(.focusConfigurationFailed) }
         vm.start()
         vm.captureManually()
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertNil(vm.lastCroppedImage)
         XCTAssertEqual(vm.captureState, .watching)
@@ -255,12 +254,12 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         let payload = makePayload()
         vm.captureFocusedPhoto = { _ in .success(payload) }
         vm.captureManually()
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         vm.stop()
     }
 
-    func testSignalTargetsCardAndResetClearsFocusPoint() async {
+    func testSignalTargetsCardAndResetClearsFocusPoint() async throws {
         let queue = makeQueue()
         let vm = AutoScanViewModel(detectorProvider: { nil }, recognitionQueue: queue)
         vm.captureDelay = 0
@@ -274,7 +273,7 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         vm.start()
         vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
         await fulfillment(of: [focused], timeout: 1)
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertNotNil(vm.captureFocusPoint)
         vm.stop()
         XCTAssertNil(vm.captureFocusPoint)
@@ -306,65 +305,65 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
         return .cameraCapture(image: image, data: Data([0xFF, 0xD8, 0xFF, 0xD9]))
     }
 
-    private func waitForPhoto(_ camera: SuspendedPhotoCapture) async {
-        for _ in 0..<1000 {
-            if camera.isWaiting { return }
-            await Task.yield()
-        }
-        XCTFail("Photo capture did not start")
+    private func waitForPhoto(_ camera: SuspendedPhotoCapture) async throws {
+        try await waitUntil("Photo capture did not start") { camera.isWaiting }
     }
 
-    private func waitForCapture(_ vm: AutoScanViewModel) async {
-        for _ in 0..<1000 {
-            if vm.canCaptureManually { return }
-            await Task.yield()
+    private func waitForCapture(_ vm: AutoScanViewModel) async throws {
+        try await waitUntil("Capture did not complete") { vm.canCaptureManually }
+    }
+
+    private func waitUntil(_ message: String, condition: () async -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(3)
+        while ContinuousClock.now < deadline {
+            if await condition() { return }
+            try await Task.sleep(for: .milliseconds(10))
         }
-        XCTFail("Capture did not complete")
+        throw WaitTimeout(message: message)
     }
 }
 
 // MARK: - Navigation lifecycle
 
 extension AutoScanCaptureLifecycleTests {
-    func testNavigationPauseFinishesPhotoWithoutRestartingScanning() async {
+    func testNavigationPauseFinishesPhotoWithoutRestartingScanning() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
         vm.start()
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         vm.pauseForNavigation()
         vm.pauseForNavigation()
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertFalse(vm.isActive)
         XCTAssertNil(vm.lastCroppedImage)
         XCTAssertFalse(vm.isCalibrated)
     }
 
-    func testNavigationPauseDuringCropPreservesUploadAcrossRestart() async {
+    func testNavigationPauseDuringCropPreservesUploadAcrossRestart() async throws {
         let queue = makeQueue()
         let crop = SuspendedCrop()
         let payload = makePayload()
         let detectedBox = box
         let vm = AutoScanViewModel(
             detectorProvider: { nil }, recognitionQueue: queue,
-            capturePhoto: { payload }, detectBox: { _ in detectedBox },
+            capturePhoto: { payload }, detectBox: { _ in
+                // Detection can finish well after the test task has yielded many times.
+                try? await Task.sleep(for: .milliseconds(500))
+                return detectedBox
+            },
             cropImage: { _, _ in await crop.run() }
         )
         vm.start()
         vm.captureManually()
-        for _ in 0..<1000 {
-            if await crop.hasStarted { break }
-            await Task.yield()
-        }
-        let started = await crop.hasStarted
-        XCTAssertTrue(started)
+        try await waitUntil("Crop did not start") { await crop.hasStarted }
         vm.pauseForNavigation()
         vm.start()
         await crop.finish(payload.displayImage)
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertNil(vm.lastCroppedImage)
         XCTAssertFalse(vm.isCalibrated)
@@ -372,14 +371,13 @@ extension AutoScanCaptureLifecycleTests {
         vm.stop()
     }
 
-    func testNavigationPauseCancelsSettlingWithoutTakingPhoto() async {
+    func testNavigationPauseCancelsSettlingWithoutTakingPhoto() async throws {
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: makeQueue(), camera: camera)
         vm.captureDelay = 60
         vm.start()
         vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
-        await Task.yield()
-        await Task.yield()
+        try await waitUntil("Card did not enter settling") { vm.captureState == .settling }
         XCTAssertEqual(vm.captureState, .settling)
         vm.pauseForNavigation()
         XCTAssertFalse(vm.isActive)
@@ -387,35 +385,35 @@ extension AutoScanCaptureLifecycleTests {
         XCTAssertEqual(camera.callCount, 0)
     }
 
-    func testExplicitStopAfterNavigationDiscardsPreservedPhoto() async {
+    func testExplicitStopAfterNavigationDiscardsPreservedPhoto() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
         vm.start()
         vm.captureManually()
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         vm.pauseForNavigation()
         vm.stop()
         vm.start()
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 0)
         XCTAssertNil(vm.lastCroppedImage)
         XCTAssertTrue(vm.isActive)
         vm.stop()
     }
 
-    func testNavigationPauseAllowsAutomaticCaptureTaskToFinish() async {
+    func testNavigationPauseAllowsAutomaticCaptureTaskToFinish() async throws {
         let queue = makeQueue()
         let camera = SuspendedPhotoCapture()
         let vm = makeViewModel(queue: queue, camera: camera)
         vm.captureDelay = 0
         vm.start()
         vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
-        await waitForPhoto(camera)
+        try await waitForPhoto(camera)
         vm.pauseForNavigation()
         camera.finish(makePayload())
-        await waitForCapture(vm)
+        try await waitForCapture(vm)
         XCTAssertEqual(queue.pendingCount, 1)
         XCTAssertFalse(vm.isActive)
         XCTAssertNil(vm.lastCroppedImage)
@@ -452,4 +450,8 @@ private actor SuspendedCrop {
         continuation?.resume(returning: CardCropResult(crops: [image], detectedCount: 1))
         continuation = nil
     }
+}
+
+private struct WaitTimeout: Error {
+    let message: String
 }

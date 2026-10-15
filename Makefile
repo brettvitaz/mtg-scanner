@@ -80,7 +80,9 @@ IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-em
 	list-deleted-collection list-deleted-deck \
 	csv-import-undo csv-import-ready csv-import-skipped csv-import-loading csv-import-error \
 	csv-import-empty csv-import-large csv-import-detail \
-	scan-count-zero scan-count-new scan-count-overflow scan-count-navigation
+	scan-count-zero scan-count-new scan-count-overflow scan-count-navigation \
+	result-scan-artwork result-scan-image result-scan-zoom result-scan-edit result-scan-missing \
+	collection-scan-excluded deck-scan-excluded
 
 ios-snapshot: ios-build
 	ROUTE=$${ROUTE:-settings} ./scripts/ios-screenshot.sh "$${ROUTE:-settings}"

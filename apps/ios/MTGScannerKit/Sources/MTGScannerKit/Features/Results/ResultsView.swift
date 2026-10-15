@@ -24,6 +24,7 @@ public struct ResultsView: View {
     @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showSearch = false
+    @State private var showFinishSaveError = false
 
     private var undoIsBlocked: Bool {
         showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
@@ -56,7 +57,7 @@ public struct ResultsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar { topToolbar }
             .navigationDestination(for: RecognizedCard.self) { card in
-                CardDetailView(card: card)
+                CardDetailView(card: card, resultScope: true)
                     .environment(appModel)
             }
         }
@@ -89,6 +90,11 @@ public struct ResultsView: View {
             Button("Cancel", role: .cancel) { contextDeleteItem = nil }
         } message: {
             Text("This card will be removed from Results.")
+        }
+        .alert("Could not save finish", isPresented: $showFinishSaveError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your changes could not be saved. Please try again.")
         }
         .sheet(item: $exportFile) { item in
             ShareSheet(activityItem: item)
@@ -294,16 +300,14 @@ private extension ResultsView {
     }
 
     func toggleFoil(_ item: CollectionItem) {
-        item.toggleFoilUnconditionally()
+        guard saveFinishChanges([item]) else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Task { await appModel.refreshPrice(for: item) }
     }
 
     func toggleSelectedFoil() {
         let items = inboxItems.filter { selectedItems.contains($0.id) }
-        for item in items {
-            item.toggleFoilUnconditionally()
-        }
+        guard saveFinishChanges(items) else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let fetchRequests = items.map { PriceFetchRequest(item: $0) }
         Task {
@@ -316,6 +320,18 @@ private extension ResultsView {
                 else { continue }
                 item.apply(price: price, matching: request)
             }
+        }
+    }
+
+    private func saveFinishChanges(_ items: [CollectionItem]) -> Bool {
+        do {
+            try ResultCorrectionSave.toggleFoil(items: items, context: modelContext, baseURL: appModel.apiBaseURL)
+            Task { await appModel.retryRecognitionFeedback() }
+            return true
+        } catch {
+            print("[Results] Could not save finish correction: \(error)")
+            showFinishSaveError = true
+            return false
         }
     }
 

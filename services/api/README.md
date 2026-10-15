@@ -150,3 +150,16 @@ Fixtures live in `samples/fixtures/` and expected results live in `samples/groun
 
 ## Notes
 `mock` remains the default provider for tests and local development. The real provider path is covered by tests with HTTP calls stubbed, so backend tests do not require network access or live API credentials.
+
+## Recognition feedback
+
+`POST /api/v1/recognition-feedback` accepts the versioned JSON feedback contract in
+`packages/schemas/v1/recognition-feedback-request.schema.json`. A request contains an
+event UUID, timestamp, original recognition, previous and corrected identifications,
+and a base64 JPEG scan (maximum edge 1,000 pixels).
+
+Events are stored atomically under the configured artifacts directory's
+`recognition-feedback/<event-uuid>/` folder as `scan.jpg` and `metadata.json`.
+Retries acknowledge the same UUID without replacing the original evidence. Storage
+failures return an error so the iOS outbox can retry. Evidence remains after a result
+is removed; no automatic cleanup, model training, or training-data management UI is included.

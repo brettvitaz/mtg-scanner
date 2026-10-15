@@ -92,8 +92,9 @@ See `docs/feature-workflow.md` for the preferred low-token workflow for feature 
 ### Recognition
 - `POST /api/v1/recognitions` — upload a single image for card recognition
 - `POST /api/v1/recognitions/batch` — upload multiple pre-cropped card images
+- `POST /api/v1/recognition-feedback` — persist an image-backed identification correction; retries with the same event UUID are acknowledged as duplicates
 
-Both return a `RecognitionResponse` containing a list of recognized cards. Each card includes identity fields (title, edition, collector number, foil) plus enriched metadata when the card matches the MTGJSON database:
+The two recognition endpoints return a `RecognitionResponse` containing a list of recognized cards. Each card includes identity fields (title, edition, collector number, foil) plus enriched metadata when the card matches the MTGJSON database:
 
 | Field | Description |
 |-------|-------------|
@@ -177,6 +178,35 @@ It does not survive relaunch or restore deleted collections or decks.
 ### Correcting card identities
 
 Open a card from Results, a collection, or a deck, then tap **Edit**. Use **Change Card** to search by name or **Change Printing** to select another edition. Choose the finish and tap **Save**. **Cancel** or dismissing the sheet discards the draft. Quantity stays unchanged. If the printing and finish already exist in the same collection or deck, confirm **Merge** to combine quantities, or cancel to keep editing. Results allows separate duplicate rows.
+
+Scanned Results retain their own card scan across scans and app restarts. Details open on
+**Artwork**; use the **Artwork / Scan** switch in details or the editor to compare the capture.
+Tap the scan to pinch zoom and pan around the collector number, then tap **Close**.
+Scans are JPEGs with a maximum long edge of 1,000 pixels, quality 85%, preserving the full
+crop and aspect ratio without upscaling. Older results, manual additions, and unusable or
+missing crops show artwork only and remain editable.
+
+Scans stay in Results: copies retain evidence on the original only, full moves remove it,
+and partial moves keep it with the remaining result. Deletion Undo restores the result's scan.
+Collections and decks never show scan controls.
+
+Saving an identification or finish change (including Results foil shortcuts) queues a training
+capture in the same local transaction. It includes the original recognition, previous and corrected
+identifications, timestamp, event UUID, and scan JPEG. Cancel, unchanged saves, quantity changes,
+and failed saves create no capture. Correction saving does not wait for upload. Pending captures
+survive restarts and result deletion, retry after correction saves and app activation, and retain
+the backend URL configured when each event was created. Acknowledged events leave the local outbox;
+failed uploads remain queued until a later retry.
+
+The feedback endpoint accepts JSON matching
+[`recognition-feedback-request.schema.json`](packages/schemas/v1/recognition-feedback-request.schema.json)
+and returns [`recognition-feedback-response.schema.json`](packages/schemas/v1/recognition-feedback-response.schema.json).
+The `scan_jpeg` field contains base64 JPEG data. The backend stores `scan.jpg` and `metadata.json`
+(original, previous, and corrected identification plus capture and server timestamps) under
+`<artifacts-dir>/recognition-feedback/<event-uuid>/`. Complete events are published atomically;
+duplicate submissions never overwrite the first event. Captures are retained independently of
+Results with no automatic backend cleanup. Actual model training and a training-data management
+interface are outside this feature.
 
 ### Importing CSV files
 

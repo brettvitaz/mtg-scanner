@@ -189,6 +189,7 @@ final class RecognitionQueue {
         guard let modelContext else { return }
         for card in result.cards {
             let item = CollectionItem(from: card, correction: nil)
+            item.attachResultEvidence(from: card)
             item.addedAt = capturedAt
             modelContext.insert(item)
             onCardIdentified?(card)

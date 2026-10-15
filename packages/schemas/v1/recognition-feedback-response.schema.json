@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recognition feedback acknowledgement",
+  "type": "object",
+  "required": [
+    "event_id",
+    "accepted",
+    "duplicate"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "accepted": {
+      "const": true
+    },
+    "duplicate": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

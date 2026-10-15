@@ -49,8 +49,6 @@ public final class AppModel {
     var lastUploadedFilename: String?
     /// Crops detected during the last capture, for display in the preview.
     var lastDetectedCrops: [UIImage] = []
-    /// Crop images keyed by the corresponding RecognizedCard.id.
-    var cardCropImages: [UUID: UIImage] = [:]
     var shouldShowResults = false
     private(set) var selectedTab = AppTab.scan
     private(set) var newlyScannedCardCount = 0
@@ -64,6 +62,7 @@ public final class AppModel {
     /// Torch level to restore when returning to scan view (same session only, not persisted)
     var lastTorchLevel: Float = 0
 
+    let feedbackUploader = RecognitionFeedbackUploader()
     private let apiClient = APIClient()
     private let cropService = CardCropService()
     private let correctionsStoreKey = "card_corrections"
@@ -106,6 +105,11 @@ public final class AppModel {
         let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
         self.exposureBias = storedBias ?? 0.0
         loadCorrections()
+    }
+
+    public func retryRecognitionFeedback() async {
+        guard let modelContext else { return }
+        await feedbackUploader.retry(context: modelContext)
     }
 
     // MARK: - Results badge
@@ -180,7 +184,6 @@ public final class AppModel {
 
         isRecognizing = true
         lastDetectedCrops = []
-        cardCropImages = [:]
         lastUploadedFilename = filename
 
         if onDeviceCropEnabled {
@@ -230,7 +233,6 @@ public final class AppModel {
                 crops: cropPairs,
                 baseURL: apiBaseURL
             )
-            associateCropsWithCards()
             statusMessage = "Recognition finished (\(cropPairs.count) crop(s)). Open Results to inspect."
         } catch {
             statusMessage = "Batch recognition failed: \(error.localizedDescription)"
@@ -247,33 +249,21 @@ public final class AppModel {
                 contentType: contentType,
                 baseURL: apiBaseURL
             )
-            associateCropsWithCards()
             statusMessage = "Recognition finished. Open Results to inspect the response."
         } catch {
             statusMessage = "Recognition failed: \(error.localizedDescription)"
         }
     }
 
-    private func associateCropsWithCards() {
-        for (index, card) in latestResult.cards.enumerated() {
-            if index < lastDetectedCrops.count {
-                cardCropImages[card.id] = lastDetectedCrops[index]
-            } else if let base64String = card.cropImageData,
-                      let data = Data(base64Encoded: base64String),
-                      let image = UIImage(data: data) {
-                cardCropImages[card.id] = image
-            }
-        }
-    }
-
     // MARK: - Persistence
 
     /// Insert recognized cards into SwiftData as inbox items (no collection or deck).
-    private func persistRecognizedCards() {
+    func persistRecognizedCards() {
         guard let modelContext else { return }
         for card in latestResult.cards {
             let correction = corrections[card.id]
             let item = CollectionItem(from: card, correction: correction)
+            item.attachResultEvidence(from: card)
             modelContext.insert(item)
         }
     }

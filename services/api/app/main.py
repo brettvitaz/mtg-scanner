@@ -11,6 +11,7 @@ from starlette.responses import Response
 
 from app.api.routes.cards import router as cards_router
 from app.api.routes.health import router as health_router
+from app.api.routes.recognition_feedback import router as recognition_feedback_router
 from app.api.routes.recognitions import router as recognitions_router
 from app.logging_config import get_logger, set_request_id, setup_logging
 from app.settings import get_settings
@@ -70,6 +71,7 @@ app = FastAPI(title="MTG Scanner API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
 app.include_router(health_router)
 app.include_router(recognitions_router, prefix="/api/v1")
+app.include_router(recognition_feedback_router, prefix="/api/v1")
 app.include_router(cards_router, prefix="/api/v1")
 
 if settings.mtg_scanner_admin_token:

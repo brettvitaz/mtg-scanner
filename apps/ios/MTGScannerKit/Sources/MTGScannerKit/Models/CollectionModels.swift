@@ -27,6 +27,8 @@ public final class CollectionItem {
     public var qtyBuying: Int?
     public var addedAt: Date
     public var quantity: Int
+    @Attribute(.externalStorage) public var resultScanJPEG: Data?
+    public var originalRecognition: Data?
 
     @Relationship(inverse: \CardCollection.items)
     public var collection: CardCollection?

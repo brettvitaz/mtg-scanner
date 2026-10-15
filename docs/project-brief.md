@@ -30,6 +30,8 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
   - Batch upload of cropped card images to backend
   - Fallback to single-image upload when no cards detected
   - Results list with card thumbnails from Scryfall
+  - Scanned Results retain a compressed full-card JPEG and immutable original recognition across app restarts. Details and editing offer Artwork / Scan; the scan viewer supports pinch zoom, pan, and Close. Copies omit evidence, full moves clear it, partial moves retain it on the remaining result, and deletion Undo restores it. Collections and decks expose no scan controls.
+  - Identification and finish corrections automatically create persistent, image-backed feedback events, saved transactionally with the edit. Unchanged, canceled, failed, quantity-only, and scanless edits create no event. Uploads retry after correction saves and activation using the event's original backend URL; queued and stored evidence survives result deletion.
   - Results tab badge counts newly scanned cards across scan runs until Results is opened. Each recognized card inserted into Results counts once, including repeated copies; pending and failed scans do not count. Opening Results clears the badge, and completions while Results is selected are already seen. The count survives backgrounding and resets on app relaunch. Counts above 99 display as 99+, with the exact count available to VoiceOver. Manual additions, imports, and list edits do not affect this scan count; there is no setting.
   - Card detail view with metadata, edition picker, Card Kingdom links, and correction editing
   - Settings flow
@@ -44,6 +46,7 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
   - `GET /health`
   - `POST /api/v1/recognitions` — single image upload
   - `POST /api/v1/recognitions/batch` — multi-image batch upload
+  - `POST /api/v1/recognition-feedback` — idempotent correction capture by event UUID
   - `GET /api/v1/cards/printings?name=` — all printings of a card across sets
 - Config-driven recognition providers: mock (default), OpenAI, OpenAI-compatible (Ollama, LM Studio)
 - Server-side card detection and cropping (OpenCV-based) for multi-card images
@@ -52,6 +55,7 @@ SwiftUI was chosen over React Native because this MVP is camera- and image-pipel
 
 ### Artifact Logging
 - Default artifact path: `.artifacts/recognitions/<timestamp>-<id>/`
+- Feedback captures retain `scan.jpg` and `metadata.json` under `<artifacts-dir>/recognition-feedback/<event-uuid>/`; there is no automatic retention cleanup or model-training step.
 - Each recognition request saves: uploaded image, crops, `response.json`, `metadata.json` (including validation details)
 - Artifact root configurable with `MTG_SCANNER_ARTIFACTS_DIR`
 

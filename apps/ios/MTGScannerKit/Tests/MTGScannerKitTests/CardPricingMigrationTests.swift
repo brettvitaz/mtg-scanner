@@ -10,10 +10,18 @@ final class CardPricingMigrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appending(path: "library.store")
         try writeLegacyStore(at: url)
-        let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self])
+        let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self, RecognitionFeedbackEvent.self])
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: url))
         let items = try container.mainContext.fetch(FetchDescriptor<CollectionItem>())
-        XCTAssertEqual(items.count, 2)
+        XCTAssertEqual(items.count, 3)
+        let result = try XCTUnwrap(items.first { $0.collection == nil && $0.deck == nil })
+        XCTAssertNil(result.resultScanJPEG)
+        XCTAssertNil(result.originalRecognition)
+        let draft = CardEditDraft(card: result.toRecognizedCard())
+        draft.isFoil = true
+        XCTAssertTrue(draft.save(item: result, context: container.mainContext, merge: false))
+        XCTAssertTrue(result.foil)
+        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<RecognitionFeedbackEvent>()), 0)
         let binder = try XCTUnwrap(items.first { $0.collection != nil })
         XCTAssertEqual(binder.collection?.name, "Binder")
         XCTAssertEqual(binder.quantity, 4)
@@ -41,6 +49,7 @@ final class CardPricingMigrationTests: XCTestCase {
         container.mainContext.insert(deck)
         container.mainContext.insert(card)
         container.mainContext.insert(deckCard)
+        container.mainContext.insert(LegacyCardLibrary.CollectionItem(title: "Legacy result", quantity: 1))
         try container.mainContext.save()
     }
 }

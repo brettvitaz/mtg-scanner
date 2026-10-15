@@ -26,22 +26,35 @@ final class CardEditDraft {
         return siblings.filter { $0.id != item.id && $0.matches(candidate) }
     }
 
-    func save(item: CollectionItem, context: ModelContext, merge: Bool) -> Bool {
+    func save(item: CollectionItem, context: ModelContext, merge: Bool,
+              feedbackBaseURL: String = AppConfig.defaultAPIBaseURL, commit: (() throws -> Void)? = nil) -> Bool {
         let matches = duplicates(for: item)
         guard matches.isEmpty || merge else { return false }
+        let snapshot = CardItemSnapshot(item)
+        let collectionDate = item.collection?.updatedAt
+        let deckDate = item.deck?.updatedAt
+        let autosave = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer { context.autosaveEnabled = autosave }
         do {
             try context.save()
+            let previous = FeedbackIdentification(item)
             item.apply(printing: printing, foil: isFoil)
             for match in matches {
                 item.quantity += match.quantity
                 context.delete(match)
             }
+            try RecognitionFeedbackEvent.capture(item: item, previous: previous,
+                                                  context: context, baseURL: feedbackBaseURL)
             item.collection?.updatedAt = Date()
             item.deck?.updatedAt = Date()
-            try context.save()
+            try (commit ?? { try context.save() })()
             return true
         } catch {
             context.rollback()
+            snapshot.restoreValues(on: item)
+            if let collectionDate { item.collection?.updatedAt = collectionDate }
+            if let deckDate { item.deck?.updatedAt = deckDate }
             errorMessage = "Could not save changes. Please try again."
             return false
         }

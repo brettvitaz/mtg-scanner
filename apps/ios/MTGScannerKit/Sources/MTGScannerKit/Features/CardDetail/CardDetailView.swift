@@ -12,7 +12,11 @@ struct CardDetailView: View {
     @State private var addedMessage: String?
 
     init(card: RecognizedCard) {
-        _viewModel = State(wrappedValue: CardDetailViewModel(card: card, cropImage: nil))
+        self.init(viewModel: CardDetailViewModel(card: card, cropImage: nil))
+    }
+
+    init(viewModel: CardDetailViewModel) {
+        _viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {
@@ -53,9 +57,12 @@ struct CardDetailView: View {
             )
         }
         .sheet(isPresented: $showAddToSheet) {
+            MoveToSheet(title: "Add To") { destination in addCardTo(destination) }
+        }
+        .sheet(item: $viewModel.transferOperation) { operation in
             if let item = storedItem {
                 let sourceID = item.id
-                CopyMoveSheet(items: [item]) { result in
+                CardTransferSheet(items: [item], operation: operation) { result in
                     if result.removedSourceIDs.contains(sourceID) {
                         dismiss()
                     } else {
@@ -63,10 +70,6 @@ struct CardDetailView: View {
                         let verb = result.operation == .copy ? "Copied" : "Moved"
                         showAddedMessage("\(verb) to \(result.destinationName)")
                     }
-                }
-            } else {
-                MoveToSheet(title: "Add To") { destination in
-                    addCardTo(destination)
                 }
             }
         }
@@ -183,16 +186,28 @@ struct CardDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
-            Button { showAddToSheet = true } label: {
-                Label(storedItem == nil ? "Add to Collection or Deck" : "Copy/Move",
-                      systemImage: "plus.rectangle.on.folder")
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+            if storedItem != nil {
+                transferButton("Copy…", symbol: "doc.on.doc", operation: .copy)
+                transferButton("Move…", symbol: "folder", operation: .move)
+            } else {
+                Button { showAddToSheet = true } label: {
+                    Label("Add to Collection or Deck", systemImage: "plus.rectangle.on.folder")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
         }
         .padding(.top, 8)
+    }
+
+    private func transferButton(
+        _ title: String, symbol: String, operation: CardTransferOperation
+    ) -> some View {
+        Button { viewModel.transferOperation = operation } label: {
+            Label(title, systemImage: symbol)
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
     }
 
 }

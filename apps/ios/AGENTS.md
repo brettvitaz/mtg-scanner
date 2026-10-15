@@ -143,7 +143,12 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
 | `card-row-list` | `CardListPricingFixtureView` | Hold rows to review sample artwork, missing data, and native actions |
 | `card-row-preview` | `CardListPricingFixtureView` | Foil preview with cached sample artwork |
-| `copy-move` | `CardListPricingFixtureView` | Copy/Move selector, per-row quantities, and destinations |
+| `copy-cards` / `copy-move` | `CardTransferFixtureView` | Copy task sheet, destination unset and confirmation disabled; `copy-move` aliases `copy-cards` |
+| `move-cards` | `CardTransferFixtureView` | Move task sheet, chosen destination and partial quantities, confirmation enabled |
+| `transfer-destinations` | `CardTransferFixtureView` | Production picker with many collections/decks, wrapping names, and excluded source lists |
+| `transfer-destinations-empty` | `CardTransferFixtureView` | No eligible existing destinations; New Collection and New Deck remain available |
+| `transfer-quantities` | `CardTransferFixtureView` | Production quantity review with 30 long-name rows, mixed finishes, and partial stacks |
+| `transfer-error` | `CardTransferFixtureView` | Task sheet with a real stale-source transfer error seeded once |
 | `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
 | `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |
 | `pricing-deck` | `CardListPricingFixtureView` | Populated deck with quantities and totals |

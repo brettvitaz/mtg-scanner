@@ -17,7 +17,7 @@ final class ResultsFeedbackIntegrationTests: FeedbackIntegrationTestCase {
         recorder.acknowledge = true
         let app = recorder.app()
         app.modelContext = context
-        var selectionBar: ResultsSelectionBar?
+        var selectionBar: CardSelectionActionBar?
         let view = ResultsView(selection: [first.id, second.id], makeSelectionBar: { bar in
             selectionBar = bar
             return AnyView(bar)
@@ -28,8 +28,8 @@ final class ResultsFeedbackIntegrationTests: FeedbackIntegrationTestCase {
             selectionBar = nil
         }
         try await waitForFeedback { selectionBar != nil }
-        XCTAssertTrue(try XCTUnwrap(selectionBar).hasSelection)
-        try XCTUnwrap(selectionBar).onToggleFoil()
+        XCTAssertFalse(try XCTUnwrap(selectionBar).isEmpty)
+        try XCTUnwrap(XCTUnwrap(selectionBar).onToggleFoil)()
         try await waitForFeedback { recorder.attempts.count == 2 }
         try await waitForFeedback { (try? context.fetchCount(FetchDescriptor<RecognitionFeedbackEvent>())) == 0 }
         XCTAssertTrue(first.foil)

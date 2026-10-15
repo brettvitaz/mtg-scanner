@@ -17,6 +17,9 @@ let package = Package(
             targets: ["MTGScannerFixtures"]
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/nalexn/ViewInspector", exact: "0.10.5")
+    ],
     targets: [
         .target(
             name: "MTGScannerKit",
@@ -35,7 +38,10 @@ let package = Package(
         ),
         .testTarget(
             name: "MTGScannerKitTests",
-            dependencies: ["MTGScannerKit", "MTGScannerFixtures"],
+            dependencies: [
+                "MTGScannerKit", "MTGScannerFixtures",
+                .product(name: "ViewInspector", package: "ViewInspector")
+            ],
             path: "Tests/MTGScannerKitTests",
             resources: [
                 .process("CropEvaluationFixtures")

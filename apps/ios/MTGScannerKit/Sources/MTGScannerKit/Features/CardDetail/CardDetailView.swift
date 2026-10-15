@@ -16,10 +16,16 @@ struct CardDetailView: View {
 
     init(card: RecognizedCard, resultScope: Bool = false, showingScan: Bool = false,
          showImageViewer: Bool = false, initialZoom: CGFloat = 1, editorDraft: CardEditDraft? = nil) {
+        self.init(viewModel: CardDetailViewModel(card: card, cropImage: nil), resultScope: resultScope,
+                  showingScan: showingScan, showImageViewer: showImageViewer,
+                  initialZoom: initialZoom, editorDraft: editorDraft)
+    }
+
+    init(viewModel: CardDetailViewModel, resultScope: Bool = false, showingScan: Bool = false,
+         showImageViewer: Bool = false, initialZoom: CGFloat = 1, editorDraft: CardEditDraft? = nil) {
         self.editorDraft = editorDraft
-        let model = CardDetailViewModel(card: card, cropImage: nil)
-        model.showingCropImage = showingScan
-        _viewModel = State(wrappedValue: model)
+        viewModel.showingCropImage = showingScan
+        _viewModel = State(initialValue: viewModel)
         _showFullscreenImage = State(initialValue: showImageViewer)
         self.resultScope = resultScope
         self.initialZoom = initialZoom
@@ -44,6 +50,7 @@ struct CardDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Edit") { showEditor = true }
+                    .accessibilityIdentifier("card-detail-edit")
             }
         }
         .fullScreenCover(isPresented: $showFullscreenImage) {
@@ -64,9 +71,12 @@ struct CardDetailView: View {
             )
         }
         .sheet(isPresented: $showAddToSheet) {
+            MoveToSheet(title: "Add To") { destination in addCardTo(destination) }
+        }
+        .sheet(item: $viewModel.transferOperation) { operation in
             if let item = storedItem {
                 let sourceID = item.id
-                CopyMoveSheet(items: [item]) { result in
+                CardTransferSheet(items: [item], operation: operation) { result in
                     if result.removedSourceIDs.contains(sourceID) {
                         dismiss()
                     } else {
@@ -74,10 +84,6 @@ struct CardDetailView: View {
                         let verb = result.operation == .copy ? "Copied" : "Moved"
                         showAddedMessage("\(verb) to \(result.destinationName)")
                     }
-                }
-            } else {
-                MoveToSheet(title: "Add To") { destination in
-                    addCardTo(destination)
                 }
             }
         }
@@ -106,6 +112,10 @@ struct CardDetailView: View {
             }
             LabeledContent("Finish", value: viewModel.editFoil ? "Foil" : "Non-foil")
                 .font(.subheadline)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Finish")
+                .accessibilityValue(viewModel.editFoil ? "Foil" : "Non-foil")
+                .accessibilityIdentifier("card-detail-finish")
         }
         .accessibilityElement(children: .contain)
     }
@@ -190,16 +200,28 @@ struct CardDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
-            Button { showAddToSheet = true } label: {
-                Label(storedItem == nil ? "Add to Collection or Deck" : "Copy/Move",
-                      systemImage: "plus.rectangle.on.folder")
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+            if storedItem != nil {
+                transferButton("Copy…", symbol: "doc.on.doc", operation: .copy)
+                transferButton("Move…", symbol: "folder", operation: .move)
+            } else {
+                Button { showAddToSheet = true } label: {
+                    Label("Add to Collection or Deck", systemImage: "plus.rectangle.on.folder")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
         }
         .padding(.top, 8)
+    }
+
+    private func transferButton(
+        _ title: String, symbol: String, operation: CardTransferOperation
+    ) -> some View {
+        Button { viewModel.transferOperation = operation } label: {
+            Label(title, systemImage: symbol)
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
     }
 
 }

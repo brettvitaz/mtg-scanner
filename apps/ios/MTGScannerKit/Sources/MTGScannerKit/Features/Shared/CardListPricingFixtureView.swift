@@ -26,7 +26,7 @@ public struct CardListPricingFixtureView: View {
             container.mainContext.insert(deck)
             for item in fixtureItems {
                 if [
-                    "pricing-collection", "copy-move", "undo-collection", "card-row-list", "selection-collection"
+                    "pricing-collection", "undo-collection", "card-row-list", "selection-collection"
                 ].contains(route) {
                     item.collection = collection
                 }
@@ -72,7 +72,6 @@ public struct CardListPricingFixtureView: View {
             RootTabView().task { appModel.shouldShowResults = true }
         case "undo-navigation":
             RootTabView().task { appModel.shouldShowResults = true }
-        case "copy-move": CopyMoveSheet(items: fixtureItems) { _ in }
         case "card-row-preview":
             GeometryReader { geometry in
                 let size = CardRowPreview.size(in: geometry.size)

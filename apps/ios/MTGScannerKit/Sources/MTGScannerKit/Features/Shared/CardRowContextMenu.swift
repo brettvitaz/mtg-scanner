@@ -77,7 +77,7 @@ final class CardRowContextMenuCoordinator: NSObject, UIContextMenuInteractionDel
 
 @MainActor
 struct CardRowMenuActions {
-    var transfer: (() -> Void)?
+    var transfer: ((CardTransferOperation) -> Void)?
     var toggleFoil: (() -> Void)?
     var delete: (() -> Void)?
     var navigate: (() -> Void)?
@@ -87,7 +87,8 @@ struct CardRowMenuActions {
     func menu(isFoil: Bool) -> UIMenu {
         var primary: [UIMenuElement] = []
         if let transfer {
-            primary.append(UIAction(title: "Copy/Move", image: UIImage(systemName: "doc.on.doc")) { _ in transfer() })
+            primary.append(UIAction(title: "Copy…", image: UIImage(systemName: "doc.on.doc")) { _ in transfer(.copy) })
+            primary.append(UIAction(title: "Move…", image: UIImage(systemName: "folder")) { _ in transfer(.move) })
         }
         if let toggleFoil {
             primary.append(UIAction(

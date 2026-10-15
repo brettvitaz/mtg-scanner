@@ -3,6 +3,9 @@ XCODE_BUILD_SERVER ?= $(shell command -v xcode-build-server 2>/dev/null)
 IOS_SOURCEKIT_PACKAGE_DIR := apps/ios/MTGScannerKit
 IOS_SOURCEKIT_RESULT_BUNDLE := tmp/ios-build-result.xcresult
 IOS_TEST_SIMULATOR_ID ?= $(shell xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $$2 ~ /^[0-9A-F-]+$$/ { print $$2; exit }')
+IOS_UI_TEST_DESTINATION ?= platform=iOS Simulator,name=iPhone 16,OS=18.6
+IOS_UI_TEST_FILTER ?= MTGScannerUITests
+IOS_UI_TEST_RESULT_BUNDLE ?= tmp/ios-ui-tests-$(shell date +%Y%m%d-%H%M%S)-$(shell uuidgen).xcresult
 IOS_TEST_SCHEME ?= MTGScannerKitTests
 IOS_TEST_DESTINATION ?= id=$(IOS_TEST_SIMULATOR_ID)
 IOS_TEST_CURRENT_DEVICE ?= iPhone 17
@@ -10,7 +13,7 @@ IOS_TEST_CURRENT_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_C
 IOS_TEST_TABLET_DEVICE ?= iPad Air 11-inch (M4)
 IOS_TEST_TABLET_DESTINATION ?= platform=iOS Simulator,OS=26.4,name=$(IOS_TEST_TABLET_DEVICE)
 
-.PHONY: bootstrap api-bootstrap api-setup api-clean api-run api-tmux api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing api-eval ios-build ios-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
+.PHONY: bootstrap api-bootstrap api-setup api-clean api-run api-tmux api-test api-lint api-security api-update-mtgjson api-import-ck-prices api-update-pricing api-eval ios-build ios-test ios-ui-test ios-test-current ios-test-tablet ios-test-matrix ios-lint ios-snapshot ios-snapshot-all lint security tree
 
 bootstrap: api-bootstrap
 
@@ -55,6 +58,15 @@ ios-test:
 	  -destination '$(IOS_TEST_DESTINATION)' \
 	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
 
+ios-ui-test:
+	xcodebuild test \
+	  -workspace apps/ios/MTGScanner.xcworkspace -scheme MTGScannerUITests \
+	  -destination '$(IOS_UI_TEST_DESTINATION)' \
+	  -only-testing:'$(IOS_UI_TEST_FILTER)' \
+	  -resultBundlePath '$(IOS_UI_TEST_RESULT_BUNDLE)' \
+	  -parallel-testing-enabled NO \
+	  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+
 ios-test-current:
 	xcodebuild test \
 	  -workspace apps/ios/MTGScanner.xcworkspace -scheme $(IOS_TEST_SCHEME) \
@@ -74,6 +86,7 @@ ios-lint:
 
 IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-empty card-detail card-edit \
 	pricing-results pricing-collection pricing-deck pricing-large pricing-filter copy-move card-row-preview card-row-list \
+	copy-cards move-cards transfer-destinations transfer-destinations-empty transfer-quantities transfer-error \
 	selection-results selection-collection selection-deck \
 	undo-results undo-collection undo-deck undo-empty undo-bulk undo-navigation \
 	list-operation list-subtract list-add-delete list-operation-complete csv-subtract \

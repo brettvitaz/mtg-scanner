@@ -3,19 +3,21 @@ import SwiftUI
 import UIKit
 
 struct CollectionDetailView: View {
+    init(collection: CardCollection, selection: CardListSelectionState = CardListSelectionState()) {
+        self.collection = collection
+        _selection = State(initialValue: selection)
+    }
+
     @Bindable var collection: CardCollection
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var isSelecting = false
-    @State private var selectedItems: Set<UUID> = []
-    @State private var showCopyMoveSheet = false
+    @State private var selection = CardListSelectionState()
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
@@ -26,7 +28,7 @@ struct CollectionDetailView: View {
     private var isDeleted: Bool { collection.isDeleted || collection.modelContext == nil }
 
     private var undoIsBlocked: Bool {
-        showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
+        selection.transferRequest != nil || showDeleteConfirmation
         || contextDeleteItem != nil || exportFile != nil || showFilterSheet
         || showAddCard || showCSVImport || showListOperation || selectedCard != nil || isDeleted
     }
@@ -54,24 +56,19 @@ struct CollectionDetailView: View {
         .cardDeleteUndo(scope: .collection(collection.id), name: collection.name, blocked: undoIsBlocked)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(isSelecting)
+        .navigationBarBackButtonHidden(selection.isSelecting)
         .toolbarBackground(Color.dsBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $selectedCard) { card in
             CardDetailView(card: card)
         }
         .toolbar { if !isDeleted { topToolbar } }
-        .sheet(isPresented: $showCopyMoveSheet) {
-            CopyMoveSheet(items: collection.items.filter { selectedItems.contains($0.id) }) { _ in
-                exitSelecting()
+        .sheet(item: $selection.transferRequest) { request in
+            CardTransferSheet(items: request.items, operation: request.operation) { _ in
+                if request.isBulk { exitSelecting() }
             }
         }
-        .sheet(item: $contextTransferItem) { item in
-            CopyMoveSheet(items: [item]) { _ in
-                contextTransferItem = nil
-            }
-        }
-        .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete \(selection.selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) { deleteSelectedItems() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -124,12 +121,12 @@ struct CollectionDetailView: View {
     @ToolbarContentBuilder
     private var topToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            if isSelecting {
+            if selection.isSelecting {
                 Button("Select All") { selectAll() }
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            if isSelecting {
+            if selection.isSelecting {
                 Menu {
                     ExportMenuContent(items: collection.items, name: collection.name, exportFile: $exportFile)
                 } label: {
@@ -160,35 +157,17 @@ struct CollectionDetailView: View {
 
     // MARK: - Bottom Action Bar
 
-    private var bottomActionBar: some View {
-        HStack {
-            Button {
-                guard !selectedItems.isEmpty else { return }
-                showCopyMoveSheet = true
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "doc.on.doc")
-                    Text("Copy/Move").font(.caption2)
-                }
-            }
-            .disabled(selectedItems.isEmpty)
-
-            Spacer()
-
-            Button(role: .destructive) {
-                guard !selectedItems.isEmpty else { return }
-                showDeleteConfirmation = true
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "trash")
-                    Text("Delete").font(.caption2)
-                }
-            }
-            .disabled(selectedItems.isEmpty)
-        }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 12)
-        .background(.bar)
+    var bottomActionBar: some View {
+        CardSelectionActionBar(
+            isEmpty: selection.selectedItems.isEmpty,
+            onTransfer: {
+                selection.transferRequest = CardTransferRequest(
+                    items: collection.items.filter { selection.selectedItems.contains($0.id) },
+                    operation: $0, isBulk: true
+                )
+            },
+            onDelete: { showDeleteConfirmation = true }
+        )
     }
 }
 
@@ -196,7 +175,7 @@ private extension CollectionDetailView {
     // MARK: - Card List
 
     var cardListWithToolbar: some View {
-        List(selection: $selectedItems) {
+        List(selection: $selection.selectedItems) {
             Section {
                 ForEach(displayedItems) { cardRowView(for: $0) }
                     .listRowInsets(EdgeInsets())
@@ -212,16 +191,16 @@ private extension CollectionDetailView {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.dsBackground)
-        .environment(\.editMode, isSelecting ? .constant(.active) : .constant(.inactive))
+        .environment(\.editMode, selection.isSelecting ? .constant(.active) : .constant(.inactive))
         .safeAreaInset(edge: .top, spacing: 0) { cardListHeader }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isSelecting { bottomActionBar }
+            if selection.isSelecting { bottomActionBar }
         }
     }
 
     @ViewBuilder
     var cardListHeader: some View {
-        if !isSelecting {
+        if !selection.isSelecting {
             VStack(spacing: 0) {
                 if showSearch {
                     ListSearchField(text: $filterState.searchText)
@@ -240,13 +219,13 @@ private extension CollectionDetailView {
 
     @ViewBuilder
     func cardRowView(for item: CollectionItem) -> some View {
-        if isSelecting {
+        if selection.isSelecting {
             CollectionItemRow(item: item)
         } else {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onTransfer: { contextTransferItem = item },
+                onTransfer: { selection.transferRequest = CardTransferRequest(items: [item], operation: $0) },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -288,21 +267,21 @@ private extension CollectionDetailView {
     func enterSelecting() {
         showSearch = false
         filterState.searchText = ""
-        selectedItems = []
-        isSelecting = true
+        selection.selectedItems = []
+        selection.isSelecting = true
     }
 
     func exitSelecting() {
-        isSelecting = false
-        selectedItems = []
+        selection.isSelecting = false
+        selection.selectedItems = []
     }
 
     func selectAll() {
-        selectedItems = Set(displayedItems.map(\.id))
+        selection.selectedItems = Set(displayedItems.map(\.id))
     }
 
     func deleteSelectedItems() {
-        let items = collection.items.filter { selectedItems.contains($0.id) }
+        let items = collection.items.filter { selection.selectedItems.contains($0.id) }
         registerUndo(for: items)
         for item in items {
             modelContext.delete(item)

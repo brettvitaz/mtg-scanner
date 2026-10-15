@@ -20,29 +20,29 @@ public final class AppModel {
     }
 #if DEBUG
     var debugSaveRawCapturesToPhotoLibrary: Bool {
-        didSet { UserDefaults.standard.set(debugSaveRawCapturesToPhotoLibrary, forKey: debugSaveRawCapturesKey) }
+        didSet { preferences.set(debugSaveRawCapturesToPhotoLibrary, forKey: debugSaveRawCapturesKey) }
     }
 #endif
     var autoScanCaptureDelay: Double {
-        didSet { UserDefaults.standard.set(autoScanCaptureDelay, forKey: autoScanCaptureDelayKey) }
+        didSet { preferences.set(autoScanCaptureDelay, forKey: autoScanCaptureDelayKey) }
     }
     var autoScanConfidenceThreshold: Double {
-        didSet { UserDefaults.standard.set(autoScanConfidenceThreshold, forKey: autoScanConfidenceKey) }
+        didSet { preferences.set(autoScanConfidenceThreshold, forKey: autoScanConfidenceKey) }
     }
     var maxConcurrentUploads: Int {
-        didSet { UserDefaults.standard.set(maxConcurrentUploads, forKey: maxConcurrentUploadsKey) }
+        didSet { preferences.set(maxConcurrentUploads, forKey: maxConcurrentUploadsKey) }
     }
     var motionBurstPreset: MotionBurstPreset {
-        didSet { UserDefaults.standard.set(motionBurstPreset.rawValue, forKey: motionBurstPresetKey) }
+        didSet { preferences.set(motionBurstPreset.rawValue, forKey: motionBurstPresetKey) }
     }
     var motionBurstMotionThreshold: Double {
-        didSet { UserDefaults.standard.set(motionBurstMotionThreshold, forKey: motionBurstMotionThresholdKey) }
+        didSet { preferences.set(motionBurstMotionThreshold, forKey: motionBurstMotionThresholdKey) }
     }
     var motionBurstMinPeakThreshold: Double {
-        didSet { UserDefaults.standard.set(motionBurstMinPeakThreshold, forKey: motionBurstMinPeakThresholdKey) }
+        didSet { preferences.set(motionBurstMinPeakThreshold, forKey: motionBurstMinPeakThresholdKey) }
     }
     var exposureBias: Double {
-        didSet { UserDefaults.standard.set(exposureBias, forKey: exposureBiasKey) }
+        didSet { preferences.set(exposureBias, forKey: exposureBiasKey) }
     }
     var isRecognizing = false
     var statusMessage = "Point camera at cards to scan."
@@ -79,35 +79,38 @@ public final class AppModel {
     private let motionBurstMinPeakThresholdKey = "motion_burst_min_peak_threshold"
     private let exposureBiasKey = "exposure_bias"
 
-    public convenience init() {
-        self.init(feedbackUploader: RecognitionFeedbackUploader())
+    private let preferences: UserDefaults
+
+    public convenience init(preferences: UserDefaults = .standard) {
+        self.init(feedbackUploader: RecognitionFeedbackUploader(), preferences: preferences)
     }
 
-    init(feedbackUploader: RecognitionFeedbackUploader) {
+    init(feedbackUploader: RecognitionFeedbackUploader, preferences: UserDefaults = .standard) {
         self.feedbackUploader = feedbackUploader
-        self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
-        self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
+        self.preferences = preferences
+        self.apiBaseURL = preferences.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
+        self.onDeviceCropEnabled = preferences.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
 #if DEBUG
         self.debugSaveRawCapturesToPhotoLibrary =
-            UserDefaults.standard.object(forKey: debugSaveRawCapturesKey) as? Bool ?? false
+            preferences.object(forKey: debugSaveRawCapturesKey) as? Bool ?? false
 #endif
-        let storedDelay = UserDefaults.standard.double(forKey: autoScanCaptureDelayKey)
+        let storedDelay = preferences.double(forKey: autoScanCaptureDelayKey)
         self.autoScanCaptureDelay = Self.clampAutoScanCaptureDelay(storedDelay)
-        let storedConf = UserDefaults.standard.double(forKey: autoScanConfidenceKey)
+        let storedConf = preferences.double(forKey: autoScanConfidenceKey)
         self.autoScanConfidenceThreshold = Self.clampAutoScanConfidence(storedConf)
-        let storedConcurrent = UserDefaults.standard.integer(forKey: maxConcurrentUploadsKey)
+        let storedConcurrent = preferences.integer(forKey: maxConcurrentUploadsKey)
         self.maxConcurrentUploads = Self.clampMaxConcurrentUploads(storedConcurrent)
-        let storedPreset = UserDefaults.standard.string(forKey: motionBurstPresetKey)
+        let storedPreset = preferences.string(forKey: motionBurstPresetKey)
         self.motionBurstPreset = MotionBurstPreset(rawValue: storedPreset ?? "") ?? .balanced
-        let storedMotionThreshold = UserDefaults.standard.double(forKey: motionBurstMotionThresholdKey)
+        let storedMotionThreshold = preferences.double(forKey: motionBurstMotionThresholdKey)
         self.motionBurstMotionThreshold = Self.clampMotionBurstMotionThreshold(
             storedMotionThreshold > 0 ? storedMotionThreshold : 0.015
         )
-        let storedMinPeak = UserDefaults.standard.double(forKey: motionBurstMinPeakThresholdKey)
+        let storedMinPeak = preferences.double(forKey: motionBurstMinPeakThresholdKey)
         self.motionBurstMinPeakThreshold = Self.clampMotionBurstMinPeakThreshold(
             storedMinPeak > 0 ? storedMinPeak : 0.05
         )
-        let storedBias = UserDefaults.standard.object(forKey: exposureBiasKey) as? Double
+        let storedBias = preferences.object(forKey: exposureBiasKey) as? Double
         self.exposureBias = storedBias ?? 0.0
         loadCorrections()
     }
@@ -365,20 +368,20 @@ extension AppModel {
 
     private func persistCorrections() {
         guard let data = try? JSONEncoder().encode(corrections) else { return }
-        UserDefaults.standard.set(data, forKey: correctionsStoreKey)
+        preferences.set(data, forKey: correctionsStoreKey)
     }
 
     private func persistAPIBaseURL() {
-        UserDefaults.standard.set(apiBaseURL, forKey: apiBaseURLStoreKey)
+        preferences.set(apiBaseURL, forKey: apiBaseURLStoreKey)
     }
 
     private func persistOnDeviceCrop() {
-        UserDefaults.standard.set(onDeviceCropEnabled, forKey: onDeviceCropStoreKey)
+        preferences.set(onDeviceCropEnabled, forKey: onDeviceCropStoreKey)
     }
 
     private func loadCorrections() {
         guard
-            let data = UserDefaults.standard.data(forKey: correctionsStoreKey),
+            let data = preferences.data(forKey: correctionsStoreKey),
             let stored = try? JSONDecoder().decode([UUID: CardCorrection].self, from: data)
         else { return }
         corrections = stored

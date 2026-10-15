@@ -29,6 +29,7 @@ struct EditCardView: View {
                 }
                 Section("Options") {
                     Toggle("Foil", isOn: $draft.isFoil)
+                        .accessibilityIdentifier("card-edit-foil")
                         .disabled(draft.printing.isFoilOnly || draft.printing.isNonFoilOnly)
                 }
                 if let error = draft.errorMessage {
@@ -77,6 +78,7 @@ struct EditCardView: View {
                 }
             }
             .fontWeight(.semibold)
+            .accessibilityIdentifier("card-edit-save")
         }
     }
 

@@ -244,11 +244,16 @@ In Results, collection detail, and deck detail, enter **Select** mode and tap
 anywhere on a card row to select or deselect it. The selection circle and bulk
 actions reflect the current selection.
 
-Results, collections, decks, card context menus, and saved-card details share a
-**Copy/Move** sheet. It defaults to Copy and the full quantity of each selected
-row. Adjust each row’s quantity to copy or move part of a stack, then choose an
-existing collection/deck or create a new destination. The source collection or
-deck is excluded from destinations.
+Results, collections, decks, card context menus, VoiceOver actions, and saved-card
+details offer separate **Copy…** and **Move…** actions. Choose a destination in the
+compact task sheet, optionally open **Review Quantities** to adjust stacks, then
+tap the fixed **Copy** or **Move** button to transfer. Quantities start at the full
+available stack. The source collection or deck is excluded from destinations.
+Newly named destinations remain drafts until the transfer succeeds; cancelling
+or dismissing the sheet preserves the source and selection and creates no empty
+list. If cards change before confirmation, the sheet shows an error; **Review
+Quantities** refreshes availability and clamps the chosen quantities. If no source
+cards remain, it closes without completing the transfer.
 
 Copy leaves the source unchanged. Move leaves any remaining quantity in the
 source and removes fully transferred rows. Matching printings and foil finishes

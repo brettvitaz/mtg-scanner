@@ -53,11 +53,12 @@ enum CardTransferError: LocalizedError {
 enum CardTransfer {
     static func perform(
         rows: [CardTransferRow], operation: CardTransferOperation,
-        destination: MoveDestination, context: ModelContext
+        destination: MoveDestination, context: ModelContext, save: (() throws -> Void)? = nil
     ) throws -> CardTransferResult {
         let items = try validate(rows: rows, destination: destination, context: context)
         // Persist pre-existing edits so a failed transfer only rolls back its own mutations.
         try context.save()
+        let sources = items.map { (item: $0, quantity: $0.quantity, collection: $0.collection, deck: $0.deck) }
         var removedIDs: Set<UUID> = []
         do {
             destination.insertIfNeeded(in: context)
@@ -69,8 +70,14 @@ enum CardTransfer {
                 }
             }
             destination.updateTimestamp()
-            try context.save()
+            try (save ?? context.save)()
         } catch {
+            // Detach sources before rollback invalidates a newly inserted destination.
+            for source in sources {
+                source.item.quantity = source.quantity
+                source.item.collection = source.collection
+                source.item.deck = source.deck
+            }
             context.rollback()
             throw error
         }

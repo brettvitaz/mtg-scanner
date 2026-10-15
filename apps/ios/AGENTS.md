@@ -54,13 +54,49 @@ xcodebuild test \
 
 Or via Makefile: `make ios-test`
 
-- Tests in `MTGScannerKit/Tests/MTGScannerKitTests/`.
+- Logic tests in `MTGScannerKit/Tests/MTGScannerKitTests/`; UI workflows in `MTGScannerUITests/`.
+- For interactive changes, run the relevant UI workflow with `make ios-ui-test` alongside logic tests and screenshot inspection. If existing coverage cannot exercise the changed interaction, add a workflow using the production controls, stable accessibility identifiers, and bounded condition waits. Report commands, results, artifacts, and coverage gaps.
+- The initial UI workflow covers saved-card Non-foil → Foil, Save dismissal, and persistence after termination/relaunch. It does not cover other interactions.
+
 - `final class <Feature>Tests: XCTestCase` naming.
 - Use `XCTUnwrap` for required optional values in tests; SwiftLint also checks test files.
 - Use `XCTAssertEqual(_:_:accuracy:)` for CGFloat/Double comparisons.
 - Test models and pure logic, including filters, tracking, YOLO validation, and decoding.
 - If you need to target the Swift package tests directly, run `xcodebuild test` with the `MTGScannerKitTests` scheme rather than `swift test`.
 - Pin simulator OS in scripted commands. `name=iPhone 16` alone resolves to `OS:latest`, which can fail when latest runtimes only have newer device families.
+
+### UI workflow command and artifacts
+
+```bash
+make ios-ui-test
+make ios-ui-test IOS_UI_TEST_FILTER=MTGScannerUITests/CardFinishTests/testEditFinishPersistsAfterRelaunch
+make ios-ui-test IOS_UI_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 17,OS=26.4'
+make ios-ui-test IOS_UI_TEST_RESULT_BUNDLE=tmp/my-ui-run.xcresult
+```
+
+The dedicated `MTGScannerUITests` scheme defaults to iPhone 16 / iOS 18.6.
+`ios-test` continues to run logic tests independently. Each UI command keeps a unique
+`tmp/ios-ui-tests-<timestamp>-<UUID>.xcresult` unless a result path is supplied; use a
+new path on each run. Failures propagate through make. Open the bundle in Xcode for
+failure diagnostics and screenshots. Successful runs also retain named initial-detail,
+editor, saved-detail, and relaunched-detail attachments. Export PNGs for visual review:
+
+```bash
+xcrun xcresulttool export attachments --path tmp/my-ui-run.xcresult --output-path tmp/my-ui-attachments
+```
+
+The DEBUG-only harness reads `UI_TEST_RUN_ID` (a UUID) and `UI_TEST_MODE` from the
+test app's launch environment before opening storage. `fresh` resets only that run's
+`Application Support/UITestRuns/<UUID>/` disk store and
+`com.brettvitaz.mtgscanner.ui-tests.<UUID>` preferences suite, then seeds one card.
+`resume` requires the existing store and never reseeds. Test teardown launches
+`cleanup`, which removes only that run's resources. An interrupted runner may leave
+its isolated resources behind; a later run uses a new UUID. Normal app data is untouched.
+
+The harness opens the production detail/editor views. A process-local URL protocol
+returns deterministic price fixtures and crashes visibly on unexpected HTTP requests;
+no backend, network connection, or API keys are needed. Extend fixtures explicitly
+when a new workflow needs another endpoint. Keep all harness code behind `#if DEBUG`.
 
 ## Build verification
 
@@ -107,7 +143,12 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `card-detail` | `CardEditFixtureView` | Shared card detail with Edit action |
 | `card-row-list` | `CardListPricingFixtureView` | Hold rows to review sample artwork, missing data, and native actions |
 | `card-row-preview` | `CardListPricingFixtureView` | Foil preview with cached sample artwork |
-| `copy-move` | `CardListPricingFixtureView` | Copy/Move selector, per-row quantities, and destinations |
+| `copy-cards` / `copy-move` | `CardTransferFixtureView` | Copy task sheet, destination unset and confirmation disabled; `copy-move` aliases `copy-cards` |
+| `move-cards` | `CardTransferFixtureView` | Move task sheet, chosen destination and partial quantities, confirmation enabled |
+| `transfer-destinations` | `CardTransferFixtureView` | Production picker with many collections/decks, wrapping names, and excluded source lists |
+| `transfer-destinations-empty` | `CardTransferFixtureView` | No eligible existing destinations; New Collection and New Deck remain available |
+| `transfer-quantities` | `CardTransferFixtureView` | Production quantity review with 30 long-name rows, mixed finishes, and partial stacks |
+| `transfer-error` | `CardTransferFixtureView` | Task sheet with a real stale-source transfer error seeded once |
 | `pricing-results` | `CardListPricingFixtureView` | Totals with buying, zero, and unknown quantities |
 | `pricing-collection` | `CardListPricingFixtureView` | Populated collection with totals |
 | `pricing-deck` | `CardListPricingFixtureView` | Populated deck with quantities and totals |

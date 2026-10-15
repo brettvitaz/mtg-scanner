@@ -85,6 +85,9 @@
 		SPM0000000000000000000004 /* MTGScannerKit in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000003 /* MTGScannerKit */; };
 		SPM0000000000000000000006 /* MTGScannerFixtures in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000005 /* MTGScannerFixtures */; };
 		F10000000000000000000001 /* CardFinishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002; };
+		F30000000000000000000001 /* PriceFilterFieldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000002 /* PriceFilterFieldTests.swift */; };
+		F30000000000000000000003 /* MTGScannerKit in Frameworks */ = {isa = PBXBuildFile; productRef = SPM0000000000000000000003 /* MTGScannerKit */; };
+		F20000000000000000000001 /* PriceFilterNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -179,6 +182,8 @@
 		SPM0000000000000000000001 /* MTGScannerKit */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; name = MTGScannerKit; path = MTGScannerKit; sourceTree = "<group>"; };
 		F10000000000000000000002 /* CardFinishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFinishTests.swift; sourceTree = "<group>"; };
 		F10000000000000000000003 /* MTGScannerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MTGScannerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F30000000000000000000002 /* PriceFilterFieldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceFilterFieldTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceFilterNavigationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -195,6 +200,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F30000000000000000000003 /* MTGScannerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -432,6 +438,7 @@
 		A00000000000000000000040 /* MTGScannerTests */ = {
 			isa = PBXGroup;
 			children = (
+				F30000000000000000000002 /* PriceFilterFieldTests.swift */,
 				A00000000000000000000290 /* DetectedCardTests.swift */,
 				A00000000000000000000291 /* RectangleFilterTests.swift */,
 				A00000000000000000000293 /* DetectionOverlayRendererTests.swift */,
@@ -470,7 +477,7 @@
 		};
 		F10000000000000000000004 /* MTGScannerUITests */ = {
 			isa = PBXGroup;
-			children = (F10000000000000000000002 /* CardFinishTests.swift */,);
+			children = (F10000000000000000000002 /* CardFinishTests.swift */, F20000000000000000000002 /* PriceFilterNavigationTests.swift */,);
 			path = MTGScannerUITests;
 			sourceTree = "<group>";
 		};
@@ -509,6 +516,9 @@
 			);
 			dependencies = (
 				A00000000000000000000033 /* PBXTargetDependency */,
+			);
+			packageProductDependencies = (
+				SPM0000000000000000000003 /* MTGScannerKit */,
 			);
 			name = MTGScannerTests;
 			productName = MTGScannerTests;
@@ -593,13 +603,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F30000000000000000000001 /* PriceFilterFieldTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F10000000000000000000007 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (F10000000000000000000001 /* CardFinishTests.swift in Sources */,);
+			files = (F10000000000000000000001 /* CardFinishTests.swift in Sources */, F20000000000000000000001 /* PriceFilterNavigationTests.swift in Sources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

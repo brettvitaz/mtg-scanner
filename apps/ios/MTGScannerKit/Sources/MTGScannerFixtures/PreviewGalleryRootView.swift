@@ -78,6 +78,8 @@ public struct PreviewGalleryRootView: View {
         case "copy-move", "copy-cards", "move-cards", "transfer-destinations",
              "transfer-destinations-empty", "transfer-quantities", "transfer-error":
             CardTransferFixtureView(route: route == "copy-move" ? "copy-cards" : route)
+        case "pricing-filter-editing", "pricing-filter-invalid":
+            CardListPricingFixtureView(route: route)
         case "selection-results", "selection-collection", "selection-deck":
             CardListPricingFixtureView(route: route)
         case "undo-results", "undo-collection", "undo-deck", "undo-empty", "undo-bulk", "undo-navigation":
@@ -185,4 +187,12 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("transfer-error") {
     PreviewGalleryRootView(route: "transfer-error")
+}
+
+#Preview("Price filter editing") {
+    PreviewGalleryRootView(route: "pricing-filter-editing")
+}
+
+#Preview("Price filter invalid") {
+    PreviewGalleryRootView(route: "pricing-filter-invalid")
 }

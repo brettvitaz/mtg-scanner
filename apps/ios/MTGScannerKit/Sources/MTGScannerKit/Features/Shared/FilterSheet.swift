@@ -6,6 +6,17 @@ struct FilterSheet: View {
     let items: [CollectionItem]
 
     @Environment(\.dismiss) private var dismiss
+    @State private var priceEditor: PriceFilterEditor
+    @State private var pendingInitialPriceFocus: PriceFilterEditor.Field?
+    @FocusState private var focusedPrice: PriceFilterEditor.Field?
+
+    init(filterState: CardFilterState, items: [CollectionItem], priceEditor: PriceFilterEditor? = nil) {
+        self.filterState = filterState
+        self.items = items
+        let editor = priceEditor ?? PriceFilterEditor(filterState: filterState)
+        _priceEditor = State(initialValue: editor)
+        _pendingInitialPriceFocus = State(initialValue: editor.focusedField)
+    }
 
     private var availableSets: [String] {
         Array(Set(items.map(\.edition))).sorted()
@@ -22,31 +33,84 @@ struct FilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                setSection
-                raritySection
-                foilSection
-                colorSection
-                typeSection
-                buyingSection
-                if hasPrices {
-                    priceSection
-                }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Filter")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Reset") { filterState.reset() }
-                        .disabled(!filterState.isActive)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .bold()
-                }
+            ScrollViewReader { proxy in
+                filterList
+                    .task {
+                        if let field = priceEditor.focusedField {
+                            // Reveal the lazy row before requesting native text-field focus.
+                            proxy.scrollTo(field, anchor: .center)
+                            focusedPrice = field
+                        }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(
+                        for: UIResponder.keyboardDidShowNotification
+                    )) { _ in
+                        guard let field = pendingInitialPriceFocus else { return }
+                        pendingInitialPriceFocus = nil
+                        if focusedPrice == field { proxy.scrollTo(field, anchor: .center) }
+                    }
             }
         }
+    }
+
+    private var filterList: some View {
+        List {
+            setSection
+            raritySection
+            foilSection
+            colorSection
+            typeSection
+            buyingSection
+            if hasPrices {
+                priceSection
+            }
+        }
+        .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Keep controls available when SwiftUI omits native keyboard toolbar items.
+            if focusedPrice != nil {
+                HStack { keyboardButtons }
+                    .padding(.horizontal)
+                    .background(.bar)
+            }
+        }
+        .navigationTitle("Filter")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Reset") { priceEditor.reset() }
+                    .accessibilityIdentifier("price-filter-reset")
+                    .disabled(!priceEditor.canReset)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") { if priceEditor.finish() { dismiss() } }
+                    .accessibilityIdentifier("price-filter-done")
+                    .bold()
+            }
+        }
+        .onChange(of: focusedPrice) { _, field in
+            if !priceEditor.move(to: field) { focusedPrice = priceEditor.focusedField }
+        }
+        .onChange(of: priceEditor.focusedField) { _, field in focusedPrice = field }
+    }
+
+    @ViewBuilder
+    private var keyboardButtons: some View {
+        Button("Previous", systemImage: "chevron.up") { priceEditor.previous() }
+            .accessibilityIdentifier("price-previous")
+            .labelStyle(.iconOnly)
+            .frame(minWidth: 44, minHeight: 44)
+            .disabled(!priceEditor.canMovePrevious)
+        Button("Next", systemImage: "chevron.down") { priceEditor.next() }
+            .accessibilityIdentifier("price-next")
+            .labelStyle(.iconOnly)
+            .frame(minWidth: 44, minHeight: 44)
+            .disabled(!priceEditor.canMoveNext)
+        Spacer()
+        Button("Done", systemImage: "checkmark") { _ = priceEditor.move(to: nil) }
+            .accessibilityIdentifier("price-keyboard-done")
+            .labelStyle(.iconOnly)
+            .frame(minWidth: 44, minHeight: 44)
     }
 
     // MARK: - Sections
@@ -140,10 +204,9 @@ struct FilterSheet: View {
 
     private var priceSection: some View {
         Section("Price") {
-            priceRangeRow(label: "Min Retail", value: $filterState.priceRetailMin)
-            priceRangeRow(label: "Max Retail", value: $filterState.priceRetailMax)
-            priceRangeRow(label: "Min Buylist", value: $filterState.priceBuyMin)
-            priceRangeRow(label: "Max Buylist", value: $filterState.priceBuyMax)
+            ForEach(PriceFilterEditor.Field.allCases) { field in
+                priceRangeRow(field).id(field)
+            }
         }
     }
 
@@ -167,16 +230,51 @@ struct FilterSheet: View {
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    private func priceRangeRow(label: String, value: Binding<Double?>) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            TextField("Any", value: value, format: .number)
-                .autocorrectionDisabled(true)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 80)
+    private func priceRangeRow(_ field: PriceFilterEditor.Field) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(field.rawValue)
+                Spacer()
+                TextField(focusedPrice == field ? "" : "Any", text: Binding(
+                    get: { priceEditor.drafts[field] ?? "" },
+                    set: { priceEditor.drafts[field] = $0 }
+                ))
+                    .accessibilityLabel(field.rawValue)
+                    .accessibilityIdentifier(field.rawValue)
+                    .autocorrectionDisabled(true)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 80)
+                    .focused($focusedPrice, equals: field)
+                    .submitLabel(field.next == nil ? .done : .next)
+                    .onSubmit { priceEditor.submit() }
+                if (priceEditor.drafts[field] ?? "").isEmpty {
+                    clearPriceButton(field).hidden()
+                } else {
+                    clearPriceButton(field)
+                }
+            }
+            if let error = priceEditor.errors[field] {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("\(field.rawValue): \(error)")
+            }
         }
+    }
+
+    private func clearPriceButton(_ field: PriceFilterEditor.Field) -> some View {
+        Button {
+            priceEditor.clear(field)
+            focusedPrice = field
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Clear \(field.rawValue)")
+        .foregroundStyle(.secondary)
+        .buttonStyle(.plain)
     }
 
     private func colorBackground(_ color: ColorFilter) -> Color {

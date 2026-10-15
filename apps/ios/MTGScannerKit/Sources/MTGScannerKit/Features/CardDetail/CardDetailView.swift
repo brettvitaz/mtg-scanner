@@ -37,6 +37,7 @@ struct CardDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Edit") { showEditor = true }
+                    .accessibilityIdentifier("card-detail-edit")
             }
         }
         .fullScreenCover(isPresented: $showFullscreenImage) {
@@ -97,6 +98,10 @@ struct CardDetailView: View {
             }
             LabeledContent("Finish", value: viewModel.editFoil ? "Foil" : "Non-foil")
                 .font(.subheadline)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Finish")
+                .accessibilityValue(viewModel.editFoil ? "Foil" : "Non-foil")
+                .accessibilityIdentifier("card-detail-finish")
         }
         .accessibilityElement(children: .contain)
     }

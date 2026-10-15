@@ -32,6 +32,12 @@
 - Use `XCTUnwrap` for required optional values; test files must pass SwiftLint.
 - MARK sections to organize test groups within a file.
 
+## iOS interactive verification
+- Interactive changes require relevant UI workflows (`make ios-ui-test`) alongside logic tests (`make ios-test`) and screenshot inspection. These checks complement each other.
+- Use production views and controls, stable accessibility identifiers, and bounded condition waits. Add a workflow when existing coverage cannot exercise the changed interaction; the initial workflow covers only card finish edit/save/relaunch.
+- UI tests use a unique run UUID, isolated disk storage and preferences, and explicit fresh/resume modes. Resume must not reseed. Intercept network requests locally; unexpected requests must fail visibly.
+- Preserve Xcode result bundles and diagnostic screenshots on failure. Inspect the named successful workflow screenshots too. Report commands, exit status, artifact paths, and anything unverified. See `apps/ios/AGENTS.md` for destination/filter overrides and fixture lifecycle.
+
 ## Regression tests
 - When fixing a bug in detection or cropping, add a regression test with the failing input.
 - Sample images for regression live in `samples/test/`.

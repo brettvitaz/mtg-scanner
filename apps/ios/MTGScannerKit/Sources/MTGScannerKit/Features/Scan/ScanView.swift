@@ -308,7 +308,7 @@ private extension ScanView {
     private func handleScanActivityChange(_ active: Bool) {
         if !active {
             storeAndTurnOffTorch()
-            autoScanViewModel.stop()
+            autoScanViewModel.pauseForNavigation()
         }
     }
 
@@ -333,6 +333,6 @@ private extension ScanView {
     private func onDisappearHandler() {
         UIApplication.shared.isIdleTimerDisabled = false
         storeAndTurnOffTorch()
-        autoScanViewModel.stop()
+        autoScanViewModel.pauseForNavigation()
     }
 }

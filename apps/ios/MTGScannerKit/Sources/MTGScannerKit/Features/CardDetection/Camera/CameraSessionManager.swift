@@ -51,6 +51,7 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
 
     private let photoOutput = AVCapturePhotoOutput()
     private var isCaptureInFlight = false
+    private var stopAfterCapture = false
     private var captureGeneration = 0
     private var _activeHandler: PhotoCaptureHandler?
     private(set) var captureDevice: AVCaptureDevice?
@@ -170,6 +171,7 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
         guard _activeHandler === handler else { return }
         isCaptureInFlight = false
         _activeHandler = nil
+        if stopAfterCapture { stopSession() }
     }
 
     /// Test-only accessor for queue-confined capture state.
@@ -398,8 +400,9 @@ extension CameraSessionManager {
 
     func start() {
         sessionQueue.async { [weak self] in
-            guard let self, !self.session.isRunning else { return }
-            self.session.startRunning()
+            guard let self else { return }
+            self.stopAfterCapture = false
+            if !self.session.isRunning { self.session.startRunning() }
             self.isSessionReady = self.session.isRunning && self.captureDevice != nil
             if self.focusSettlingState == nil, let device = self.captureDevice {
                 self.observeAdjustments(device)
@@ -418,8 +421,18 @@ extension CameraSessionManager {
         stop()
     }
 
+    /// Rejects new photos immediately, then stops the session after the accepted photo finishes.
+    func pauseForNavigation() {
+        sessionQueue.async { [self] in
+            stopAfterCapture = true
+            isSessionReady = false
+            if !isCaptureInFlight { stopSession() }
+        }
+    }
+
     func stop() {
         sessionQueue.async { [self] in
+            self.stopAfterCapture = false
             self.isSessionReady = false
             if self.isCaptureInFlight {
                 self.captureGeneration &+= 1
@@ -427,10 +440,15 @@ extension CameraSessionManager {
                 self._activeHandler = nil
                 self.isCaptureInFlight = false
             }
-            self.clearFocusWait()
-            guard self.session.isRunning else { return }
-            self.session.stopRunning()
+            self.stopSession()
         }
+    }
+
+    private func stopSession() {
+        stopAfterCapture = false
+        isSessionReady = false
+        clearFocusWait()
+        if session.isRunning { session.stopRunning() }
     }
 }
 

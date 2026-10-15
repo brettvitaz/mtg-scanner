@@ -323,6 +323,106 @@ final class AutoScanCaptureLifecycleTests: XCTestCase {
     }
 }
 
+// MARK: - Navigation lifecycle
+
+extension AutoScanCaptureLifecycleTests {
+    func testNavigationPauseFinishesPhotoWithoutRestartingScanning() async {
+        let queue = makeQueue()
+        let camera = SuspendedPhotoCapture()
+        let vm = makeViewModel(queue: queue, camera: camera)
+        vm.start()
+        vm.captureManually()
+        await waitForPhoto(camera)
+        vm.pauseForNavigation()
+        vm.pauseForNavigation()
+        camera.finish(makePayload())
+        await waitForCapture(vm)
+        XCTAssertEqual(queue.pendingCount, 1)
+        XCTAssertFalse(vm.isActive)
+        XCTAssertNil(vm.lastCroppedImage)
+        XCTAssertFalse(vm.isCalibrated)
+    }
+
+    func testNavigationPauseDuringCropPreservesUploadAcrossRestart() async {
+        let queue = makeQueue()
+        let crop = SuspendedCrop()
+        let payload = makePayload()
+        let detectedBox = box
+        let vm = AutoScanViewModel(
+            detectorProvider: { nil }, recognitionQueue: queue,
+            capturePhoto: { payload }, detectBox: { _ in detectedBox },
+            cropImage: { _, _ in await crop.run() }
+        )
+        vm.start()
+        vm.captureManually()
+        for _ in 0..<1000 {
+            if await crop.hasStarted { break }
+            await Task.yield()
+        }
+        let started = await crop.hasStarted
+        XCTAssertTrue(started)
+        vm.pauseForNavigation()
+        vm.start()
+        await crop.finish(payload.displayImage)
+        await waitForCapture(vm)
+        XCTAssertEqual(queue.pendingCount, 1)
+        XCTAssertNil(vm.lastCroppedImage)
+        XCTAssertFalse(vm.isCalibrated)
+        XCTAssertEqual(vm.statusMessage, "Watching for cards…")
+        vm.stop()
+    }
+
+    func testNavigationPauseCancelsSettlingWithoutTakingPhoto() async {
+        let camera = SuspendedPhotoCapture()
+        let vm = makeViewModel(queue: makeQueue(), camera: camera)
+        vm.captureDelay = 60
+        vm.start()
+        vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
+        await Task.yield()
+        await Task.yield()
+        XCTAssertEqual(vm.captureState, .settling)
+        vm.pauseForNavigation()
+        XCTAssertFalse(vm.isActive)
+        XCTAssertEqual(vm.captureState, .watching)
+        XCTAssertEqual(camera.callCount, 0)
+    }
+
+    func testExplicitStopAfterNavigationDiscardsPreservedPhoto() async {
+        let queue = makeQueue()
+        let camera = SuspendedPhotoCapture()
+        let vm = makeViewModel(queue: queue, camera: camera)
+        vm.start()
+        vm.captureManually()
+        await waitForPhoto(camera)
+        vm.pauseForNavigation()
+        vm.stop()
+        vm.start()
+        camera.finish(makePayload())
+        await waitForCapture(vm)
+        XCTAssertEqual(queue.pendingCount, 0)
+        XCTAssertNil(vm.lastCroppedImage)
+        XCTAssertTrue(vm.isActive)
+        vm.stop()
+    }
+
+    func testNavigationPauseAllowsAutomaticCaptureTaskToFinish() async {
+        let queue = makeQueue()
+        let camera = SuspendedPhotoCapture()
+        let vm = makeViewModel(queue: queue, camera: camera)
+        vm.captureDelay = 0
+        vm.start()
+        vm.presenceTracker.onNewCardSignal?(box, vm.scanSessionID)
+        await waitForPhoto(camera)
+        vm.pauseForNavigation()
+        camera.finish(makePayload())
+        await waitForCapture(vm)
+        XCTAssertEqual(queue.pendingCount, 1)
+        XCTAssertFalse(vm.isActive)
+        XCTAssertNil(vm.lastCroppedImage)
+    }
+
+}
+
 @MainActor
 private final class SuspendedPhotoCapture {
     private var continuation: CheckedContinuation<RecognitionImagePayload?, Never>?

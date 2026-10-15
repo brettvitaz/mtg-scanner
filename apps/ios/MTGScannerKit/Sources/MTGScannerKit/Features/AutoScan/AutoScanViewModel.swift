@@ -61,6 +61,7 @@ final class AutoScanViewModel {
 
     private(set) var scanSessionID = UUID()
     private var captureOperationID: UUID?
+    private var preservedCaptureSessionID: UUID?
     var canCaptureManually: Bool { captureOperationID == nil }
     private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
     private(set) var captureFocusPoint: CGPoint?
@@ -141,10 +142,26 @@ final class AutoScanViewModel {
         statusMessage = "Watching for cards…"
     }
 
+    /// Stops new captures while allowing the accepted photo and crop to finish.
+    func pauseForNavigation() {
+        if captureOperationID == nil {
+            settleTask?.cancel()
+        } else if preservedCaptureSessionID == nil {
+            preservedCaptureSessionID = scanSessionID
+        }
+        settleTask = nil
+        resetScanningState()
+    }
+
     func stop() {
-        isActive = false
+        preservedCaptureSessionID = nil
         settleTask?.cancel()
         settleTask = nil
+        resetScanningState()
+    }
+
+    private func resetScanningState() {
+        isActive = false
         captureState = .watching
         lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
@@ -288,15 +305,19 @@ final class AutoScanViewModel {
 
     private func performCapture(sessionID: UUID, operationID: UUID) async {
         defer {
-            if captureOperationID == operationID { captureOperationID = nil }
+            if captureOperationID == operationID {
+                captureOperationID = nil
+                preservedCaptureSessionID = nil
+            }
         }
-        guard sessionID == scanSessionID else { return }
+        guard acceptsCapture(from: sessionID) else { return }
         let result = await captureResult()
-        guard sessionID == scanSessionID else { return }
+        guard acceptsCapture(from: sessionID) else { return }
         switch result {
         case .success(let payload):
             await processAutoCapturedPayload(payload, sessionID: sessionID)
         case .failure(let failure):
+            guard sessionID == scanSessionID else { return }
             if isActive { presenceTracker.markCaptured() }
             captureState = .watching
             statusMessage = failure.message
@@ -319,14 +340,19 @@ final class AutoScanViewModel {
 #if DEBUG
         await saveRawCaptureIfEnabled(payload)
 #endif
-        guard sessionID == scanSessionID else { return }
+        guard acceptsCapture(from: sessionID) else { return }
         let result = await cropCapturedPayload(payload)
+        guard acceptsCapture(from: sessionID) else { return }
+        enqueueAfterCapture(payload: payload, cropped: result.image)
         guard sessionID == scanSessionID else { return }
         lastCroppedImage = result.image
         if isActive { acknowledgeCapture(boundingBox: result.boundingBox) }
-        enqueueAfterCapture(payload: payload, cropped: result.image)
         captureState = .watching
         statusMessage = isActive ? "Captured! Watching for next card…" : "Captured! Tap Start to begin auto scan."
+    }
+
+    private func acceptsCapture(from sessionID: UUID) -> Bool {
+        sessionID == scanSessionID || sessionID == preservedCaptureSessionID
     }
 
     private func acknowledgeCapture(boundingBox: CGRect?) {

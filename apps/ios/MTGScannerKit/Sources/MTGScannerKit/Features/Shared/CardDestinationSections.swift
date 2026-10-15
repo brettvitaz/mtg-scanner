@@ -8,8 +8,7 @@ struct CardDestinationSections: View {
     @State private var showNewCollection = false
     @State private var showNewDeck = false
 
-    var excludedCollections: Set<UUID> = []
-    var excludedDecks: Set<UUID> = []
+    var filter = CardDestinationFilter()
     let onSelect: (MoveDestination) -> Void
 
     var body: some View {
@@ -21,7 +20,7 @@ struct CardDestinationSections: View {
                 } label: {
                     Label("New Collection", systemImage: "plus.circle")
                 }
-                ForEach(collections.filter { !excludedCollections.contains($0.id) }) { collection in
+                ForEach(collections.filter { filter.includes(.collection($0)) }) { collection in
                     destinationButton(.collection(collection), symbol: "folder")
                 }
             }
@@ -32,7 +31,7 @@ struct CardDestinationSections: View {
                 } label: {
                     Label("New Deck", systemImage: "plus.circle")
                 }
-                ForEach(decks.filter { !excludedDecks.contains($0.id) }) { deck in
+                ForEach(decks.filter { filter.includes(.deck($0)) }) { deck in
                     destinationButton(.deck(deck), symbol: "rectangle.stack")
                 }
             }
@@ -49,10 +48,12 @@ struct CardDestinationSections: View {
         Button { onSelect(destination) } label: {
             HStack {
                 Label(destination.name, systemImage: symbol)
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 12)
                 Text("\(destination.items.totalQuantity)").foregroundStyle(.secondary)
             }
         }
+        .frame(minHeight: 44)
         .foregroundStyle(.primary)
         .accessibilityLabel("\(destination.name), \(destination.items.totalQuantity) cards")
     }

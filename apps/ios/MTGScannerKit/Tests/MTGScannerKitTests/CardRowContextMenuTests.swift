@@ -14,10 +14,10 @@ final class CardRowContextMenuTests: XCTestCase {
     }
 
     func testMenuGroupsActionsAndUsesCurrentFoilLabel() throws {
-        let actions = CardRowMenuActions(transfer: {}, toggleFoil: {}, delete: {})
+        let actions = CardRowMenuActions(transfer: { _ in }, toggleFoil: {}, delete: {})
         let menu = actions.menu(isFoil: false)
         let primary = try XCTUnwrap(menu.children.first as? UIMenu)
-        XCTAssertEqual(primary.children.map(\.title), ["Copy/Move", "Set as Foil"])
+        XCTAssertEqual(primary.children.map(\.title), ["Copy…", "Move…", "Set as Foil"])
         let destructive = try XCTUnwrap(menu.children.last as? UIMenu)
         let delete = try XCTUnwrap(destructive.children.first as? UIAction)
         XCTAssertEqual(delete.title, "Delete")
@@ -30,7 +30,7 @@ final class CardRowContextMenuTests: XCTestCase {
     func testNativeActionsInvokeOnlyTheirMatchingCallback() throws {
         var calls: [String] = []
         let actions = CardRowMenuActions(
-            transfer: { calls.append("transfer") }, toggleFoil: { calls.append("foil") },
+            transfer: { calls.append($0.rawValue) }, toggleFoil: { calls.append("foil") },
             delete: { calls.append("delete") }, navigate: { calls.append("navigate") }
         )
         for group in actions.menu(isFoil: false).children {
@@ -42,12 +42,12 @@ final class CardRowContextMenuTests: XCTestCase {
                 button.sendActions(for: .touchUpInside)
             }
         }
-        XCTAssertEqual(calls, ["transfer", "foil", "delete"])
+        XCTAssertEqual(calls, ["Copy", "Move", "foil", "delete"])
     }
 
     func testPreviewDoesNotNavigateAndCommitNavigatesAfterCompletion() throws {
         var navigated = 0
-        let row = makeRow(actions: CardRowMenuActions(transfer: {}, navigate: { navigated += 1 }))
+        let row = makeRow(actions: CardRowMenuActions(transfer: { _ in }, navigate: { navigated += 1 }))
         let coordinator = row.makeCoordinator()
         let interaction = UIContextMenuInteraction(delegate: coordinator)
         let configuration = try XCTUnwrap(coordinator.contextMenuInteraction(

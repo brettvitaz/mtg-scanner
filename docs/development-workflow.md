@@ -156,7 +156,7 @@ In Results, collections, and decks, hold a card row to preview a large full-card
 image. The successful preview omits repeated collection details. Missing or failed
 artwork shows compact card identification; loading uses the same portrait frame.
 VoiceOver retains card identity, printing, finish, and artwork status. Tap the
-preview to open card detail, or choose Copy/Move, Set as Foil / Set as Non-Foil,
+preview to open card detail, or choose Copy…, Move…, Set as Foil / Set as Non-Foil,
 or Delete. Delete retains its confirmation and foil changes retain existing duplicate handling.
 Previews are disabled during multiselect. Native menu appearance follows the
 installed OS; iOS 18 remains supported.

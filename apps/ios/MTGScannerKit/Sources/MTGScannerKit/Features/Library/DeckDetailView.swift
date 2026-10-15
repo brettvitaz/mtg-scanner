@@ -10,12 +10,11 @@ struct DeckDetailView: View {
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var showCopyMoveSheet = false
+    @State private var transferRequest: CardTransferRequest?
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
@@ -26,7 +25,7 @@ struct DeckDetailView: View {
     private var isDeleted: Bool { deck.isDeleted || deck.modelContext == nil }
 
     private var undoIsBlocked: Bool {
-        showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
+        transferRequest != nil || showDeleteConfirmation
         || contextDeleteItem != nil || exportFile != nil || showFilterSheet
         || showAddCard || showCSVImport || showListOperation || selectedCard != nil || isDeleted
     }
@@ -61,14 +60,9 @@ struct DeckDetailView: View {
             CardDetailView(card: card)
         }
         .toolbar { if !isDeleted { topToolbar } }
-        .sheet(isPresented: $showCopyMoveSheet) {
-            CopyMoveSheet(items: deck.items.filter { selectedItems.contains($0.id) }) { _ in
-                exitSelecting()
-            }
-        }
-        .sheet(item: $contextTransferItem) { item in
-            CopyMoveSheet(items: [item]) { _ in
-                contextTransferItem = nil
+        .sheet(item: $transferRequest) { request in
+            CardTransferSheet(items: request.items, operation: request.operation) { _ in
+                if request.isBulk { exitSelecting() }
             }
         }
         .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
@@ -236,7 +230,7 @@ private extension DeckDetailView {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onTransfer: { contextTransferItem = item },
+                onTransfer: { transferRequest = CardTransferRequest(items: [item], operation: $0) },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },
@@ -258,29 +252,15 @@ private extension DeckDetailView {
 
 private extension DeckDetailView {
     var bottomActionBar: some View {
-        HStack {
-            actionButton("doc.on.doc", "Copy/Move") { showCopyMoveSheet = true }
-            Spacer()
-            actionButton("trash", "Delete", role: .destructive) { showDeleteConfirmation = true }
-        }
-        .padding(.horizontal, 30)
-        .padding(.vertical, 12)
-        .background(.bar)
-    }
-
-    func actionButton(
-        _ icon: String, _ label: String, role: ButtonRole? = nil, action: @escaping () -> Void
-    ) -> some View {
-        Button(role: role) {
-            guard !selectedItems.isEmpty else { return }
-            action()
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                Text(label).font(.caption2)
-            }
-        }
-        .disabled(selectedItems.isEmpty)
+        CardSelectionActionBar(
+            isEmpty: selectedItems.isEmpty,
+            onTransfer: {
+                transferRequest = CardTransferRequest(
+                    items: deck.items.filter { selectedItems.contains($0.id) }, operation: $0, isBulk: true
+                )
+            },
+            onDelete: { showDeleteConfirmation = true }
+        )
     }
 }
 

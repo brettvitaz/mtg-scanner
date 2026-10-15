@@ -5,7 +5,7 @@ import SwiftUI
 struct CollectionItemRow: View {
     @Bindable var item: CollectionItem
     var showQuantityStepper: Bool = false
-    var onTransfer: (() -> Void)?
+    var onTransfer: ((CardTransferOperation) -> Void)?
     var onDelete: (() -> Void)?
     var onSwipeDelete: (() -> Void)?
     var onToggleFoil: (() -> Void)?
@@ -35,7 +35,10 @@ struct CollectionItemRow: View {
             .accessibilityElement(children: showQuantityStepper ? .contain : .ignore)
             .accessibilityLabel(accessibilitySummary)
             .accessibilityActions {
-                if let onTransfer { Button("Copy/Move", action: onTransfer) }
+                if let onTransfer {
+                    Button("Copy…") { onTransfer(.copy) }
+                    Button("Move…") { onTransfer(.move) }
+                }
                 if let onToggleFoil {
                     Button(item.foil ? "Set as Non-Foil" : "Set as Foil", action: onToggleFoil)
                 }

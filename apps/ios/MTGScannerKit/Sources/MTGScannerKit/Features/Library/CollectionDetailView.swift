@@ -10,12 +10,11 @@ struct CollectionDetailView: View {
 
     @State private var isSelecting = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var showCopyMoveSheet = false
+    @State private var transferRequest: CardTransferRequest?
     @State private var showDeleteConfirmation = false
     @State private var exportFile: ExportActivityItem?
     @State private var filterState = CardFilterState()
     @State private var showFilterSheet = false
-    @State private var contextTransferItem: CollectionItem?
     @State private var contextDeleteItem: CollectionItem?
     @State private var showAddCard = false
     @State private var showCSVImport = false
@@ -26,7 +25,7 @@ struct CollectionDetailView: View {
     private var isDeleted: Bool { collection.isDeleted || collection.modelContext == nil }
 
     private var undoIsBlocked: Bool {
-        showCopyMoveSheet || contextTransferItem != nil || showDeleteConfirmation
+        transferRequest != nil || showDeleteConfirmation
         || contextDeleteItem != nil || exportFile != nil || showFilterSheet
         || showAddCard || showCSVImport || showListOperation || selectedCard != nil || isDeleted
     }
@@ -61,14 +60,9 @@ struct CollectionDetailView: View {
             CardDetailView(card: card)
         }
         .toolbar { if !isDeleted { topToolbar } }
-        .sheet(isPresented: $showCopyMoveSheet) {
-            CopyMoveSheet(items: collection.items.filter { selectedItems.contains($0.id) }) { _ in
-                exitSelecting()
-            }
-        }
-        .sheet(item: $contextTransferItem) { item in
-            CopyMoveSheet(items: [item]) { _ in
-                contextTransferItem = nil
+        .sheet(item: $transferRequest) { request in
+            CardTransferSheet(items: request.items, operation: request.operation) { _ in
+                if request.isBulk { exitSelecting() }
             }
         }
         .alert("Delete \(selectedItems.count) card(s)?", isPresented: $showDeleteConfirmation) {
@@ -161,34 +155,15 @@ struct CollectionDetailView: View {
     // MARK: - Bottom Action Bar
 
     private var bottomActionBar: some View {
-        HStack {
-            Button {
-                guard !selectedItems.isEmpty else { return }
-                showCopyMoveSheet = true
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "doc.on.doc")
-                    Text("Copy/Move").font(.caption2)
-                }
-            }
-            .disabled(selectedItems.isEmpty)
-
-            Spacer()
-
-            Button(role: .destructive) {
-                guard !selectedItems.isEmpty else { return }
-                showDeleteConfirmation = true
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "trash")
-                    Text("Delete").font(.caption2)
-                }
-            }
-            .disabled(selectedItems.isEmpty)
-        }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 12)
-        .background(.bar)
+        CardSelectionActionBar(
+            isEmpty: selectedItems.isEmpty,
+            onTransfer: {
+                transferRequest = CardTransferRequest(
+                    items: collection.items.filter { selectedItems.contains($0.id) }, operation: $0, isBulk: true
+                )
+            },
+            onDelete: { showDeleteConfirmation = true }
+        )
     }
 }
 
@@ -246,7 +221,7 @@ private extension CollectionDetailView {
             CollectionItemRow(
                 item: item,
                 showQuantityStepper: true,
-                onTransfer: { contextTransferItem = item },
+                onTransfer: { transferRequest = CardTransferRequest(items: [item], operation: $0) },
                 onDelete: { contextDeleteItem = item },
                 onSwipeDelete: { deleteItem(item) },
                 onToggleFoil: { toggleFoil(item) },

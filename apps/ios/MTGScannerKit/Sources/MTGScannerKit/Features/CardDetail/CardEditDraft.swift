@@ -7,8 +7,10 @@ final class CardEditDraft {
     var printing: CardPrinting
     var isFoil: Bool
     var errorMessage: String?
+    private let commit: (() throws -> Void)?
 
-    init(card: RecognizedCard, printing: CardPrinting? = nil) {
+    init(card: RecognizedCard, printing: CardPrinting? = nil, commit: (() throws -> Void)? = nil) {
+        self.commit = commit
         let initialPrinting = printing ?? CardPrinting(card: card)
         self.printing = initialPrinting
         self.isFoil = initialPrinting.isFoilOnly
@@ -48,7 +50,7 @@ final class CardEditDraft {
                                                   context: context, baseURL: feedbackBaseURL)
             item.collection?.updatedAt = Date()
             item.deck?.updatedAt = Date()
-            try (commit ?? { try context.save() })()
+            try (commit ?? self.commit ?? { try context.save() })()
             return true
         } catch {
             context.rollback()

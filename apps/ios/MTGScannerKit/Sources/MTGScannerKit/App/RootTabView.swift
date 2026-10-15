@@ -1,7 +1,9 @@
+import SwiftData
 import SwiftUI
 import UIKit
 
 public struct RootTabView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AppModel.self) private var appModel
     @State private var scanMode: DetectionMode = .scan
@@ -58,6 +60,10 @@ public struct RootTabView: View {
             Button("Settings") { appModel.selectTab(.settings) }
         } message: {
             Text(appModel.connectionAlertMessage)
+        }
+        .task {
+            appModel.modelContext = modelContext
+            await appModel.retryRecognitionFeedback()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await appModel.retryRecognitionFeedback() } }

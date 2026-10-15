@@ -62,7 +62,7 @@ public final class AppModel {
     /// Torch level to restore when returning to scan view (same session only, not persisted)
     var lastTorchLevel: Float = 0
 
-    let feedbackUploader = RecognitionFeedbackUploader()
+    let feedbackUploader: RecognitionFeedbackUploader
     private let apiClient = APIClient()
     private let cropService = CardCropService()
     private let correctionsStoreKey = "card_corrections"
@@ -79,7 +79,12 @@ public final class AppModel {
     private let motionBurstMinPeakThresholdKey = "motion_burst_min_peak_threshold"
     private let exposureBiasKey = "exposure_bias"
 
-    public init() {
+    public convenience init() {
+        self.init(feedbackUploader: RecognitionFeedbackUploader())
+    }
+
+    init(feedbackUploader: RecognitionFeedbackUploader) {
+        self.feedbackUploader = feedbackUploader
         self.apiBaseURL = UserDefaults.standard.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         self.onDeviceCropEnabled = UserDefaults.standard.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
 #if DEBUG

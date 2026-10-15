@@ -3,7 +3,17 @@ import SwiftUI
 import UIKit
 
 public struct ResultsView: View {
-    public init() {}
+    private let makeSelectionBar: (ResultsSelectionBar) -> AnyView
+
+    public init() {
+        makeSelectionBar = { AnyView($0) }
+    }
+
+    init(selection: Set<UUID>, makeSelectionBar: @escaping (ResultsSelectionBar) -> AnyView = { AnyView($0) }) {
+        self.makeSelectionBar = makeSelectionBar
+        _isSelecting = State(initialValue: !selection.isEmpty)
+        _selectedItems = State(initialValue: selection)
+    }
 
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
@@ -237,31 +247,12 @@ public struct ResultsView: View {
 
 private extension ResultsView {
     var bottomActionBar: some View {
-        HStack {
-            actionButton("doc.on.doc", "Copy/Move") { showCopyMoveSheet = true }
-            Spacer()
-            actionButton("sparkles", "Toggle Foil") { toggleSelectedFoil() }
-            Spacer()
-            actionButton("trash", "Delete", role: .destructive) { showDeleteConfirmation = true }
-        }
-        .padding(.horizontal, 30)
-        .padding(.vertical, 12)
-        .background(.bar)
-    }
-
-    func actionButton(
-        _ icon: String, _ label: String, role: ButtonRole? = nil, action: @escaping () -> Void
-    ) -> some View {
-        Button(role: role) {
-            guard !selectedItems.isEmpty else { return }
-            action()
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                Text(label).font(.caption2)
-            }
-        }
-        .disabled(selectedItems.isEmpty)
+        makeSelectionBar(ResultsSelectionBar(
+            hasSelection: !selectedItems.isEmpty,
+            onTransfer: { showCopyMoveSheet = true },
+            onToggleFoil: toggleSelectedFoil,
+            onDelete: { showDeleteConfirmation = true }
+        ))
     }
 }
 

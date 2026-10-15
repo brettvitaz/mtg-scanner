@@ -12,9 +12,11 @@ struct CardDetailView: View {
     @State private var addedMessage: String?
     private let resultScope: Bool
     private let initialZoom: CGFloat
+    private let editorDraft: CardEditDraft?
 
     init(card: RecognizedCard, resultScope: Bool = false, showingScan: Bool = false,
-         showImageViewer: Bool = false, initialZoom: CGFloat = 1) {
+         showImageViewer: Bool = false, initialZoom: CGFloat = 1, editorDraft: CardEditDraft? = nil) {
+        self.editorDraft = editorDraft
         let model = CardDetailViewModel(card: card, cropImage: nil)
         model.showingCropImage = showingScan
         _viewModel = State(wrappedValue: model)
@@ -52,7 +54,7 @@ struct CardDetailView: View {
         }
         .sheet(isPresented: $showEditor) {
             EditCardView(
-                draft: CardEditDraft(card: currentCard, printing: viewModel.selectedPrinting),
+                draft: editorDraft ?? CardEditDraft(card: currentCard, printing: viewModel.selectedPrinting),
                 scan: resultScan,
                 onSave: saveEdit,
                 requiresMerge: { draft in

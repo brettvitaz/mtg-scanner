@@ -51,9 +51,7 @@ struct MTGScannerApp: App {
             .environment(libraryViewModel)
             .modelContainer(modelContainer)
             .onAppear {
-                appModel.modelContext = modelContainer.mainContext
                 libraryViewModel.modelContext = modelContainer.mainContext
-                Task { await appModel.retryRecognitionFeedback() }
             }
     }
 }

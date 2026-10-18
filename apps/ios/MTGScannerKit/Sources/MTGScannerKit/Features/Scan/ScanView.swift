@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct ScanView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var detectionMode: DetectionMode
     let isActive: Bool
     @State private var detectionViewModel: CardDetectionViewModel
@@ -171,33 +172,50 @@ struct ScanView: View {
     }
 
     private var captureControls: some View {
-        VStack(spacing: 8) {
-            if isAutoScanMode { AutoScanView(viewModel: autoScanViewModel) }
-            ZStack {
-                ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor, opensMenu: opensZoomMenu) { preset in
-                    captureCoordinator.setZoom(preset)
-                }
-                .disabled(!autoScanViewModel.canCaptureManually)
-                HStack {
-                    Spacer()
-                    FlashlightButton(torchLevel: $detectionViewModel.torchLevel,
-                                     lastTorchLevel: lastTorchLevelBinding, opensBrightness: opensBrightness)
-                }
+        VStack(spacing: 12) {
+            if isAutoScanMode, let failure = autoScanViewModel.captureFailure {
+                StationCaptureFailureView(message: failure, retry: autoScanViewModel.captureManually)
             }
+            if isAutoScanMode && dynamicTypeSize.isAccessibilitySize {
+                AutoScanView(viewModel: autoScanViewModel)
+            }
+            framingControls
             bottomBar
         }
+        .frame(maxWidth: 420)
         .padding(.horizontal, 20)
-        .padding(.top, 24)
-        .padding(.bottom, 12)
+        .padding(.top, 16)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity)
         .background {
             LinearGradient(
-                stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.65), location: 0.4),
-                        .init(color: .black.opacity(0.75), location: 1)],
+                stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.65), location: 0.2),
+                        .init(color: .black.opacity(0.7), location: 1)],
                 startPoint: .top, endPoint: .bottom
             )
-                .padding(.top, -100)
+                .padding(.top, -32)
                 .ignoresSafeArea(edges: .bottom)
                 .allowsHitTesting(false)
+        }
+    }
+
+    private var framingControls: some View {
+        ZStack {
+            ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor, opensMenu: opensZoomMenu) { preset in
+                captureCoordinator.setZoom(preset)
+            }
+            .disabled(!autoScanViewModel.canCaptureManually)
+            HStack {
+                if isAutoScanMode && !dynamicTypeSize.isAccessibilitySize {
+                    AutoScanView(viewModel: autoScanViewModel)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, 100)
+                } else {
+                    Spacer()
+                }
+                FlashlightButton(torchLevel: $detectionViewModel.torchLevel,
+                                 lastTorchLevel: lastTorchLevelBinding, opensBrightness: opensBrightness)
+            }
         }
     }
 
@@ -255,11 +273,11 @@ struct ScanView: View {
         Group {
             if let image = autoScanViewModel.lastCroppedImage {
                 Image(uiImage: image).resizable().scaledToFit()
-                    .frame(width: 42, height: 56)
+                    .frame(width: 36, height: 48)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .accessibilityLabel("Last captured card")
             } else {
-                Color.clear.frame(width: 42, height: 56).accessibilityHidden(true)
+                Color.clear.frame(width: 36, height: 48).accessibilityHidden(true)
             }
         }
     }
@@ -274,11 +292,10 @@ struct ScanView: View {
     private var photoPickerButton: some View {
         PhotosPicker(selection: $selectedPhoto, matching: .images) {
             Image(systemName: "photo.on.rectangle")
-                .font(.system(size: 24))
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(.white)
-                .frame(width: 54, height: 54)
-                .background(.ultraThinMaterial)
-                .clipShape(Circle())
+                .frame(width: 48, height: 48)
+                .captureControlSurface(in: Circle())
         }
         .accessibilityLabel("Choose photo")
         .accessibilityHint("Selects an existing image for card recognition.")

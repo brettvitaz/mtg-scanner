@@ -11,11 +11,10 @@ struct FlashlightButton: View {
 
     var body: some View {
         Image(systemName: torchIsOn ? "flashlight.on.fill" : "flashlight.off.fill")
-            .font(.system(size: 24))
+            .font(.system(size: 20, weight: .medium))
             .foregroundStyle(torchIsOn ? .yellow : .white)
-            .frame(width: 54, height: 54)
-            .background(.ultraThinMaterial)
-            .clipShape(Circle())
+            .frame(width: 44, height: 44)
+            .captureControlSurface(in: Circle())
             .contentShape(Circle())
             .gesture(
                 ExclusiveGesture(
@@ -76,26 +75,41 @@ struct BrightnessPopover: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("Brightness").font(.headline).lineLimit(1).minimumScaleFactor(0.75)
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark").frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Close")
-            }
-            Text("\(Int((torchLevel * 100).rounded()))%")
-                .font(.title3.monospacedDigit())
-                .accessibilityIdentifier("torch-brightness-percentage")
-                .accessibilityHidden(true)
+        VStack(spacing: 4) {
+            header
+            if dynamicTypeSize.isAccessibilitySize { percentage }
             BrightnessBar(level: $torchLevel, remembered: $lastTorchLevel)
                 .frame(height: 44)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
         .padding(.bottom, 12)
         .frame(width: sizeClass == .regular && dynamicTypeSize.isAccessibilitySize ? 420 : 300)
         .presentationCompactAdaptation(.popover)
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Text("Brightness").font(.subheadline.weight(.medium)).lineLimit(1).minimumScaleFactor(0.75)
+            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize { percentage }
+            Button { dismiss() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+        }
+    }
+
+    private var percentage: some View {
+        Text("\(Int((torchLevel * 100).rounded()))%")
+            .font(.headline.monospacedDigit())
+            .fixedSize()
+            .accessibilityIdentifier("torch-brightness-percentage")
+            .accessibilityHidden(true)
     }
 }
 

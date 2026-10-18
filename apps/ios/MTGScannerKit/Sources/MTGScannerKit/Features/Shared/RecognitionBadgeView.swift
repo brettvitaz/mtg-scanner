@@ -46,8 +46,7 @@ struct RecognitionBadgeView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
+        .captureControlSurface(in: Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Recognition in progress")
         .accessibilityValue("\(recognitionQueue.pendingCount) pending")
@@ -60,6 +59,7 @@ struct RecognitionBadgeView: View {
                 .foregroundStyle(.white.opacity(0.8))
                 .frame(width: 44, height: 44)
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Cancel recognition")
         .accessibilityHint("Cancels pending card recognition requests.")
     }
@@ -68,15 +68,15 @@ struct RecognitionBadgeView: View {
         Button {
             showingFailedAlert = true
         } label: {
-            Text("\(recognitionQueue.failedCount) failed")
+            Label("\(recognitionQueue.failedCount) failed", systemImage: "exclamationmark.circle")
                 .font(.caption.bold())
-                .foregroundStyle(.red)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .frame(minHeight: 44)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
+                .captureControlSurface(in: Capsule())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Recognition failures")
         .accessibilityValue("\(recognitionQueue.failedCount) failed")
         .accessibilityHint("Tap to retry or dismiss failed cards.")

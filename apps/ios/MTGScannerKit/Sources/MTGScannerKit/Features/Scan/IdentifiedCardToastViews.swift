@@ -76,6 +76,7 @@ struct IdentifiedCardToastView: View {
                 .contentShape(Rectangle())
                 .background(Circle().fill(Color.white.opacity(0.3)).frame(width: 24, height: 24))
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Dismiss")
         .accessibilityHint("Dismisses this recognized card notification.")
     }
@@ -129,6 +130,7 @@ struct IdentifiedCardToastContainer: View {
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
+        .frame(maxWidth: 480)
         .padding(.horizontal, 16)
         .animation(animation, value: viewModel.recentCards.count)
     }

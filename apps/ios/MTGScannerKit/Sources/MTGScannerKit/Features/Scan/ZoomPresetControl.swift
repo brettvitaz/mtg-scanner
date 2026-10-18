@@ -11,8 +11,8 @@ struct ZoomPresetControl: View {
     var body: some View {
         NativeZoomMenu(currentZoom: currentZoom, opensMenu: opensMenu, onSelect: onSelect)
             .fixedSize()
-            .frame(minWidth: 80, minHeight: 44)
-            .background(.ultraThinMaterial, in: Capsule())
+            .frame(minWidth: 72, minHeight: 44)
+            .captureControlSurface(in: Capsule())
     }
 
     static func label(_ value: CGFloat) -> String {
@@ -34,6 +34,7 @@ private struct NativeZoomMenu: UIViewRepresentable {
         config.image = UIImage(systemName: "chevron.down")
         config.imagePlacement = .trailing
         config.imagePadding = 6
+        config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
         config.baseForegroundColor = .white
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
             var attributes = attributes
@@ -45,7 +46,9 @@ private struct NativeZoomMenu: UIViewRepresentable {
         button.accessibilityValue = ZoomPresetControl.label(currentZoom)
         button.accessibilityIdentifier = "capture-zoom"
         button.menu = UIMenu(children: ZoomPresetControl.presets.map { preset in
-            UIAction(title: ZoomPresetControl.label(preset)) { _ in onSelect(preset) }
+            UIAction(title: ZoomPresetControl.label(preset), state: currentZoom == preset ? .on : .off) { _ in
+                onSelect(preset)
+            }
         })
         button.showsMenuAsPrimaryAction = true
         button.opensMenu = opensMenu

@@ -103,20 +103,27 @@ final class BrightnessBarControl: UIControl {
     @objc private func increase() { accessibilityIncrement() }
 
     override func draw(_ rect: CGRect) {
-        let track = CGRect(x: 0, y: bounds.midY - 6, width: bounds.width, height: 12)
+        let track = CGRect(x: 0, y: bounds.midY - 6, width: bounds.width, height: 8)
         UIColor.secondarySystemFill.setFill()
-        UIBezierPath(roundedRect: track, cornerRadius: 6).fill()
+        UIBezierPath(roundedRect: track, cornerRadius: 4).fill()
         UIColor.systemYellow.setFill()
         let fill = CGRect(x: 0, y: track.minY, width: bounds.width * CGFloat(level), height: track.height)
-        UIBezierPath(roundedRect: fill, cornerRadius: 6).fill()
-        UIColor.label.setStroke()
+        UIBezierPath(roundedRect: fill, cornerRadius: 4).fill()
+        UIColor.secondaryLabel.setStroke()
         for preset in Self.presets {
             let x = min(bounds.width - 1, max(1, bounds.width * CGFloat(preset)))
             let mark = UIBezierPath()
-            mark.move(to: CGPoint(x: x, y: bounds.midY - 10))
-            mark.addLine(to: CGPoint(x: x, y: bounds.midY + 10))
+            mark.move(to: CGPoint(x: x, y: track.maxY + 5))
+            mark.addLine(to: CGPoint(x: x, y: track.maxY + 9))
             mark.lineWidth = 1
             mark.stroke()
         }
+        let thumbX = min(bounds.width - 7, max(7, bounds.width * CGFloat(level)))
+        let thumb = UIBezierPath(ovalIn: CGRect(x: thumbX - 7, y: track.midY - 7, width: 14, height: 14))
+        UIColor.white.setFill()
+        thumb.fill()
+        UIColor.tertiaryLabel.setStroke()
+        thumb.lineWidth = 0.5
+        thumb.stroke()
     }
 }

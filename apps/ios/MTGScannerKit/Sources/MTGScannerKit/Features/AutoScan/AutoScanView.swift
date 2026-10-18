@@ -6,24 +6,29 @@ struct AutoScanView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 4) {
-            Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Station status")
-                .accessibilityValue(viewModel.stationStatus.rawValue)
-                .accessibilityIdentifier("station-status")
-                .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : viewModel.completionSequence)
-            if let failure = viewModel.captureFailure {
-                Button { viewModel.captureManually() } label: {
-                    Text(failure).font(.caption).multilineTextAlignment(.center)
-                        .frame(minHeight: 44)
-                }
-                .foregroundStyle(.white)
-                .accessibilityLabel("Capture failed. \(failure) Retry capture")
-            }
+        Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Station status")
+            .accessibilityValue(viewModel.stationStatus.rawValue)
+            .accessibilityIdentifier("station-status")
+            .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : viewModel.completionSequence)
+    }
+}
+
+struct StationCaptureFailureView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        Button(action: retry) {
+            Text(message).font(.caption).multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .accessibilityLabel("Capture failed. \(message) Retry capture")
     }
 }
 
@@ -35,11 +40,15 @@ struct StationStartStopButton: View {
             if viewModel.isActive { viewModel.stop() } else { viewModel.start() }
         } label: {
             Text(viewModel.isActive ? "Stop" : "Start")
-                .font(.subheadline.bold())
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .foregroundStyle(.white)
-                .frame(minWidth: 64, minHeight: 54)
-                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.horizontal, 14)
+                .frame(minWidth: 64, minHeight: 48)
+                .captureControlSurface(in: Capsule())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel(viewModel.isActive ? "Stop Station" : "Start Station")
         .accessibilityHint("Controls automatic card capture.")
         .accessibilityIdentifier("station-start-stop")

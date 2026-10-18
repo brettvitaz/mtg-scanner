@@ -10,8 +10,6 @@ struct ZoomPresetControl: View {
 
     var body: some View {
         NativeZoomMenu(currentZoom: currentZoom, opensMenu: opensMenu, onSelect: onSelect)
-            .fixedSize()
-            .frame(minWidth: 72, minHeight: 44)
             .captureControlSurface(in: Capsule())
     }
 
@@ -28,12 +26,17 @@ private struct NativeZoomMenu: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ZoomMenuButton { ZoomMenuButton(type: .system) }
 
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: ZoomMenuButton, context: Context) -> CGSize? {
+        uiView.intrinsicContentSize
+    }
+
     func updateUIView(_ button: ZoomMenuButton, context: Context) {
         var config = UIButton.Configuration.plain()
         config.title = ZoomPresetControl.label(currentZoom)
         config.image = UIImage(systemName: "chevron.down")
         config.imagePlacement = .trailing
         config.imagePadding = 6
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
         config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
         config.baseForegroundColor = .white
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in

@@ -45,18 +45,16 @@ struct ScanView: View {
     }
 
     var body: some View {
-        ZStack {
-            cameraPreview
-                .ignoresSafeArea()
-
-            cameraOverlay
-
-            if shutterFlash {
-                Color.white.opacity(0.7)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
+        GeometryReader { geometry in
+            captureContent
+                .overlay(alignment: .bottom) {
+                    Color.black
+                        .frame(height: geometry.safeAreaInsets.bottom)
+                        .offset(y: geometry.safeAreaInsets.bottom)
+                        .allowsHitTesting(false)
+                }
         }
+        .toolbarBackground(.black, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarColorScheme(.dark, for: .tabBar)
         .onAppear(perform: onAppearHandler)
@@ -118,6 +116,16 @@ struct ScanView: View {
     }
 
     // MARK: - Setup
+
+    private var captureContent: some View {
+        ZStack {
+            cameraPreview.ignoresSafeArea()
+            cameraOverlay
+            if shutterFlash {
+                Color.white.opacity(0.7).ignoresSafeArea().allowsHitTesting(false)
+            }
+        }
+    }
 
     private func configureAutoScan() {
         autoScanViewModel.appModel = appModel
@@ -189,12 +197,14 @@ struct ScanView: View {
         .frame(maxWidth: .infinity)
         .background {
             LinearGradient(
-                stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.65), location: 0.2),
-                        .init(color: .black.opacity(0.7), location: 1)],
+                stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.06), location: 0.15),
+                        .init(color: .black.opacity(0.32), location: 0.3),
+                        .init(color: .black.opacity(0.72), location: 0.47),
+                        .init(color: .black.opacity(0.96), location: 0.58),
+                        .init(color: .black, location: 0.65), .init(color: .black, location: 1)],
                 startPoint: .top, endPoint: .bottom
             )
-                .padding(.top, -32)
-                .ignoresSafeArea(edges: .bottom)
+                .padding(.top, -80)
                 .allowsHitTesting(false)
         }
     }

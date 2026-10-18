@@ -8,11 +8,13 @@ import SwiftUI
 struct CameraPreviewRepresentable: UIViewControllerRepresentable {
 
     @Binding var detectionMode: DetectionMode
-    var zoomFactor: CGFloat = 1.0
     var camera: AutoScanCamera = .standard
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     var captureCoordinator: CameraCaptureCoordinator?
     var onZoomFactorChanged: ((CGFloat) -> Void)?
+    var willChangeZoom: ((CGFloat) -> Bool)?
+    var onZoomMotionChanged: ((Bool) -> Void)?
+    var onZoomFailure: ((CGFloat) -> Void)?
     var shouldChangeZoom: ((CGFloat) -> Bool)?
     /// Receives raw `CMSampleBuffer` frames on the session queue when in Auto Scan mode.
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
@@ -34,7 +36,6 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: CameraViewController, context: Context) {
         connect(vc)
         vc.updateDetectionMode(detectionMode)
-        vc.setZoom(zoomFactor)
         vc.setTorchLevel(torchLevel)
         vc.setExposureBias(exposureBias)
         captureCoordinator?.controller = vc
@@ -44,6 +45,9 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
         vc.onDetectedCardsChanged = onDetectedCardsChanged
         vc.onZoomFactorChanged = onZoomFactorChanged
         vc.shouldChangeZoom = shouldChangeZoom
+        vc.willChangeZoom = willChangeZoom
+        vc.onZoomMotionChanged = onZoomMotionChanged
+        vc.onZoomFailure = onZoomFailure
         vc.onAutoScanFrame = onAutoScanFrame
         captureCoordinator?.controller = vc
     }

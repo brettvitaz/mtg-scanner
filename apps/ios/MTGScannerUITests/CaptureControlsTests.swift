@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 @MainActor
@@ -15,30 +16,87 @@ final class CaptureControlsTests: XCTestCase {
         app.tabBars.buttons["Station"].tap()
         assertStatus("Ready")
         XCTAssertEqual(app.sheets.count, 0)
-        let zoom = app.buttons["capture-zoom"]
+        let zoom = app.buttons["capture-zoom-1"]
+        for anchor in 1...3 { XCTAssertTrue(app.buttons["capture-zoom-\(anchor)"].exists) }
+        screenshot("inline-zoom-running")
         zoom.tap()
-        XCTAssertTrue(app.buttons["1.5×"].waitForExistence(timeout: 3))
-        for choice in ["1×", "1.5×", "2×", "3×"] { XCTAssertTrue(app.buttons[choice].exists) }
-        XCTAssertEqual(app.descendants(matching: .any)["station-status"].value as? String, "Ready")
-        screenshot("zoom-menu-running")
-        app.buttons["1.5×"].tap()
         assertStatus("Paused")
-        XCTAssertEqual(zoom.value as? String, "1.5×")
+        assertZoom(1, "1.5×")
         XCTAssertTrue(app.images["Last captured card"].exists)
-        for choice in ["3×", "2×", "1×"] {
-            zoom.tap()
-            app.buttons[choice].tap()
-            XCTAssertEqual(zoom.value as? String, choice)
+        zoom.tap()
+        assertZoom(1, "1×")
+        for anchor in [2, 3, 1] {
+            app.buttons["capture-zoom-\(anchor)"].tap()
+            assertZoom(anchor, "\(anchor)×")
+            app.buttons["capture-zoom-\(anchor)"].tap()
+            assertZoom(anchor, "\(anchor).5×")
+            app.buttons["capture-zoom-\(anchor)"].tap()
+            assertZoom(anchor, "\(anchor)×")
         }
         app.buttons["station-start-stop"].tap()
         assertStatus("Ready")
         app.tabBars.buttons["Results"].tap()
         app.tabBars.buttons["Table"].tap()
-        XCTAssertEqual(app.buttons["capture-zoom"].value as? String, "1×")
+        XCTAssertEqual(app.buttons["capture-zoom-1"].value as? String, "1×")
         app.tabBars.buttons["Station"].tap()
         assertStatus("Stopped")
-        XCTAssertEqual(app.buttons["capture-zoom"].value as? String, "1×")
+        XCTAssertEqual(app.buttons["capture-zoom-1"].value as? String, "1×")
         screenshot("capture-navigation")
+    }
+
+    func testThresholdFixturesKeepTheActiveValueOnTheShutterAxis() {
+        for (route, anchor, value) in [("low", 1, "1.9×"), ("high", 2, "2.1×"), ("upper", 3, "3.2×")] {
+            launch("capture-zoom-pinch-\(route)")
+            assertStatus("Paused")
+            assertZoom(anchor, value)
+            XCTAssertTrue(app.tabBars.buttons["Station"].isSelected)
+            let active = app.buttons["capture-zoom-\(anchor)"]
+            let shutter = app.buttons["capture-shutter"]
+            XCTAssertEqual(active.frame.midX, shutter.frame.midX, accuracy: 1)
+            for family in 1...3 {
+                let button = app.buttons["capture-zoom-\(family)"]
+                XCTAssertGreaterThanOrEqual(button.frame.width, 44)
+                XCTAssertGreaterThanOrEqual(button.frame.height, 44)
+            }
+            app.tabBars.buttons["Station"].tap()
+            assertZoom(anchor, value)
+            screenshot("zoom-pinch-\(route)")
+            active.tap()
+            assertZoom(anchor, "\(anchor)×")
+            app.terminate()
+        }
+    }
+
+    func testMotionLocksCaptureAndStartButAllowsRetargeting() {
+        launch("capture-station-zoom-transition")
+        assertStatus("Paused")
+        assertZoom(1, "1.3×")
+        XCTAssertFalse(app.buttons["capture-shutter"].isEnabled)
+        XCTAssertFalse(app.buttons["station-start-stop"].isEnabled)
+        screenshot("station-zoom-transition-locked")
+        app.buttons["capture-zoom-2"].tap()
+        assertZoom(2, "2×")
+        XCTAssertTrue(app.buttons["station-start-stop"].isEnabled)
+        XCTAssertTrue(app.buttons["capture-shutter"].isEnabled)
+        app.buttons["station-start-stop"].tap()
+        assertStatus("Ready")
+    }
+
+    func testNativePinchCrossesFamiliesAndCanReturnToBase() {
+        launch("capture-zoom-open")
+        assertZoom(1, "1.5×")
+        app.images["capture-fixture-pinch-target"].pinch(withScale: 1.6, velocity: 1)
+        let family = app.buttons["capture-zoom-3"]
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: family)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed, app.debugDescription)
+        screenshot("native-pinch-above-three")
+        family.tap()
+        assertZoom(3, "3×")
+        app.images["capture-fixture-pinch-target"].pinch(withScale: 0.5, velocity: -1)
+        let low = app.buttons["capture-zoom-1"]
+        let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: low)
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed, app.debugDescription)
+        screenshot("native-pinch-reverse")
     }
 
     func testTorchHoldPresetRelativeDragCloseAndRestore() {
@@ -111,9 +169,39 @@ final class CaptureControlsTests: XCTestCase {
         screenshot("capture-and-recognition-errors")
     }
 
+    func testTabletOrientationKeepsControlsOnTheShutterAxis() throws {
+        launch("capture-zoom-pinch-high")
+        guard app.frame.width >= 700 else { throw XCTSkip("iPad orientation matrix runs on an iPad destination") }
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft, .landscapeRight] {
+            XCUIDevice.shared.orientation = orientation
+            let landscape = orientation != .portrait
+            let viewport = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in (self.app.frame.width > self.app.frame.height) == landscape },
+                object: app
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [viewport], timeout: 5), .completed)
+            // Real actions wait for native idleness and prove the rotated controls are usable.
+            app.buttons["capture-zoom-1"].tap()
+            assertZoom(1, "1×")
+            app.buttons["capture-zoom-2"].tap()
+            assertZoom(2, "2×")
+            assertStatus("Paused")
+            XCTAssertEqual(app.buttons["capture-zoom-2"].frame.midX,
+                           app.buttons["capture-shutter"].frame.midX, accuracy: 1)
+            screenshot("tablet-orientation-\(orientation.rawValue)")
+        }
+    }
+
     private func launch(_ route: String) {
         app.launchArguments = ["-UI_PREVIEW_ROUTE", route]
         app.launch()
+    }
+
+    private func assertZoom(_ family: Int, _ value: String) {
+        let control = app.buttons["capture-zoom-\(family)"]
+        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: control)
+        XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 5), .completed, app.debugDescription)
     }
 
     private func assertStatus(_ value: String) {
@@ -130,7 +218,7 @@ final class CaptureControlsTests: XCTestCase {
     }
 
     private func screenshot(_ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)

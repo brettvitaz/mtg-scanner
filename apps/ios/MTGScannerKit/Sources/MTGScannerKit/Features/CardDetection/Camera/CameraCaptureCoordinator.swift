@@ -6,9 +6,23 @@ import UIKit
 final class CameraCaptureCoordinator {
     weak var controller: CameraViewController?
 
+    var zoomFailure: String?
+    private var requestedZoom: CGFloat = 1
+
     func setZoom(_ factor: CGFloat) {
-        controller?.setZoom(factor)
+        requestedZoom = factor
+        zoomFailure = nil
+        guard let controller else { reportZoomFailure(factor); return }
+        controller.setZoom(factor, animated: true)
     }
+
+    func reportZoomFailure(_ factor: CGFloat) {
+        requestedZoom = factor
+        zoomFailure = "Zoom failed. Retry"
+    }
+
+    func retryZoom() { setZoom(requestedZoom) }
+    func cancelZoom() { controller?.cancelZoom() }
 
     func focus(on point: CGPoint) {
         controller?.focus(on: point)

@@ -67,7 +67,9 @@ final class AutoScanViewModel {
     private(set) var scanSessionID = UUID()
     private var captureOperationID: UUID?
     private var preservedCaptureSessionID: UUID?
-    var canCaptureManually: Bool { captureOperationID == nil }
+    var isZoomMoving = false
+    var canChangeZoom: Bool { captureOperationID == nil }
+    var canCaptureManually: Bool { canChangeZoom && !isZoomMoving }
     private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
     private(set) var captureFocusPoint: CGPoint?
     var captureFocusedPhoto: (@MainActor (CGPoint?) async -> CameraCaptureResult)?
@@ -146,7 +148,7 @@ final class AutoScanViewModel {
     // MARK: - Controls
 
     func start() {
-        guard !isActive else { return }
+        guard !isActive, !isZoomMoving else { return }
         resetSession()
         isActive = true
         isPausedForZoom = false
@@ -157,6 +159,7 @@ final class AutoScanViewModel {
 
     /// Stops new captures while allowing the accepted photo and crop to finish.
     func pauseForNavigation() {
+        captureCoordinator?.cancelZoom()
         if captureOperationID == nil {
             settleTask?.cancel()
         } else if preservedCaptureSessionID == nil {
@@ -166,10 +169,10 @@ final class AutoScanViewModel {
         resetScanningState()
     }
 
-    /// Pauses detection immediately after an actual, device-clamped change.
+    /// Pauses before the first authorized hardware movement, once per active session.
     func prepareForZoomChange(from current: CGFloat, to applied: CGFloat) -> Bool {
-        guard canCaptureManually else { return false }
-        guard abs(current - applied) > 0.001, isActive else { return true }
+        guard canChangeZoom else { return false }
+        guard current != applied, isActive else { return true }
         settleTask?.cancel()
         settleTask = nil
         isActive = false
@@ -188,6 +191,7 @@ final class AutoScanViewModel {
     }
 
     func stop() {
+        captureCoordinator?.cancelZoom()
         preservedCaptureSessionID = nil
         settleTask?.cancel()
         settleTask = nil
@@ -390,7 +394,7 @@ extension AutoScanViewModel {
     }
 
     var stationStatus: StationStatus {
-        if !canCaptureManually { return .capturing }
+        if !canChangeZoom { return .capturing }
         if isPausedForZoom || captureFailure != nil { return .paused }
         guard isActive else { return .stopped }
         return captureState == .settling ? .settling : .ready

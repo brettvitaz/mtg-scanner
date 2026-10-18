@@ -137,10 +137,34 @@ capture, and the recognition badge's Cancel action cancels queued uploads.
 Zoom changes while watching/settling use a separate pause: thumbnail and queued jobs
 remain, settling is cancelled, and Start establishes a fresh motion baseline.
 
-Run `make ios-ui-test IOS_UI_TEST_FILTER=MTGScannerUITests/CaptureControlsTests`
-for native navigation, zoom, brightness gestures, and fixture-state checks.
-Use `make ios-snapshot ROUTE=capture-table-binder` and the capture routes in
-`apps/ios/AGENTS.md` for production-shell visual checks.
+Capture UI changes begin with a native feasibility checkpoint in the production tab
+shell: Table/Station, exposed inline zoom, base/half-step taps, threshold crossings,
+retarget/pinch interruption, capture locks, brightness, toast, and largest text. Keep
+full-screen PNGs, gesture recordings, pinned simulator OS, and a concern-by-concern
+verdict. A passing geometry test does not establish native materials or physical focus.
+The capture rework checkpoint is recorded in the task worktree's
+`tmp/capture-rework-build/checkpoint-report.md`; its first inspection and correction
+artifacts remain available for manual review.
+
+Run `make ios-build`, `make ios-lint`, `make ios-test`, and
+`make ios-ui-test IOS_UI_TEST_FILTER=MTGScannerUITests/CaptureControlsTests`.
+Pin `IOS_TEST_DESTINATION` / `IOS_UI_TEST_DESTINATION` to an installed OS. For iPad,
+`CaptureControlsTests/testTabletOrientationKeepsControlsOnTheShutterAxis` covers both
+landscape orientations and portrait. Export `XCUIScreen.main.screenshot()` attachments
+for full-display landscape evidence; app-only screenshots can crop the rotated canvas.
+Named SwiftUI action invocation is currently
+unavailable through ViewInspector on the installed runtime; that test reports an
+explicit skip. Check those actions and VoiceOver focus continuity on a device.
+
+Use `make ios-snapshot ROUTE=capture-zoom-open` and the capture routes in
+`apps/ios/AGENTS.md` for production-shell visual checks. `capture-zoom-menu` is a
+compatibility alias for the exposed inline controls. Transition routes hold the
+production motion scheduler at an intermediate applied value; selecting a different
+anchor replaces that held request and completes normally. The frame fixture proves
+logic and layout, not optical zoom. Preset progress is output only; SwiftUI updates
+never feed it back as a new camera request. Hardware configuration and mutation run
+on the session queue, with the accepted-photo and Station pause guards checked
+before the first mutation. Stop/navigation invalidate queued frames and late callbacks.
 
 For physical acceptance, run the app from `open apps/ios/MTGScanner.xcworkspace`.
 In Table, capture a complete nine-pocket binder page and inspect all page/card edges,
@@ -220,3 +244,10 @@ For sample artwork and missing-data review, launch `card-row-list` (cached
 fixture image, no network required). For native menu and gesture review, launch `pricing-results`,
 `pricing-collection`, or `pricing-deck` and hold a row. Check light/dark,
 large text, horizontal swipes, quantity controls, and preview-to-detail navigation.
+
+Before changing the common camera policy, compare viable physical lenses on the same
+phone at equivalent applied factors in both modes, separately recording intentional
+1× resets. Keep lens/capability/minimum-focus-distance data, configured photo dimensions,
+preview crop/aspect, focus/deadline logs, complete binder pages, low/middle/high Station
+stacks, full-resolution crops and fallback-device evidence. The current rework has not
+selected a validated common policy; ADR 0007's close-focus evidence must remain intact.

@@ -178,7 +178,10 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `capture-station-ready` / `capture-station-settling` / `capture-station-capturing` | `CaptureFixtureView` | Inert capture dependencies, real Station states |
 | `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, zoom pause |
 | `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Single foil toast or notification preference suppression |
-| `capture-zoom-menu` | `CaptureFixtureView` | Actual native four-choice zoom menu opened after appearance |
+| `capture-zoom-open` / `capture-zoom-menu` | `CaptureFixtureView` | Fully exposed inline selector at 1.5×; former menu route is a compatibility alias |
+| `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Paused/Start at applied 1.9× / 2.1× / 3.2× with the corresponding family centered |
+| `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Production preset scheduler held at intermediate applied zoom; shutter/Start locked; another target interrupts and completes |
+| `capture-station-brightness` | `CaptureFixtureView` | Ready with the actual brightness popup open; opening alone has not paused Station |
 | `capture-brightness` / `capture-brightness-adjusted` | `CaptureFixtureView` | Actual horizontal popover at 50% / 48% |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
 | `csv-import` | `CSVImportFixtureView` | Matched, ambiguous, and invalid rows; problems-first review |
@@ -208,9 +211,16 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 The `capture-*` routes use `RootTabView`, `ScanView`, and the production controls,
 with inert camera and recognition dependencies and an isolated in-memory store.
-State is seeded after appearance/configuration. Native menus and popovers open their
-real controls. Set `SIMCTL_CHILD_CAPTURE_FIXTURE_BACKGROUND=bright` before
-`make ios-snapshot` to use white preview margins; the default margins are black.
+State is seeded after appearance/configuration. Inline zoom and brightness use the
+real controls. Preset transition fixtures hold the production scheduler at an
+intermediate applied value, and selecting a different anchor interrupts that hold.
+Set `SIMCTL_CHILD_CAPTURE_FIXTURE_BACKGROUND=bright` before `make ios-snapshot`
+for a bright photographic scene covering the entire viewfinder, including beneath
+controls and native tab material; the default scene is dark. A complete aspect-fit
+binder/card remains inset for edge inspection. This is synthetic layout evidence,
+not a production camera crop or optical framing result. The `CaptureFixture` log
+category records the runtime Reduce Motion, Reduce Transparency and Increase Contrast
+flags for verification.
 Use `xcrun simctl ui <udid> appearance light|dark` and
 `xcrun simctl ui <udid> content_size large|accessibility-extra-extra-extra-large`
 for appearance and text-size variants. The system Reduce Motion preference is honored.

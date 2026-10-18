@@ -90,3 +90,17 @@ problem rather than treating improved recognition as proof of settling.
 Apple documents separate [focus adjustment](https://developer.apple.com/documentation/avfoundation/avcapturedevice/isadjustingfocus)
 and [exposure adjustment](https://developer.apple.com/documentation/avfoundation/avcapturedevice/isadjustingexposure)
 flags. Neither is an image sharpness measurement.
+
+## Capture rework: common policy acceptance remains open (2026-10-18)
+
+The approved replacement brief at `tmp/feature-briefs/capture-rework.md` in the
+capture-consistency task worktree requires a common physical-camera policy and 1×
+baseline for Table and Station. The inline zoom/presentation implementation does not
+establish the hardware evidence needed to choose between viable common policies.
+The existing separate-mode selection above therefore remains implemented, explicitly
+unresolved against R8; it is not evidence of completion of that requirement.
+
+Do not supersede the close-focus rationale or force wide/ultra-wide from visual taste.
+Compare both modes and candidate policies at equivalent applied factors on a real
+phone, with complete binder edges/detail and low/middle/high stand stacks, before
+recording the validated replacement here. Include a fallback device when available.

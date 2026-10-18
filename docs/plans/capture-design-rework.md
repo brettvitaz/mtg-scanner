@@ -3,6 +3,21 @@
 Date: 2026-10-18. Status: findings and requirements for the next design pass;
 not an approved replacement visual design or an implementation-completion report.
 
+## Effective replacement and build evidence
+
+The user approved the replacement design on 2026-10-18. The authoritative build input
+is `tmp/feature-briefs/capture-rework.md` in the capture-consistency worktree; it
+supersedes conflicting menu/preset and background prescriptions below. The original
+rejection remains historical evidence, not approval of the rejected implementation.
+The replacement uses three inline zoom anchors, half-step cycling, continuous pinch,
+interruptible optical movement and a continuous viewfinder.
+
+Native checkpoint results, screenshots, recordings and baseline/final check logs live
+in that worktree's `tmp/capture-rework-build/`. The checkpoint is separate from
+independent finish review and physical acceptance. Common physical-camera policy
+selection remains unresolved pending comparative hardware evidence; simulator labels
+and layout cannot approve it.
+
 ## Purpose
 
 Improve the Table and Station capture experience after the user rejected the

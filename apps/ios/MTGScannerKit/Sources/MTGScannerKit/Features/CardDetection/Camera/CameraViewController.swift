@@ -46,7 +46,16 @@ final class CameraViewController: UIViewController {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let detectionLayer = CALayer()
     private var zoomFactorAtGestureStart: CGFloat = 1.0
-    private static let maxZoomFactor: CGFloat = 5.0
+    private var zoomGeneration = 0
+    private var pinchInProgress = false
+    private(set) var isZoomMoving = false
+    var willChangeZoom: ((CGFloat) -> Bool)?
+    var onZoomMotionChanged: ((Bool) -> Void)?
+    var onZoomFailure: ((CGFloat) -> Void)?
+    private var zoomDestination: CGFloat = 1
+    var scheduleZoomFrame: (@escaping @MainActor @Sendable () -> Void) -> Void = { work in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.016, execute: work)
+    }
 
     init(sessionManager: CameraSessionManager = CameraSessionManager()) {
         self.sessionManager = sessionManager
@@ -80,6 +89,7 @@ final class CameraViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         isVisible = false
+        cancelZoom()
         sessionManager.setTorchLevel(0)
         sessionManager.pauseForNavigation()
         renderer?.clear()
@@ -133,6 +143,7 @@ final class CameraViewController: UIViewController {
     }
 
     func shutDown() {
+        cancelZoom()
         onAutoScanFrame = nil
         sessionManager.shutDown()
     }
@@ -157,46 +168,6 @@ final class CameraViewController: UIViewController {
         desiredExposureBias = bias
         guard isVisible else { return }
         sessionManager.setExposureBias(bias)
-    }
-
-    // MARK: - Zoom
-
-    /// Applies device-constrained zoom and reports the value only after a successful change.
-    func setZoom(_ factor: CGFloat) {
-        let target = zoomDevice ?? sessionManager.captureDevice.map(CameraZoomDevice.init)
-        guard let target else { return }
-        let clamped = Self.clampedZoom(start: factor, scale: 1, max: min(Self.maxZoomFactor, target.maximum))
-        guard abs(clamped - appliedZoom) > 0.001 else {
-            if factor != clamped { onZoomFactorChanged?(appliedZoom) }
-            return
-        }
-        guard shouldChangeZoom?(clamped) ?? true, target.apply(clamped) else { return }
-        appliedZoom = clamped
-        onZoomFactorChanged?(clamped)
-    }
-
-    private func setupPinchGesture() {
-        let recognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
-        view.addGestureRecognizer(recognizer)
-    }
-
-    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
-        switch gesture.state {
-        case .began:
-            zoomFactorAtGestureStart = appliedZoom
-        case .changed:
-            applyPinch(scale: gesture.scale)
-        default:
-            break
-        }
-    }
-
-    func applyPinch(scale: CGFloat) {
-        setZoom(zoomFactorAtGestureStart * scale)
-    }
-
-    static func clampedZoom(start: CGFloat, scale: CGFloat, max maxFactor: CGFloat) -> CGFloat {
-        Swift.max(1.0, Swift.min(maxFactor, start * scale))
     }
 
     // MARK: - Setup
@@ -229,5 +200,110 @@ final class CameraViewController: UIViewController {
             }
             self.onDetectedCardsChanged?(cards)
         }
+    }
+}
+
+// MARK: - Zoom
+
+extension CameraViewController {
+    func setZoom(_ factor: CGFloat, animated: Bool = false) {
+        guard let device = zoomDevice ?? CameraZoomDevice(sessionManager) else { onZoomFailure?(factor); return }
+        let destination = Self.clampedZoom(start: factor, scale: 1, max: min(5, device.maximum))
+        guard shouldChangeZoom?(destination) ?? true else { return }
+        zoomGeneration &+= 1
+        let generation = zoomGeneration
+        zoomDestination = destination
+        guard destination != appliedZoom else {
+            setZoomMoving(false)
+            return
+        }
+        if animated {
+            advanceZoom(step: 1, start: appliedZoom, destination: destination, device: device, generation: generation)
+        } else {
+            applyZoom(destination, device: device, generation: generation) { [weak self] in
+                if self?.pinchInProgress == false { self?.setZoomMoving(false) }
+            }
+        }
+    }
+
+    private func advanceZoom(
+        step: Int, start: CGFloat, destination: CGFloat, device: CameraZoomDevice, generation: Int
+    ) {
+        guard generation == zoomGeneration else { return }
+        let progress = CGFloat(step) / 16
+        let eased = progress * progress * (3 - 2 * progress)
+        let value = step == 16 ? destination : start + (destination - start) * eased
+        applyZoom(value, device: device, generation: generation) { [weak self] in
+            guard let self, generation == self.zoomGeneration else { return }
+            guard step < 16 else { self.setZoomMoving(false); return }
+            self.scheduleZoomFrame { [weak self] in
+                self?.advanceZoom(step: step + 1, start: start, destination: destination,
+                                  device: device, generation: generation)
+            }
+        }
+    }
+
+    private func applyZoom(
+        _ value: CGFloat, device: CameraZoomDevice, generation: Int, completion: @escaping () -> Void
+    ) {
+        device.change(value, { [weak self] in
+            guard let self, generation == self.zoomGeneration,
+                  self.shouldChangeZoom?(value) ?? true,
+                  self.willChangeZoom?(value) ?? true else { return false }
+            self.setZoomMoving(true)
+            return true
+        }, { [weak self] success in
+            guard let self, generation == self.zoomGeneration else { return }
+            guard success else {
+                self.cancelZoom()
+                self.onZoomFailure?(self.zoomDestination)
+                return
+            }
+            self.appliedZoom = value
+            self.onZoomFactorChanged?(value)
+            completion()
+        })
+    }
+
+    func cancelZoom() {
+        zoomGeneration &+= 1
+        pinchInProgress = false
+        setZoomMoving(false)
+    }
+
+    private func setZoomMoving(_ moving: Bool) {
+        guard isZoomMoving != moving else { return }
+        isZoomMoving = moving
+        onZoomMotionChanged?(moving)
+    }
+
+    func beginPinch() {
+        cancelZoom()
+        pinchInProgress = true
+        zoomFactorAtGestureStart = appliedZoom
+    }
+
+    func endPinch() {
+        pinchInProgress = false
+        setZoomMoving(false)
+    }
+
+    func applyPinch(scale: CGFloat) { setZoom(zoomFactorAtGestureStart * scale) }
+
+    private func setupPinchGesture() {
+        view.addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:))))
+    }
+
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .began: beginPinch()
+        case .changed: applyPinch(scale: gesture.scale)
+        case .ended, .cancelled, .failed: endPinch()
+        default: break
+        }
+    }
+
+    nonisolated static func clampedZoom(start: CGFloat, scale: CGFloat, max maxFactor: CGFloat) -> CGFloat {
+        Swift.max(1, Swift.min(maxFactor, start * scale))
     }
 }

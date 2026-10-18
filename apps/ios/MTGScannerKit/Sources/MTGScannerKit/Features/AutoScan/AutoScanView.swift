@@ -9,6 +9,7 @@ struct AutoScanView: View {
         Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.8), radius: 2, y: 1)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Station status")
             .accessibilityValue(viewModel.stationStatus.rawValue)
@@ -25,6 +26,10 @@ struct StationCaptureFailureView: View {
         Button(action: retry) {
             Text(message).font(.caption).multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+                .captureControlSurface(in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
@@ -41,13 +46,13 @@ struct StationStartStopButton: View {
         } label: {
             Text(viewModel.isActive ? "Stop" : "Start")
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .fixedSize(horizontal: true, vertical: true)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .frame(minWidth: 64, minHeight: 48)
                 .captureControlSurface(in: Capsule())
         }
+        .disabled(!viewModel.isActive && viewModel.isZoomMoving)
         .buttonStyle(.plain)
         .accessibilityLabel(viewModel.isActive ? "Stop Station" : "Start Station")
         .accessibilityHint("Controls automatic card capture.")

@@ -65,7 +65,10 @@ public struct PreviewGalleryRootView: View {
         case "capture-table-binder", "capture-station-ready", "capture-station-settling",
              "capture-station-capturing", "capture-station-stopped", "capture-station-error",
              "capture-station-paused", "capture-recognition-foil", "capture-recognition-disabled",
-             "capture-zoom-menu", "capture-brightness", "capture-brightness-adjusted":
+             "capture-zoom-menu", "capture-brightness", "capture-brightness-adjusted",
+             "capture-zoom-open", "capture-zoom-pinch-low", "capture-zoom-pinch-high",
+             "capture-zoom-pinch-upper", "capture-zoom-transition",
+             "capture-station-zoom-transition", "capture-station-brightness":
             if let binder = Bundle.module.url(forResource: "CaptureBinder", withExtension: "jpg"),
                let card = Bundle.module.url(forResource: "ResultScanSample", withExtension: "jpg"),
                let binderData = try? Data(contentsOf: binder), let cardData = try? Data(contentsOf: card) {
@@ -252,4 +255,32 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("capture-brightness-adjusted") {
     PreviewGalleryRootView(route: "capture-brightness-adjusted")
+}
+
+#Preview("capture-zoom-open") {
+    PreviewGalleryRootView(route: "capture-zoom-open")
+}
+
+#Preview("capture-zoom-pinch-low") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-low")
+}
+
+#Preview("capture-zoom-pinch-high") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-high")
+}
+
+#Preview("capture-zoom-pinch-upper") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-upper")
+}
+
+#Preview("capture-zoom-transition") {
+    PreviewGalleryRootView(route: "capture-zoom-transition")
+}
+
+#Preview("capture-station-zoom-transition") {
+    PreviewGalleryRootView(route: "capture-station-zoom-transition")
+}
+
+#Preview("capture-station-brightness") {
+    PreviewGalleryRootView(route: "capture-station-brightness")
 }

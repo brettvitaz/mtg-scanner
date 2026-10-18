@@ -48,11 +48,21 @@ Tap either capture tab to open it directly. Re-selecting a tab does not change m
 Successful recognition adds to the unseen Results count; opening Results clears it.
 
 Both capture tabs place zoom above the centered shutter, the last capture at left,
-and photo import (Table) or Start/Stop (Station) at right. The zoom menu offers
-1×, 1.5×, 2×, and 3×; pinch zoom remains available, with the actual device-clamped
-value displayed. Changing zoom while Station watches or settles pauses it and clears
-calibration. Tap Start to resume; queued recognition and the thumbnail are preserved.
-Zoom changes are blocked during accepted capture/preparation.
+and photo import (Table) or Start/Stop (Station) at right. Three inline zoom anchors
+show 1×, 2×, and 3×. Tap an inactive anchor to ease to its base; tap the active base
+again to select its half-step (1.5×, 2.5×, or 3.5×), then tap to return. After arbitrary
+pinch zoom, tapping the active anchor first returns to its family base. No increment
+setting or focal-length label is needed. The centered active circle reports the actual
+device-clamped factor, rounded only for display, and recenters at the unrounded 2×/3×
+boundaries. Pinch stays continuous and interrupts preset motion; another tap replaces
+the destination. Reduce Motion removes the sliding recentering effect.
+
+Before actual zoom movement, Station pauses and clears calibration once. Tap Start to
+resume; queued recognition and the thumbnail are preserved. Capture and Start are
+unavailable during movement. An accepted photo/preparation blocks every zoom path.
+Stop and navigation cancel queued motion. A configuration failure leaves the displayed
+factor truthful and provides Retry. At accessibility text sizes, inactive zoom choices
+and Station actions wrap into separate rows so their labels remain readable.
 
 Tap the torch to toggle its remembered brightness, or hold it to open brightness.
 VoiceOver also offers Adjust brightness. The horizontal bar shows one percentage:
@@ -79,7 +89,10 @@ device supports the 1080p video/photo pipeline. This keeps growing stacks in sca
 stands within closer focusing range without a camera setting or lens switches during scanning.
 Phones without a suitable close-up lens use the main camera and may need a lower stack limit.
 Table uses the standard camera. Switching capture tabs resets zoom and calibration.
-Binder framing and readable per-card detail still need physical verification; UI layout
+A shared physical-camera policy for both modes is still awaiting comparative hardware
+validation; this visual/zoom change retains the existing lens choices above rather
+than guessing at the optical tradeoff. Binder framing and readable per-card detail
+still need physical verification; UI layout
 does not establish lens focus, complete page edges, or optical sharpness.
 
 Continuous autofocus targets the detected card during the existing settling delay. Capture

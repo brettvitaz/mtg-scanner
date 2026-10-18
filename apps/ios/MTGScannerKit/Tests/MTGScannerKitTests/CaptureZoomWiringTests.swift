@@ -16,7 +16,7 @@ final class CaptureZoomWiringTests: XCTestCase {
             let coordinator = CameraCaptureCoordinator()
             let camera = CameraViewController()
             var applied: [CGFloat] = []
-            camera.zoomDevice = CameraZoomDevice(maximum: 2.4) { applied.append($0); return true }
+            camera.zoomDevice = immediateZoomDevice(maximum: 2.4) { applied.append($0) }
             let state = CaptureHostState()
             let view = CaptureZoomHost(state: state, mode: mode, model: model, detection: detection,
                                        coordinator: coordinator, camera: camera)
@@ -27,22 +27,165 @@ final class CaptureZoomWiringTests: XCTestCase {
             let control = try view.inspect().find(ZoomPresetControl.self).actualView()
             for (preset, expected) in [(1.5, 1.5), (2, 2), (3, 2.4), (1, 1)] {
                 control.onSelect(preset)
-                XCTAssertEqual(detection.zoomFactor, expected, accuracy: 0.001)
+                try await waitForScanCount { !camera.isZoomMoving && abs(detection.zoomFactor - expected) < 0.001 }
             }
-            XCTAssertEqual(applied, [1.5, 2, 2.4, 1])
+            XCTAssertTrue(applied.contains { $0 > 1 && $0 < 1.5 })
             camera.applyPinch(scale: 1.73)
             XCTAssertEqual(detection.zoomFactor, 1.73, accuracy: 0.001)
             let refreshed = try view.inspect().find(ZoomPresetControl.self).actualView()
             XCTAssertEqual(ZoomPresetControl.label(refreshed.currentZoom), "1.7×")
             model.start()
-            camera.zoomDevice = CameraZoomDevice(maximum: 2.4) { _ in false }
+            camera.zoomDevice = immediateZoomDevice(maximum: 2.4, accepts: false)
             camera.setZoom(2)
             XCTAssertTrue(model.isActive)
             XCTAssertEqual(detection.zoomFactor, 1.73, accuracy: 0.001)
+            try await retryFailedZoom(coordinator, camera: camera, detection: detection)
             state.active = false
             try await waitForScanCount { !model.isActive && detection.zoomFactor == 1 }
             XCTAssertFalse(model.isCalibrated)
         }
+    }
+
+    // A single assignment, stale ramp completion or post-movement pause breaks these assertions.
+    func testMotionReportsProgressPausesBeforeMutationAndLocksCaptureUntilCompletion() async throws {
+        let model = AutoScanViewModel(detector: nil)
+        let camera = CameraViewController()
+        var factors: [CGFloat] = []
+        var sessionAfterPause: UUID?
+        camera.zoomDevice = immediateZoomDevice(maximum: 2.4) { value in
+            XCTAssertFalse(model.isActive)
+            XCTAssertFalse(model.canCaptureManually)
+            if let sessionAfterPause { XCTAssertEqual(model.scanSessionID, sessionAfterPause) }
+            sessionAfterPause = model.scanSessionID
+            factors.append(value)
+        }
+        camera.shouldChangeZoom = { _ in model.canChangeZoom }
+        camera.willChangeZoom = { value in model.prepareForZoomChange(from: camera.appliedZoom, to: value) }
+        camera.onZoomMotionChanged = { model.isZoomMoving = $0 }
+        model.start()
+        camera.setZoom(3, animated: true)
+        try await waitForScanCount { camera.isZoomMoving }
+        XCTAssertLessThan(camera.appliedZoom, 2.4)
+        model.start()
+        XCTAssertFalse(model.isActive)
+        try await waitForScanCount { !camera.isZoomMoving }
+        XCTAssertEqual(camera.appliedZoom, 2.4)
+        XCTAssertTrue(model.canCaptureManually)
+        XCTAssertEqual(model.stationStatus, .paused)
+        XCTAssertGreaterThan(factors.count, 2)
+        XCTAssertTrue(zip(factors, factors.dropFirst()).allSatisfy { $0 <= $1 })
+        model.start()
+        XCTAssertEqual(model.stationStatus, .ready)
+        XCTAssertFalse(model.isCalibrated)
+        model.stop()
+    }
+
+    func testRetargetPinchAndNavigationDiscardOldMotion() async throws {
+        let camera = CameraViewController()
+        camera.zoomDevice = immediateZoomDevice(maximum: 4)
+        camera.setZoom(3, animated: true)
+        try await waitForScanCount { camera.appliedZoom > 1.1 }
+        camera.setZoom(1.5, animated: true)
+        try await waitForScanCount { !camera.isZoomMoving }
+        XCTAssertEqual(camera.appliedZoom, 1.5)
+        camera.setZoom(3.5, animated: true)
+        try await waitForScanCount { camera.appliedZoom > 1.6 }
+        let start = camera.appliedZoom
+        camera.beginPinch()
+        camera.applyPinch(scale: 1.1)
+        camera.endPinch()
+        XCTAssertEqual(camera.appliedZoom, start * 1.1, accuracy: 0.001)
+        camera.setZoom(3, animated: true)
+        try await waitForScanCount { camera.isZoomMoving }
+        camera.cancelZoom()
+        let stopped = camera.appliedZoom
+        // Wait beyond the old destination: a stale task would overwrite the pinch/navigation result.
+        try await Task.sleep(for: .milliseconds(350))
+        XCTAssertEqual(camera.appliedZoom, stopped)
+        XCTAssertFalse(camera.isZoomMoving)
+    }
+
+    private func retryFailedZoom(
+        _ coordinator: CameraCaptureCoordinator, camera: CameraViewController, detection: CardDetectionViewModel
+    ) async throws {
+        XCTAssertNotNil(coordinator.zoomFailure)
+        camera.zoomDevice = immediateZoomDevice(maximum: 2.4)
+        coordinator.retryZoom()
+        try await waitForScanCount { !camera.isZoomMoving && detection.zoomFactor == 2 }
+        XCTAssertNil(coordinator.zoomFailure)
+    }
+
+    func testLateHardwareCompletionCannotPublishAfterNavigation() throws {
+        let camera = CameraViewController()
+        var authorize: CameraZoomDevice.Authorization?
+        var complete: CameraZoomDevice.Completion?
+        camera.zoomDevice = CameraZoomDevice(maximum: 4, change: { _, permission, callback in
+            authorize = permission
+            complete = callback
+        })
+        camera.setZoom(3, animated: true)
+        XCTAssertTrue(try XCTUnwrap(authorize)())
+        XCTAssertTrue(camera.isZoomMoving)
+        camera.cancelZoom()
+        try XCTUnwrap(complete)(true)
+        XCTAssertEqual(camera.appliedZoom, 1)
+        XCTAssertFalse(camera.isZoomMoving)
+        XCTAssertFalse(try XCTUnwrap(authorize)())
+    }
+
+    func testStopCancelsQueuedZoomFrames() {
+        let model = AutoScanViewModel(detector: nil)
+        let camera = CameraViewController()
+        let coordinator = CameraCaptureCoordinator()
+        coordinator.controller = camera
+        model.captureCoordinator = coordinator
+        camera.zoomDevice = immediateZoomDevice(maximum: 4)
+        camera.shouldChangeZoom = { _ in model.canChangeZoom }
+        camera.willChangeZoom = { model.prepareForZoomChange(from: camera.appliedZoom, to: $0) }
+        camera.onZoomMotionChanged = { model.isZoomMoving = $0 }
+        var frames: [@MainActor @Sendable () -> Void] = []
+        camera.scheduleZoomFrame = { frames.append($0) }
+        model.start()
+        camera.setZoom(3, animated: true)
+        let pausedAt = camera.appliedZoom
+        XCTAssertTrue(camera.isZoomMoving)
+        model.stop()
+        XCTAssertFalse(camera.isZoomMoving)
+        frames.forEach { $0() }
+        XCTAssertEqual(camera.appliedZoom, pausedAt)
+    }
+
+    func testSmallActualMovementStillPausesStationBeforeMutation() {
+        let camera = CameraViewController()
+        let model = AutoScanViewModel(detector: nil)
+        camera.zoomDevice = immediateZoomDevice(maximum: 4) { _ in XCTAssertFalse(model.isActive) }
+        camera.willChangeZoom = { model.prepareForZoomChange(from: camera.appliedZoom, to: $0) }
+        model.start()
+        camera.setZoom(1.00001)
+        XCTAssertEqual(camera.appliedZoom, 1.00001)
+        XCTAssertEqual(model.stationStatus, .paused)
+        model.stop()
+    }
+
+    func testNoOpAndConfigurationFailurePreserveStationAndReleaseMotion() async throws {
+        let camera = CameraViewController()
+        let model = AutoScanViewModel(detector: nil)
+        camera.zoomDevice = immediateZoomDevice(maximum: 1)
+        camera.willChangeZoom = { model.prepareForZoomChange(from: camera.appliedZoom, to: $0) }
+        camera.onZoomMotionChanged = { model.isZoomMoving = $0 }
+        model.start()
+        camera.setZoom(3, animated: true)
+        XCTAssertTrue(model.isActive)
+        XCTAssertFalse(camera.isZoomMoving)
+        var failed = false
+        camera.onZoomFailure = { _ in failed = true }
+        camera.zoomDevice = immediateZoomDevice(maximum: 4, accepts: false)
+        camera.setZoom(2, animated: true)
+        try await waitForScanCount { failed }
+        XCTAssertTrue(model.isActive)
+        XCTAssertFalse(camera.isZoomMoving)
+        XCTAssertEqual(camera.appliedZoom, 1)
+        model.stop()
     }
 
     func testHostedTableShutterKeepsZoomLockedThroughCropAndNavigation() async throws {
@@ -58,7 +201,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         model.captureFocusedPhoto = { _ in .success(.cameraCapture(image: image, data: Data([1]))) }
         let camera = CameraViewController()
         var applied: [CGFloat] = []
-        camera.zoomDevice = CameraZoomDevice(maximum: 5) { applied.append($0); return true }
+        camera.zoomDevice = immediateZoomDevice(maximum: 5) { applied.append($0) }
         let state = CaptureHostState()
         let view = CaptureZoomHost(state: state, mode: .scan, model: model, detection: CardDetectionViewModel(),
                                    coordinator: CameraCaptureCoordinator(), camera: camera)
@@ -84,7 +227,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         model.captureFocusedPhoto = { _ in await gate.run() }
         let camera = CameraViewController()
         var applied: [CGFloat] = []
-        camera.zoomDevice = CameraZoomDevice(maximum: 5) { applied.append($0); return true }
+        camera.zoomDevice = immediateZoomDevice(maximum: 5) { applied.append($0) }
         camera.shouldChangeZoom = { _ in model.canCaptureManually }
         model.start()
         model.captureManually()
@@ -144,4 +287,16 @@ private actor TableCropGate {
         }
         XCTAssertNotNil(continuation)
     }
+}
+
+@MainActor
+func immediateZoomDevice(
+    maximum: CGFloat, accepts: Bool = true, didApply: @escaping (CGFloat) -> Void = { _ in }
+) -> CameraZoomDevice {
+    CameraZoomDevice(maximum: maximum, change: { value, authorize, complete in
+        guard accepts else { complete(false); return }
+        guard authorize() else { return }
+        didApply(value)
+        complete(true)
+    })
 }

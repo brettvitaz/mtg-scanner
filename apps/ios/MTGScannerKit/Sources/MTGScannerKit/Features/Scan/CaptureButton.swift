@@ -9,11 +9,13 @@ struct CaptureButton: View {
             ZStack {
                 Circle()
                     .strokeBorder(Color.white, lineWidth: 4)
-                    .frame(width: 70, height: 70)
+                    .frame(width: 76, height: 76)
                 Circle()
                     .fill(isDisabled ? Color.white.opacity(0.4) : Color.white)
-                    .frame(width: 60, height: 60)
+                    .frame(width: 64, height: 64)
             }
+            .background(.ultraThinMaterial, in: Circle())
+            .environment(\.colorScheme, .dark)
         }
         .disabled(isDisabled)
         .buttonStyle(CaptureButtonStyle())

@@ -1,9 +1,9 @@
 import SwiftUI
 
 extension View {
-    /// Camera controls keep the same contrast over both bright and dark scenes.
+    /// Local system material keeps camera imagery visible between independent controls.
     nonisolated func captureControlSurface(in shape: some InsettableShape) -> some View {
-        background(.black.opacity(0.5), in: shape)
-            .overlay { shape.strokeBorder(.white.opacity(0.18), lineWidth: 0.5) }
+        background(.ultraThinMaterial, in: shape)
+            .environment(\.colorScheme, .dark)
     }
 }

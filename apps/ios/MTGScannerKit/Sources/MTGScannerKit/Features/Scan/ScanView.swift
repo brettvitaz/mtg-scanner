@@ -16,7 +16,6 @@ struct ScanView: View {
 
     private let previewContent: ((CameraPreviewRepresentable) -> AnyView)?
     private let opensBrightness: Bool
-    private let opensZoomMenu: Bool
     private let onConfigured: (() -> Void)?
 
     @State private var selectedPhoto: PhotosPickerItem?
@@ -30,7 +29,7 @@ struct ScanView: View {
         detectionViewModel: CardDetectionViewModel = CardDetectionViewModel(),
         captureCoordinator: CameraCaptureCoordinator = CameraCaptureCoordinator(),
         previewContent: ((CameraPreviewRepresentable) -> AnyView)? = nil,
-        opensBrightness: Bool = false, opensZoomMenu: Bool = false,
+        opensBrightness: Bool = false,
         onConfigured: (() -> Void)? = nil
     ) {
         _detectionMode = detectionMode
@@ -38,23 +37,14 @@ struct ScanView: View {
         self.previewContent = previewContent
         self.onConfigured = onConfigured
         self.opensBrightness = opensBrightness
-        self.opensZoomMenu = opensZoomMenu
         _captureCoordinator = State(initialValue: captureCoordinator)
         _autoScanViewModel = State(initialValue: autoScanViewModel)
         _detectionViewModel = State(initialValue: detectionViewModel)
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            captureContent
-                .overlay(alignment: .bottom) {
-                    Color.black
-                        .frame(height: geometry.safeAreaInsets.bottom)
-                        .offset(y: geometry.safeAreaInsets.bottom)
-                        .allowsHitTesting(false)
-                }
-        }
-        .toolbarBackground(.black, for: .tabBar)
+        captureContent
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarColorScheme(.dark, for: .tabBar)
         .onAppear(perform: onAppearHandler)
@@ -80,6 +70,7 @@ struct ScanView: View {
         }
 #endif
         .onChange(of: cameraPreviewID) { _, _ in
+            captureCoordinator.cancelZoom()
             autoScanViewModel.pauseForNavigation()
             detectionViewModel.zoomFactor = 1
         }
@@ -180,53 +171,33 @@ struct ScanView: View {
     }
 
     private var captureControls: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 24) {
             if isAutoScanMode, let failure = autoScanViewModel.captureFailure {
                 StationCaptureFailureView(message: failure, retry: autoScanViewModel.captureManually)
             }
-            if isAutoScanMode && dynamicTypeSize.isAccessibilitySize {
-                AutoScanView(viewModel: autoScanViewModel)
+            if let failure = captureCoordinator.zoomFailure {
+                Button(action: captureCoordinator.retryZoom) {
+                    Label(failure, systemImage: "arrow.clockwise").font(.caption)
+                        .padding(10).frame(minHeight: 44).captureControlSurface(in: Capsule())
+                }
+                .foregroundStyle(.white)
+                .accessibilityIdentifier("capture-zoom-retry")
             }
             framingControls
             bottomBar
         }
         .frame(maxWidth: 420)
         .padding(.horizontal, 20)
-        .padding(.top, 16)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
-        .background {
-            LinearGradient(
-                stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.06), location: 0.15),
-                        .init(color: .black.opacity(0.32), location: 0.3),
-                        .init(color: .black.opacity(0.72), location: 0.47),
-                        .init(color: .black.opacity(0.96), location: 0.58),
-                        .init(color: .black, location: 0.65), .init(color: .black, location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
-                .padding(.top, -80)
-                .allowsHitTesting(false)
-        }
     }
 
     private var framingControls: some View {
-        ZStack {
-            ZoomPresetControl(currentZoom: detectionViewModel.zoomFactor, opensMenu: opensZoomMenu) { preset in
-                captureCoordinator.setZoom(preset)
-            }
-            .disabled(!autoScanViewModel.canCaptureManually)
-            HStack {
-                if isAutoScanMode && !dynamicTypeSize.isAccessibilitySize {
-                    AutoScanView(viewModel: autoScanViewModel)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.trailing, 100)
-                } else {
-                    Spacer()
-                }
-                FlashlightButton(torchLevel: $detectionViewModel.torchLevel,
-                                 lastTorchLevel: lastTorchLevelBinding, opensBrightness: opensBrightness)
-            }
-        }
+        CaptureFramingControls(currentZoom: detectionViewModel.zoomFactor,
+                               isEnabled: autoScanViewModel.canChangeZoom,
+                               torchLevel: $detectionViewModel.torchLevel,
+                               lastTorchLevel: lastTorchLevelBinding, opensBrightness: opensBrightness,
+                               onSelect: captureCoordinator.setZoom)
     }
 
     private var cameraPreviewID: String {
@@ -236,17 +207,20 @@ struct ScanView: View {
     private var cameraPreview: some View {
         let preview = CameraPreviewRepresentable(
             detectionMode: $detectionMode,
-            zoomFactor: detectionViewModel.zoomFactor,
             camera: isAutoScanMode ? .automatic : .standard,
             onDetectedCardsChanged: { cards in
                 detectionViewModel.handleDetectedCards(cards)
             },
             captureCoordinator: captureCoordinator,
             onZoomFactorChanged: { factor in
-                _ = autoScanViewModel.prepareForZoomChange(from: detectionViewModel.zoomFactor, to: factor)
                 detectionViewModel.zoomFactor = factor
             },
-            shouldChangeZoom: { _ in autoScanViewModel.canCaptureManually },
+            willChangeZoom: { factor in
+                autoScanViewModel.prepareForZoomChange(from: detectionViewModel.zoomFactor, to: factor)
+            },
+            onZoomMotionChanged: { autoScanViewModel.isZoomMoving = $0 },
+            onZoomFailure: captureCoordinator.reportZoomFailure,
+            shouldChangeZoom: { _ in autoScanViewModel.canChangeZoom },
             onAutoScanFrame: isAutoScanMode
                 ? { [weak autoScanViewModel] buffer in
                     Task { @MainActor in
@@ -261,19 +235,42 @@ struct ScanView: View {
             if let previewContent { previewContent(preview) } else { AnyView(preview) }
         }
         .id(cameraPreviewID)
-        .accessibilityHidden(true)
+        .accessibilityHidden(previewContent == nil)
     }
 
+    @ViewBuilder
     private var bottomBar: some View {
+        if dynamicTypeSize.isAccessibilitySize && isAutoScanMode {
+            VStack(spacing: 12) {
+                ZStack {
+                    manualShutter
+                    HStack { thumbnail; Spacer() }.allowsHitTesting(false)
+                }
+                StationStartStopButton(viewModel: autoScanViewModel)
+                AutoScanView(viewModel: autoScanViewModel).fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            ordinaryBottomBar
+        }
+    }
+
+    private var manualShutter: some View {
+        CaptureButton(action: isAutoScanMode ? autoScanViewModel.captureManually : captureCard,
+                      isDisabled: !autoScanViewModel.canCaptureManually)
+            .accessibilityIdentifier("capture-shutter")
+    }
+
+    private var ordinaryBottomBar: some View {
         HStack(alignment: .center) {
             thumbnail.frame(maxWidth: .infinity, alignment: .leading)
-            CaptureButton(
-                action: isAutoScanMode ? autoScanViewModel.captureManually : captureCard,
-                isDisabled: !autoScanViewModel.canCaptureManually
-            )
-            .accessibilityIdentifier("capture-shutter")
+            manualShutter
             Group {
-                if isAutoScanMode { StationStartStopButton(viewModel: autoScanViewModel) } else { photoPickerButton }
+                if isAutoScanMode {
+                    VStack(spacing: 6) {
+                        StationStartStopButton(viewModel: autoScanViewModel)
+                        AutoScanView(viewModel: autoScanViewModel)
+                    }
+                } else { photoPickerButton }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -373,6 +370,7 @@ private extension ScanView {
     private func handleScanActivityChange(_ active: Bool) {
         if !active {
             storeAndTurnOffTorch()
+            captureCoordinator.cancelZoom()
             autoScanViewModel.pauseForNavigation()
             detectionViewModel.zoomFactor = 1
         }
@@ -400,6 +398,7 @@ private extension ScanView {
     private func onDisappearHandler() {
         UIApplication.shared.isIdleTimerDisabled = false
         storeAndTurnOffTorch()
+        captureCoordinator.cancelZoom()
         autoScanViewModel.pauseForNavigation()
     }
 }

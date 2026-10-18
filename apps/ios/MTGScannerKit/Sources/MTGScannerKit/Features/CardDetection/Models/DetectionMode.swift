@@ -9,15 +9,15 @@ public enum DetectionMode: String, CaseIterable, Identifiable {
 
     public var displayName: String {
         switch self {
-        case .scan: return "Scan"
-        case .auto: return "Auto"
+        case .scan: return "Table"
+        case .auto: return "Station"
         }
     }
 
     public var systemImage: String {
         switch self {
         case .scan: return "camera.viewfinder"
-        case .auto: return "camera.viewfinder.badge.automatic"
+        case .auto: return "square.stack.3d.up"
         }
     }
 }

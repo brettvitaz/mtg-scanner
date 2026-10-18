@@ -10,6 +10,7 @@ struct IdentifiedCardToastView: View {
     let onDismiss: () -> Void
     @State private var shimmerOffset: CGFloat = -1.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 8) {
@@ -21,8 +22,7 @@ struct IdentifiedCardToastView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(.ultraThinMaterial)
-                .opacity(0.85)
+                .fill(.regularMaterial)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -30,9 +30,6 @@ struct IdentifiedCardToastView: View {
         )
         .overlay(shimmerOverlay)
         .accessibilityElement(children: .contain)
-        .onAppear {
-            UIAccessibility.post(notification: .announcement, argument: accessibilityLabel)
-        }
     }
 
     private var accessibilityLabel: String {
@@ -49,28 +46,21 @@ struct IdentifiedCardToastView: View {
 
     @ViewBuilder
     private var cardLabels: some View {
-        HStack(spacing: 8) {
-            Text(card.title)
-                .font(.system(size: 16, weight: .bold))
-                .lineLimit(1)
-            if card.isFoil {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.yellow)
-                    .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 2) {
+            if dynamicTypeSize.isAccessibilitySize {
+                Text("Recognized").font(.caption).foregroundStyle(.secondary)
+                Text(card.title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Recognized \(card.title)").font(.subheadline.weight(.semibold)).lineLimit(2)
             }
-            Text(card.setCode.uppercased())
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .layoutPriority(1)
-            if !card.collectorNumber.isEmpty {
-                Text("#\(card.collectorNumber)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .layoutPriority(1)
+            HStack(spacing: 6) {
+                if card.isFoil {
+                    Image(systemName: "sparkles").foregroundStyle(.yellow).accessibilityHidden(true)
+                }
+                Text("\(card.setCode.uppercased()) #\(card.collectorNumber)")
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
@@ -121,7 +111,7 @@ struct IdentifiedCardToastView: View {
     }
 }
 
-/// Container view that displays multiple card toasts stacked vertically.
+/// A single transient recognition notification, without a reserved screen lane.
 struct IdentifiedCardToastContainer: View {
     @Bindable var viewModel: IdentifiedCardsViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -132,7 +122,7 @@ struct IdentifiedCardToastContainer: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            ForEach(viewModel.recentCards) { card in
+            ForEach(viewModel.recentCards.prefix(1)) { card in
                 IdentifiedCardToastView(card: card) {
                     viewModel.removeCard(id: card.id)
                 }

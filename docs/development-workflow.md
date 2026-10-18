@@ -126,13 +126,30 @@ legacy identities must be corrected before applying.
 Simulator fixtures: `make ios-snapshot ROUTE=list-subtract`, `ROUTE=list-operation`,
 `ROUTE=list-add-delete`, `ROUTE=list-operation-complete`, and `ROUTE=csv-subtract`.
 
-## Scan navigation
+## Capture navigation
 
-Leaving Scan or Auto Scan stops new automatic captures and turns off the torch.
+Leaving Table or Station stops new automatic captures and turns off the torch.
 A photo capture already accepted by the camera, cropping, and queued recognition
-continue; successful identifications appear in Results. Returning to Scan does
-not restart Auto Scan. Its explicit Stop/reset still discards an unfinished
+continue; successful identifications appear in Results. Switching capture tabs resets
+zoom/calibration. Returning to Station does
+not restart automatic capture. Its explicit Stop/reset still discards an unfinished
 capture, and the recognition badge's Cancel action cancels queued uploads.
+Zoom changes while watching/settling use a separate pause: thumbnail and queued jobs
+remain, settling is cancelled, and Start establishes a fresh motion baseline.
+
+Run `make ios-ui-test IOS_UI_TEST_FILTER=MTGScannerUITests/CaptureControlsTests`
+for native navigation, zoom, brightness gestures, and fixture-state checks.
+Use `make ios-snapshot ROUTE=capture-table-binder` and the capture routes in
+`apps/ios/AGENTS.md` for production-shell visual checks.
+
+For physical acceptance, run the app from `open apps/ios/MTGScanner.xcworkspace`.
+In Table, capture a complete nine-pocket binder page and inspect all page/card edges,
+titles, and collector numbers in the full-resolution photos and crops. In Station,
+follow ADR 0007's physical acceptance check for low/middle/high stacks at the user's
+125–175 mm reference distances (geometry, not a guaranteed focus range). Include a
+phone using the main-camera fallback when available. Enable Save Raw Captures to
+Photos in Debug and inspect Console's `com.mtgscanner` / `CameraFocus` logs.
+Simulator snapshots cannot establish these optical or framing results.
 
 ## Contract-first changes
 - Update versioned schemas under `packages/schemas/v1/`.

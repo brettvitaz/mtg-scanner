@@ -62,6 +62,15 @@ public struct PreviewGalleryRootView: View {
             }
 
         #if DEBUG
+        case "capture-table-binder", "capture-station-ready", "capture-station-settling",
+             "capture-station-capturing", "capture-station-stopped", "capture-station-error",
+             "capture-station-paused", "capture-recognition-foil", "capture-recognition-disabled",
+             "capture-zoom-menu", "capture-brightness", "capture-brightness-adjusted":
+            if let binder = Bundle.module.url(forResource: "CaptureBinder", withExtension: "jpg"),
+               let card = Bundle.module.url(forResource: "ResultScanSample", withExtension: "jpg"),
+               let binderData = try? Data(contentsOf: binder), let cardData = try? Data(contentsOf: card) {
+                CaptureFixtureView(route: route, binderData: binderData, cardData: cardData)
+            }
         case "scan-count-zero", "scan-count-new", "scan-count-overflow", "scan-count-navigation":
             ScanCountFixtureView(route: route)
         case "result-scan-artwork", "result-scan-image", "result-scan-zoom", "result-scan-edit",
@@ -195,4 +204,52 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Price filter invalid") {
     PreviewGalleryRootView(route: "pricing-filter-invalid")
+}
+
+#Preview("capture-table-binder") {
+    PreviewGalleryRootView(route: "capture-table-binder")
+}
+
+#Preview("capture-station-ready") {
+    PreviewGalleryRootView(route: "capture-station-ready")
+}
+
+#Preview("capture-station-settling") {
+    PreviewGalleryRootView(route: "capture-station-settling")
+}
+
+#Preview("capture-station-capturing") {
+    PreviewGalleryRootView(route: "capture-station-capturing")
+}
+
+#Preview("capture-station-stopped") {
+    PreviewGalleryRootView(route: "capture-station-stopped")
+}
+
+#Preview("capture-station-error") {
+    PreviewGalleryRootView(route: "capture-station-error")
+}
+
+#Preview("capture-station-paused") {
+    PreviewGalleryRootView(route: "capture-station-paused")
+}
+
+#Preview("capture-recognition-foil") {
+    PreviewGalleryRootView(route: "capture-recognition-foil")
+}
+
+#Preview("capture-recognition-disabled") {
+    PreviewGalleryRootView(route: "capture-recognition-disabled")
+}
+
+#Preview("capture-zoom-menu") {
+    PreviewGalleryRootView(route: "capture-zoom-menu")
+}
+
+#Preview("capture-brightness") {
+    PreviewGalleryRootView(route: "capture-brightness")
+}
+
+#Preview("capture-brightness-adjusted") {
+    PreviewGalleryRootView(route: "capture-brightness-adjusted")
 }

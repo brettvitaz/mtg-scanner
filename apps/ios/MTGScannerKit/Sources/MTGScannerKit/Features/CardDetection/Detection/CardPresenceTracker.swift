@@ -174,6 +174,13 @@ final class CardPresenceTracker: @unchecked Sendable {
         }
     }
 
+    /// Waits for preceding reset/rearm operations on the serial tracker queue.
+    func finishRearming() async {
+        await withCheckedContinuation { continuation in
+            presenceQueue.async { continuation.resume() }
+        }
+    }
+
     /// Sets the detection zone, clearing stale reference samples.
     ///
     /// Dispatches to the presenceQueue so it serialises with frame processing.

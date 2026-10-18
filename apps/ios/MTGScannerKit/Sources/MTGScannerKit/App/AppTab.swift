@@ -1,6 +1,7 @@
-/// Tab identities shared by navigation and the newly scanned card count.
-enum AppTab: Int {
-    case scan
+/// Native destinations; capture tabs open their workflow directly.
+enum AppTab: Int, CaseIterable {
+    case table
+    case station
     case results
     case library
     case settings

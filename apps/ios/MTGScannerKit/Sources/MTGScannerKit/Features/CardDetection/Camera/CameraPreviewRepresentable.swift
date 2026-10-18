@@ -13,6 +13,7 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     var captureCoordinator: CameraCaptureCoordinator?
     var onZoomFactorChanged: ((CGFloat) -> Void)?
+    var shouldChangeZoom: ((CGFloat) -> Bool)?
     /// Receives raw `CMSampleBuffer` frames on the session queue when in Auto Scan mode.
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
     /// Torch brightness: 0 = off, 0.1–1.0 = on at that brightness.
@@ -22,11 +23,7 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let vc = CameraViewController()
-        vc.camera = camera
-        vc.onDetectedCardsChanged = onDetectedCardsChanged
-        vc.onZoomFactorChanged = onZoomFactorChanged
-        vc.onAutoScanFrame = onAutoScanFrame
-        captureCoordinator?.controller = vc
+        connect(vc)
         return vc
     }
 
@@ -35,13 +32,20 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: CameraViewController, context: Context) {
+        connect(vc)
         vc.updateDetectionMode(detectionMode)
-        vc.onDetectedCardsChanged = onDetectedCardsChanged
-        vc.onZoomFactorChanged = onZoomFactorChanged
-        vc.onAutoScanFrame = onAutoScanFrame
         vc.setZoom(zoomFactor)
         vc.setTorchLevel(torchLevel)
         vc.setExposureBias(exposureBias)
         captureCoordinator?.controller = vc
     }
+    func connect(_ vc: CameraViewController) {
+        vc.camera = camera
+        vc.onDetectedCardsChanged = onDetectedCardsChanged
+        vc.onZoomFactorChanged = onZoomFactorChanged
+        vc.shouldChangeZoom = shouldChangeZoom
+        vc.onAutoScanFrame = onAutoScanFrame
+        captureCoordinator?.controller = vc
+    }
+
 }

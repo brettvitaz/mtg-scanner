@@ -5,6 +5,7 @@ struct FlashlightButton: View {
     @Binding var torchLevel: Float
     @Binding var lastTorchLevel: Float
     @State private var showBrightnessPopover = false
+    var opensBrightness = false
 
     private var torchIsOn: Bool { torchLevel > 0 }
 
@@ -31,12 +32,20 @@ struct FlashlightButton: View {
                     }
                 }
             )
-            .popover(isPresented: $showBrightnessPopover) {
-                BrightnessPopover(torchLevel: $torchLevel, lastTorchLevel: $lastTorchLevel)
+            .task { if opensBrightness { ensureTorchOn(); showBrightnessPopover = true } }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { toggleTorch() }
+            .accessibilityAction(named: "Adjust brightness") {
+                ensureTorchOn()
+                showBrightnessPopover = true
             }
+            .accessibilityIdentifier("capture-torch")
             .accessibilityLabel("Flashlight")
             .accessibilityHint("Double tap to toggle. Long press to adjust brightness.")
             .accessibilityValue(accessibilityValue)
+            .popover(isPresented: $showBrightnessPopover) {
+                BrightnessPopover(torchLevel: $torchLevel, lastTorchLevel: $lastTorchLevel)
+            }
     }
 
     private var accessibilityValue: String {
@@ -45,99 +54,59 @@ struct FlashlightButton: View {
     }
 
     private func toggleTorch() {
-        if torchIsOn {
-            lastTorchLevel = clampedLevel(torchLevel)
-            torchLevel = 0
-        } else {
-            torchLevel = restoreLevel
-            lastTorchLevel = torchLevel
-        }
+        let state = TorchState(level: torchLevel, remembered: lastTorchLevel)
+        state.toggle()
+        torchLevel = state.level
+        lastTorchLevel = state.remembered
     }
 
     private func ensureTorchOn() {
-        if !torchIsOn {
-            torchLevel = restoreLevel
-        }
-        lastTorchLevel = torchLevel
-    }
-
-    private var restoreLevel: Float {
-        clampedLevel(lastTorchLevel > 0 ? lastTorchLevel : 0.5)
+        let state = TorchState(level: torchLevel, remembered: lastTorchLevel)
+        state.openBrightness()
+        torchLevel = state.level
+        lastTorchLevel = state.remembered
     }
 }
 
-private struct BrightnessPopover: View {
+struct BrightnessPopover: View {
     @Binding var torchLevel: Float
     @Binding var lastTorchLevel: Float
     @Environment(\.dismiss) private var dismiss
-    @State private var snappedAnchor: Float?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             HStack {
-                Text("Brightness")
-                    .font(.headline)
+                Text("Brightness").font(.headline).lineLimit(1).minimumScaleFactor(0.75)
                 Spacer()
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "xmark").frame(width: 44, height: 44)
                 }
                 .accessibilityLabel("Close")
             }
-            HStack {
-                Button {
-                    setLevel(torchLevel - 0.05)
-                } label: {
-                    Image(systemName: "sun.min")
-                }
-                .accessibilityLabel("Decrease brightness")
-                Slider(value: sliderValue, in: 0.01...1.0)
-                    .accessibilityLabel("Flashlight brightness")
-                    .accessibilityValue("\(Int(torchLevel * 100 + 0.5)) percent")
-                Button {
-                    setLevel(torchLevel + 0.05)
-                } label: {
-                    Image(systemName: "sun.max.fill")
-                }
-                .accessibilityLabel("Increase brightness")
-            }
-            Text("\(Int(torchLevel * 100 + 0.5))%")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("\(Int((torchLevel * 100).rounded()))%")
+                .font(.title3.monospacedDigit())
+                .accessibilityIdentifier("torch-brightness-percentage")
+                .accessibilityHidden(true)
+            BrightnessBar(level: $torchLevel, remembered: $lastTorchLevel)
+                .frame(height: 44)
         }
-        .padding()
-        .frame(minWidth: 260)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
+        .frame(width: sizeClass == .regular && dynamicTypeSize.isAccessibilitySize ? 420 : 300)
         .presentationCompactAdaptation(.popover)
     }
-
-    private var sliderValue: Binding<Float> {
-        Binding(
-            get: { torchLevel > 0 ? torchLevel : 0.5 },
-            set: { setLevel($0) }
-        )
-    }
-
-    private func setLevel(_ value: Float) {
-        let snapped = snapLevel(clampedLevel(value))
-        if snapped.anchor != snappedAnchor {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            snappedAnchor = snapped.anchor
-        }
-        torchLevel = snapped.level
-        lastTorchLevel = snapped.level
-    }
 }
 
-private func clampedLevel(_ level: Float) -> Float {
-    min(1.0, max(0.01, level))
-}
+private struct BrightnessBar: UIViewRepresentable {
+    @Binding var level: Float
+    @Binding var remembered: Float
 
-private func snapLevel(_ level: Float) -> (level: Float, anchor: Float?) {
-    let anchors: [Float] = [0.01, 0.10, 0.25, 0.50, 0.75, 1.0]
-    let threshold: Float = 0.03
-    guard let anchor = anchors.min(by: { abs($0 - level) < abs($1 - level) }),
-          abs(anchor - level) <= threshold else {
-        return (level, nil)
+    func makeUIView(context: Context) -> BrightnessBarControl { BrightnessBarControl() }
+
+    func updateUIView(_ view: BrightnessBarControl, context: Context) {
+        view.level = level
+        view.onChange = { value in level = value; remembered = value }
     }
-    return (anchor, anchor)
 }

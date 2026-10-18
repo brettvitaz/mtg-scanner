@@ -41,18 +41,46 @@ Run the `MTGScanner` scheme in Xcode. The app flow is:
 3. Upload crops to the backend batch endpoint (or full image as fallback)
 4. View results list with card thumbnails; tap a card for full detail view with metadata, edition picker, and purchase links
 
-In Auto Scan, **Start** watches for card arrivals and **Stop** resets detection and calibration.
+The five native tabs are **Table**, **Station**, **Results**, **Library**, and **Settings**.
+Table opens first and captures one or more cards on a table, binder page, or in hand;
+it also imports photos. Station watches a fixed scanning station for card drops.
+Tap either capture tab to open it directly. Re-selecting a tab does not change modes.
+Successful recognition adds to the unseen Results count; opening Results clears it.
+
+Both capture tabs place zoom above the centered shutter, the last capture at left,
+and photo import (Table) or Start/Stop (Station) at right. The zoom menu offers
+1×, 1.5×, 2×, and 3×; pinch zoom remains available, with the actual device-clamped
+value displayed. Changing zoom while Station watches or settles pauses it and clears
+calibration. Tap Start to resume; queued recognition and the thumbnail are preserved.
+Zoom changes are blocked during accepted capture/preparation.
+
+Tap the torch to toggle its remembered brightness, or hold it to open brightness.
+VoiceOver also offers Adjust brightness. The horizontal bar shows one percentage:
+release a tap to select the nearest marked preset (1%, 10%, 25%, 50%, 75%, 100%),
+or drag from anywhere to adjust relative to the starting level in 1% steps.
+Only preset selection emits a haptic; touch-down and drag release do not snap.
+
+Station uses compact Ready, Settling, Capturing, Stopped, and Paused feedback.
+Ready follows tracker rearming and release of the accepted capture; recognition can
+continue independently. One compact Recognized toast verifies the latest card/printing,
+with a foil effect that respects Reduce Motion. Settings → Show recognition notifications
+is on by default. Turning it off hides toast visuals/speech while preserving Results,
+counts, queue errors, and Station readiness.
+
+In Station, **Start** watches for card arrivals and **Stop** resets detection and calibration.
 After restarting, move or place the next card to trigger automatic capture. Use the shutter
-button to capture a stationary card immediately; it also works while Auto Scan is stopped
+button to capture a stationary card immediately; it also works while Station is stopped
 without starting automatic scanning. During the settling delay, the shutter captures immediately.
 Capture is disabled while a photo is being captured or prepared for recognition. If on-device
 cropping finds no card, the original photo is uploaded for recognition.
 
-Auto Scan automatically selects a fixed autofocus-capable ultra-wide camera when the
+Station automatically selects a fixed autofocus-capable ultra-wide camera when the
 device supports the 1080p video/photo pipeline. This keeps growing stacks in scanning
 stands within closer focusing range without a camera setting or lens switches during scanning.
 Phones without a suitable close-up lens use the main camera and may need a lower stack limit.
-Normal Scan uses the standard camera. Changing scan mode resets zoom and calibration.
+Table uses the standard camera. Switching capture tabs resets zoom and calibration.
+Binder framing and readable per-card detail still need physical verification; UI layout
+does not establish lens focus, complete page edges, or optical sharpness.
 
 Continuous autofocus targets the detected card during the existing settling delay. Capture
 reuses that focus instead of starting another focus/exposure pass at the shutter. If the
@@ -130,7 +158,7 @@ Returns a `CardPriceResponse` with `price_retail`, `qty_retail`, `price_buy`, `q
 ## iOS app
 
 The app provides a full scanning pipeline:
-1. **Scan** — capture with camera (live detection overlays) or pick from photo library
+1. **Table / Station** — capture with camera (live detection overlays) or pick from photo library
 2. **Results list** — card thumbnails with title, set, and collector number
 3. **Card detail** — tap a card to see its full details:
    - Card image from Scryfall (tap for fullscreen, toggle to on-device crop image)

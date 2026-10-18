@@ -27,6 +27,11 @@ final class CameraViewController: UIViewController {
     /// Set to `nil` when not in Auto Scan mode to avoid unnecessary overhead.
     var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
 
+    var shouldChangeZoom: ((CGFloat) -> Bool)?
+    private(set) var appliedZoom: CGFloat = 1
+    // Device boundary injection allows hosted controls to exercise the real zoom path.
+    var zoomDevice: CameraZoomDevice?
+
     var camera: AutoScanCamera = .standard
 
     // MARK: - Private
@@ -156,14 +161,18 @@ final class CameraViewController: UIViewController {
 
     // MARK: - Zoom
 
-    /// Sets the camera zoom to `factor`, animating smoothly via AVFoundation ramp.
+    /// Applies device-constrained zoom and reports the value only after a successful change.
     func setZoom(_ factor: CGFloat) {
-        guard let device = sessionManager.captureDevice else { return }
-        let maxFactor = min(Self.maxZoomFactor, device.activeFormat.videoMaxZoomFactor)
-        let clamped = max(1.0, min(maxFactor, factor))
-        guard (try? device.lockForConfiguration()) != nil else { return }
-        device.ramp(toVideoZoomFactor: clamped, withRate: 8.0)
-        device.unlockForConfiguration()
+        let target = zoomDevice ?? sessionManager.captureDevice.map(CameraZoomDevice.init)
+        guard let target else { return }
+        let clamped = Self.clampedZoom(start: factor, scale: 1, max: min(Self.maxZoomFactor, target.maximum))
+        guard abs(clamped - appliedZoom) > 0.001 else {
+            if factor != clamped { onZoomFactorChanged?(appliedZoom) }
+            return
+        }
+        guard shouldChangeZoom?(clamped) ?? true, target.apply(clamped) else { return }
+        appliedZoom = clamped
+        onZoomFactorChanged?(clamped)
     }
 
     private func setupPinchGesture() {
@@ -172,28 +181,18 @@ final class CameraViewController: UIViewController {
     }
 
     @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
-        guard let device = sessionManager.captureDevice else { return }
         switch gesture.state {
         case .began:
-            zoomFactorAtGestureStart = device.videoZoomFactor
+            zoomFactorAtGestureStart = appliedZoom
         case .changed:
-            applyZoom(scale: gesture.scale, to: device)
+            applyPinch(scale: gesture.scale)
         default:
             break
         }
     }
 
-    private func applyZoom(scale: CGFloat, to device: AVCaptureDevice) {
-        let desired = Self.clampedZoom(
-            start: zoomFactorAtGestureStart, scale: scale,
-            max: min(Self.maxZoomFactor, device.activeFormat.videoMaxZoomFactor)
-        )
-        do {
-            try device.lockForConfiguration()
-            device.videoZoomFactor = desired
-            device.unlockForConfiguration()
-        } catch { return }
-        onZoomFactorChanged?(desired)
+    func applyPinch(scale: CGFloat) {
+        setZoom(zoomFactorAtGestureStart * scale)
     }
 
     static func clampedZoom(start: CGFloat, scale: CGFloat, max maxFactor: CGFloat) -> CGFloat {

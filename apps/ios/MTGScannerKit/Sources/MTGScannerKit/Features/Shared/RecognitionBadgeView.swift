@@ -58,6 +58,7 @@ struct RecognitionBadgeView: View {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 20))
                 .foregroundStyle(.white.opacity(0.8))
+                .frame(width: 44, height: 44)
         }
         .accessibilityLabel("Cancel recognition")
         .accessibilityHint("Cancels pending card recognition requests.")
@@ -72,6 +73,7 @@ struct RecognitionBadgeView: View {
                 .foregroundStyle(.red)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
+                .frame(minHeight: 44)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
         }

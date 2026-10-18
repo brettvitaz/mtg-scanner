@@ -1,5 +1,8 @@
 # ADR 0007: Automatic fixed close-up lens and continuous focus for Auto Scan
 
+The capture UI now calls Auto Scan **Station** and Normal Scan **Table**. The
+lens, focus, processing preset, and still-photo quality decisions below remain authoritative.
+
 ## Status
 
 Accepted. User testing confirmed that Close-up produces sharper growing-stack images;

@@ -1,113 +1,47 @@
 import SwiftUI
 
-/// Overlay controls displayed over the camera preview during Auto Scan mode.
-///
-/// The camera preview and detection overlay (YOLO bounding boxes) are rendered by
-/// the underlying `CameraPreviewRepresentable` in `ScanView`. This view adds the
-/// Auto Scan-specific controls: running counts, status strip, manual capture, and Start/Stop button.
+/// Compact Station feedback within the shared capture controls.
 struct AutoScanView: View {
-    @Bindable var viewModel: AutoScanViewModel
-    @Bindable var recognitionQueue: RecognitionQueue
-    @Binding var torchLevel: Float
-    @Binding var lastTorchLevel: Float
+    let viewModel: AutoScanViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack {
-            topBar
-            Spacer()
-            statusStrip
-            bottomBar
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-
-    // MARK: - Subviews
-
-    private var topBar: some View {
-        HStack(alignment: .top) {
-            cropPreview
-            Spacer()
-            RecognitionBadgeView(
-                recognitionQueue: recognitionQueue,
-                onCancel: viewModel.cancelRecognition,
-                onRetryFailed: recognitionQueue.retryFailed,
-                onClearFailed: recognitionQueue.clearFailed
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var cropPreview: some View {
-        if let image = viewModel.lastCroppedImage {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 60, height: 84)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.6), lineWidth: 1))
-                .shadow(radius: 4)
-                .accessibilityLabel("Last cropped card preview")
-                .accessibilityHint("Shows the most recent card image prepared for recognition.")
-        }
-    }
-
-    private var statusStrip: some View {
-        HStack(spacing: 8) {
-            stateIndicator
-            Text(viewModel.statusMessage)
-                .font(.caption.bold())
+        VStack(spacing: 4) {
+            Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Auto scan status")
-        .accessibilityValue(viewModel.statusMessage)
-    }
-
-    private var stateIndicator: some View {
-        Circle()
-            .fill(stateColor)
-            .frame(width: 8, height: 8)
-    }
-
-    private var stateColor: Color {
-        guard viewModel.isActive else { return .gray }
-        switch viewModel.captureState {
-        case .watching:  return .green
-        case .settling:  return .yellow
-        case .capturing: return .white
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Station status")
+                .accessibilityValue(viewModel.stationStatus.rawValue)
+                .accessibilityIdentifier("station-status")
+                .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : viewModel.completionSequence)
+            if let failure = viewModel.captureFailure {
+                Button { viewModel.captureManually() } label: {
+                    Text(failure).font(.caption).multilineTextAlignment(.center)
+                        .frame(minHeight: 44)
+                }
+                .foregroundStyle(.white)
+                .accessibilityLabel("Capture failed. \(failure) Retry capture")
+            }
         }
     }
+}
 
-    private var bottomBar: some View {
-        HStack(alignment: .center) {
-            startStopButton
-                .frame(maxWidth: .infinity, alignment: .leading)
-            CaptureButton(action: viewModel.captureManually, isDisabled: !viewModel.canCaptureManually)
-            FlashlightButton(torchLevel: $torchLevel, lastTorchLevel: $lastTorchLevel)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .padding(.bottom, 8)
-    }
+struct StationStartStopButton: View {
+    let viewModel: AutoScanViewModel
 
-    private var startStopButton: some View {
+    var body: some View {
         Button {
             if viewModel.isActive { viewModel.stop() } else { viewModel.start() }
         } label: {
             Text(viewModel.isActive ? "Stop" : "Start")
-                .font(.title3.bold())
+                .font(.subheadline.bold())
                 .foregroundStyle(.white)
                 .frame(minWidth: 64, minHeight: 54)
-                .padding(.horizontal, 8)
-                .background(viewModel.isActive ? Color.red.opacity(0.85) : Color.green.opacity(0.85))
-                .clipShape(Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
         }
-        .accessibilityLabel(viewModel.isActive ? "Stop auto scan" : "Start auto scan")
-        .accessibilityValue(viewModel.isActive ? "Running" : "Stopped")
-        .accessibilityHint(viewModel.isActive ? "Stops automatic card capture." : "Starts automatic card capture.")
+        .accessibilityLabel(viewModel.isActive ? "Stop Station" : "Start Station")
+        .accessibilityHint("Controls automatic card capture.")
+        .accessibilityIdentifier("station-start-stop")
     }
 }

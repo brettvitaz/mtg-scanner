@@ -6,6 +6,30 @@ import XCTest
 
 @MainActor
 final class RootTabBadgeTests: XCTestCase {
+    func testCaptureDestinationsAreIndependentNativeTabs() async throws {
+        let app = AppModel()
+        let container = try ModelContainer(
+            for: CollectionItem.self, CardCollection.self, Deck.self, RecognitionFeedbackEvent.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = container.mainContext
+        let library = LibraryViewModel()
+        library.modelContext = context
+        let root = RootTabView { mode, active in
+            AnyView(ScanView(detectionMode: .constant(mode), isActive: active,
+                             previewContent: { _ in AnyView(Color.black) }))
+        }
+        let window = makeScanCountWindow(view: root.environment(app)
+            .environment(library).modelContainer(context.container))
+        defer { closeScanCountWindow(window) }
+        try await waitForScanCount { self.findTabController(window.rootViewController)?.tabBar.items != nil }
+        let controller = try XCTUnwrap(findTabController(window.rootViewController))
+        XCTAssertEqual(controller.tabBar.items?.map(\.title), ["Table", "Station", "Results", "Library", "Settings"])
+        XCTAssertEqual(controller.selectedIndex, 0)
+        try await waitForScanCount { app.modelContext != nil }
+        await app.retryRecognitionFeedback()
+    }
+
     func testNativeResultsSelectionClearsBadgeAndSuppressesLateCards() async throws {
         let app = AppModel()
         app.selectTab(.settings)

@@ -6,6 +6,10 @@ import UIKit
 final class CameraCaptureCoordinator {
     weak var controller: CameraViewController?
 
+    func setZoom(_ factor: CGFloat) {
+        controller?.setZoom(factor)
+    }
+
     func focus(on point: CGPoint) {
         controller?.focus(on: point)
     }

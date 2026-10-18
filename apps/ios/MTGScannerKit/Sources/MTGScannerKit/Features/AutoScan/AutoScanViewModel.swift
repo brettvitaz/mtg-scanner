@@ -27,6 +27,11 @@ final class AutoScanViewModel {
         case capturing
     }
 
+    private(set) var captureFailure: String?
+    private(set) var isPausedForZoom = false
+    private(set) var completionSequence = 0
+    let feedback = CaptureFeedback()
+
     private(set) var isActive = false
     private(set) var captureState: CaptureState = .watching
     private(set) var statusMessage = "Tap Start to begin."
@@ -95,6 +100,7 @@ final class AutoScanViewModel {
     init(
         detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
         recognitionQueue: RecognitionQueue,
+        presenceTracker: CardPresenceTracker? = nil,
         identifiedCardsViewModel: IdentifiedCardsViewModel? = nil,
         capturePhoto: (@MainActor () async -> RecognitionImagePayload?)? = nil,
         detectBox: (@Sendable (CGImage) async -> CGRect?)? = nil,
@@ -102,7 +108,7 @@ final class AutoScanViewModel {
             await CardCropService().detectAndCrop(image: $0, hint: $1)
         }
     ) {
-        presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
+        self.presenceTracker = presenceTracker ?? CardPresenceTracker(detectorProvider: detectorProvider)
         self.recognitionQueue = recognitionQueue
         self.identifiedCardsViewModel = identifiedCardsViewModel ?? IdentifiedCardsViewModel()
         self.detectBox = detectBox
@@ -126,9 +132,14 @@ final class AutoScanViewModel {
 
     private func setupRecognitionCallback() {
         recognitionQueue.onCardIdentified = { [weak self] card in
-            self?.appModel?.recordScannedCard()
+            guard let self else { return }
+            appModel?.recordScannedCard()
+            guard appModel?.showRecognitionNotifications ?? true else { return }
             let identifiedCard = IdentifiedCard(from: card)
-            self?.identifiedCardsViewModel.addCard(identifiedCard)
+            identifiedCardsViewModel.addCard(identifiedCard)
+            feedback.recognized(identifiedCard) { [weak self] in
+                self?.appModel?.showRecognitionNotifications ?? true
+            }
         }
     }
 
@@ -138,6 +149,8 @@ final class AutoScanViewModel {
         guard !isActive else { return }
         resetSession()
         isActive = true
+        isPausedForZoom = false
+        captureFailure = nil
         captureState = .watching
         statusMessage = "Watching for cards…"
     }
@@ -153,6 +166,27 @@ final class AutoScanViewModel {
         resetScanningState()
     }
 
+    /// Pauses detection immediately after an actual, device-clamped change.
+    func prepareForZoomChange(from current: CGFloat, to applied: CGFloat) -> Bool {
+        guard canCaptureManually else { return false }
+        guard abs(current - applied) > 0.001, isActive else { return true }
+        settleTask?.cancel()
+        settleTask = nil
+        isActive = false
+        isPausedForZoom = true
+        captureState = .watching
+        captureFailure = nil
+        resetSession()
+        return true
+    }
+
+    func updateNotificationPreference(_ enabled: Bool) {
+        if !enabled {
+            identifiedCardsViewModel.clearAll()
+            feedback.cancelRecognition()
+        }
+    }
+
     func stop() {
         preservedCaptureSessionID = nil
         settleTask?.cancel()
@@ -162,6 +196,8 @@ final class AutoScanViewModel {
 
     private func resetScanningState() {
         isActive = false
+        isPausedForZoom = false
+        captureFailure = nil
         captureState = .watching
         lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
@@ -205,54 +241,6 @@ final class AutoScanViewModel {
         presenceTracker.burstConfiguration = configuration
     }
 
-    // MARK: - Standard Scan Enqueue
-
-    /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.
-    ///
-    /// Called by scan mode after a manual capture. Runs Vision detection
-    /// on a detached background task to avoid blocking the main actor.
-    @MainActor
-    func enqueueCapturedImage(_ payload: RecognitionImagePayload, cropEnabled: Bool) async {
-        let image = payload.displayImage
-        if cropEnabled {
-            let detectCrops = cropImage
-            let crops = await Task.detached(priority: .userInitiated) {
-                await detectCrops(image, nil)
-            }.value
-            if crops.crops.isEmpty {
-                recognitionQueue.enqueue(
-                    payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
-                )
-                return
-            }
-
-            for crop in crops.crops {
-                guard let cropPayload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
-                recognitionQueue.enqueue(
-                    payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
-                )
-            }
-        } else {
-            recognitionQueue.enqueue(
-                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
-            )
-        }
-    }
-
-    @MainActor
-    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
-        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else { return }
-        await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
-    }
-
-#if DEBUG
-    @MainActor
-    func saveRawCaptureIfEnabled(_ payload: RecognitionImagePayload) async {
-        guard debugSaveRawCapturesToPhotoLibrary else { return }
-        await rawCaptureSaver.saveRawCapture(payload)
-    }
-#endif
-
     // MARK: - Frame Forwarding
 
     /// Forward camera frames to the presence tracker while active.
@@ -261,14 +249,15 @@ final class AutoScanViewModel {
     /// processing motion while a capture is imminent or in progress, and doing so
     /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, captureState == .watching, canCaptureManually else { return }
+        guard isActive, captureFailure == nil, captureState == .watching, canCaptureManually else { return }
         presenceTracker.processFrame(sampleBuffer)
     }
 
     // MARK: - State Machine
 
     private func handleNewCardSignal(boundingBox: CGRect?, sessionID: UUID) {
-        guard isActive, sessionID == scanSessionID, boundingBox != nil, canCaptureManually else { return }
+        guard isActive, captureFailure == nil, sessionID == scanSessionID,
+              boundingBox != nil, canCaptureManually else { return }
         switch captureState {
         case .watching:
             captureFocusPoint = CameraFocus.point(fromYOLOBox: boundingBox)
@@ -297,31 +286,47 @@ final class AutoScanViewModel {
     private func beginCapture() -> UUID {
         let operationID = UUID()
         captureOperationID = operationID
+        captureFailure = nil
         captureState = .capturing
         statusMessage = "Capturing…"
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         return operationID
     }
 
     private func performCapture(sessionID: UUID, operationID: UUID) async {
-        defer {
-            if captureOperationID == operationID {
-                captureOperationID = nil
-                preservedCaptureSessionID = nil
-            }
+        guard acceptsCapture(from: sessionID) else {
+            releaseCapture(operationID)
+            return
         }
-        guard acceptsCapture(from: sessionID) else { return }
         let result = await captureResult()
-        guard acceptsCapture(from: sessionID) else { return }
+        guard acceptsCapture(from: sessionID) else {
+            releaseCapture(operationID)
+            return
+        }
         switch result {
         case .success(let payload):
             await processAutoCapturedPayload(payload, sessionID: sessionID)
+            let completedInSession = sessionID == scanSessionID
+            // Acknowledge on the real tracker queue before releasing the accepted operation.
+            await presenceTracker.finishRearming()
+            releaseCapture(operationID)
+            guard completedInSession, sessionID == scanSessionID else { return }
+            completionSequence += 1
+            let ready = isActive && canCaptureManually
+            feedback.completed(ready: ready)
         case .failure(let failure):
+            releaseCapture(operationID)
             guard sessionID == scanSessionID else { return }
             if isActive { presenceTracker.markCaptured() }
             captureState = .watching
+            captureFailure = failure.message
             statusMessage = failure.message
         }
+    }
+
+    private func releaseCapture(_ operationID: UUID) {
+        guard captureOperationID == operationID else { return }
+        captureOperationID = nil
+        preservedCaptureSessionID = nil
     }
 
     private func captureResult() async -> CameraCaptureResult {
@@ -365,6 +370,100 @@ final class AutoScanViewModel {
         detectionZone = calibratedZone
         isCalibrated = true
     }
+}
+
+// MARK: - Station presentation
+extension AutoScanViewModel {
+    enum StationStatus: String {
+        case ready = "Ready", settling = "Settling", capturing = "Capturing"
+        case stopped = "Stopped", paused = "Paused"
+
+        var symbol: String {
+            switch self {
+            case .ready: "checkmark.circle"
+            case .settling: "hourglass"
+            case .capturing: "camera.fill"
+            case .stopped: "stop.circle"
+            case .paused: "pause.circle"
+            }
+        }
+    }
+
+    var stationStatus: StationStatus {
+        if !canCaptureManually { return .capturing }
+        if isPausedForZoom || captureFailure != nil { return .paused }
+        guard isActive else { return .stopped }
+        return captureState == .settling ? .settling : .ready
+    }
+}
+
+// MARK: - Table recognition preparation
+extension AutoScanViewModel {
+    func captureTablePhoto(cropEnabled: Bool) async -> String? {
+        guard canCaptureManually else { return nil }
+        let operationID = beginCapture()
+        defer { releaseCapture(operationID) }
+        switch await captureResult() {
+        case .success(let payload):
+#if DEBUG
+            await saveRawCaptureIfEnabled(payload)
+#endif
+            await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
+            return nil
+        case .failure(let failure):
+            return failure.message
+        }
+    }
+
+    // MARK: - Standard Scan Enqueue
+
+    /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.
+    ///
+    /// Called by scan mode after a manual capture. Runs Vision detection
+    /// on a detached background task to avoid blocking the main actor.
+    @MainActor
+    func enqueueCapturedImage(_ payload: RecognitionImagePayload, cropEnabled: Bool) async {
+        let image = payload.displayImage
+        lastCroppedImage = image
+        if cropEnabled {
+            let detectCrops = cropImage
+            let crops = await Task.detached(priority: .userInitiated) {
+                await detectCrops(image, nil)
+            }.value
+            if crops.crops.isEmpty {
+                recognitionQueue.enqueue(
+                    payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                )
+                return
+            }
+
+            for crop in crops.crops {
+                guard let cropPayload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
+                recognitionQueue.enqueue(
+                    payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
+                )
+            }
+        } else {
+            recognitionQueue.enqueue(
+                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+            )
+        }
+    }
+
+    @MainActor
+    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
+        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else { return }
+        await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
+    }
+
+#if DEBUG
+    @MainActor
+    func saveRawCaptureIfEnabled(_ payload: RecognitionImagePayload) async {
+        guard debugSaveRawCapturesToPhotoLibrary else { return }
+        await rawCaptureSaver.saveRawCapture(payload)
+    }
+#endif
+
 }
 
 // MARK: - Crop Helpers

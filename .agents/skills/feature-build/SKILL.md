@@ -1,16 +1,16 @@
 ---
 name: feature-build
-description: Implement an approved feature brief written by feature-design, verify it against the repository's checks, commit it, and hand it off for review. Use only when the user invokes this skill with a brief path.
+description: Use when the user explicitly invokes feature-build with the path to an approved feature-design brief.
 ---
 
 # Feature build
 
-The path to an approved brief follows this skill. Use only a brief path the user gives. If there is none, ask for it; do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there. Implement only the approved design, and do not change it on your own. If something in it cannot be built as approved, stop and ask. If an item can be built but cannot do what it is for (for example, a test that no code change could make fail), build the rest, then report that item in the handoff with the reason and a proposed fix.
+The path to an approved brief follows this skill. Use only a brief path the user gives. If there is none, ask for it; do not pick a file from `tmp/feature-briefs/` yourself, because old briefs from other work can be there. Implement the effective design: the approved brief reconciled with later explicit user instructions. Do not invent design changes. If feasibility requires a material unresolved choice, ask about that choice and continue independent work. If an item can be built but cannot do what it is for (for example, a test that no code change could make fail), build the rest, then report that item in the handoff with the reason and a proposed fix.
 
 ## Rules
 
 - When you say you will do a step, make the tool call in the same turn. Do not end a turn after only announcing a step.
-- Work only in the current worktree. Do not look at other branches, other worktrees, or earlier attempts at this feature.
+- Work only in the current worktree. Do not inspect other branches, worktrees, or earlier attempts without explicit user authorization. Read only specifically authorized external artifacts; transfer them into the task handoff.
 - The root `AGENTS.md` is already in your context. Do not read it again.
 - Run every check in the foreground with output in a log file, then report the exit code. Never pipe a check through `tail` or `head`.
 
@@ -18,22 +18,29 @@ The path to an approved brief follows this skill. Use only a brief path the user
 
 Create a todo list with one item per step before you start, and keep it updated.
 
-1. Read the brief in full. Then read, as whole files, the nested `AGENTS.md` and the `.agents/rules/` files for each subsystem the brief touches, plus `.agents/rules/testing.md` and `.agents/rules/code-review.md`.
+1. Read the brief and its linked requirements/artifacts in full. Before baselines or dependent work, reconcile later user corrections into the authoritative requirements record (stable IDs, source/quote, kind, status and supersession) and affected brief, Behavior and Test map sections. State the concrete consequence; do not seek approval again for the instruction just supplied. “Use the same lens” supersedes separate lens selection; protecting Station focus constrains the shared policy. Return to design only for a substantial new visual choice, keeping settled decisions closed. Verify approval evidence and required behavioral inputs are available. For UI work, also verify selected direction/version, required rendered states and visual references. Transfer authorized ignored/external artifacts with explicit source/destination paths; report missing inputs and pause dependent work rather than infer approval. Then read, as whole files, the nested `AGENTS.md` and the `.agents/rules/` files for each subsystem the brief touches, plus `.agents/rules/testing.md` and `.agents/rules/code-review.md`.
 2. Run `git fetch origin` and `git rev-list --left-right --count HEAD...origin/main`. If this branch is behind `origin/main`, tell the user. Do not rebase without asking.
-3. Baseline. Run the checks `AGENTS.md` lists for each touched subsystem, one at a time, each to its own log, for example `make ios-test > tmp/baseline-ios-test.log 2>&1; echo "exit=$?"`. Record any failures. Do not edit code until every baseline check has finished.
-4. Implement the brief yourself, in this session, including every test in its Test map. Do not hand the implementation to a subagent. If a subagent is used for anything else, give it file paths to read; never retype or paste the brief or a diff.
-5. Review the implementation yourself: `git diff`, plus `git status --short` for new files. Confirm that every Behavior item has the test named in the Test map, and that the code change the Test map names would make that test fail. Add any missing tests.
-6. Visual check, for UI changes. Add each snapshot route from the brief, following all five steps of "Adding a new route" in `apps/ios/AGENTS.md`. Run `make ios-snapshot ROUTE=<name>`, open each PNG with your read tool, and describe what you see. Fix anything that does not match the brief.
-7. Update the docs listed in the brief, and any other docs whose described behavior or configuration changed.
-8. Final checks: rerun the baseline checks to new log files, then `git diff --check`.
-9. Run `git status --short`. Every changed or new path must be part of this feature. List any that are not, and do not delete them without asking.
-10. Go through `.agents/rules/code-review.md` one criterion at a time: PASS, FAIL, or N/A with a reason. Fix every FAIL this change caused, then rerun the affected checks.
-11. Commit the feature's changes with messages that say what changed and why. Several commits are fine, since PRs are squash-merged. Do not include unrelated changes in them; list anything unrelated in the handoff instead.
-12. Hand off with:
+3. For UI work, load [Impeccable](../impeccable/SKILL.md), run setup once per session with the actual target, and resume the applicable playbook from the selected direction. Use [new-work](../impeccable/reference/new-work.md) for its contract/persistence steps where applicable; do not redo an approved choice. Native iOS also loads [ios](../impeccable/reference/ios.md); capture surfaces use Operate mode. Read [craft-floor](../impeccable/reference/craft-floor.md) immediately before UI edits. Backend-only work skips visual workflow.
+4. Baseline. Run the checks `AGENTS.md` lists for each touched subsystem, one at a time, each to its own log, for example `make ios-test > tmp/baseline-ios-test.log 2>&1; echo "exit=$?"`. Record any failures. Do not edit code until every baseline check has finished.
+5. Implement the effective brief yourself, in this session, including every test in its Test map. Do not hand the implementation to a subagent. Independent finish review and documentation are separate roles, not implementation delegation. Give agents paths to authoritative request/corrections, requirements, brief and diff artifacts rather than retyped summaries.
+6. Review the implementation yourself: `git diff`, plus `git status --short` for new files. Confirm that every Behavior item has the test named in the Test map, and that the code change the Test map names would make that test fail. Add any missing tests.
+7. For UI changes, follow the installed playbook's bounded inspection and [new-work §7, Inspect and finish](../impeccable/reference/new-work.md#7-inspect-and-finish) handoffs:
+   - Add required snapshot routes per `apps/ios/AGENTS.md`; capture native Simulator PNGs with `make ios-snapshot ROUTE=<name>` and the iOS reference. Inspect the actual reported state: an oversized open popup requires open-popup captures, not a closed-button width test. Cover shipped device classes, relevant appearances/text sizes and the brief's exact states/criteria. Open every capture to validate it. Browser overlays, `live`, `generate` and the HTML/CSS detector do not verify SwiftUI; skip the native detector and say so in the review packet.
+   - Builder inspection is one batched round, one correction batch, at most one confirmation round. Then hand off; do not extend self-polishing. Use the installed finish reviewer's input/output and correction protocol, including its recapture/rebuild/fix/ship dispositions and scoped verdicts. Required inputs travel as file paths: original request and corrections, effective brief/requirements, selected direction and applicable contract, quality bar, all required screenshots, platform and craft-floor guidance, plus build/fidelity artifacts where applicable.
+   - Dispatch the prescribed finish reviewer with fresh context and no inherited transcript. Verify this harness supports the installed named role (Codex: `impeccable_finish_reviewer`) rather than assuming a generic spawn accepts it. If only a general-purpose agent is available, use it fresh with [degraded finish-reviewer](../impeccable/reference/degraded/finish-reviewer.md)'s role contract and disclose the substitution. Only no-subagent harnesses use the installed inline degraded procedure. A failed or unavailable review remains unverified, never a self-awarded visual pass.
+   - Act on the review's disposition per the reference. A fix-list verdict covers only those fixes, not the whole surface. If the user rejects a shipped screenshot or supplies contrary evidence, include that evidence in a new full independent review; another inline patch and self-pass cannot close it.
+8. Update the brief's docs and changed behavior/config docs. For UI, complete the installed documentation handoff in new-work §7 using its documenter role (or disclosed supported substitute/fallback). New worlds and approved system changes require token-bearing `DESIGN.md` and `.impeccable/design.json`; ordinary extensions preserve incumbent files and report drift. Verify the outcome after the last correction.
+9. Final checks: rerun the baseline checks to new log files, then `git diff --check`.
+10. Run `git status --short`. Every changed or new path must be part of this feature. List any that are not, and do not delete them without asking.
+11. Go through `.agents/rules/code-review.md` one criterion at a time: PASS, FAIL, or N/A with a reason. Fix every FAIL this change caused, then rerun the affected checks.
+12. Commit the feature's changes with messages that say what changed and why. Several commits are fine, since PRs are squash-merged. Do not include unrelated changes in them; list anything unrelated in the handoff instead.
+13. Hand off with:
     - Absolute worktree path, branch, and commit hashes.
-    - A table of Behavior item, its test, and the result.
+    - Effective brief/requirements and approval/artifact paths, including superseded requirements and amendments.
+    - Behavioral results: requirement ID, test and result. Camera consistency needs physical selection/framing evidence; equal labels or enum names do not prove it.
     - Baseline and final check results, with log paths.
-    - Snapshot PNG paths.
+    - Rendered check results and native PNG paths/states; independent visual disposition, actual reviewer/substitution, scope and open findings; documentation handoff outcome.
+    - Physical acceptance separately: hardware/device evidence for focus, framing, sharpness and other physical checks, or explicit outstanding checks. Tests never establish visual quality; visual review never establishes optical performance.
     - Every deviation from the brief, and why.
     - Brief items that cannot do what they are for, each with a proposed fix.
     - Anything unverified.

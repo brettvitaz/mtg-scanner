@@ -32,15 +32,26 @@ Three repo skills in `.agents/skills/` run this workflow in phases. Invoke them
 with `/skill:<name>` in pi or `$<name>` in Codex. Text after the skill name is
 passed through unchanged.
 
-1. `feature-design <request>` agrees on a design with the user, stops for
-   approval, then saves the approved design to `tmp/feature-briefs/<name>.md`.
-   In Codex, run it in Plan mode: only Plan mode has the interactive question
-   prompt.
-2. `feature-build <brief path>` runs the baseline checks, implements the brief
-   in the same session, verifies tests, snapshots, and docs, reviews against
-   `.agents/rules/code-review.md`, and commits.
-3. `feature-review [brief path]` sends the branch diff to one reviewer subagent,
-   checks each finding, and reports without fixing.
+1. `feature-design <request>` discovers current requirements, shapes UI through the installed Impeccable workflow where applicable, obtains explicit design approval, and saves `tmp/feature-briefs/<name>.md`. Use the structured question mechanism available in the harness; Plan mode is not a universal prerequisite.
+2. `feature-build <brief path>` reconciles later user corrections before dependent work, runs baselines, implements the effective design itself, verifies behavior, obtains independent UI finish review and documentation through Impeccable, and commits for manual review.
+3. `feature-review [brief path]` sends the branch diff and effective requirements to one independent correctness reviewer, verifies findings, and reports without fixing. It does not certify native visual quality or hardware behavior.
+
+The brief carries one requirements record with stable IDs, source/quote, kind, status and supersession. Separate user decisions from implementation choices, assumptions and open questions. Later explicit user corrections supersede older requirements: update the record and affected brief/test sections, state the consequence and proceed without asking the user to approve their instruction again. Substantial unresolved visual choices return to design without reopening settled decisions.
+
+A portable handoff includes absolute paths to the brief, requirements record, selected direction/reference and version, approval evidence, required states and verification plan. Transfer actual gitignored briefs, temporary/external images and sidecars to a location the next session/worktree can read; verify destination files. Missing artifacts remain missing, not approved. Read only external artifacts the user authorized; do not explore unrelated worktrees.
+
+For UI, the local skills route to [Impeccable](../.agents/skills/impeccable/SKILL.md) and its installed references instead of maintaining a parallel design process. Shape stops before direction contracts and implementation; build resumes the selected playbook and persistence steps. Whole-treatment rejection uses the applicable replacement/concept process; a settled local fix inherits the existing world. Native capture surfaces use Operate mode and iOS guidance. Builder visual inspection is bounded; independent finish review and documentation follow the installed protocol, with supported role routing or disclosed substitutes.
+
+Keep these evidence categories separate in the handoff:
+
+| Evidence | What it establishes |
+| --- | --- |
+| Behavioral tests and correctness review | Effective requirements and regressions in exercised code paths |
+| Native rendered checks | Exact states captured from Simulator, including open overlays, device classes, appearance and text size |
+| Independent finish review | Visual judgment at the review's actual scope; fix-list resolution alone is not whole-surface approval |
+| Physical acceptance | Device evidence for lens selection, framing, focus, sharpness, gestures and performance |
+
+A closed-button geometry test cannot resolve an oversized open popup. A user-rejected screenshot goes to a new full independent finish review with that evidence; another self-certified tweak cannot close it. Browser tools and HTML/CSS detector results do not verify SwiftUI. Missing reviewers or hardware must be disclosed without inventing a pass. Backend-only features retain the correctness workflow and skip visual work.
 
 ## Feature thread template
 Each implementation thread should define:
@@ -93,6 +104,7 @@ Readiness does not authorize worktree cleanup:
 - [ ] pre-implementation baseline established (tests/build passed before changes, or failures noted)
 - [ ] code implemented and matches the stated requirements
 - [ ] relevant tests added or updated; tests exercise real code paths
+- [ ] UI finish review and documentation complete at the reported scope, or limitations and open findings explicit; physical acceptance reported separately
 - [ ] applicable verification passes after changes; skipped checks and unrelated baseline failures are reported
 - [ ] code review checklist completed — each criterion stated with pass/fail
 - [ ] no scope creep — only requested changes included
@@ -118,7 +130,7 @@ Pick the smallest set that proves the change:
 
 ## iOS verification checklist
 Pick the smallest set that proves the change:
-- `xcodebuild -project apps/ios/MTGScanner.xcodeproj -scheme MTGScanner -sdk iphonesimulator -configuration Debug build`
+- `make ios-build`, `make ios-lint`, and relevant tests with `make ios-test` (workspace-based commands)
 - targeted simulator/manual validation when the change is UI/UX-related
 
 ## Provider strategy

@@ -107,7 +107,7 @@
       {
         "name": "station-feedback",
         "condition": "All text sizes and both capture modes",
-        "behavior": "Independent centered status above framing; minimum height 20 scaled relativeTo caption, gap 8; Table preserves invisible space and hides status from accessibility; fixed 48-point trailing action remains beside shutter"
+        "behavior": "Independent centered status above framing; minimum height 20 scaled relativeTo caption, gap 8; Table preserves invisible space and hides status from accessibility; fixed 48-point trailing action remains beside shutter Preparing represents initial scene learning within the existing warmup; Ready requires a learned reference. Next-reference learning overlaps accepted capture preparation without an added per-card wait."
       },
       {
         "name": "capture-rhythm",
@@ -204,7 +204,12 @@
       "Native semantic colors have no fabricated tonal ramps.",
       "SwiftUI materials, semantic text and native snippets are preserved as v2 extensions rather than HTML/CSS approximations.",
       "No HTML/CSS rendering proof or optical acceptance is asserted."
-    ]
+    ],
+    "stationMotionAcceptance": {
+      "scope": "Physical iPhone 17 Pro, Station at 1.5\u00d7: Start/taps, rapid identical-copy drops and empty-tray first arrival passed with four intended captures and no reported extras or misses.",
+      "performance": "Sampler median 8.7 ms, p95 12.7 ms; no busy drops while watching. Four capture-to-rearm intervals ranged 1.19\u20131.53 s. This small sample does not establish unchanged throughput.",
+      "limits": "No universal lighting, stand, zoom or optical-quality acceptance inferred."
+    }
   },
   "components": [],
   "narrative": {

@@ -1,3 +1,4 @@
+import Accelerate
 import CoreVideo
 import Foundation
 
@@ -6,9 +7,9 @@ import Foundation
 /// Used in Auto Scan mode to distinguish a new card drop (large scene change) from
 /// an unchanged bin (same card or empty).
 ///
-/// Sampling every `sampleStride` pixels in both axes gives a coarse-but-fast
-/// approximation of overall frame luminance, robust to JPEG compression and minor
-/// lighting flicker.
+/// Low-pass resampling onto a coarse grid avoids turning fine stationary image
+/// detail into motion when its sampling phase changes. Calibrated regions select
+/// cells from that same full-frame grid.
 struct FrameDifferenceAnalyzer {
 
     /// Pixel spacing for the sparse sampling grid.
@@ -18,13 +19,43 @@ struct FrameDifferenceAnalyzer {
         self.sampleStride = max(sampleStride, 1)
     }
 
+    #if DEBUG
+    static let profilesSampling = ProcessInfo.processInfo.environment["STATION_SAMPLE_PROFILE"] == "1"
+    #endif
+
     // MARK: - Sampling
 
-    /// Samples luminance values from a BGRA pixel buffer on a coarse grid.
+    /// Low-pass resampling prevents fine lighting/image detail aliasing into coarse-grid motion.
     ///
     /// Returns an empty array if the buffer cannot be locked.
     func sample(_ pixelBuffer: CVPixelBuffer) -> [UInt8] {
-        sample(pixelBuffer, zone: nil)
+        #if DEBUG
+        let started = Date.timeIntervalSinceReferenceDate
+        defer {
+            if Self.profilesSampling {
+                print("[StationSample] milliseconds=\((Date.timeIntervalSinceReferenceDate - started) * 1000)")
+            }
+        }
+        #endif
+        guard CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly) == kCVReturnSuccess else { return [] }
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return [] }
+        let width = CVPixelBufferGetWidth(pixelBuffer), height = CVPixelBufferGetHeight(pixelBuffer)
+        let columns = (width + sampleStride - 1) / sampleStride
+        let rows = (height + sampleStride - 1) / sampleStride
+        var source = vImage_Buffer(data: base, height: vImagePixelCount(height),
+                                   width: vImagePixelCount(width), rowBytes: CVPixelBufferGetBytesPerRow(pixelBuffer))
+        var pixels = [UInt8](repeating: 0, count: columns * rows * 4)
+        let error = pixels.withUnsafeMutableBytes { bytes in
+            var destination = vImage_Buffer(data: bytes.baseAddress, height: vImagePixelCount(rows),
+                                            width: vImagePixelCount(columns), rowBytes: columns * 4)
+            return vImageScale_ARGB8888(&source, &destination, nil, vImage_Flags(kvImageNoFlags))
+        }
+        guard error == kvImageNoError else { return [] }
+        return stride(from: 0, to: pixels.count, by: 4).map { index in
+            UInt8(clamping: (77 * Int(pixels[index + 2]) + 150 * Int(pixels[index + 1]) +
+                             29 * Int(pixels[index])) >> 8)
+        }
     }
 
     /// Samples luminance values from a BGRA pixel buffer within a specific zone.
@@ -95,6 +126,24 @@ struct FrameDifferenceAnalyzer {
             y += sampleStride
         }
         return samples
+    }
+
+    /// Indices in the fixed full-frame sample grid that fall inside the calibrated motion region.
+    func sampleIndices(width: Int, height: Int, zone: CGRect?) -> [Int] {
+        let columns = (width + sampleStride - 1) / sampleStride
+        let rows = (height + sampleStride - 1) / sampleStride
+        guard zone != nil else { return Array(0..<(columns * rows)) }
+        let bounds = pixelBounds(for: zone, width: width, height: height)
+        var result: [Int] = []
+        for row in 0..<rows {
+            for column in 0..<columns where bounds.contains(
+                CGPoint(x: (Double(column) + 0.5) * Double(width) / Double(columns),
+                        y: (Double(row) + 0.5) * Double(height) / Double(rows))
+            ) {
+                result.append(row * columns + column)
+            }
+        }
+        return result
     }
 
     // MARK: - Difference

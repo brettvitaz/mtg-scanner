@@ -27,6 +27,7 @@ final class AutoScanViewModel {
         case capturing
     }
 
+    private(set) var isTrackerReady = false
     private(set) var captureFailure: String?
     var isPausedForZoom: Bool { isActive && (isZoomMoving || isZoomSettling) }
     private(set) var completionSequence = 0
@@ -129,6 +130,10 @@ final class AutoScanViewModel {
     }
 
     private func setupSignalHandler() {
+        presenceTracker.onReadinessChanged = { [weak self] ready, session in
+            guard let self, session == scanSessionID else { return }
+            isTrackerReady = ready
+        }
         presenceTracker.onNewCardSignal = { [weak self] boundingBox, sessionID in
             Task { @MainActor [weak self] in
                 self?.handleNewCardSignal(boundingBox: boundingBox, sessionID: sessionID)
@@ -213,6 +218,7 @@ final class AutoScanViewModel {
     private func resetSession() {
         captureFocusPoint = nil
         scanSessionID = UUID()
+        isTrackerReady = false
         detectionZone = nil
         isCalibrated = false
         presenceTracker.resetSession(scanSessionID)
@@ -251,13 +257,11 @@ final class AutoScanViewModel {
 
     /// Forward camera frames to the presence tracker while active.
     ///
-    /// Frames are dropped during `.settling` and `.capturing` — there is no value in
-    /// processing motion while a capture is imminent or in progress, and doing so
-    /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
+    /// Sampling continues during capture preparation to learn the next baseline without
+    /// delaying Ready. The tracker cannot emit another arrival until capture acknowledgement.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, !isPausedForZoom, captureFailure == nil,
-              captureState == .watching, canCaptureManually else { return }
-        presenceTracker.processFrame(sampleBuffer)
+        guard isActive, !isPausedForZoom, captureFailure == nil, !isZoomMoving else { return }
+        presenceTracker.processFrame(sampleBuffer, allowCapture: captureState == .watching && canCaptureManually)
     }
 
     // MARK: - State Machine
@@ -265,6 +269,7 @@ final class AutoScanViewModel {
     private func handleNewCardSignal(boundingBox: CGRect?, sessionID: UUID) {
         guard isActive, !isPausedForZoom, captureFailure == nil, sessionID == scanSessionID,
               boundingBox != nil, canCaptureManually else { return }
+        isTrackerReady = true // A validated tracker signal is emitted only after baseline learning.
         switch captureState {
         case .watching:
             captureFocusPoint = CameraFocus.point(fromYOLOBox: boundingBox)
@@ -318,7 +323,7 @@ final class AutoScanViewModel {
             releaseCapture(operationID)
             guard completedInSession, sessionID == scanSessionID else { return }
             completionSequence += 1
-            let ready = isActive && canCaptureManually
+            let ready = isActive && canCaptureManually && isTrackerReady
             feedback.completed(ready: ready)
         case .failure(let failure):
             releaseCapture(operationID)
@@ -382,11 +387,12 @@ final class AutoScanViewModel {
 // MARK: - Station presentation
 extension AutoScanViewModel {
     enum StationStatus: String {
-        case ready = "Ready", settling = "Settling", capturing = "Capturing"
+        case preparing = "Preparing", ready = "Ready", settling = "Settling", capturing = "Capturing"
         case stopped = "Stopped", paused = "Paused"
 
         var symbol: String {
             switch self {
+            case .preparing: "hourglass"
             case .ready: "checkmark.circle"
             case .settling: "hourglass"
             case .capturing: "camera.fill"
@@ -400,7 +406,8 @@ extension AutoScanViewModel {
         if !canChangeZoom { return .capturing }
         if isPausedForZoom || captureFailure != nil { return .paused }
         guard isActive else { return .stopped }
-        return captureState == .settling ? .settling : .ready
+        if captureState == .settling { return .settling }
+        return isTrackerReady ? .ready : .preparing
     }
 }
 

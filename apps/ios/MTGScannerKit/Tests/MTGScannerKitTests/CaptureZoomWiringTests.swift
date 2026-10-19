@@ -10,6 +10,14 @@ final class CaptureZoomWiringTests: XCTestCase {
         for mode in DetectionMode.allCases { try await exerciseHostedPresetControls(mode) }
     }
 
+    private func completeBaselineLearningAfterZoom(_ model: AutoScanViewModel) async throws {
+        try await waitForScanCount { !model.isPausedForZoom }
+        XCTAssertEqual(model.stationStatus, .preparing)
+        // This camera-device double supplies zoom events, not live frame samples.
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
+        XCTAssertEqual(model.stationStatus, .ready)
+    }
+
     private func exerciseHostedPresetControls(_ mode: DetectionMode) async throws {
         let app = AppModel()
         let context = try makeScanCountContext()
@@ -78,7 +86,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         XCTAssertEqual(camera.appliedZoom, 2.4)
         XCTAssertTrue(model.canCaptureManually)
         XCTAssertEqual(model.stationStatus, .paused)
-        try await waitForScanCount { model.stationStatus == .ready }
+        try await completeBaselineLearningAfterZoom(model)
         XCTAssertGreaterThan(factors.count, 2)
         XCTAssertTrue(zip(factors, factors.dropFirst()).allSatisfy { $0 <= $1 })
         model.start()
@@ -175,7 +183,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         camera.setZoom(1.00001)
         XCTAssertEqual(camera.appliedZoom, 1.00001)
         XCTAssertEqual(model.stationStatus, .paused)
-        try await waitForScanCount { model.stationStatus == .ready }
+        try await completeBaselineLearningAfterZoom(model)
         model.stop()
     }
 

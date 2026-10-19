@@ -321,6 +321,16 @@ final class CaptureControlsTests: XCTestCase {
 }
 
 extension CaptureControlsTests {
+    func testPreparingStationKeepsStopAndManualCaptureAvailable() {
+        launch("capture-station-preparing")
+        assertStatus("Preparing")
+        XCTAssertTrue(app.buttons["capture-shutter"].isEnabled)
+        XCTAssertEqual(app.buttons["station-start-stop"].label, "Stop Station")
+        screenshot("station-learning-before-ready")
+        app.buttons["station-start-stop"].tap()
+        assertStatus("Stopped")
+    }
+
     func testAllFiveTabsUseSharedSelectedAccent() {
         launch("capture-table-binder")
         for title in ["Table", "Station", "Results", "Library", "Settings"] {

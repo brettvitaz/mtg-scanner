@@ -62,7 +62,7 @@ public struct PreviewGalleryRootView: View {
             }
 
         #if DEBUG
-        case "capture-table-binder", "capture-station-ready", "capture-station-settling",
+        case "capture-table-binder", "capture-station-ready", "capture-station-preparing", "capture-station-settling",
              "capture-station-capturing", "capture-station-stopped", "capture-station-error",
              "capture-station-paused", "capture-recognition-foil", "capture-recognition-disabled",
              "capture-recognition-stack", "capture-recognition-processing",

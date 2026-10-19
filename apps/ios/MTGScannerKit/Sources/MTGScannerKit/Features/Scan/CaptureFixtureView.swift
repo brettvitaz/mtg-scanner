@@ -101,6 +101,15 @@ private final class CaptureFixtureState {
             opensBrightness: active && (route.hasPrefix("capture-brightness") || route == "capture-station-brightness"),
             onConfigured: { [weak self] in if active { self?.seed(mode: mode) } }
         )
+        .task { [weak self] in
+            // Inert cameras have no live samples; these routes explicitly simulate tracker readiness.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled, let self, route != "capture-station-preparing" else { return }
+                let model = self.modelFor(mode)
+                if active { model.presenceTracker.onReadinessChanged?(true, model.scanSessionID) }
+            }
+        }
     }
 
     private func seed(mode: DetectionMode) {

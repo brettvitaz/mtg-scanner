@@ -97,7 +97,7 @@ IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-em
 	scan-count-zero scan-count-new scan-count-overflow scan-count-navigation \
 	result-scan-artwork result-scan-image result-scan-zoom result-scan-edit result-scan-missing \
 	collection-scan-excluded deck-scan-excluded \
-	capture-table-binder capture-station-ready capture-station-settling \
+	capture-table-binder capture-station-ready capture-station-preparing capture-station-settling \
 	capture-station-capturing capture-station-stopped capture-station-error \
 	capture-station-paused capture-recognition-foil capture-recognition-disabled \
 	capture-recognition-stack capture-recognition-processing \

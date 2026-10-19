@@ -99,6 +99,22 @@ final class CardPresenceTrackerTests: XCTestCase {
         }
     }
 
+    func testIdenticalCopyArrivalCanReturnToTheSameAppearance() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        for _ in 0..<8 { tracker.processFrame(try uniformFrame(128)); await tracker.finishRearming() }
+        let arrived = expectation(description: "Local passage is an arrival even with identical final appearance")
+        arrived.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in arrived.fulfill() }
+        for value: UInt8 in [0, 0, 128, 128, 128, 128] {
+            tracker.processFrame(try uniformFrame(value))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [arrived], timeout: 0.2)
+    }
+
     private func uniformFrame(_ value: UInt8) throws -> CMSampleBuffer {
         try renderedFrame { context in
             context.setFillColor(UIColor(white: CGFloat(value) / 255, alpha: 1).cgColor)

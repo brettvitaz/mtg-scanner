@@ -25,6 +25,7 @@ final class StationFeedbackTests: XCTestCase {
             XCTAssertEqual(queue.pendingCount, 1)
         }
         model.start()
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
         model.captureManually()
         try await wait { await gate.isWaiting }
         XCTAssertEqual(model.stationStatus, .capturing)
@@ -63,7 +64,10 @@ final class StationFeedbackTests: XCTestCase {
         model.isZoomMoving = false
         XCTAssertTrue(model.isActive)
         XCTAssertEqual(model.stationStatus, .paused)
-        try await wait { model.stationStatus == .ready }
+        try await wait { !model.isPausedForZoom }
+        XCTAssertEqual(model.stationStatus, .preparing)
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
+        XCTAssertEqual(model.stationStatus, .ready)
         model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), oldSession)
         await Task.yield()
         XCTAssertEqual(model.captureState, .watching)
@@ -84,7 +88,10 @@ final class StationFeedbackTests: XCTestCase {
         model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), settlingSession)
         await Task.yield()
         XCTAssertEqual(model.captureState, .watching)
-        try await wait { model.stationStatus == .ready }
+        try await wait { !model.isPausedForZoom }
+        XCTAssertEqual(model.stationStatus, .preparing)
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
+        XCTAssertEqual(model.stationStatus, .ready)
         XCTAssertGreaterThanOrEqual(ended.duration(to: .now), .milliseconds(700))
         XCTAssertNotEqual(model.scanSessionID, settlingSession)
         model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), settlingSession)
@@ -106,7 +113,10 @@ final class StationFeedbackTests: XCTestCase {
         model.isZoomMoving = false
         let ended = ContinuousClock.now
         XCTAssertEqual(model.stationStatus, .paused)
-        try await wait { model.stationStatus == .ready }
+        try await wait { !model.isPausedForZoom }
+        XCTAssertEqual(model.stationStatus, .preparing)
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
+        XCTAssertEqual(model.stationStatus, .ready)
         XCTAssertGreaterThanOrEqual(ended.duration(to: .now), .milliseconds(700))
         model.isZoomMoving = true
         model.isZoomMoving = false
@@ -114,7 +124,7 @@ final class StationFeedbackTests: XCTestCase {
         XCTAssertFalse(model.isPausedForZoom)
         XCTAssertEqual(model.stationStatus, .stopped)
         model.start()
-        XCTAssertEqual(model.stationStatus, .ready)
+        XCTAssertEqual(model.stationStatus, .preparing)
         model.stop()
     }
 
@@ -135,6 +145,8 @@ final class StationFeedbackTests: XCTestCase {
         XCTAssertEqual(model.stationStatus, .paused)
         model.captureManually()
         try await wait { await gate.isWaiting }
+        // This photo-service double has no video stream; integration tests exercise real rearming samples.
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
         // The accepted crop deliberately completes after the cancelled pause's deadline.
         try await Task.sleep(for: .milliseconds(900))
         await gate.finish(image)
@@ -172,6 +184,20 @@ final class StationFeedbackTests: XCTestCase {
         try await wait { readyEvents.count == 1 }
         XCTAssertEqual(readyEvents, [false])
         XCTAssertEqual(model.stationStatus, .stopped)
+    }
+
+    func testStaleReadinessCannotArmANewSession() {
+        let model = AutoScanViewModel(detector: nil)
+        model.start()
+        let previous = model.scanSessionID
+        model.stop()
+        model.start()
+        XCTAssertEqual(model.stationStatus, .preparing)
+        model.presenceTracker.onReadinessChanged?(true, previous)
+        XCTAssertEqual(model.stationStatus, .preparing)
+        model.presenceTracker.onReadinessChanged?(true, model.scanSessionID)
+        XCTAssertEqual(model.stationStatus, .ready)
+        model.stop()
     }
 
     private func wait(_ condition: () async -> Bool) async throws {

@@ -29,7 +29,7 @@ final class StationTrackerIntegrationTests: XCTestCase {
             guard let model else { XCTFail("Capture model was released before feedback"); return }
             speeches.append(message)
             XCTAssertTrue(message.contains("Ready for the next card"))
-            XCTAssertTrue(model.canCaptureManually)
+            XCTAssertTrue(model.canCaptureManually && model.stationStatus == .ready)
             completions += 1
         }
         try await assertPreparationIsNotReady(model, gate: gate, photos: { photos }, completions: { completions })
@@ -46,6 +46,22 @@ final class StationTrackerIntegrationTests: XCTestCase {
         XCTAssertEqual(queue.pendingCount, 2)
         XCTAssertEqual([haptics, speeches.count], [2, 2])
         try await assertZoomPreservesWorkAndResetsBaseline(model, queue: queue, photos: { photos })
+    }
+
+    func testStartReadinessUsesExistingWarmupWithoutATimer() async throws {
+        let model = AutoScanViewModel(detector: nil)
+        model.start()
+        XCTAssertEqual(model.stationStatus, .preparing)
+        for _ in 0..<7 {
+            model.processFrame(try frame(128))
+            await model.presenceTracker.finishRearming()
+        }
+        XCTAssertEqual(model.stationStatus, .preparing)
+        model.processFrame(try frame(128))
+        await model.presenceTracker.finishRearming()
+        try await wait { model.stationStatus == .ready }
+        XCTAssertEqual(model.recognitionQueue.pendingCount, 0)
+        model.stop()
     }
 
     private func assertPreparationIsNotReady(
@@ -75,9 +91,11 @@ final class StationTrackerIntegrationTests: XCTestCase {
         // Residual camera changes are dropped, not learned as a card arrival.
         try await burst(model, baseline: 0, card: 255)
         XCTAssertEqual(photos(), 2)
-        try await wait { model.stationStatus == .ready }
-        // Only settled framing becomes the new baseline.
+        try await wait { !model.isPausedForZoom }
+        XCTAssertEqual(model.stationStatus, .preparing)
+        // Only settled framing becomes the new baseline; Ready follows actual samples.
         try await burst(model, baseline: 100, card: 100)
+        try await wait { model.stationStatus == .ready }
         XCTAssertEqual(photos(), 2)
         model.stop()
     }

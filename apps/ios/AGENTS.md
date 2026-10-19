@@ -175,7 +175,7 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `scan-count-zero` / `scan-count-new` / `scan-count-overflow` | `ScanCountFixtureView` | Production tab shell on Settings: no badge with older Results, 12 newly scanned cards, or 1,000 cards displayed as 99+ |
 | `scan-count-navigation` | `ScanCountFixtureView` | Open Results to clear 12; leave and simulate a new scan. Open Results button also checks programmatic navigation |
 | `capture-table-binder` | `CaptureFixtureView` | Nine-pocket page, production Table tab and controls, fractional zoom |
-| `capture-station-ready` / `capture-station-settling` / `capture-station-capturing` | `CaptureFixtureView` | Inert capture dependencies, real Station states |
+| `capture-station-preparing` / `capture-station-ready` / `capture-station-settling` / `capture-station-capturing` | `CaptureFixtureView` | Inert capture dependencies, real Station states |
 | `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, temporary zoom suspension with activity still started |
 | `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Foil completion notice or notification preference suppression |
 | `capture-recognition-stack` / `capture-recognition-processing` | `CaptureFixtureView` | Three compact completion notices with three queued requests, or queued requests alone; production queue actions |

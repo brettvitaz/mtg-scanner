@@ -70,17 +70,23 @@ release a tap to select the nearest marked preset (1%, 10%, 25%, 50%, 75%, 100%)
 or drag from anywhere to adjust relative to the starting level in 1% steps.
 Only preset selection emits a haptic; touch-down and drag release do not snap.
 
-Station uses compact Ready, Settling, Capturing, Stopped, and Paused feedback.
-Ready follows tracker rearming and release of the accepted capture; recognition can
+Station uses compact Preparing, Ready, Settling, Capturing, Stopped, and Paused feedback.
+Preparing learns scene variation within the existing motion warmup. Ready follows
+tracker rearming and release of the accepted capture; recognition can
 continue independently. Up to three compact completion notices verify recent cards/printings,
 with a brief foil shimmer that respects Reduce Motion. Settings → Show recognition notifications
 is on by default. Turning it off hides toast visuals/speech while preserving Results,
 counts, queue errors, and Station readiness.
 
-Station uses motion bursts followed by settlement and card-model validation to identify
-arrivals. The experimental image-stability and global-translation veto has been withdrawn
-because it could suppress valid arrivals. Stand vibration can still trigger a capture;
-reliable shake discrimination requires physical stand evidence before reintroduction.
+Station low-pass resamples each camera frame before measuring motion, preventing
+fine image detail from aliasing into the coarse motion grid. It measures motion
+outside the scene variation learned during warmup, then
+uses burst settlement and card-model validation to identify arrivals. Frame stability
+participates in settlement rather than discarding an already accepted candidate.
+Sampling continues during photo/crop preparation to rearm without an added per-card
+learning wait. Identical copies remain eligible when a new arrival produces motion.
+Recorded-scene replay covers Start/tap false triggers and real drops; physical stand
+acceptance is required to establish reliability under actual camera conditions.
 
 In Station, **Start** watches for card arrivals and **Stop** resets detection and calibration.
 After restarting, move or place the next card to trigger automatic capture. Use the shutter
@@ -122,6 +128,10 @@ Configuration failures log the underlying error and show a retry message in the 
 retrying an unchanged target attempts configuration again when no prepared state exists.
 See [ADR 0007](docs/decisions/adr-0007-auto-scan-focus-and-close-up-camera.md#physical-acceptance-check)
 for the physical acceptance check.
+
+For a local Debug-only Station processing profile, launch with
+`STATION_SAMPLE_PROFILE=1`. `[StationSample]` logs report sampler milliseconds
+and frames dropped while the tracker queue is busy; this does not record camera images.
 
 ## Useful commands
 ```bash

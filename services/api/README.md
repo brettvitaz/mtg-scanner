@@ -163,3 +163,8 @@ Events are stored atomically under the configured artifacts directory's
 Retries acknowledge the same UUID without replacing the original evidence. Storage
 failures return an error so the iOS outbox can retry. Evidence remains after a result
 is removed; no automatic cleanup, model training, or training-data management UI is included.
+
+## Docker
+
+See [Running the API with Docker](../../docs/docker.md) for container configuration,
+persistent storage, verification, and updates.

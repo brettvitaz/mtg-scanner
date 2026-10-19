@@ -1,0 +1,41 @@
+name: mtg-scanner
+services:
+  api:
+    image: mtg-scanner-api:${MTG_SCANNER_IMAGE_TAG:-local}
+    build:
+      context: .
+      args:
+        SOURCE_REVISION: ${MTG_SCANNER_IMAGE_TAG:-local}
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${MTG_SCANNER_HOST_PORT:-8000}:8000"
+    environment:
+      MTG_SCANNER_API_HOST: 0.0.0.0
+      MTG_SCANNER_API_PORT: "8000"
+      MTG_SCANNER_MTGJSON_DB_PATH: /app/services/api/data/mtgjson/mtgjson.sqlite
+      MTG_SCANNER_CK_PRICES_DB_PATH: /app/services/api/data/ck_prices/ck_prices.sqlite
+      MTG_SCANNER_ARTIFACTS_DIR: /app/artifacts
+    volumes:
+      - type: bind
+        source: ./config/.env
+        target: /app/services/api/.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - ./data/mtgjson:/app/services/api/data/mtgjson
+      - ./data/ck_prices:/app/services/api/data/ck_prices
+      - ./data/pricing:/app/services/api/data/pricing
+      - ./artifacts:/app/artifacts
+      - ./logs:/app/services/api/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json, urllib.request; r = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5); assert json.load(r) == {'status': 'ok'}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

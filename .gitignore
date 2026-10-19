@@ -40,3 +40,8 @@ services/api/data/ck_prices/
 
 # Pi agent background task output
 .pi/tasks/
+
+# Docker runtime state
+/data/
+/artifacts/
+/logs/

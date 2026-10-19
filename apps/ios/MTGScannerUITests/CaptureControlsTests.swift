@@ -20,7 +20,7 @@ final class CaptureControlsTests: XCTestCase {
         for anchor in 1...3 { XCTAssertTrue(app.buttons["capture-zoom-\(anchor)"].exists) }
         screenshot("inline-zoom-running")
         zoom.tap()
-        assertStatus("Paused")
+        assertStatus("Ready")
         assertZoom(1, "1.5×")
         XCTAssertTrue(app.images["Last captured card"].exists)
         zoom.tap()
@@ -33,8 +33,7 @@ final class CaptureControlsTests: XCTestCase {
             app.buttons["capture-zoom-\(anchor)"].tap()
             assertZoom(anchor, "\(anchor)×")
         }
-        app.buttons["station-start-stop"].tap()
-        assertStatus("Ready")
+        XCTAssertEqual(app.buttons["station-start-stop"].label, "Stop Station")
         app.tabBars.buttons["Results"].tap()
         app.tabBars.buttons["Table"].tap()
         XCTAssertEqual(app.buttons["capture-zoom-1"].value as? String, "1×")
@@ -69,22 +68,23 @@ final class CaptureControlsTests: XCTestCase {
         }
     }
 
-    func testTableHalfStepStillWorksAfterAStationRoundTrip() {
+    func testTableZoomIsRestoredAfterAStationRoundTrip() {
         launch("capture-table-binder")
         assertZoom(1, "1.5×")
         app.tabBars.buttons["Station"].tap()
         app.tabBars.buttons["Table"].tap()
-        assertZoom(1, "1×")
-        app.buttons["capture-zoom-1"].tap()
         assertZoom(1, "1.5×")
         screenshot("table-half-step-after-mode-return")
+        app.buttons["capture-zoom-1"].tap()
+        assertZoom(1, "1×")
+        screenshot("table-base-after-restored-zoom-tap")
     }
 
     func testThresholdFixturesKeepTheActiveValueOnTheShutterAxis() {
         for (route, anchor, value) in [("low", 1, "1.9×"), ("edge", 1, "1.9×"),
                                        ("high", 2, "2.1×"), ("upper", 3, "3.2×")] {
             launch("capture-zoom-pinch-\(route)")
-            assertStatus("Paused")
+            assertStatus("Ready")
             assertZoom(anchor, value)
             XCTAssertTrue(app.tabBars.buttons["Station"].isSelected)
             let active = app.buttons["capture-zoom-\(anchor)"]
@@ -109,14 +109,15 @@ final class CaptureControlsTests: XCTestCase {
         assertStatus("Paused")
         assertZoom(1, "1.5×")
         XCTAssertFalse(app.buttons["capture-shutter"].isEnabled)
-        XCTAssertFalse(app.buttons["station-start-stop"].isEnabled)
+        XCTAssertTrue(app.buttons["station-start-stop"].isEnabled)
+        XCTAssertEqual(app.buttons["station-start-stop"].label, "Stop Station")
         screenshot("station-zoom-transition-locked")
         app.buttons["capture-zoom-2"].tap()
         assertZoom(2, "2×")
         XCTAssertTrue(app.buttons["station-start-stop"].isEnabled)
         XCTAssertTrue(app.buttons["capture-shutter"].isEnabled)
-        app.buttons["station-start-stop"].tap()
         assertStatus("Ready")
+        XCTAssertEqual(app.buttons["station-start-stop"].label, "Stop Station")
     }
 
     func testNativePinchCrossesFamiliesAndCanReturnToBase() {
@@ -223,11 +224,29 @@ final class CaptureControlsTests: XCTestCase {
             assertZoom(1, "1×")
             app.buttons["capture-zoom-2"].tap()
             assertZoom(2, "2×")
-            assertStatus("Paused")
+            assertStatus("Ready")
             XCTAssertEqual(app.buttons["capture-zoom-2"].frame.midX,
                            app.buttons["capture-shutter"].frame.midX, accuracy: 1)
             screenshot("tablet-orientation-\(orientation.rawValue)")
         }
+    }
+
+    func testLiveCameraRemainsConnectedAcrossCaptureModes() throws {
+#if targetEnvironment(simulator)
+        throw XCTSkip("Real preview verification requires a physical camera")
+#else
+        app.launchArguments = ["-UI_TEST_LIVE_CAMERA", "YES"]
+        app.launch()
+        let preview = app.otherElements["camera-live-preview"]
+        for mode in ["Table", "Station", "Table", "Station", "Table"] {
+            if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
+            app.tabBars.buttons[mode].tap()
+            XCTAssertTrue(preview.waitForExistence(timeout: 10))
+            let live = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'Live'"), object: preview)
+            XCTAssertEqual(XCTWaiter.wait(for: [live], timeout: 5), .completed)
+            XCTAssertTrue(preview.isHittable)
+        }
+#endif
     }
 
     private func launch(_ route: String) {

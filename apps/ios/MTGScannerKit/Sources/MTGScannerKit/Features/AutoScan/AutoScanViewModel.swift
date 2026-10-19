@@ -28,7 +28,7 @@ final class AutoScanViewModel {
     }
 
     private(set) var captureFailure: String?
-    private(set) var isPausedForZoom = false
+    var isPausedForZoom: Bool { isActive && isZoomMoving }
     private(set) var completionSequence = 0
     let feedback = CaptureFeedback()
 
@@ -67,7 +67,11 @@ final class AutoScanViewModel {
     private(set) var scanSessionID = UUID()
     private var captureOperationID: UUID?
     private var preservedCaptureSessionID: UUID?
-    var isZoomMoving = false
+    var isZoomMoving = false {
+        didSet {
+            if oldValue && !isZoomMoving && isActive { resetSession() }
+        }
+    }
     var canChangeZoom: Bool { captureOperationID == nil }
     var canCaptureManually: Bool { canChangeZoom && !isZoomMoving }
     private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
@@ -151,7 +155,6 @@ final class AutoScanViewModel {
         guard !isActive, !isZoomMoving else { return }
         resetSession()
         isActive = true
-        isPausedForZoom = false
         captureFailure = nil
         captureState = .watching
         statusMessage = "Watching for cards…"
@@ -169,14 +172,12 @@ final class AutoScanViewModel {
         resetScanningState()
     }
 
-    /// Pauses before the first authorized hardware movement, once per active session.
+    /// Discard the old framing baseline while retaining the started Station activity.
     func prepareForZoomChange(from current: CGFloat, to applied: CGFloat) -> Bool {
         guard canChangeZoom else { return false }
-        guard current != applied, isActive else { return true }
+        guard current != applied, isActive, !isZoomMoving else { return true }
         settleTask?.cancel()
         settleTask = nil
-        isActive = false
-        isPausedForZoom = true
         captureState = .watching
         captureFailure = nil
         resetSession()
@@ -200,7 +201,6 @@ final class AutoScanViewModel {
 
     private func resetScanningState() {
         isActive = false
-        isPausedForZoom = false
         captureFailure = nil
         captureState = .watching
         lastCroppedImage = nil

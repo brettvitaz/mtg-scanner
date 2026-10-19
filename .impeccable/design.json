@@ -161,17 +161,28 @@
         "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureButton.swift",
         "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureControlSurface.swift",
         "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureFramingControls.swift",
-        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/AutoScan/AutoScanView.swift"
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/AutoScan/AutoScanView.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/App/RootTabView.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/AutoScan/AutoScanViewModel.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Camera/CameraSessionManager.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Camera/CameraViewController.swift"
       ],
-      "review": "tmp/capture-refinement/corrections.md",
-      "verdictScope": "Current-source documentation merge under C1\u2013C11 human corrections; earlier contrast-only verdict is superseded and no new finish verdict is asserted here",
+      "review": "tmp/capture-lifecycle/requirements.md",
+      "verdictScope": "Current-source behavior documentation merge under latest lifecycle corrections L1\u2013L4; no new finish verdict or physical acceptance asserted",
       "unresolved": [
         "Physical optical movement/focus/framing acceptance",
         "VoiceOver device focus continuity",
         "Reduce Transparency verification"
       ],
       "rasterProvenance": "No new shipping raster assets introduced; pre-existing synthetic fixture photos are layout evidence only.",
-      "cameraPolicy": "ScanView requests camera: .automatic for both modes; policy implementation and physical optical acceptance are distinct"
+      "cameraPolicy": "ScanView requests camera: .automatic for both modes; policy implementation and physical optical acceptance are distinct",
+      "captureLifecycle": {
+        "preview": "One movable preview layer follows the visible capture mode; session stays warm during Table\u2013Station handoff.",
+        "zoom": "Each mode independently saves applied zoom and restores it on navigation return; supersedes navigation resets to 1\u00d7.",
+        "station": "Active Station suspends detection events while zoom moves, discards stale tracking results, then automatically rebaselines and resumes. Activity stays active and Stop stays available. Navigation or explicitly stopped Station requires Start; accepted-photo protection remains.",
+        "reframing": "Preview-only iPhone 17 Pro framing remains investigation; no new control or sensor offset, and full photo remains unchanged.",
+        "physicalEvidence": "Physical iPhone 17 Pro live-preview test passed across repeated capture-mode handoffs; optical image quality remains unverified."
+      }
     },
     "representationNotes": [
       "Native semantic colors have no fabricated tonal ramps.",
@@ -182,7 +193,7 @@
   "components": [],
   "narrative": {
     "northStar": "Fluid native viewfinder",
-    "overview": "Table and Station keep collectors inside the camera image. Independent controls float over the scene: the white shutter leads, selected magnification uses restrained system yellow, and local dark material supports secondary actions. The result is clean, fast and confident, consistent with PRODUCT.md's precision reference tool.\n\nThis record covers the implemented capture surfaces only. It does not establish a design system for Results, Library or Settings. The approved capture brief and surface contract supply the language; the SwiftUI implementation supplies the tokens. The latest human corrections supersede the earlier contrast-only verdict and its selected zoom backing. This record reflects current source; it does not assign a new finish-review verdict. Both modes now request the same automatic camera policy. Physical camera acceptance, VoiceOver focus continuity and Reduce Transparency verification remain separate outstanding checks.",
+    "overview": "Table and Station keep collectors inside the camera image. Independent controls float over the scene: the white shutter leads, selected magnification uses restrained system yellow, and local dark material supports secondary actions. The result is clean, fast and confident, consistent with PRODUCT.md's precision reference tool.\n\nThis record covers the implemented capture surfaces only. It does not establish a design system for Results, Library or Settings. The approved capture brief and surface contract supply the language; the SwiftUI implementation supplies the tokens. The latest human corrections supersede the earlier contrast-only verdict and its selected zoom backing. This record reflects current source, including the latest capture lifecycle correction; it does not assign a new finish-review verdict. Both modes request the same automatic camera policy. One movable preview layer follows the visible capture mode, and the capture session stays warm during Table\u2013Station handoff. Each mode restores its own saved applied zoom on return; navigation no longer resets magnification to 1\u00d7. Physical camera acceptance, VoiceOver focus continuity and Reduce Transparency verification remain separate outstanding checks.",
     "keyCharacteristics": [
       "Continuous camera imagery between independent controls.",
       "A centered shutter and active zoom axis, with stable secondary capture slots.",

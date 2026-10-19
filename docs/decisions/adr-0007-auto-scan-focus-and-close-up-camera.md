@@ -33,7 +33,8 @@ one-shot focus/exposure pass at the shutter slows scanning without overcoming le
   Adjustment flags do not prove optical sharpness.
 - Share one root-owned camera session across capture modes. Ownership-tag frame delivery,
   navigation stops and shutdown so an outgoing controller cannot stop the incoming one.
-  Reset actual zoom/calibration on activation; preserve accepted photos and queued recognition.
+  Restore each mode’s saved actual zoom and reset calibration on activation; preserve
+  accepted photos and queued recognition.
   Reapply exposure and supported torch controls at session start, skipping unchanged updates.
 
 ## Consequences
@@ -114,3 +115,21 @@ Production-wiring tests cover shared session identity, both capability profiles,
 return synchronization, old-owner shutdown rejection, native progress/interruption and
 logarithmic rate symmetry. Device checks above still establish framing, sharpness and
 motion quality separately.
+
+## Preview lifecycle repair and transient zoom suspension
+
+A shared session alone did not share preview ownership: each tab created its own
+AVCaptureVideoPreviewLayer and requested navigation stop/start. The lifecycle repair
+uses one manager-owned layer, attached only by the appearing controller; offscreen
+layout cannot resize it. Root capture/scene visibility keeps the session running across
+capture tabs and requests a safe stop elsewhere. The lens policy stays common.
+
+The latest user instruction supersedes 1× navigation resets and explicit Start after
+zoom. Each capture mode restores its saved magnification. Zoom suspends Station events
+and settling while leaving activity started; the old tracking generation is invalidated
+and a fresh baseline is established automatically when movement ends. Accepted photos
+still prevent zoom from starting. Navigation and explicit Stop retain their semantics.
+
+Preview-only Station reframing is a separate design question for the user’s iPhone 17 Pro.
+Do not shift sensor-space detection/crop coordinates or alter full captured photos to
+compensate for a mount-specific low card position.

@@ -22,7 +22,8 @@ struct ScanView: View {
     @State private var shutterFlash = false
     @State private var photoLoadError: String?
     @State private var captureError: String?
-    @State private var needsZoomReset = true
+    @State private var needsZoomRestore = true
+    @State private var savedZoom: CGFloat = 1
     @ScaledMetric(relativeTo: .caption) private var feedbackHeight = 20.0
 
     init(
@@ -76,7 +77,7 @@ struct ScanView: View {
         .onChange(of: cameraPreviewID) { _, _ in
             captureCoordinator.cancelZoom()
             autoScanViewModel.pauseForNavigation()
-            needsZoomReset = true
+            needsZoomRestore = true
         }
         .onChange(of: autoScanViewModel.canChangeZoom) { _, available in
             if available && isActive { synchronizeCameraZoom() }
@@ -231,7 +232,8 @@ struct ScanView: View {
             captureCoordinator: captureCoordinator,
             onZoomFactorChanged: { factor in
                 detectionViewModel.zoomFactor = factor
-                resetCameraZoomIfNeeded()
+                if isActive && !needsZoomRestore { savedZoom = factor }
+                restoreCameraZoomIfNeeded()
             },
             willChangeZoom: { factor in
                 autoScanViewModel.prepareForZoomChange(from: detectionViewModel.zoomFactor, to: factor)
@@ -254,7 +256,14 @@ struct ScanView: View {
             if let previewContent { previewContent(preview) } else { AnyView(preview) }
         }
         .id(cameraPreviewID)
-        .accessibilityHidden(previewContent == nil)
+        .accessibilityHidden(hidesPreviewFromAccessibility)
+    }
+
+    private var hidesPreviewFromAccessibility: Bool {
+#if DEBUG
+        if CameraViewController.livePreviewTestEnabled { return false }
+#endif
+        return previewContent == nil
     }
 
     private var bottomBar: some View {
@@ -372,7 +381,7 @@ private extension ScanView {
             captureCoordinator.cancelZoom()
             autoScanViewModel.isZoomMoving = false
             autoScanViewModel.pauseForNavigation()
-            needsZoomReset = true
+            needsZoomRestore = true
         } else {
             synchronizeCameraZoom()
         }
@@ -380,11 +389,11 @@ private extension ScanView {
 
     private func synchronizeCameraZoom() { captureCoordinator.controller?.synchronizeZoom() }
 
-    private func resetCameraZoomIfNeeded() {
-        guard isActive, needsZoomReset, autoScanViewModel.canChangeZoom,
+    private func restoreCameraZoomIfNeeded() {
+        guard isActive, needsZoomRestore, autoScanViewModel.canChangeZoom,
               let controller = captureCoordinator.controller else { return }
-        needsZoomReset = false
-        controller.setZoom(1)
+        needsZoomRestore = false
+        controller.setZoom(savedZoom)
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {

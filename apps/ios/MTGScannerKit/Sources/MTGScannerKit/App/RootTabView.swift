@@ -55,6 +55,8 @@ public struct RootTabView: View {
                 }
                 .tag(AppTab.settings)
         }
+        .onAppear { updateCameraVisibility() }
+        .onChange(of: appModel.selectedTab) { _, _ in updateCameraVisibility() }
         .background(ResultsTabAccessibility(value: appModel.resultsBadgeAccessibilityValue))
         .onChange(of: appModel.shouldShowResults) { _, newValue in
             if newValue {
@@ -73,10 +75,16 @@ public struct RootTabView: View {
             await appModel.retryRecognitionFeedback()
         }
         .onChange(of: scenePhase) { _, phase in
+            updateCameraVisibility()
             if phase == .active { Task { await appModel.retryRecognitionFeedback() } }
         }
         .environment(\.undoSelectedTab, appModel.selectedTab.rawValue)
     }
+    private func updateCameraVisibility() {
+        let captureSelected = appModel.selectedTab == .table || appModel.selectedTab == .station
+        cameraSession.setCaptureVisible(captureSelected && scenePhase == .active)
+    }
+
     @ViewBuilder
     private func captureDestination(_ mode: DetectionMode, tab: AppTab) -> some View {
         if let captureContent {

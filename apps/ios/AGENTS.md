@@ -176,11 +176,11 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `scan-count-navigation` | `ScanCountFixtureView` | Open Results to clear 12; leave and simulate a new scan. Open Results button also checks programmatic navigation |
 | `capture-table-binder` | `CaptureFixtureView` | Nine-pocket page, production Table tab and controls, fractional zoom |
 | `capture-station-ready` / `capture-station-settling` / `capture-station-capturing` | `CaptureFixtureView` | Inert capture dependencies, real Station states |
-| `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, zoom pause |
+| `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, temporary zoom suspension with activity still started |
 | `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Single foil toast or notification preference suppression |
 | `capture-zoom-open` / `capture-zoom-menu` | `CaptureFixtureView` | Fully exposed inline selector at 1.5×; former menu route is a compatibility alias |
-| `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-edge` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Paused/Start at applied 1.9× / 2.1× / 1.99× / 3.2× (1.99× displays 1.9×) with the corresponding family centered |
-| `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Fixture driver held at intermediate applied zoom, chosen destination displayed; shutter/Start locked; another target interrupts and completes |
+| `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-edge` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Ready after zoom at applied 1.9× / 2.1× / 1.99× / 3.2× (1.99× displays 1.9×) with the corresponding family centered |
+| `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Fixture driver held at intermediate applied zoom, chosen destination displayed; shutter locked, active Stop available; another target interrupts and resumes detection |
 | `capture-station-brightness` | `CaptureFixtureView` | Ready with the actual brightness popup open; opening alone has not paused Station |
 | `capture-brightness` / `capture-brightness-adjusted` | `CaptureFixtureView` | Actual horizontal popover at 50% / 48% |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |

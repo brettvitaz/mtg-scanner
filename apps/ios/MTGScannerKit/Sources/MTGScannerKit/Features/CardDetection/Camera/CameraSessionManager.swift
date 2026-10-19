@@ -13,7 +13,16 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
 
     // MARK: - Public
 
-    let session = AVCaptureSession()
+    let session: AVCaptureSession
+    @MainActor lazy var previewLayer = AVCaptureVideoPreviewLayer(session: session)
+    private var captureVisible = false
+
+    override convenience init() { self.init(session: AVCaptureSession()) }
+
+    init(session: AVCaptureSession) {
+        self.session = session
+        super.init()
+    }
 
     /// Called on the session queue for each delivered video frame.
     var onFrame: ((CMSampleBuffer) -> Void)?
@@ -409,21 +418,30 @@ extension CameraSessionManager {
         }
     }
 
+    func setCaptureVisible(_ visible: Bool) {
+        sessionQueue.async { [self] in
+            captureVisible = visible
+            if !visible { pauseOnSessionQueue() } else if captureDevice != nil { resumeSession() }
+        }
+    }
+
     func start() { start(owner: nil, onStarted: {}) }
 
     func start(owner: UUID?, onStarted: @escaping @MainActor @Sendable () -> Void) {
         sessionQueue.async { [weak self] in
             guard let self, self.ownsCamera(owner) else { return }
-            self.stopAfterCapture = false
-            if !self.session.isRunning { self.session.startRunning() }
-            self.isSessionReady = self.session.isRunning && self.captureDevice != nil
-            if self.focusSettlingState == nil, let device = self.captureDevice {
-                self.observeAdjustments(device)
-                if !self.configureFocus(device, point: self.focusPoint) {
-                    print("[Camera] Could not restore continuous focus")
-                }
-            }
+            self.resumeSession()
             Task { @MainActor in onStarted() }
+        }
+    }
+
+    private func resumeSession() {
+        stopAfterCapture = false
+        if !session.isRunning { session.startRunning() }
+        isSessionReady = session.isRunning && captureDevice != nil
+        if focusSettlingState == nil, let device = captureDevice {
+            observeAdjustments(device)
+            if !configureFocus(device, point: focusPoint) { print("[Camera] Could not restore continuous focus") }
         }
     }
 
@@ -445,9 +463,9 @@ extension CameraSessionManager {
     }
 
     private func pauseOnSessionQueue() {
-        stopAfterCapture = true
+        stopAfterCapture = !captureVisible
         isSessionReady = false
-        if !isCaptureInFlight { stopSession() }
+        if !captureVisible && !isCaptureInFlight { stopSession() }
     }
 
     func ownsCamera(_ owner: UUID?) -> Bool {

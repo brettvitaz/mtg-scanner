@@ -208,3 +208,14 @@ exercise production controller wiring, ownership, delayed frames and redundant w
 Physical binder/stack image quality, real zoom smoothness, torch feel and haptics remain
 device acceptance work. They do not defer the common-lens implementation. See the
 worktree's `tmp/capture-refinement/` review packet for logs, native captures and findings.
+
+## Lifecycle correction and revised behavior
+
+The next user report identified a white Table preview and slow capture-tab switching.
+Latest authority is `tmp/capture-lifecycle/requirements.md`: one reusable preview layer
+and warm capture-mode handoff replace separate preview attachments and per-tab stops.
+Per-mode saved zoom supersedes navigation 1× reset. Active Station now suspends events
+only during zoom and resumes automatically, superseding explicit Start after zoom.
+Preview-only reframing is under investigation for iPhone 17 Pro; full photos remain
+unchanged and no universal offset is applied. Current evidence lives in the worktree’s
+`tmp/capture-lifecycle/`.

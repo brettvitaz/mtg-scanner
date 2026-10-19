@@ -46,6 +46,7 @@ final class CameraViewController: UIViewController {
     private var desiredExposureBias: Float = 0
 
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var previewObservation: NSKeyValueObservation?
     private let detectionLayer = CALayer()
     private var zoomFactorAtGestureStart: CGFloat = 1.0
     private var zoomGeneration = 0
@@ -99,6 +100,15 @@ final class CameraViewController: UIViewController {
         sessionManager.configure(camera: camera)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard let previewLayer else { return }
+        view.layer.insertSublayer(previewLayer, at: 0)
+        previewLayer.frame = view.bounds
+        updatePreviewOrientation()
+        reportPreviewState()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         isVisible = true
@@ -127,9 +137,11 @@ final class CameraViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        previewLayer?.frame = view.bounds
+        if previewLayer?.superlayer === view.layer {
+            previewLayer?.frame = view.bounds
+            updatePreviewOrientation()
+        }
         detectionLayer.frame = view.bounds
-        updatePreviewOrientation()
         engine.updateIsLandscape(view.bounds.width > view.bounds.height)
     }
 
@@ -205,12 +217,34 @@ final class CameraViewController: UIViewController {
     // MARK: - Setup
 
     private func setupPreviewLayer() {
-        let layer = AVCaptureVideoPreviewLayer(session: sessionManager.session)
+        let layer = sessionManager.previewLayer
         layer.videoGravity = .resizeAspectFill
-        layer.frame = view.bounds
-        view.layer.addSublayer(layer)
         previewLayer = layer
+        view.backgroundColor = .black
+#if DEBUG
+        if Self.livePreviewTestEnabled {
+            view.isAccessibilityElement = true
+            view.accessibilityIdentifier = "camera-live-preview"
+            view.accessibilityLabel = "Camera preview"
+        }
+#endif
+        previewObservation = layer.observe(\.isPreviewing, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in self?.reportPreviewState() }
+        }
     }
+
+    private func reportPreviewState() {
+        guard let previewLayer, previewLayer.superlayer === view.layer else { return }
+#if DEBUG
+        if Self.livePreviewTestEnabled {
+            view.accessibilityValue = previewLayer.isPreviewing ? "Live" : "Waiting"
+        }
+#endif
+    }
+
+#if DEBUG
+    static var livePreviewTestEnabled: Bool { ProcessInfo.processInfo.arguments.contains("-UI_TEST_LIVE_CAMERA") }
+#endif
 
     private func setupDetectionLayer() {
         detectionLayer.frame = view.bounds
@@ -220,7 +254,7 @@ final class CameraViewController: UIViewController {
 
     private func wireComponents() {
         engine.onDetection = { [weak self] cards in
-            guard let self, let previewLayer = self.previewLayer else { return }
+            guard let self, !self.isZoomMoving, let previewLayer = self.previewLayer else { return }
             // Only show green detection overlay in scan mode, not auto mode (which uses YOLO)
             if self.engine.currentDetectionMode == .scan {
                 self.renderer?.update(detections: cards, previewLayer: previewLayer)

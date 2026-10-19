@@ -40,7 +40,7 @@ final class StationFeedbackTests: XCTestCase {
         model.stop()
     }
 
-    func testZoomPausesSettlingOnceAndRequiresExplicitStart() async throws {
+    func testZoomSuspendsSettlingAndAutomaticallyResumesActiveDetection() async throws {
         let model = AutoScanViewModel(detector: nil)
         model.captureDelay = 60
         model.start()
@@ -50,13 +50,19 @@ final class StationFeedbackTests: XCTestCase {
         XCTAssertTrue(model.prepareForZoomChange(from: 1, to: 1))
         XCTAssertTrue(model.isActive)
         XCTAssertTrue(model.prepareForZoomChange(from: 1, to: 1.5))
-        XCTAssertFalse(model.isActive)
+        XCTAssertTrue(model.isActive)
+        model.isZoomMoving = true
         XCTAssertEqual(model.stationStatus, .paused)
         XCTAssertFalse(model.isCalibrated)
         let pausedSession = model.scanSessionID
         XCTAssertTrue(model.prepareForZoomChange(from: 1.5, to: 1.8))
         XCTAssertEqual(model.scanSessionID, pausedSession)
-        model.start()
+        model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), pausedSession)
+        await Task.yield()
+        XCTAssertEqual(model.captureState, .watching)
+        model.isZoomMoving = false
+        XCTAssertTrue(model.isActive)
+        XCTAssertEqual(model.stationStatus, .ready)
         model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), oldSession)
         await Task.yield()
         XCTAssertEqual(model.captureState, .watching)

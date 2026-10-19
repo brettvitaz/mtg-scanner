@@ -130,12 +130,13 @@ Simulator fixtures: `make ios-snapshot ROUTE=list-subtract`, `ROUTE=list-operati
 
 Leaving Table or Station stops new automatic captures and turns off the torch.
 A photo capture already accepted by the camera, cropping, and queued recognition
-continue; successful identifications appear in Results. Switching capture tabs resets
-zoom/calibration. Returning to Station does
+continue; successful identifications appear in Results. Switching capture tabs restores
+the incoming mode’s saved zoom and resets calibration. Returning to Station does
 not restart automatic capture. Its explicit Stop/reset still discards an unfinished
 capture, and the recognition badge's Cancel action cancels queued uploads.
 Zoom changes while watching/settling use a separate pause: thumbnail and queued jobs
-remain, settling is cancelled, and Start establishes a fresh motion baseline.
+remain, settling is cancelled, and activity stays started. Detection resumes automatically
+with a fresh motion baseline after zoom ends; stale tracking callbacks are ignored.
 
 Capture UI changes begin with a native feasibility checkpoint in the production tab
 shell: Table/Station, exposed inline zoom, base/half-step taps, threshold crossings,
@@ -250,8 +251,25 @@ fixture image, no network required). For native menu and gesture review, launch 
 large text, horizontal swipes, quantity controls, and preview-to-detail navigation.
 
 Before changing the common camera policy, compare viable physical lenses on the same
-phone at equivalent applied factors in both modes, separately recording intentional
-1× resets. Keep lens/capability/minimum-focus-distance data, configured photo dimensions,
+phone at equivalent applied factors in both modes, separately recording per-mode zoom
+restoration. Keep lens/capability/minimum-focus-distance data, configured photo dimensions,
 preview crop/aspect, focus/deadline logs, complete binder pages, low/middle/high Station
-stacks, full-resolution crops and fallback-device evidence. The current rework has not
-selected a validated common policy; ADR 0007's close-focus evidence must remain intact.
+stacks, full-resolution crops and fallback-device evidence. Both modes implement the
+same close-focus policy; comparative optical acceptance remains separate. ADR 0007’s
+close-focus evidence remains authoritative.
+
+### Camera lifecycle regression verification
+
+The capture tabs share one preview layer and session. Only the appearing controller
+attaches the layer; offscreen layout must not resize it. Root tab/scene visibility
+keeps the session warm across Table/Station and stops it outside capture or in the
+background. Simulator fixtures cannot prove that a physical preview is rendering.
+
+On an unlocked paired phone, run the physical-only
+`CaptureControlsTests/testLiveCameraRemainsConnectedAcrossCaptureModes` workflow using
+the MTGScannerUITests scheme and the device destination with signing enabled. It
+checks AVFoundation `isPreviewing` and visible layer ownership through DEBUG-only
+accessibility instrumentation, switching tabs without taking photos. The test skips
+on Simulator. An unsigned Simulator runner can remain cached after test-source changes;
+remove only `com.brettvitaz.mtgscanner.uitests.xctrunner` from the task Simulator and
+rerun when observed assertions do not match compiled source. Preserve failed logs.

@@ -165,7 +165,9 @@ private final class CaptureFixtureState {
                 CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), model.scanSessionID
             )
         case "capture-station-capturing": model.captureManually()
-        case "capture-station-paused": _ = model.prepareForZoomChange(from: 1, to: 1.5)
+        case "capture-station-paused":
+            _ = model.prepareForZoomChange(from: 1, to: 1.5)
+            model.isZoomMoving = true
         case "capture-station-error":
             model.captureFocusedPhoto = { _ in .failure(.unavailable) }
             model.captureManually()

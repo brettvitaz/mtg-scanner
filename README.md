@@ -57,12 +57,12 @@ device-clamped factor, rounded only for display, and recenters at the unrounded 
 boundaries. Pinch stays continuous and interrupts preset motion; another tap replaces
 the destination. Reduce Motion removes the sliding recentering effect.
 
-Before actual zoom movement, Station pauses and clears calibration once. Tap Start to
-resume; queued recognition and the thumbnail are preserved. Capture and Start are
-unavailable during movement. An accepted photo/preparation blocks every zoom path.
-Stop and navigation cancel queued motion. A configuration failure leaves the displayed
-factor truthful and provides Retry. At accessibility text sizes, inactive zoom choices
-and Station actions wrap into separate rows so their labels remain readable.
+While zoom moves, a started Station temporarily suspends detection events and cancels
+settling. It stays started, retains its thumbnail and recognition queue, and automatically
+rebuilds the motion baseline when movement ends. Stop remains available. New capture
+is unavailable during movement; an accepted photo/preparation blocks every zoom path.
+Stop and navigation cancel motion. Configuration failure provides Retry. Accessibility
+text reflows zoom choices without moving the Start/Stop control.
 
 Tap the torch to toggle its remembered brightness, or hold it to open brightness.
 VoiceOver also offers Adjust brightness. The horizontal bar shows one percentage:
@@ -87,8 +87,10 @@ cropping finds no card, the original photo is uploaded for recognition.
 Table and Station share one camera session and one fixed lens policy. Both select an
 autofocus-capable physical ultra-wide camera when it supports the existing 1080p
 video/photo pipeline, with the physical wide camera as the common fallback. The
-lens stays fixed across mode changes; switching capture tabs resets actual zoom to
-1× and calibration. Returning to Station requires Start.
+lens stays fixed across mode changes. One preview layer moves between the two capture
+tabs, and the session stays running during handoff. Leaving both capture tabs or
+backgrounding stops the camera safely. Each mode restores its own saved zoom on return;
+Station calibration resets and returning to Station requires Start.
 
 Preset taps animate directly to the chosen zoom anchor without counting intermediate
 values in the button. Pinch zoom reports the actual applied factor; the 1× family

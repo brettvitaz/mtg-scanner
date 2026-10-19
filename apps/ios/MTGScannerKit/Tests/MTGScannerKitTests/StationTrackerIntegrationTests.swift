@@ -68,7 +68,9 @@ final class StationTrackerIntegrationTests: XCTestCase {
         XCTAssertTrue(model.lastCroppedImage === thumbnail)
         XCTAssertEqual(queue.pendingCount, 2)
         XCTAssertFalse(model.isCalibrated)
-        model.start()
+        model.isZoomMoving = true
+        model.isZoomMoving = false
+        XCTAssertTrue(model.isActive)
         // The changed framing becomes a baseline, never a new arrival.
         try await burst(model, baseline: 100, card: 100)
         XCTAssertEqual(photos(), 2)

@@ -48,7 +48,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         try await waitForScanCount { !model.isActive }
         XCTAssertEqual(detection.zoomFactor, camera.appliedZoom)
         state.active = true
-        try await waitForScanCount { camera.appliedZoom == 1 && detection.zoomFactor == 1 }
+        try await waitForScanCount { camera.appliedZoom == 2 && detection.zoomFactor == 2 }
         XCTAssertFalse(model.isCalibrated)
     }
 
@@ -59,7 +59,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         var factors: [CGFloat] = []
         var sessionAfterPause: UUID?
         camera.zoomDevice = immediateZoomDevice(maximum: 2.4) { value in
-            XCTAssertFalse(model.isActive)
+            XCTAssertTrue(model.isActive)
             XCTAssertFalse(model.canCaptureManually)
             if let sessionAfterPause { XCTAssertEqual(model.scanSessionID, sessionAfterPause) }
             sessionAfterPause = model.scanSessionID
@@ -73,11 +73,11 @@ final class CaptureZoomWiringTests: XCTestCase {
         try await waitForScanCount { camera.isZoomMoving }
         XCTAssertLessThan(camera.appliedZoom, 2.4)
         model.start()
-        XCTAssertFalse(model.isActive)
+        XCTAssertTrue(model.isActive)
         try await waitForScanCount { !camera.isZoomMoving }
         XCTAssertEqual(camera.appliedZoom, 2.4)
         XCTAssertTrue(model.canCaptureManually)
-        XCTAssertEqual(model.stationStatus, .paused)
+        XCTAssertEqual(model.stationStatus, .ready)
         XCTAssertGreaterThan(factors.count, 2)
         XCTAssertTrue(zip(factors, factors.dropFirst()).allSatisfy { $0 <= $1 })
         model.start()
@@ -161,15 +161,19 @@ final class CaptureZoomWiringTests: XCTestCase {
         XCTAssertEqual(camera.appliedZoom, pausedAt)
     }
 
-    func testSmallActualMovementStillPausesStationBeforeMutation() {
+    func testSmallActualMovementSuspendsRatherThanStoppingStation() {
         let camera = CameraViewController()
         let model = AutoScanViewModel(detector: nil)
-        camera.zoomDevice = immediateZoomDevice(maximum: 4) { _ in XCTAssertFalse(model.isActive) }
+        camera.zoomDevice = immediateZoomDevice(maximum: 4) { _ in
+            XCTAssertTrue(model.isActive)
+            XCTAssertTrue(model.isZoomMoving)
+        }
+        camera.onZoomMotionChanged = { model.isZoomMoving = $0 }
         camera.willChangeZoom = { model.prepareForZoomChange(from: camera.appliedZoom, to: $0) }
         model.start()
         camera.setZoom(1.00001)
         XCTAssertEqual(camera.appliedZoom, 1.00001)
-        XCTAssertEqual(model.stationStatus, .paused)
+        XCTAssertEqual(model.stationStatus, .ready)
         model.stop()
     }
 
@@ -252,7 +256,7 @@ final class CaptureZoomWiringTests: XCTestCase {
 
 @MainActor
 final class CapturePresentationWiringTests: XCTestCase {
-    func testReturningToCaptureResetsTheActualCameraBeforeTheFirstHalfStepTap() async throws {
+    func testReturningToCaptureRestoresItsSavedActualZoom() async throws {
         let app = AppModel()
         let context = try makeScanCountContext()
         let model = AutoScanViewModel(detector: nil)
@@ -271,12 +275,13 @@ final class CapturePresentationWiringTests: XCTestCase {
         model.start()
         state.active = false
         try await waitForScanCount { !model.isActive }
+        camera.setZoom(2) // The other mode changes the shared physical camera.
         state.active = true
-        try await waitForScanCount { camera.appliedZoom == 1 && detection.zoomFactor == 1 }
+        try await waitForScanCount { camera.appliedZoom == 1.5 && detection.zoomFactor == 1.5 }
         let control = try view.inspect().find(ZoomPresetControl.self).actualView()
-        control.onSelect(1.5)
-        try await waitForScanCount { !camera.isZoomMoving && detection.zoomFactor == 1.5 }
-        XCTAssertEqual(camera.appliedZoom, 1.5)
+        control.onSelect(1)
+        try await waitForScanCount { !camera.isZoomMoving && detection.zoomFactor == 1 }
+        XCTAssertEqual(camera.appliedZoom, 1)
     }
 
     func testBothCaptureModesWireTheCloseFocusPolicyAndItsWideFallback() async throws {

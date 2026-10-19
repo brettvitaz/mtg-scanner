@@ -123,10 +123,25 @@ private final class CaptureFixtureState {
                 model.recognitionQueue.maxConcurrent = 1
                 await model.enqueueCapturedImage(card, cropEnabled: false)
             }
-            if route.hasPrefix("capture-recognition-") {
+            await seedRecognition(model)
+        }
+    }
+
+    private func seedRecognition(_ model: AutoScanViewModel) async {
+        guard route.hasPrefix("capture-recognition-") else { return }
+        if route == "capture-recognition-stack" || route == "capture-recognition-processing" {
+            model.recognitionQueue.maxConcurrent = 0
+            for _ in 0..<3 { await model.enqueueCapturedImage(card, cropEnabled: false) }
+        }
+        guard route != "capture-recognition-processing" else { return }
+        model.recognitionQueue.onCardIdentified?(
+            RecognizedCard(title: "Lightning Bolt", edition: "Foundations", collectorNumber: "199",
+                           foil: true, setCode: "fdn")
+        )
+        if route == "capture-recognition-stack" {
+            for title in ["Teferi’s Protection", "Boseiju, Who Endures"] {
                 model.recognitionQueue.onCardIdentified?(
-                    RecognizedCard(title: "Lightning Bolt", edition: "Foundations", collectorNumber: "199",
-                                   foil: true, setCode: "fdn")
+                    RecognizedCard(title: title, edition: "Test", collectorNumber: "123", setCode: "tst")
                 )
             }
         }

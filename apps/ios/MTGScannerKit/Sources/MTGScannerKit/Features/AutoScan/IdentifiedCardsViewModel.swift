@@ -14,7 +14,7 @@ final class IdentifiedCardsViewModel {
 
     // MARK: - Configuration
 
-    let maxCards = 1
+    let maxCards = 3
     let displayDuration: TimeInterval
 
     init(displayDuration: TimeInterval = 3) {

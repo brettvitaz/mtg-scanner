@@ -5,13 +5,29 @@ import XCTest
 
 @MainActor
 final class CaptureNotificationTests: XCTestCase {
-    func testNewCompletionReplacesPreviousToast() {
+    func testCompletionsStackNewestFirstAndEvictOnlyTheFourthOldest() {
         let model = IdentifiedCardsViewModel()
         model.addCard(IdentifiedCard(from: RecognizedCard(title: "Island", edition: "Test")))
         model.addCard(IdentifiedCard(from: RecognizedCard(title: "Forest", edition: "Test")))
-        XCTAssertEqual(model.recentCards.map(\.title), ["Forest"])
+        model.addCard(IdentifiedCard(from: RecognizedCard(title: "Mountain", edition: "Test")))
+        XCTAssertEqual(model.recentCards.map(\.title), ["Mountain", "Forest", "Island"])
+        model.addCard(IdentifiedCard(from: RecognizedCard(title: "Plains", edition: "Test")))
+        XCTAssertEqual(model.recentCards.map(\.title), ["Plains", "Mountain", "Forest"])
         model.clearAll()
     }
+    func testStackedCompletionsExpireWithoutRemovingNewerNotices() async throws {
+        let model = IdentifiedCardsViewModel(displayDuration: 0.4)
+        let first = IdentifiedCard(from: RecognizedCard(title: "Island", edition: "Test"))
+        let second = IdentifiedCard(from: RecognizedCard(title: "Forest", edition: "Test"))
+        model.addCard(first)
+        // Stagger arrivals so the second notice must outlive the first one's timer.
+        try await Task.sleep(for: .milliseconds(200))
+        model.addCard(second)
+        try await waitForScanCount { !model.recentCards.contains { $0.id == first.id } }
+        XCTAssertEqual(model.recentCards.map(\.title), ["Forest"])
+        try await waitForScanCount { model.recentCards.isEmpty }
+    }
+
     func testPreferenceSuppressesOnlyFeedbackWhileResultsAndCountsContinueOnEitherCaptureTab() async throws {
         let suite = "notifications-\(UUID())"
         let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))

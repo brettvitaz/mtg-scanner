@@ -177,7 +177,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `capture-table-binder` | `CaptureFixtureView` | Nine-pocket page, production Table tab and controls, fractional zoom |
 | `capture-station-ready` / `capture-station-settling` / `capture-station-capturing` | `CaptureFixtureView` | Inert capture dependencies, real Station states |
 | `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, temporary zoom suspension with activity still started |
-| `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Single foil toast or notification preference suppression |
+| `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Foil completion notice or notification preference suppression |
+| `capture-recognition-stack` / `capture-recognition-processing` | `CaptureFixtureView` | Three compact completion notices with three queued requests, or queued requests alone; production queue actions |
 | `capture-zoom-open` / `capture-zoom-menu` | `CaptureFixtureView` | Fully exposed inline selector at 1.5×; former menu route is a compatibility alias |
 | `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-edge` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Ready after zoom at applied 1.9× / 2.1× / 1.99× / 3.2× (1.99× displays 1.9×) with the corresponding family centered |
 | `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Fixture driver held at intermediate applied zoom, chosen destination displayed; shutter locked, active Stop available; another target interrupts and resumes detection |
@@ -211,7 +212,7 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 
 The `capture-*` routes use `RootTabView`, `ScanView`, and the production controls,
 with inert camera and recognition dependencies and an isolated in-memory store.
-State is seeded after appearance/configuration. Inline zoom and brightness use the
+State is seeded after appearance/configuration. Completion notices use a 60-second fixture lifetime for inspection; production retains independent three-second expiry. The stack and processing routes keep three real requests queued with concurrency zero, so their queue actions remain interactive without network access. Inline zoom and brightness use the
 real controls. Preset transition fixtures hold the elapsed-time fixture driver at an
 intermediate applied value while presenting the destination. Selecting a different
 anchor interrupts that hold.

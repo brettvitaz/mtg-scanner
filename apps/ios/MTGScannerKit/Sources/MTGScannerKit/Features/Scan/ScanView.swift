@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct ScanView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var detectionMode: DetectionMode
     let isActive: Bool
     let cameraSession: CameraSessionManager
@@ -162,27 +163,34 @@ struct ScanView: View {
 
     private var cameraOverlay: some View {
         VStack(spacing: 0) {
-            if appModel.showRecognitionNotifications, !autoScanViewModel.identifiedCardsViewModel.recentCards.isEmpty {
-                IdentifiedCardToastContainer(viewModel: autoScanViewModel.identifiedCardsViewModel)
-                    .padding(.top, 8)
-            }
-            HStack {
-                Spacer()
-                RecognitionBadgeView(
-                    recognitionQueue: autoScanViewModel.recognitionQueue,
-                    onCancel: autoScanViewModel.cancelRecognition,
-                    onRetryFailed: autoScanViewModel.recognitionQueue.retryFailed,
-                    onClearFailed: autoScanViewModel.recognitionQueue.clearFailed
-                )
-            }
-            .padding(.horizontal, 20)
             Spacer(minLength: 0)
             captureControls
         }
+        .overlay(alignment: .top) {
+            if appModel.showRecognitionNotifications {
+                IdentifiedCardToastContainer(viewModel: autoScanViewModel.identifiedCardsViewModel)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    private func recognitionStatus(showsThumbnail: Bool) -> some View {
+        RecognitionBadgeView(
+            recognitionQueue: autoScanViewModel.recognitionQueue,
+            image: autoScanViewModel.lastCroppedImage,
+            showsThumbnail: showsThumbnail,
+            onCancel: autoScanViewModel.cancelRecognition,
+            onRetryFailed: autoScanViewModel.recognitionQueue.retryFailed,
+            onClearFailed: autoScanViewModel.recognitionQueue.clearFailed
+        )
     }
 
     private var captureControls: some View {
         VStack(spacing: 24) {
+            if dynamicTypeSize.isAccessibilitySize {
+                recognitionStatus(showsThumbnail: false)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
             if isAutoScanMode, let failure = autoScanViewModel.captureFailure {
                 StationCaptureFailureView(message: failure, retry: autoScanViewModel.captureManually)
             }
@@ -264,56 +272,6 @@ struct ScanView: View {
         if CameraViewController.livePreviewTestEnabled { return false }
 #endif
         return previewContent == nil
-    }
-
-    private var bottomBar: some View {
-        ZStack {
-            manualShutter
-            HStack {
-                thumbnail.frame(width: 48, height: 48)
-                Spacer()
-                if isAutoScanMode { StationStartStopButton(viewModel: autoScanViewModel) } else { photoPickerButton }
-            }
-        }
-        .frame(height: 76)
-    }
-
-    private var manualShutter: some View {
-        CaptureButton(action: isAutoScanMode ? autoScanViewModel.captureManually : captureCard,
-                      isDisabled: !autoScanViewModel.canCaptureManually)
-            .accessibilityIdentifier("capture-shutter")
-    }
-
-    private var thumbnail: some View {
-        Group {
-            if let image = autoScanViewModel.lastCroppedImage {
-                Image(uiImage: image).resizable().scaledToFit()
-                    .frame(width: 36, height: 48)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .accessibilityLabel("Last captured card")
-            } else {
-                Color.clear.frame(width: 36, height: 48).accessibilityHidden(true)
-            }
-        }
-    }
-
-    private var lastTorchLevelBinding: Binding<Float> {
-        Binding(
-            get: { appModel.lastTorchLevel },
-            set: { appModel.lastTorchLevel = $0 }
-        )
-    }
-
-    private var photoPickerButton: some View {
-        PhotosPicker(selection: $selectedPhoto, matching: .images) {
-            Image(systemName: "photo.on.rectangle")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .captureControlSurface(in: Circle())
-        }
-        .accessibilityLabel("Choose photo")
-        .accessibilityHint("Selects an existing image for card recognition.")
     }
 
     // MARK: - Actions
@@ -422,4 +380,70 @@ private extension ScanView {
         captureCoordinator.cancelZoom()
         autoScanViewModel.pauseForNavigation()
     }
+}
+
+// The capture row keeps its shutter axis independent of secondary feedback widths.
+private extension ScanView {
+    var bottomBar: some View {
+        GeometryReader { geometry in
+            ZStack {
+                manualShutter.frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        thumbnail.frame(width: 48, height: 48)
+                    } else {
+                        recognitionStatus(showsThumbnail: true)
+                            .frame(width: max(48, (geometry.size.width - 76) / 2 - 24), height: 76)
+                    }
+                    Spacer()
+                    if isAutoScanMode {
+                        StationStartStopButton(viewModel: autoScanViewModel)
+                    } else {
+                        photoPickerButton
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            }
+        }
+        .frame(height: 76)
+    }
+
+    var manualShutter: some View {
+        CaptureButton(action: isAutoScanMode ? autoScanViewModel.captureManually : captureCard,
+                      isDisabled: !autoScanViewModel.canCaptureManually)
+            .accessibilityIdentifier("capture-shutter")
+    }
+
+    var thumbnail: some View {
+        Group {
+            if let image = autoScanViewModel.lastCroppedImage {
+                Image(uiImage: image).resizable().scaledToFit()
+                    .frame(width: 36, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .accessibilityLabel("Last captured card")
+            } else {
+                Color.clear.frame(width: 36, height: 48).accessibilityHidden(true)
+            }
+        }
+    }
+
+    var lastTorchLevelBinding: Binding<Float> {
+        Binding(
+            get: { appModel.lastTorchLevel },
+            set: { appModel.lastTorchLevel = $0 }
+        )
+    }
+
+    var photoPickerButton: some View {
+        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+            Image(systemName: "photo.on.rectangle")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .captureControlSurface(in: Circle())
+        }
+        .accessibilityLabel("Choose photo")
+        .accessibilityHint("Selects an existing image for card recognition.")
+    }
+
 }

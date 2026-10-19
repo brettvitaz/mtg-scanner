@@ -102,9 +102,9 @@ Zoom and status use semantic styles for Dynamic Type; the secondary action symbo
 
 The camera preview ignores safe areas. Capture controls form a centered cluster bounded to a native width of 420 points with the frontmatter insets; they do not create a full-width enclosing toolbar. The active zoom stays on the shutter axis, with the shared control gap below the framing rail. Ordinary inactive zoom anchors move horizontally at 52-point intervals around the selected family. The shared control gap also separates the shutter row from the native navigation boundary.
 
-The bottom row centers the shutter independently of its fixed 48-point side slots: last-card thumbnail left, Table import or Station Start/Stop right. Status sits centered above framing in an independent strip with a 20-point minimum height scaled relative to `.caption`; Table reserves the same space invisibly and hides it from accessibility. The status gap separates this strip from framing, so text never moves the action. At accessibility text sizes zoom neighbors move to a separate row below the active pill. Torch lifts to its own row when available control width is below 360 points or accessibility text is active. These are native available-width rules, not browser breakpoints.
+The bottom row centers the shutter independently of secondary content: latest-capture thumbnail and aggregate recognition status left, 48-point Table import or Station Start/Stop right. The queue group uses the space to the left of the protected shutter gap, with a fixed 76-point row height. At accessibility text sizes, queue actions occupy a reserved full-width row above capture controls, while the thumbnail remains in the bottom row. Status sits centered above framing in an independent strip with a 20-point minimum height scaled relative to `.caption`; Table reserves the same space invisibly and hides it from accessibility. The status gap separates this strip from framing, so text never moves the action. At accessibility text sizes zoom neighbors move to a separate row below the active pill. Torch lifts to its own row when available control width is below 360 points or accessibility text is active. These are native available-width rules, not browser breakpoints.
 
-The existing native five-destination tab shell remains the navigation boundary. Recognition confirmation stays at the top; capture recovery stays near capture controls and remains distinct from recognition-queue failures.
+The existing native five-destination tab shell remains the navigation boundary. Up to three compact recognition completion notices appear in an independent top overlay; at accessibility text sizes, only the newest notice is displayed. Notice arrival and expiry cannot reposition the recognition queue or capture controls. Capture recovery stays near capture controls and remains distinct from recognition-queue failures.
 
 ## Elevation & Depth
 
@@ -138,7 +138,7 @@ A multiline, locally backed recovery button provides a capture retry target with
 
 ### Secondary capture slots
 
-The aspect-fit last-card thumbnail and circular native photo-import action balance the shutter. Torch retains its existing toggle/hold and horizontal brightness interaction through the shared framing layout. This document does not redefine those preserved interactions or introduce a second brightness indicator.
+The aspect-fit latest-capture thumbnail and circular native photo-import action balance the shutter. Torch retains its existing toggle/hold and horizontal brightness interaction through the shared framing layout. This document does not redefine those preserved interactions or introduce a second brightness indicator.
 
 ## Do's and Don'ts
 
@@ -153,3 +153,11 @@ The aspect-fit last-card thumbnail and circular native photo-import action balan
 - **Don't** count through intermediate applied factors during a preset move or label magnification as a focal length or physical lens.
 - **Don't** treat sampled colors, fixture scenery or schematic storyboard fills as production palette tokens.
 - **Don't** infer physical camera quality or complete accessibility acceptance from simulator presentation.
+
+### Recognition queue and completion feedback
+
+The latest-capture thumbnail is grouped with aggregate queue activity, not linked to an individual recognition job. A spinner and “N pending” caption indicate queued and active requests. A persistent warning symbol signals failures; when there is no pending work, the caption reads “N failed.” VoiceOver always reports both counts. A placeholder preserves access when requests remain after the latest image clears. Tapping this group opens native, explicitly labeled Cancel pending recognition, Retry failed and Dismiss failures actions, as applicable. There is no standalone cancellation cross.
+
+Completion notices and queue captions use the existing 65% black feedback backing with local dark native material for readable text over bright scenery. Completion notices use a card title and a set/collector metadata line with an explicit Foil label when applicable. Up to three notices stack newest first with 6-point separation; each retains its independent three-second expiry. A fourth completion evicts the oldest visible notice, while every identification remains in Results. The existing notification setting suppresses completion feedback without suppressing queue activity or failures. Notice dismissal remains available as a VoiceOver custom action, without a visible close icon.
+
+Foil receives one subtle cyan/pink shimmer pass over 0.8 seconds at appearance. It neither repeats nor runs with Reduce Motion enabled. Notice insertions and removals use a short opacity transition, also respecting Reduce Motion. Existing camera lifecycle, optics, zoom, Station state and the proposal-only reframing remain unchanged.

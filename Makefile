@@ -100,6 +100,7 @@ IOS_SNAPSHOT_ROUTES ?= settings scan results csv-import collection-empty deck-em
 	capture-table-binder capture-station-ready capture-station-settling \
 	capture-station-capturing capture-station-stopped capture-station-error \
 	capture-station-paused capture-recognition-foil capture-recognition-disabled \
+	capture-recognition-stack capture-recognition-processing \
 	capture-zoom-menu capture-brightness capture-brightness-adjusted \
 	capture-zoom-open capture-zoom-pinch-low capture-zoom-pinch-high capture-zoom-pinch-edge \
 	capture-zoom-pinch-upper capture-zoom-transition capture-station-zoom-transition \

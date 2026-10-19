@@ -80,6 +80,11 @@
         "name": "station-completion",
         "value": ".symbolEffect(.bounce, options: .nonRepeating)",
         "purpose": "Completion-sequence change; sequence suppressed under Reduce Motion"
+      },
+      {
+        "name": "foil-completion",
+        "value": ".easeOut(duration: 0.8), one pass",
+        "purpose": "Subtle cyan/pink completion shimmer; absent under Reduce Motion"
       }
     ],
     "nativeLayout": [
@@ -101,7 +106,12 @@
       {
         "name": "capture-rhythm",
         "condition": "All capture layouts",
-        "behavior": "24-point framing-to-shutter gap and bottom inset; maximum cluster width 420, horizontal inset 20; shutter row height 76, side slots 48"
+        "behavior": "24-point framing-to-shutter gap and bottom inset; maximum cluster width 420, horizontal inset 20; shutter row height 76, trailing action 48; leading aggregate queue/thumbnail group fills available width before protected 24-point shutter gap"
+      },
+      {
+        "name": "recognition-feedback",
+        "condition": "Table and Station",
+        "behavior": "Aggregate queue actions stay with latest-capture thumbnail; AX queue uses dedicated reserved row. Up to three independently expiring three-second notices overlay the top; AX shows one. Notices never position capture controls."
       }
     ],
     "nativeComponents": [

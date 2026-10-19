@@ -174,8 +174,8 @@ final class CaptureControlsTests: XCTestCase {
 
     func testRecognitionPreferencePreservesThumbnail() {
         launch("capture-recognition-foil")
-        let notification = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Recognized Lightning Bolt")
+        let notification = app.otherElements.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "capture-recognition-notice-")
         ).firstMatch
         XCTAssertTrue(notification.waitForExistence(timeout: 5))
         screenshot("recognition-foil")
@@ -192,19 +192,55 @@ final class CaptureControlsTests: XCTestCase {
             NSPredicate(format: "label BEGINSWITH %@", "Capture failed.")
         ).firstMatch
         XCTAssertTrue(captureRetry.waitForExistence(timeout: 5))
-        let failures = app.buttons["Recognition failures"]
+        let failures = app.buttons["capture-recognition-queue"]
         XCTAssertTrue(failures.waitForExistence(timeout: 5))
         failures.tap()
-        for action in ["Retry", "Dismiss", "Cancel"] { XCTAssertTrue(app.alerts.buttons[action].exists) }
-        app.alerts.buttons["Cancel"].tap()
+        for action in ["Retry failed", "Dismiss failures"] { XCTAssertTrue(app.buttons[action].exists) }
+        if app.buttons["Cancel"].exists {
+            app.buttons["Cancel"].tap()
+        } else {
+            // Native popover presentation dismisses by tapping outside on iOS 26/iPad.
+            app.images["capture-fixture-pinch-target"].tap()
+        }
         failures.tap()
-        app.alerts.buttons["Retry"].tap()
+        app.buttons["Retry failed"].tap()
         XCTAssertTrue(failures.waitForExistence(timeout: 5))
         failures.tap()
-        app.alerts.buttons["Dismiss"].tap()
+        app.buttons["Dismiss failures"].tap()
         XCTAssertTrue(failures.waitForNonExistence(timeout: 5))
         XCTAssertTrue(captureRetry.exists)
         screenshot("capture-and-recognition-errors")
+    }
+
+    func testThreeNoticesDoNotMoveQueueOrCaptureControlsAndCancellationIsExplicit() {
+        launch("capture-recognition-processing")
+        let queue = app.buttons["capture-recognition-queue"]
+        XCTAssertTrue(queue.waitForExistence(timeout: 5))
+        XCTAssertEqual(queue.value as? String, "3 pending, 0 failed")
+        let queueFrame = queue.frame
+        let shutterFrame = app.buttons["capture-shutter"].frame
+        screenshot("recognition-processing")
+        app.terminate()
+        launch("capture-recognition-stack")
+        let notices = app.otherElements.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "capture-recognition-notice-")
+        )
+        XCTAssertTrue(queue.waitForExistence(timeout: 5))
+        XCTAssertEqual(notices.count, 3)
+        XCTAssertFalse(app.buttons["Dismiss"].exists)
+        XCTAssertFalse(app.buttons["Cancel recognition"].exists)
+        XCTAssertEqual(queue.frame.midX, queueFrame.midX, accuracy: 1)
+        XCTAssertEqual(queue.frame.midY, queueFrame.midY, accuracy: 1)
+        XCTAssertEqual(app.buttons["capture-shutter"].frame.midY, shutterFrame.midY, accuracy: 1)
+        XCTAssertLessThan(queue.frame.maxX, app.buttons["capture-shutter"].frame.minX)
+        screenshot("recognition-three-notices")
+        queue.tap()
+        XCTAssertTrue(app.buttons["Cancel pending recognition"].waitForExistence(timeout: 3))
+        screenshot("recognition-queue-actions")
+        app.buttons["Cancel pending recognition"].tap()
+        XCTAssertTrue(queue.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(notices.count, 3)
+        XCTAssertEqual(app.buttons["capture-shutter"].frame.midY, shutterFrame.midY, accuracy: 1)
     }
 
     func testTabletOrientationKeepsControlsOnTheShutterAxis() throws {

@@ -1,137 +1,80 @@
 import SwiftUI
-import UIKit
 
-/// Displays a single identified card toast notification.
-///
-/// Slides in from the trailing edge with a semi-transparent background.
-/// Shows the card title, foil indicator, set code, and collector number.
+/// A brief completion receipt. Results remain available after the notice expires.
 struct IdentifiedCardToastView: View {
     let card: IdentifiedCard
     let onDismiss: () -> Void
-    @State private var shimmerOffset: CGFloat = -1.0
+    @State private var shimmerOffset: CGFloat = -1
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: 8) {
-            cardLabels
-            Spacer()
-            dismissButton
+        VStack(alignment: .leading, spacing: 2) {
+            Text(card.title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Text("\(card.setCode.uppercased()) #\(card.collectorNumber)")
+                if card.isFoil { Label("Foil", systemImage: "sparkles") }
+            }
+            .font(.caption)
+            .foregroundStyle(.white)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.regularMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .foregroundStyle(.white)
+        .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
+        .captureControlSurface(in: RoundedRectangle(cornerRadius: 12))
         .overlay(shimmerOverlay)
-        .accessibilityElement(children: .contain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAction(named: "Dismiss notification", onDismiss)
+        .accessibilityIdentifier("capture-recognition-notice-\(card.id)")
     }
 
     private var accessibilityLabel: String {
         var parts = ["Recognized \(card.title)"]
-        if card.isFoil {
-            parts.append("foil")
-        }
+        if card.isFoil { parts.append("foil") }
         parts.append("set \(card.setCode.uppercased())")
-        if !card.collectorNumber.isEmpty {
-            parts.append("collector number \(card.collectorNumber)")
-        }
+        if !card.collectorNumber.isEmpty { parts.append("collector number \(card.collectorNumber)") }
         return parts.joined(separator: ", ")
     }
 
     @ViewBuilder
-    private var cardLabels: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if dynamicTypeSize.isAccessibilitySize {
-                Text("Recognized").font(.caption).foregroundStyle(.secondary)
-                Text(card.title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("Recognized \(card.title)").font(.subheadline.weight(.semibold)).lineLimit(2)
-            }
-            HStack(spacing: 6) {
-                if card.isFoil {
-                    Image(systemName: "sparkles").foregroundStyle(.yellow).accessibilityHidden(true)
-                }
-                Text("\(card.setCode.uppercased()) #\(card.collectorNumber)")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Recently recognized card.")
-    }
-
-    private var dismissButton: some View {
-        Button(action: onDismiss) {
-            Image(systemName: "xmark")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.primary)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
-                .background(Circle().fill(Color.white.opacity(0.3)).frame(width: 24, height: 24))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Dismiss")
-        .accessibilityHint("Dismisses this recognized card notification.")
-    }
-
-    @ViewBuilder
     private var shimmerOverlay: some View {
-        if card.isFoil {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.red.opacity(0.3),
-                            Color.orange.opacity(0.3),
-                            Color.yellow.opacity(0.3),
-                            Color.green.opacity(0.3),
-                            Color.blue.opacity(0.3),
-                            Color.purple.opacity(0.3),
-                            Color.red.opacity(0.3)
-                        ],
-                        startPoint: UnitPoint(x: shimmerOffset, y: 0),
-                        endPoint: UnitPoint(x: shimmerOffset + 1, y: 1)
-                    )
-                )
-                .blendMode(.overlay)
+        if card.isFoil && !reduceMotion {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(LinearGradient(
+                    colors: [.clear, .cyan.opacity(0.12), .pink.opacity(0.12), .clear],
+                    startPoint: UnitPoint(x: shimmerOffset, y: 0),
+                    endPoint: UnitPoint(x: shimmerOffset + 0.7, y: 1)
+                ))
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
                 .onAppear {
-                    guard !reduceMotion else { return }
-                    withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
-                        shimmerOffset = 1.0
-                    }
+                    withAnimation(.easeOut(duration: 0.8)) { shimmerOffset = 1.5 }
                 }
         }
     }
 }
 
-/// A single transient recognition notification, without a reserved screen lane.
+/// Completion notices occupy their own top overlay and never lay out capture controls.
 struct IdentifiedCardToastContainer: View {
     @Bindable var viewModel: IdentifiedCardsViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var animation: Animation? {
-        reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.7)
-    }
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(viewModel.recentCards.prefix(1)) { card in
-                IdentifiedCardToastView(card: card) {
-                    viewModel.removeCard(id: card.id)
-                }
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+        VStack(spacing: 6) {
+            ForEach(viewModel.recentCards.prefix(dynamicTypeSize.isAccessibilitySize ? 1 : 3)) { card in
+                IdentifiedCardToastView(card: card) { viewModel.removeCard(id: card.id) }
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: 480)
         .padding(.horizontal, 16)
-        .animation(animation, value: viewModel.recentCards.count)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: viewModel.recentCards.map(\.id))
     }
 }

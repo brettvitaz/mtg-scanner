@@ -22,7 +22,7 @@ final class ScanCountRecognitionTests: XCTestCase {
         await waitForQueue(queue)
         XCTAssertEqual(app.newlyScannedCardCount, 6)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CollectionItem>()), 6)
-        XCTAssertEqual(vm.identifiedCardsViewModel.recentCards.count, 1)
+        XCTAssertEqual(vm.identifiedCardsViewModel.recentCards.map(\.title), ["Island", "Island"])
         vm.stop()
     }
 
@@ -82,7 +82,7 @@ final class ScanCountRecognitionTests: XCTestCase {
         XCTAssertEqual(queue.completedCount, 1)
         XCTAssertEqual(app.newlyScannedCardCount, 2)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CollectionItem>()), 2)
-        XCTAssertEqual(vm.identifiedCardsViewModel.recentCards.count, 1)
+        XCTAssertEqual(vm.identifiedCardsViewModel.recentCards.map(\.title), ["Island", "Island"])
     }
 
     func testLateCompletionWhileResultsIsSelectedIsSeen() async throws {

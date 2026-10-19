@@ -77,11 +77,10 @@ with a brief foil shimmer that respects Reduce Motion. Settings → Show recogni
 is on by default. Turning it off hides toast visuals/speech while preserving Results,
 counts, queue errors, and Station readiness.
 
-Station requires stable image samples before triggering. It rejects motion confidently explained
-by the whole scene translating together, using textured areas outside the detected card as
-independent background evidence. Local changes, identical-card placements, and ambiguous
-or texture-poor scenes remain eligible; this is not a guarantee against every vibration or
-vision-model false positive.
+Station uses motion bursts followed by settlement and card-model validation to identify
+arrivals. The experimental image-stability and global-translation veto has been withdrawn
+because it could suppress valid arrivals. Stand vibration can still trigger a capture;
+reliable shake discrimination requires physical stand evidence before reintroduction.
 
 In Station, **Start** watches for card arrivals and **Stop** resets detection and calibration.
 After restarting, move or place the next card to trigger automatic capture. Use the shutter

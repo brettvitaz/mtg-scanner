@@ -164,6 +164,6 @@ Completion notices and queue captions use the existing 65% black feedback backin
 
 Foil receives one subtle cyan/pink shimmer pass over 0.8 seconds at appearance. It neither repeats nor runs with Reduce Motion enabled. Notice insertions and removals use a short opacity transition, also respecting Reduce Motion. Existing camera lifecycle, optics, zoom, Station state and the proposal-only reframing remain unchanged.
 
-### Stand vibration
+### Station trigger recovery
 
-Automatic capture requires stable adjacent image samples; a stable aggregate difference score alone is insufficient. A bounded whole-frame thumbnail registration check rejects confidently global translation only when the same motion explains multiple textured peripheral tiles outside the detected card. Local or inconclusive motion stays eligible, including identical printings with the same final appearance. Tight framing without independent background declines this veto. This signal check changes no card bounds, crop coordinates, provider contracts or preview framing. Physical stand acceptance remains separate from synthetic-image regression evidence.
+Motion bursts and their existing settlement state drive card validation. The experimental adjacent-image gate and global-translation veto were withdrawn after they suppressed valid stationary arrivals under low image noise. Keep post-zoom quiet time separate from arrival detection. Vibration discrimination remains unresolved and requires physical stand acceptance before any replacement algorithm is introduced.

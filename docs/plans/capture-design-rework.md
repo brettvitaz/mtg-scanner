@@ -1,13 +1,13 @@
 # Capture experience: findings and rework requirements
 
-Date: 2026-10-18. Historical findings below are preserved. The effective replacement
-and latest implemented correction sections record the current approved direction;
+Date: 2026-10-18. Historical findings below are preserved. The
+[canonical approved contract](capture-rework.md) reconciles all later corrections;
 physical acceptance remains separate.
 
 ## Effective replacement and build evidence
 
 The user approved the replacement design on 2026-10-18. The authoritative build input
-is `tmp/feature-briefs/capture-rework.md` in the capture-consistency worktree; it
+is [the tracked capture contract](capture-rework.md); it
 supersedes conflicting menu/preset and background prescriptions below. The original
 rejection remains historical evidence, not approval of the rejected implementation.
 The replacement uses three inline zoom anchors, half-step cycling, continuous pinch,

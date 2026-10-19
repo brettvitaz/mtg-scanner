@@ -32,7 +32,7 @@ Three repo skills in `.agents/skills/` run this workflow in phases. Invoke them
 with `/skill:<name>` in pi or `$<name>` in Codex. Text after the skill name is
 passed through unchanged.
 
-1. `feature-design <request>` discovers current requirements, shapes UI through the installed Impeccable workflow where applicable, obtains explicit design approval, and saves `tmp/feature-briefs/<name>.md`. Use the structured question mechanism available in the harness; Plan mode is not a universal prerequisite.
+1. `feature-design <request>` discovers current requirements, shapes UI through the installed Impeccable workflow where applicable, obtains explicit design approval, and saves the approved canonical brief in tracked `docs/plans/` or the existing `docs/work-efforts/` task record. Use the structured question mechanism available in the harness; Plan mode is not a universal prerequisite.
 2. `feature-build <brief path>` reconciles later user corrections before dependent work, runs baselines, implements the effective design itself, verifies behavior, obtains independent UI finish review and documentation through Impeccable, and commits for manual review.
 3. `feature-review [brief path]` sends the branch diff and effective requirements to one independent correctness reviewer, verifies findings, and reports without fixing. It does not certify native visual quality or hardware behavior.
 
@@ -53,7 +53,15 @@ skill bodies and relative references from the task worktree per
 checkout or change third-party skill discovery. These obligations do not make the
 explicit-only feature skills implicit.
 
-A portable handoff includes absolute paths to the brief, requirements record, selected direction/reference and version, approval evidence, required states and verification plan. Transfer actual gitignored briefs, temporary/external images and sidecars to a location the next session/worktree can read; verify destination files. Missing artifacts remain missing, not approved. Read only external artifacts the user authorized; do not explore unrelated worktrees.
+Approved briefs and their effective decisions survive completion in the repository,
+per [approved brief retention](../AGENTS.md#approved-brief-retention). Drafts and private
+evidence may stay local; legacy ignored approved briefs must be promoted before
+dependent work or completion. Verify the new record before replacing old brief paths
+with forwarding pointers, preserving local history. Include sufficient approval,
+requirements and evidence summaries for a fresh checkout; retain important architecture
+rationale in linked ADRs. This does not authorize artifact publication or cleanup.
+
+A portable handoff includes absolute paths to the brief, requirements record, selected direction/reference and version, approval evidence, required states and verification plan. Transfer required temporary/external images and sidecars to a location the next session/worktree can read; verify destination files. Missing artifacts remain missing, not approved. Read only external artifacts the user authorized; do not explore unrelated worktrees.
 
 For UI, the local skills route to [Impeccable](../.agents/skills/impeccable/SKILL.md) and its installed references instead of maintaining a parallel design process. Shape stops before direction contracts and implementation; build resumes the selected playbook and persistence steps. Whole-treatment rejection uses the applicable replacement/concept process; a settled local fix inherits the existing world. Native capture surfaces use Operate mode and iOS guidance. Builder visual inspection is bounded; independent finish review and documentation follow the installed protocol, with supported role routing or disclosed substitutes.
 
@@ -118,6 +126,7 @@ Readiness does not authorize worktree cleanup:
 - [ ] work was done in a worktree, not on main/master
 - [ ] pre-implementation baseline established (tests/build passed before changes, or failures noted)
 - [ ] code implemented and matches the stated requirements
+- [ ] approved designated brief/record retained in tracked docs with essential links resolving without ignored artifacts; retention checked and commit/PR reference recorded when available
 - [ ] designated brief/record opened and synchronized; handoff names its path and updated sections/IDs, or explains why no update/no designated brief applies
 - [ ] relevant tests added or updated; tests exercise real code paths
 - [ ] UI finish review and documentation complete at the reported scope, or limitations and open findings explicit; physical acceptance reported separately
@@ -165,8 +174,9 @@ To keep prompts efficient for smaller local models:
 
 ## Maintaining the workflow guidance
 
-After changing active-brief maintenance or skill provenance, use the isolated
+After changing active-brief maintenance, retention or skill provenance, use the isolated
 [behavioral checks](../.agents/skills/feature-build/references/brief-maintenance-checks.md).
 They cover follow-ups, findings-only completion, read-only review, mismatched catalog
-paths and tasks with no designated brief. Preserve baseline results even when the
+paths, legacy ignored approvals, read-only retention review and tasks with no
+designated brief. Preserve baseline results even when the
 old guidance passes a small trial; format validation alone does not prove compliance.

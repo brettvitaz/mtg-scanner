@@ -9,8 +9,10 @@ When reviewing code — whether self-reviewing before handoff or evaluating chan
 - If this task has a designated brief, open its actual decision/verification record
   (including ignored files). Check later approved corrections, material findings,
   supersession and evidence limits are synchronized, not merely summarized in a
-  handoff or ADR. A stale effective record fails this criterion. During read-only
-  review report the gap without editing it.
+  handoff or ADR. A stale effective record fails this criterion. For an approved designated brief,
+  verify tracked retention and essential linked records per AGENTS.md: an ignored-only
+  contract or evidence conclusion available only through local artifacts also fails.
+  During read-only review report the gap without editing it.
 - Are edge cases handled (empty inputs, boundary values, nil/optional paths)?
 - Are there logic errors, off-by-one errors, or incorrect math?
 

@@ -10,6 +10,7 @@ An optional brief path may follow this skill. Get an independent review of the f
 ## Rules
 
 - When you say you will do a step, make the tool call in the same turn. Do not end a turn after only announcing a step.
+- Resolve repository-owned skill copies from the task worktree per `AGENTS.md`; preserve this skill's read-only boundary.
 - Do not modify project sources or requirements, stage, commit, or stash. Write only review artifacts under `tmp/`.
 - Do not inspect other branches, worktrees, or earlier attempts without explicit user authorization. Read only specifically authorized external artifacts; do not modify them.
 
@@ -32,6 +33,7 @@ Create a todo list with one item per step before you start, and keep it updated.
 5. Write the reviewer's task from the template:
    - **What Was Implemented:** one sentence from the brief.
    - **Requirements:** absolute paths to the effective brief, requirements record and explicit amendments, identifying effective IDs and superseded entries. Tell the reviewer to read those sources, not a retyped Behavior list that loses corrections.
+   - **Brief synchronization:** supplied record path and claimed updated sections/IDs, or the handoff's no-update/no-designated-brief explanation. Have the reviewer inspect the file and compare later approved instructions and material evidence against it. Report stale synchronization as a correctness finding; do not repair it in this read-only phase.
    - **Git range:** replace it with the absolute path of `tmp/review.diff` and tell the reviewer to read that file in full; it is the exact change under review. Do not paste or retype the diff. Give the absolute worktree path so it can read context.
    - **Review focus, only this:** "Does the code correctly implement each requirement, and would a test fail if any requirement broke?" Tell it to skip style unless it hides a bug, and to use `.agents/rules/code-review.md` and `.agents/rules/testing.md` as the standard.
    - Tell it not to run builds or tests. Include the latest check results: from the build handoff if it is in this session, otherwise from the newest check logs in `tmp/` (for example `tmp/final-*.log`), read for exit status and failures. Say which files you read; if there are none, say the checks were not found, not that they failed.

@@ -6,6 +6,11 @@ When reviewing code — whether self-reviewing before handoff or evaluating chan
 
 ## 1. Correctness
 - Does the code do what the spec or task description says?
+- If this task has a designated brief, open its actual decision/verification record
+  (including ignored files). Check later approved corrections, material findings,
+  supersession and evidence limits are synchronized, not merely summarized in a
+  handoff or ADR. A stale effective record fails this criterion. During read-only
+  review report the gap without editing it.
 - Are edge cases handled (empty inputs, boundary values, nil/optional paths)?
 - Are there logic errors, off-by-one errors, or incorrect math?
 

@@ -38,6 +38,21 @@ passed through unchanged.
 
 The brief carries one requirements record with stable IDs, source/quote, kind, status and supersession. Separate user decisions from implementation choices, assumptions and open questions. Later explicit user corrections supersede older requirements: update the record and affected brief/test sections, state the consequence and proceed without asking the user to approve their instruction again. Substantial unresolved visual choices return to design without reopening settled decisions.
 
+The designated brief remains active during ordinary follow-ups after a skill finishes.
+Follow [AGENTS.md](../AGENTS.md#active-feature-brief-maintenance) before dependent
+work and at final handoff. Record approved changes and material verified findings,
+including failed acceptance and uncertainty, in the brief's canonical record;
+updating only a handoff, ADR or design tokens is insufficient. Final handoff includes
+**Brief synchronization** with the absolute record path and updated sections/IDs,
+or the reason no update was needed. A read-only reviewer reports drift without
+editing requirements. No designated brief means no inferred brief selection.
+
+Repository skill catalogs may point at another checkout. Resolve repository-owned
+skill bodies and relative references from the task worktree per
+[skill provenance](../AGENTS.md#repository-skill-provenance); do not modify the other
+checkout or change third-party skill discovery. These obligations do not make the
+explicit-only feature skills implicit.
+
 A portable handoff includes absolute paths to the brief, requirements record, selected direction/reference and version, approval evidence, required states and verification plan. Transfer actual gitignored briefs, temporary/external images and sidecars to a location the next session/worktree can read; verify destination files. Missing artifacts remain missing, not approved. Read only external artifacts the user authorized; do not explore unrelated worktrees.
 
 For UI, the local skills route to [Impeccable](../.agents/skills/impeccable/SKILL.md) and its installed references instead of maintaining a parallel design process. Shape stops before direction contracts and implementation; build resumes the selected playbook and persistence steps. Whole-treatment rejection uses the applicable replacement/concept process; a settled local fix inherits the existing world. Native capture surfaces use Operate mode and iOS guidance. Builder visual inspection is bounded; independent finish review and documentation follow the installed protocol, with supported role routing or disclosed substitutes.
@@ -103,6 +118,7 @@ Readiness does not authorize worktree cleanup:
 - [ ] work was done in a worktree, not on main/master
 - [ ] pre-implementation baseline established (tests/build passed before changes, or failures noted)
 - [ ] code implemented and matches the stated requirements
+- [ ] designated brief/record opened and synchronized; handoff names its path and updated sections/IDs, or explains why no update/no designated brief applies
 - [ ] relevant tests added or updated; tests exercise real code paths
 - [ ] UI finish review and documentation complete at the reported scope, or limitations and open findings explicit; physical acceptance reported separately
 - [ ] applicable verification passes after changes; skipped checks and unrelated baseline failures are reported
@@ -146,3 +162,11 @@ To keep prompts efficient for smaller local models:
 - avoid loading every doc by default
 - prefer direct file pointers over broad repo summaries
 - summarize prior findings in 5-10 bullets instead of pasting long transcripts
+
+## Maintaining the workflow guidance
+
+After changing active-brief maintenance or skill provenance, use the isolated
+[behavioral checks](../.agents/skills/feature-build/references/brief-maintenance-checks.md).
+They cover follow-ups, findings-only completion, read-only review, mismatched catalog
+paths and tasks with no designated brief. Preserve baseline results even when the
+old guidance passes a small trial; format validation alone does not prove compliance.

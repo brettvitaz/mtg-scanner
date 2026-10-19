@@ -137,6 +137,7 @@ private final class CaptureFixtureState {
         switch route {
         case "capture-table-binder", "capture-zoom-open", "capture-zoom-menu": camera.setZoom(1.5)
         case "capture-zoom-pinch-low": modelFor(mode).start(); camera.setZoom(1.9)
+        case "capture-zoom-pinch-edge": modelFor(mode).start(); camera.setZoom(1.99)
         case "capture-zoom-pinch-high": modelFor(mode).start(); camera.setZoom(2.1)
         case "capture-zoom-pinch-upper": modelFor(mode).start(); camera.setZoom(3.2)
         case "capture-zoom-transition", "capture-station-zoom-transition":

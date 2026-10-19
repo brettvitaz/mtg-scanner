@@ -44,8 +44,45 @@ final class CaptureControlsTests: XCTestCase {
         screenshot("capture-navigation")
     }
 
+    func testSecondaryActionGeometryIsFixedAcrossModesAndStationStates() {
+        launch("capture-table-binder")
+        let reference = app.buttons["Choose photo"].frame
+        let shutter = app.buttons["capture-shutter"].frame
+        let zoom = app.buttons["capture-zoom-1"].frame
+        let navigation = app.tabBars.firstMatch.frame
+        print("Capture spacing: zoom/shutter=\(shutter.minY - zoom.maxY), " +
+              "shutter/tab=\(navigation.minY - shutter.maxY)")
+        XCTAssertEqual(shutter.minY - zoom.maxY, 24, accuracy: 1)
+        XCTAssertEqual(navigation.minY - shutter.maxY, 24, accuracy: 1)
+        app.terminate()
+        for state in ["ready", "settling", "capturing", "stopped", "paused"] {
+            launch("capture-station-\(state)")
+            let action = app.buttons["station-start-stop"].frame
+            XCTAssertEqual(action.midX, reference.midX, accuracy: 1)
+            XCTAssertEqual(action.midY, reference.midY, accuracy: 1)
+            XCTAssertEqual(action.width, reference.width, accuracy: 1)
+            XCTAssertEqual(action.height, reference.height, accuracy: 1)
+            XCTAssertEqual(app.buttons["capture-shutter"].frame.midX, shutter.midX, accuracy: 1)
+            XCTAssertEqual(app.buttons["capture-shutter"].frame.midY, shutter.midY, accuracy: 1)
+            screenshot("fixed-action-\(state)")
+            app.terminate()
+        }
+    }
+
+    func testTableHalfStepStillWorksAfterAStationRoundTrip() {
+        launch("capture-table-binder")
+        assertZoom(1, "1.5×")
+        app.tabBars.buttons["Station"].tap()
+        app.tabBars.buttons["Table"].tap()
+        assertZoom(1, "1×")
+        app.buttons["capture-zoom-1"].tap()
+        assertZoom(1, "1.5×")
+        screenshot("table-half-step-after-mode-return")
+    }
+
     func testThresholdFixturesKeepTheActiveValueOnTheShutterAxis() {
-        for (route, anchor, value) in [("low", 1, "1.9×"), ("high", 2, "2.1×"), ("upper", 3, "3.2×")] {
+        for (route, anchor, value) in [("low", 1, "1.9×"), ("edge", 1, "1.9×"),
+                                       ("high", 2, "2.1×"), ("upper", 3, "3.2×")] {
             launch("capture-zoom-pinch-\(route)")
             assertStatus("Paused")
             assertZoom(anchor, value)
@@ -70,7 +107,7 @@ final class CaptureControlsTests: XCTestCase {
     func testMotionLocksCaptureAndStartButAllowsRetargeting() {
         launch("capture-station-zoom-transition")
         assertStatus("Paused")
-        assertZoom(1, "1.3×")
+        assertZoom(1, "1.5×")
         XCTAssertFalse(app.buttons["capture-shutter"].isEnabled)
         XCTAssertFalse(app.buttons["station-start-stop"].isEnabled)
         screenshot("station-zoom-transition-locked")

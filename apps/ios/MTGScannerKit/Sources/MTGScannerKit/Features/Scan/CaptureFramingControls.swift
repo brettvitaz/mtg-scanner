@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared framing rail owns compact-width and accessibility placement in both modes.
+/// Framing controls share the torch's scale and keep a clear shutter axis.
 struct CaptureFramingControls: View {
     let currentZoom: CGFloat
     let isEnabled: Bool
@@ -9,35 +9,31 @@ struct CaptureFramingControls: View {
     var opensBrightness = false
     let onSelect: (CGFloat) -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .subheadline) private var labelLineHeight = 20.0
+    @State private var compactWidth = false
+
+    private var liftTorch: Bool { compactWidth || dynamicTypeSize.isAccessibilitySize }
+    private var rowHeight: CGFloat { max(44, labelLineHeight + 12) }
+    private var railHeight: CGFloat { dynamicTypeSize.isAccessibilitySize ? rowHeight * 2 + 8 : rowHeight }
 
     var body: some View {
-        GeometryReader { geometry in
-            let liftTorch = geometry.size.width < 360 || dynamicTypeSize.isAccessibilitySize
-            ZStack(alignment: .top) {
-                ZoomPresetControl(currentZoom: currentZoom) { preset in
-                    onSelect(preset)
-                }
+        ZStack(alignment: .top) {
+            ZoomPresetControl(currentZoom: currentZoom, rowHeight: rowHeight, onSelect: onSelect)
                 .disabled(!isEnabled)
-                .padding(.top, 52)
-                HStack {
-                    Spacer()
-                    FlashlightButton(torchLevel: $torchLevel,
-                                     lastTorchLevel: $lastTorchLevel, opensBrightness: opensBrightness)
-                }
-                .padding(.top, liftTorch ? 0 : 56)
+                .padding(.top, liftTorch ? 52 : 0)
+            HStack {
+                Spacer()
+                FlashlightButton(torchLevel: $torchLevel,
+                                 lastTorchLevel: $lastTorchLevel, opensBrightness: opensBrightness)
             }
         }
-        .frame(height: framingHeight)
+        .frame(height: railHeight + (liftTorch ? 52 : 0))
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { compactWidth = geometry.size.width < 360 }
+                    .onChange(of: geometry.size.width) { _, width in compactWidth = width < 360 }
+            }
+        }
     }
-
-    @ScaledMetric(relativeTo: .title3) private var zoomDiameter = 56.0
-
-    @ScaledMetric(relativeTo: .subheadline) private var zoomInactiveFont = 17.0
-
-    private var framingHeight: CGFloat {
-        if dynamicTypeSize.isAccessibilitySize { return zoomDiameter + max(44, zoomInactiveFont * 1.2 + 8) + 60 }
-        // Compact devices reserve a separate torch row without moving the active zoom axis.
-        return zoomDiameter + 52
-    }
-
 }

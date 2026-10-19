@@ -9,7 +9,10 @@ struct AutoScanView: View {
         Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.8), radius: 2, y: 1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.65), in: Capsule())
+            .captureControlSurface(in: Capsule())
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Station status")
             .accessibilityValue(viewModel.stationStatus.rawValue)
@@ -44,13 +47,11 @@ struct StationStartStopButton: View {
         Button {
             if viewModel.isActive { viewModel.stop() } else { viewModel.start() }
         } label: {
-            Text(viewModel.isActive ? "Stop" : "Start")
-                .font(.subheadline.weight(.semibold))
-                .fixedSize(horizontal: true, vertical: true)
+            Image(systemName: viewModel.isActive ? "stop.fill" : "play.fill")
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .frame(minWidth: 64, minHeight: 48)
-                .captureControlSurface(in: Capsule())
+                .frame(width: 48, height: 48)
+                .captureControlSurface(in: Circle())
         }
         .disabled(!viewModel.isActive && viewModel.isZoomMoving)
         .buttonStyle(.plain)

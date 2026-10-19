@@ -20,7 +20,7 @@ one-shot focus/exposure pass at the shutter slows scanning without overcoming le
 
 - Auto Scan selects the autofocus-capable physical ultra-wide camera when it supports
   the existing 1080p video/photo pipeline; otherwise it uses the physical wide camera.
-  Keep that lens fixed for the session. Normal Scan uses the standard camera. No camera
+  Keep that lens fixed for the shared Table/Station session. Both modes use this policy. No camera
   setting or model-specific branch is exposed, and the former camera preference is ignored.
 - Target detected cards in native top-left YOLO coordinates. Ignore target jitter within
   0.02 normalized units to avoid restarting focus unnecessarily.
@@ -31,8 +31,10 @@ one-shot focus/exposure pass at the shutter slows scanning without overcoming le
   If focus adjustment is ongoing, wait at most 0.5 seconds after the capture request, then
   capture with continuous autofocus active. Exposure adjustment does not block capture.
   Adjustment flags do not prove optical sharpness.
-- Replace the controller on scan-mode changes, cancelling old capture, disconnecting old
-  frames, and resetting zoom/calibration. Reapply exposure and supported torch controls.
+- Share one root-owned camera session across capture modes. Ownership-tag frame delivery,
+  navigation stops and shutdown so an outgoing controller cannot stop the incoming one.
+  Reset actual zoom/calibration on activation; preserve accepted photos and queued recognition.
+  Reapply exposure and supported torch controls at session start, skipping unchanged updates.
 
 ## Consequences
 
@@ -91,16 +93,24 @@ Apple documents separate [focus adjustment](https://developer.apple.com/document
 and [exposure adjustment](https://developer.apple.com/documentation/avfoundation/avcapturedevice/isadjustingexposure)
 flags. Neither is an image sharpness measurement.
 
-## Capture rework: common policy acceptance remains open (2026-10-18)
+## Capture correction: common physical policy (2026-10-18)
 
-The approved replacement brief at `tmp/feature-briefs/capture-rework.md` in the
-capture-consistency task worktree requires a common physical-camera policy and 1×
-baseline for Table and Station. The inline zoom/presentation implementation does not
-establish the hardware evidence needed to choose between viable common policies.
-The existing separate-mode selection above therefore remains implemented, explicitly
-unresolved against R8; it is not evidence of completion of that requirement.
+The user explicitly required the same lens in both modes. Both now use the established
+close-focus automatic policy above, including the same wide fallback; a single
+RootTabView-owned CameraSessionManager keeps its configured physical input across tabs.
+The earlier separate Table/Station selection and hardware-based implementation deferral
+are superseded. Physical image quality remains an acceptance check, not a reason to
+leave different policies implemented.
 
-Do not supersede the close-focus rationale or force wide/ultra-wide from visual taste.
-Compare both modes and candidate policies at equivalent applied factors on a real
-phone, with complete binder edges/detail and low/middle/high stand stacks, before
-recording the validated replacement here. Include a fallback device when available.
+Presets use AVCaptureDevice's native zoom ramp. Its rate is logarithmic (powers of two
+per second), so equal outward/return ratios use equal rates. Direct pinch interrupts at
+the instantaneous actual factor. Configuration stays on the session queue; generation
+and owner checks discard obsolete work. Assignment of the instantaneous zoom stops a
+ramp immediately before direct pinch or manual capture. These choices follow Apple's
+[zoom factor](https://developer.apple.com/documentation/avfoundation/avcapturedevice/videozoomfactor)
+and [ramp API](https://developer.apple.com/documentation/avfoundation/avcapturedevice/ramp(tovideozoomfactor:withrate:)) documentation.
+
+Production-wiring tests cover shared session identity, both capability profiles, mode
+return synchronization, old-owner shutdown rejection, native progress/interruption and
+logarithmic rate symmetry. Device checks above still establish framing, sharpness and
+motion quality separately.

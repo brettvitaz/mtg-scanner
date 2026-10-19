@@ -9,22 +9,24 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
 
     @Binding var detectionMode: DetectionMode
     var camera: AutoScanCamera = .standard
+    var sessionManager: CameraSessionManager?
     var onDetectedCardsChanged: (([DetectedCard]) -> Void)?
     var captureCoordinator: CameraCaptureCoordinator?
     var onZoomFactorChanged: ((CGFloat) -> Void)?
     var willChangeZoom: ((CGFloat) -> Bool)?
     var onZoomMotionChanged: ((Bool) -> Void)?
     var onZoomFailure: ((CGFloat) -> Void)?
+    var onZoomPresetChanged: ((CGFloat?) -> Void)?
     var shouldChangeZoom: ((CGFloat) -> Bool)?
     /// Receives raw `CMSampleBuffer` frames on the session queue when in Auto Scan mode.
-    var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
+    var onAutoScanFrame: (@Sendable (CMSampleBuffer) -> Void)?
     /// Torch brightness: 0 = off, 0.1–1.0 = on at that brightness.
     var torchLevel: Float = 0
     /// Exposure bias in EV stops. Positive = brighter, negative = darker.
     var exposureBias: Float = 0
 
     func makeUIViewController(context: Context) -> CameraViewController {
-        let vc = CameraViewController()
+        let vc = CameraViewController(sessionManager: sessionManager ?? CameraSessionManager())
         connect(vc)
         return vc
     }
@@ -48,6 +50,7 @@ struct CameraPreviewRepresentable: UIViewControllerRepresentable {
         vc.willChangeZoom = willChangeZoom
         vc.onZoomMotionChanged = onZoomMotionChanged
         vc.onZoomFailure = onZoomFailure
+        vc.onZoomPresetChanged = onZoomPresetChanged
         vc.onAutoScanFrame = onAutoScanFrame
         captureCoordinator?.controller = vc
     }

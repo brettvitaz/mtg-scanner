@@ -7,9 +7,9 @@ import UniformTypeIdentifiers
 struct ScanView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var detectionMode: DetectionMode
     let isActive: Bool
+    let cameraSession: CameraSessionManager
     @State private var detectionViewModel: CardDetectionViewModel
     @State private var captureCoordinator = CameraCaptureCoordinator()
     @State private var autoScanViewModel: AutoScanViewModel
@@ -22,6 +22,8 @@ struct ScanView: View {
     @State private var shutterFlash = false
     @State private var photoLoadError: String?
     @State private var captureError: String?
+    @State private var needsZoomReset = true
+    @ScaledMetric(relativeTo: .caption) private var feedbackHeight = 20.0
 
     init(
         detectionMode: Binding<DetectionMode>, isActive: Bool,
@@ -30,10 +32,12 @@ struct ScanView: View {
         captureCoordinator: CameraCaptureCoordinator = CameraCaptureCoordinator(),
         previewContent: ((CameraPreviewRepresentable) -> AnyView)? = nil,
         opensBrightness: Bool = false,
-        onConfigured: (() -> Void)? = nil
+        onConfigured: (() -> Void)? = nil,
+        cameraSession: CameraSessionManager = CameraSessionManager()
     ) {
         _detectionMode = detectionMode
         self.isActive = isActive
+        self.cameraSession = cameraSession
         self.previewContent = previewContent
         self.onConfigured = onConfigured
         self.opensBrightness = opensBrightness
@@ -72,7 +76,13 @@ struct ScanView: View {
         .onChange(of: cameraPreviewID) { _, _ in
             captureCoordinator.cancelZoom()
             autoScanViewModel.pauseForNavigation()
-            detectionViewModel.zoomFactor = 1
+            needsZoomReset = true
+        }
+        .onChange(of: autoScanViewModel.canChangeZoom) { _, available in
+            if available && isActive { synchronizeCameraZoom() }
+        }
+        .onChange(of: captureCoordinator.controller != nil) { _, connected in
+            if connected && isActive { synchronizeCameraZoom() }
         }
         .onChange(of: appModel.showRecognitionNotifications) { _, enabled in
             autoScanViewModel.updateNotificationPreference(enabled)
@@ -183,17 +193,23 @@ struct ScanView: View {
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("capture-zoom-retry")
             }
-            framingControls
+            VStack(spacing: 8) {
+                AutoScanView(viewModel: autoScanViewModel)
+                    .frame(maxWidth: .infinity, minHeight: feedbackHeight)
+                    .opacity(isAutoScanMode ? 1 : 0)
+                    .accessibilityHidden(!isAutoScanMode)
+                framingControls
+            }
             bottomBar
         }
         .frame(maxWidth: 420)
         .padding(.horizontal, 20)
-        .padding(.bottom, 16)
+        .padding(.bottom, 24)
         .frame(maxWidth: .infinity)
     }
 
     private var framingControls: some View {
-        CaptureFramingControls(currentZoom: detectionViewModel.zoomFactor,
+        CaptureFramingControls(currentZoom: captureCoordinator.presetZoom ?? detectionViewModel.zoomFactor,
                                isEnabled: autoScanViewModel.canChangeZoom,
                                torchLevel: $detectionViewModel.torchLevel,
                                lastTorchLevel: lastTorchLevelBinding, opensBrightness: opensBrightness,
@@ -207,19 +223,22 @@ struct ScanView: View {
     private var cameraPreview: some View {
         let preview = CameraPreviewRepresentable(
             detectionMode: $detectionMode,
-            camera: isAutoScanMode ? .automatic : .standard,
+            camera: .automatic,
+            sessionManager: cameraSession,
             onDetectedCardsChanged: { cards in
                 detectionViewModel.handleDetectedCards(cards)
             },
             captureCoordinator: captureCoordinator,
             onZoomFactorChanged: { factor in
                 detectionViewModel.zoomFactor = factor
+                resetCameraZoomIfNeeded()
             },
             willChangeZoom: { factor in
                 autoScanViewModel.prepareForZoomChange(from: detectionViewModel.zoomFactor, to: factor)
             },
-            onZoomMotionChanged: { autoScanViewModel.isZoomMoving = $0 },
+            onZoomMotionChanged: { if isActive { autoScanViewModel.isZoomMoving = $0 } },
             onZoomFailure: captureCoordinator.reportZoomFailure,
+            onZoomPresetChanged: { captureCoordinator.presetZoom = $0 },
             shouldChangeZoom: { _ in autoScanViewModel.canChangeZoom },
             onAutoScanFrame: isAutoScanMode
                 ? { [weak autoScanViewModel] buffer in
@@ -238,42 +257,22 @@ struct ScanView: View {
         .accessibilityHidden(previewContent == nil)
     }
 
-    @ViewBuilder
     private var bottomBar: some View {
-        if dynamicTypeSize.isAccessibilitySize && isAutoScanMode {
-            VStack(spacing: 12) {
-                ZStack {
-                    manualShutter
-                    HStack { thumbnail; Spacer() }.allowsHitTesting(false)
-                }
-                StationStartStopButton(viewModel: autoScanViewModel)
-                AutoScanView(viewModel: autoScanViewModel).fixedSize(horizontal: false, vertical: true)
+        ZStack {
+            manualShutter
+            HStack {
+                thumbnail.frame(width: 48, height: 48)
+                Spacer()
+                if isAutoScanMode { StationStartStopButton(viewModel: autoScanViewModel) } else { photoPickerButton }
             }
-        } else {
-            ordinaryBottomBar
         }
+        .frame(height: 76)
     }
 
     private var manualShutter: some View {
         CaptureButton(action: isAutoScanMode ? autoScanViewModel.captureManually : captureCard,
                       isDisabled: !autoScanViewModel.canCaptureManually)
             .accessibilityIdentifier("capture-shutter")
-    }
-
-    private var ordinaryBottomBar: some View {
-        HStack(alignment: .center) {
-            thumbnail.frame(maxWidth: .infinity, alignment: .leading)
-            manualShutter
-            Group {
-                if isAutoScanMode {
-                    VStack(spacing: 6) {
-                        StationStartStopButton(viewModel: autoScanViewModel)
-                        AutoScanView(viewModel: autoScanViewModel)
-                    }
-                } else { photoPickerButton }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
     }
 
     private var thumbnail: some View {
@@ -371,9 +370,21 @@ private extension ScanView {
         if !active {
             storeAndTurnOffTorch()
             captureCoordinator.cancelZoom()
+            autoScanViewModel.isZoomMoving = false
             autoScanViewModel.pauseForNavigation()
-            detectionViewModel.zoomFactor = 1
+            needsZoomReset = true
+        } else {
+            synchronizeCameraZoom()
         }
+    }
+
+    private func synchronizeCameraZoom() { captureCoordinator.controller?.synchronizeZoom() }
+
+    private func resetCameraZoomIfNeeded() {
+        guard isActive, needsZoomReset, autoScanViewModel.canChangeZoom,
+              let controller = captureCoordinator.controller else { return }
+        needsZoomReset = false
+        controller.setZoom(1)
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {
@@ -391,6 +402,7 @@ private extension ScanView {
     private func onAppearHandler() {
         if previewContent == nil { detectionViewModel.requestCameraPermissionIfNeeded() }
         configureAutoScan()
+        if isActive { synchronizeCameraZoom() }
         onConfigured?()
         UIApplication.shared.isIdleTimerDisabled = true
     }

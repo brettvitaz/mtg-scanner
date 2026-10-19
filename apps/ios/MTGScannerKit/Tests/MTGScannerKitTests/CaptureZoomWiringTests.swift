@@ -7,43 +7,49 @@ import XCTest
 @MainActor
 final class CaptureZoomWiringTests: XCTestCase {
     func testHostedSharedPresetControlsReportDeviceClampAndPinchInBothModes() async throws {
-        for mode in DetectionMode.allCases {
-            let app = AppModel()
-            let context = try makeScanCountContext()
-            app.modelContext = context
-            let model = AutoScanViewModel(detector: nil)
-            let detection = CardDetectionViewModel()
-            let coordinator = CameraCaptureCoordinator()
-            let camera = CameraViewController()
-            var applied: [CGFloat] = []
-            camera.zoomDevice = immediateZoomDevice(maximum: 2.4) { applied.append($0) }
-            let state = CaptureHostState()
-            let view = CaptureZoomHost(state: state, mode: mode, model: model, detection: detection,
-                                       coordinator: coordinator, camera: camera)
-                .environment(app).modelContainer(context.container)
-            let window = makeScanCountWindow(view: view)
-            defer { closeScanCountWindow(window) }
-            try await waitForScanCount { coordinator.controller != nil && model.appModel != nil }
-            let control = try view.inspect().find(ZoomPresetControl.self).actualView()
-            for (preset, expected) in [(1.5, 1.5), (2, 2), (3, 2.4), (1, 1)] {
-                control.onSelect(preset)
-                try await waitForScanCount { !camera.isZoomMoving && abs(detection.zoomFactor - expected) < 0.001 }
-            }
-            XCTAssertTrue(applied.contains { $0 > 1 && $0 < 1.5 })
-            camera.applyPinch(scale: 1.73)
-            XCTAssertEqual(detection.zoomFactor, 1.73, accuracy: 0.001)
-            let refreshed = try view.inspect().find(ZoomPresetControl.self).actualView()
-            XCTAssertEqual(ZoomPresetControl.label(refreshed.currentZoom), "1.7×")
-            model.start()
-            camera.zoomDevice = immediateZoomDevice(maximum: 2.4, accepts: false)
-            camera.setZoom(2)
-            XCTAssertTrue(model.isActive)
-            XCTAssertEqual(detection.zoomFactor, 1.73, accuracy: 0.001)
-            try await retryFailedZoom(coordinator, camera: camera, detection: detection)
-            state.active = false
-            try await waitForScanCount { !model.isActive && detection.zoomFactor == 1 }
-            XCTAssertFalse(model.isCalibrated)
+        for mode in DetectionMode.allCases { try await exerciseHostedPresetControls(mode) }
+    }
+
+    private func exerciseHostedPresetControls(_ mode: DetectionMode) async throws {
+        let app = AppModel()
+        let context = try makeScanCountContext()
+        app.modelContext = context
+        let model = AutoScanViewModel(detector: nil)
+        let detection = CardDetectionViewModel()
+        let coordinator = CameraCaptureCoordinator()
+        let camera = CameraViewController()
+        var applied: [CGFloat] = []
+        camera.zoomDevice = immediateZoomDevice(maximum: 2.4) { applied.append($0) }
+        let state = CaptureHostState()
+        let view = CaptureZoomHost(state: state, mode: mode, model: model, detection: detection,
+                                   coordinator: coordinator, camera: camera)
+            .environment(app).modelContainer(context.container)
+        let window = makeScanCountWindow(view: view)
+        defer { closeScanCountWindow(window) }
+        try await waitForScanCount { coordinator.controller != nil && model.appModel != nil }
+        let control = try view.inspect().find(ZoomPresetControl.self).actualView()
+        for (preset, expected) in [(1.5, 1.5), (2, 2), (3, 2.4), (1, 1)] {
+            control.onSelect(preset)
+            try await waitForScanCount { !camera.isZoomMoving && abs(detection.zoomFactor - expected) < 0.001 }
         }
+        XCTAssertTrue(applied.contains { $0 > 1 && $0 < 1.5 })
+        camera.applyPinch(scale: 1.73)
+        XCTAssertEqual(detection.zoomFactor, 1.73, accuracy: 0.001)
+        let refreshed = try view.inspect().find(ZoomPresetControl.self).actualView()
+        XCTAssertEqual(ZoomPresetControl.label(refreshed.currentZoom), "1.7×")
+        model.start()
+        camera.zoomDevice = immediateZoomDevice(maximum: 2.4, accepts: false)
+        camera.setZoom(2)
+        XCTAssertTrue(model.isActive)
+        XCTAssertEqual(detection.zoomFactor, 1.73, accuracy: 0.001)
+        try await retryFailedZoom(coordinator, camera: camera, detection: detection)
+        model.start()
+        state.active = false
+        try await waitForScanCount { !model.isActive }
+        XCTAssertEqual(detection.zoomFactor, camera.appliedZoom)
+        state.active = true
+        try await waitForScanCount { camera.appliedZoom == 1 && detection.zoomFactor == 1 }
+        XCTAssertFalse(model.isCalibrated)
     }
 
     // A single assignment, stale ramp completion or post-movement pause breaks these assertions.
@@ -242,6 +248,99 @@ final class CaptureZoomWiringTests: XCTestCase {
         XCTAssertEqual(applied, [2])
         model.stop()
     }
+}
+
+@MainActor
+final class CapturePresentationWiringTests: XCTestCase {
+    func testReturningToCaptureResetsTheActualCameraBeforeTheFirstHalfStepTap() async throws {
+        let app = AppModel()
+        let context = try makeScanCountContext()
+        let model = AutoScanViewModel(detector: nil)
+        let detection = CardDetectionViewModel()
+        let coordinator = CameraCaptureCoordinator()
+        let camera = CameraViewController()
+        camera.zoomDevice = immediateZoomDevice(maximum: 4)
+        let state = CaptureHostState()
+        let view = CaptureZoomHost(state: state, mode: .scan, model: model, detection: detection,
+                                   coordinator: coordinator, camera: camera)
+            .environment(app).modelContainer(context.container)
+        let window = makeScanCountWindow(view: view)
+        defer { closeScanCountWindow(window) }
+        try await waitForScanCount { coordinator.controller != nil && model.appModel != nil }
+        camera.setZoom(1.5)
+        model.start()
+        state.active = false
+        try await waitForScanCount { !model.isActive }
+        state.active = true
+        try await waitForScanCount { camera.appliedZoom == 1 && detection.zoomFactor == 1 }
+        let control = try view.inspect().find(ZoomPresetControl.self).actualView()
+        control.onSelect(1.5)
+        try await waitForScanCount { !camera.isZoomMoving && detection.zoomFactor == 1.5 }
+        XCTAssertEqual(camera.appliedZoom, 1.5)
+    }
+
+    func testBothCaptureModesWireTheCloseFocusPolicyAndItsWideFallback() async throws {
+        for mode in DetectionMode.allCases {
+            let app = AppModel()
+            let context = try makeScanCountContext()
+            let model = AutoScanViewModel(detector: nil)
+            let camera = CameraViewController()
+            let coordinator = CameraCaptureCoordinator()
+            let view = CaptureZoomHost(state: CaptureHostState(), mode: mode, model: model,
+                                       detection: CardDetectionViewModel(), coordinator: coordinator, camera: camera)
+                .environment(app).modelContainer(context.container)
+            let window = makeScanCountWindow(view: view)
+            defer { closeScanCountWindow(window) }
+            try await waitForScanCount { coordinator.controller != nil }
+            XCTAssertEqual(camera.camera.preferredDeviceType(closeUpAvailable: true), .builtInUltraWideCamera)
+            XCTAssertEqual(camera.camera.preferredDeviceType(closeUpAvailable: false), .builtInWideAngleCamera)
+        }
+    }
+
+    func testPresetReadoutMovesToTheChosenAnchorWithoutCountingAppliedFrames() async throws {
+        let app = AppModel()
+        let context = try makeScanCountContext()
+        let model = AutoScanViewModel(detector: nil)
+        let detection = CardDetectionViewModel()
+        let coordinator = CameraCaptureCoordinator()
+        let camera = CameraViewController()
+        camera.zoomDevice = immediateZoomDevice(maximum: 4)
+        camera.scheduleZoomFrame = { _ in }
+        let view = CaptureZoomHost(state: CaptureHostState(), mode: .scan, model: model, detection: detection,
+                                   coordinator: coordinator, camera: camera)
+            .environment(app).modelContainer(context.container)
+        let window = makeScanCountWindow(view: view)
+        defer { closeScanCountWindow(window) }
+        try await waitForScanCount { coordinator.controller != nil && model.appModel != nil }
+        coordinator.setZoom(2)
+        XCTAssertGreaterThan(camera.appliedZoom, 1)
+        XCTAssertLessThan(camera.appliedZoom, 2)
+        let selected = try view.inspect().find(ZoomPresetControl.self).actualView()
+        XCTAssertEqual(selected.currentZoom, 2)
+        camera.beginPinch()
+        camera.applyPinch(scale: 1.1)
+        camera.endPinch()
+        let pinched = try view.inspect().find(ZoomPresetControl.self).actualView()
+        XCTAssertEqual(pinched.currentZoom, camera.appliedZoom)
+    }
+
+    func testDelayedZoomFrameCatchesUpToElapsedTimeInsteadOfExtendingTheRamp() async throws {
+        let camera = CameraViewController()
+        camera.zoomDevice = immediateZoomDevice(maximum: 4)
+        var resumed = false
+        camera.scheduleZoomFrame = { frame in
+            guard !resumed else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                frame()
+                resumed = true
+            }
+        }
+        camera.setZoom(3, animated: true)
+        try await waitForScanCount { resumed }
+        XCTAssertEqual(camera.appliedZoom, 3)
+        XCTAssertFalse(camera.isZoomMoving)
+    }
+
 }
 
 @MainActor

@@ -67,7 +67,7 @@ public struct PreviewGalleryRootView: View {
              "capture-station-paused", "capture-recognition-foil", "capture-recognition-disabled",
              "capture-zoom-menu", "capture-brightness", "capture-brightness-adjusted",
              "capture-zoom-open", "capture-zoom-pinch-low", "capture-zoom-pinch-high",
-             "capture-zoom-pinch-upper", "capture-zoom-transition",
+             "capture-zoom-pinch-upper", "capture-zoom-pinch-edge", "capture-zoom-transition",
              "capture-station-zoom-transition", "capture-station-brightness":
             if let binder = Bundle.module.url(forResource: "CaptureBinder", withExtension: "jpg"),
                let card = Bundle.module.url(forResource: "ResultScanSample", withExtension: "jpg"),
@@ -283,4 +283,8 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("capture-station-brightness") {
     PreviewGalleryRootView(route: "capture-station-brightness")
+}
+
+#Preview("capture-zoom-pinch-edge") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-edge")
 }

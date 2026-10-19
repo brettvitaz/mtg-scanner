@@ -7,6 +7,7 @@ final class CameraCaptureCoordinator {
     weak var controller: CameraViewController?
 
     var zoomFailure: String?
+    var presetZoom: CGFloat?
     private var requestedZoom: CGFloat = 1
 
     func setZoom(_ factor: CGFloat) {

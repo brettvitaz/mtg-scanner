@@ -1,7 +1,8 @@
 # Capture experience: findings and rework requirements
 
-Date: 2026-10-18. Status: findings and requirements for the next design pass;
-not an approved replacement visual design or an implementation-completion report.
+Date: 2026-10-18. Historical findings below are preserved. The effective replacement
+and latest implemented correction sections record the current approved direction;
+physical acceptance remains separate.
 
 ## Effective replacement and build evidence
 
@@ -14,9 +15,10 @@ interruptible optical movement and a continuous viewfinder.
 
 Native checkpoint results, screenshots, recordings and baseline/final check logs live
 in that worktree's `tmp/capture-rework-build/`. The checkpoint is separate from
-independent finish review and physical acceptance. Common physical-camera policy
-selection remains unresolved pending comparative hardware evidence; simulator labels
-and layout cannot approve it.
+independent finish review and physical acceptance. The latest correction implements
+a common physical-camera session and policy; see the final section and
+`tmp/capture-refinement/` for current evidence. Simulator results do not establish
+optical quality.
 
 ## Purpose
 
@@ -185,3 +187,24 @@ new visual concept, claim the lens is unified, or authorize unrelated recognitio
 backend, navigation, or collection changes. The next approved build brief should
 incorporate these requirements and replace conflicting older instructions instead
 of appending another ambiguous note to them.
+
+## Implemented correction to the approved capture build (2026-10-18)
+
+The latest user correction list supersedes the previous zoom sizing/material, preset
+readout and common-lens deferral. The approved brief and `tmp/capture-refinement/corrections.md`
+record all eleven corrections. Both modes now share one physical session and automatic
+close-focus policy with the same wide fallback. Actual activation reset and hardware
+readback keep the zoom label synchronized. Presets present their destination immediately
+and use native ramps; pinch presents actual factors with threshold-safe rounding.
+
+The framing baseline is 44pt with semantic subheadline text and shared flashlight
+material. Import and Start/Stop occupy the same fixed 48pt circular slot. Independent
+Station status sits above framing, with an 8pt relationship and reserved scaled height.
+Zoom-to-shutter and shutter-to-bottom-native-navigation gaps are 24pt. This replaces
+the variable intrinsic Start/status group. Native tablet navigation follows its system
+placement. Fixtures include the 1.99× boundary and held transitions; regression checks
+exercise production controller wiring, ownership, delayed frames and redundant writes.
+
+Physical binder/stack image quality, real zoom smoothness, torch feel and haptics remain
+device acceptance work. They do not defer the common-lens implementation. See the
+worktree's `tmp/capture-refinement/` review packet for logs, native captures and findings.

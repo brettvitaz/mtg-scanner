@@ -179,8 +179,8 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, zoom pause |
 | `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Single foil toast or notification preference suppression |
 | `capture-zoom-open` / `capture-zoom-menu` | `CaptureFixtureView` | Fully exposed inline selector at 1.5×; former menu route is a compatibility alias |
-| `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Paused/Start at applied 1.9× / 2.1× / 3.2× with the corresponding family centered |
-| `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Production preset scheduler held at intermediate applied zoom; shutter/Start locked; another target interrupts and completes |
+| `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-edge` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Paused/Start at applied 1.9× / 2.1× / 1.99× / 3.2× (1.99× displays 1.9×) with the corresponding family centered |
+| `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Fixture driver held at intermediate applied zoom, chosen destination displayed; shutter/Start locked; another target interrupts and completes |
 | `capture-station-brightness` | `CaptureFixtureView` | Ready with the actual brightness popup open; opening alone has not paused Station |
 | `capture-brightness` / `capture-brightness-adjusted` | `CaptureFixtureView` | Actual horizontal popover at 50% / 48% |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
@@ -212,8 +212,9 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 The `capture-*` routes use `RootTabView`, `ScanView`, and the production controls,
 with inert camera and recognition dependencies and an isolated in-memory store.
 State is seeded after appearance/configuration. Inline zoom and brightness use the
-real controls. Preset transition fixtures hold the production scheduler at an
-intermediate applied value, and selecting a different anchor interrupts that hold.
+real controls. Preset transition fixtures hold the elapsed-time fixture driver at an
+intermediate applied value while presenting the destination. Selecting a different
+anchor interrupts that hold.
 Set `SIMCTL_CHILD_CAPTURE_FIXTURE_BACKGROUND=bright` before `make ios-snapshot`
 for a bright photographic scene covering the entire viewfinder, including beneath
 controls and native tab material; the default scene is dark. A complete aspect-fit

@@ -1,17 +1,12 @@
 import SwiftUI
 
-/// Inline magnification anchors. Selection always follows the unrounded applied factor.
+/// Inline anchors present applied pinch zoom or the selected preset destination.
 struct ZoomPresetControl: View {
     let currentZoom: CGFloat
+    var rowHeight: CGFloat = 44
     let onSelect: (CGFloat) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .title3) private var diameter = 56.0
-
-    @ScaledMetric(relativeTo: .subheadline) private var inactiveFontSize = 17.0
-
-    var inactiveHeight: CGFloat { max(44, inactiveFontSize * 1.2 + 8) }
-
     var body: some View {
         ZStack(alignment: .top) {
             ForEach(1...3, id: \.self) { anchor in
@@ -20,7 +15,7 @@ struct ZoomPresetControl: View {
             }
         }
         .frame(width: typeSize.isAccessibilitySize ? 240 : 264,
-               height: typeSize.isAccessibilitySize ? diameter + inactiveHeight + 8 : diameter,
+               height: typeSize.isAccessibilitySize ? rowHeight * 2 + 8 : rowHeight,
                alignment: .top)
         .animation(reduceMotion ? nil : .smooth(duration: 0.24), value: Self.family(currentZoom))
     }
@@ -30,20 +25,21 @@ struct ZoomPresetControl: View {
         let next = Self.destination(anchor: anchor, current: currentZoom)
         return Button { onSelect(next) } label: {
             Text(active ? Self.label(currentZoom) : Self.label(CGFloat(anchor)))
-                .font(active ? .title3.weight(.semibold) : .subheadline.weight(.medium))
+                .font(.subheadline.weight(active ? .semibold : .medium))
                 .monospacedDigit()
                 .foregroundStyle(active ? Color.yellow : Color.white)
-                .frame(minWidth: active ? diameter : 44,
-                       minHeight: typeSize.isAccessibilitySize && !active ? inactiveHeight : diameter)
+                // A crisp outline preserves unbacked numerals over bright live imagery.
+                .shadow(color: .black, radius: 0, x: 1)
+                .shadow(color: .black, radius: 0, x: -1)
+                .shadow(color: .black, radius: 0, y: 1)
+                .shadow(color: .black, radius: 0, y: -1)
+                .fixedSize()
+                .padding(.horizontal, 4)
+                .frame(minWidth: 44, minHeight: rowHeight)
                 .contentShape(Rectangle())
                 .background {
-                    if active {
-                        Circle().fill(.ultraThinMaterial)
-                            .overlay { Circle().fill(.black.opacity(0.65)) }
-                            .environment(\.colorScheme, .dark)
-                    }
+                    if active { Color.clear.captureControlSurface(in: Capsule()) }
                 }
-                .shadow(color: .black.opacity(0.9), radius: 1, y: 1)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("capture-zoom-\(anchor)")
@@ -66,7 +62,7 @@ struct ZoomPresetControl: View {
     }
 
     private func verticalOffset(_ anchor: Int) -> CGFloat {
-        typeSize.isAccessibilitySize && anchor != Self.family(currentZoom) ? diameter + 8 : 0
+        typeSize.isAccessibilitySize && anchor != Self.family(currentZoom) ? rowHeight + 8 : 0
     }
 
     static func family(_ applied: CGFloat) -> Int { applied < 2 ? 1 : (applied < 3 ? 2 : 3) }
@@ -77,7 +73,9 @@ struct ZoomPresetControl: View {
     }
 
     static func label(_ value: CGFloat) -> String {
-        let rounded = (value * 10).rounded() / 10
+        let family = Self.family(value)
+        let roundedValue = (value * 10).rounded() / 10
+        let rounded = family < 3 ? min(roundedValue, CGFloat(family) + 0.9) : roundedValue
         return rounded == rounded.rounded() ? String(format: "%.0f×", Double(rounded))
             : String(format: "%.1f×", Double(rounded))
     }

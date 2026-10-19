@@ -159,10 +159,14 @@ explicit skip. Check those actions and VoiceOver focus continuity on a device.
 Use `make ios-snapshot ROUTE=capture-zoom-open` and the capture routes in
 `apps/ios/AGENTS.md` for production-shell visual checks. `capture-zoom-menu` is a
 compatibility alias for the exposed inline controls. Transition routes hold the
-production motion scheduler at an intermediate applied value; selecting a different
-anchor replaces that held request and completes normally. The frame fixture proves
-logic and layout, not optical zoom. Preset progress is output only; SwiftUI updates
-never feed it back as a new camera request. Hardware configuration and mutation run
+fixture motion driver at an intermediate applied value while the button presents the
+chosen destination; selecting a different anchor replaces that held request and completes
+normally. The frame fixture proves logic and layout, not optical zoom. Production presets
+use the native camera ramp; deterministic fixtures use an elapsed-time
+driver. Pinch shows applied factors and caps rounded family labels below their next
+threshold. Both modes share a root-owned close-focus camera session and identical fallback.
+Ownership checks prevent an outgoing tab from stopping the current session. Preset progress
+is output only; SwiftUI updates never feed it back as a new camera request. Hardware configuration and mutation run
 on the session queue, with the accepted-photo and Station pause guards checked
 before the first mutation. Stop/navigation invalidate queued frames and late callbacks.
 

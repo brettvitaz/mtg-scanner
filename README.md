@@ -84,16 +84,22 @@ without starting automatic scanning. During the settling delay, the shutter capt
 Capture is disabled while a photo is being captured or prepared for recognition. If on-device
 cropping finds no card, the original photo is uploaded for recognition.
 
-Station automatically selects a fixed autofocus-capable ultra-wide camera when the
-device supports the 1080p video/photo pipeline. This keeps growing stacks in scanning
-stands within closer focusing range without a camera setting or lens switches during scanning.
-Phones without a suitable close-up lens use the main camera and may need a lower stack limit.
-Table uses the standard camera. Switching capture tabs resets zoom and calibration.
-A shared physical-camera policy for both modes is still awaiting comparative hardware
-validation; this visual/zoom change retains the existing lens choices above rather
-than guessing at the optical tradeoff. Binder framing and readable per-card detail
-still need physical verification; UI layout
-does not establish lens focus, complete page edges, or optical sharpness.
+Table and Station share one camera session and one fixed lens policy. Both select an
+autofocus-capable physical ultra-wide camera when it supports the existing 1080p
+video/photo pipeline, with the physical wide camera as the common fallback. The
+lens stays fixed across mode changes; switching capture tabs resets actual zoom to
+1× and calibration. Returning to Station requires Start.
+
+Preset taps animate directly to the chosen zoom anchor without counting intermediate
+values in the button. Pinch zoom reports the actual applied factor; the 1× family
+stays at or below 1.9× until the 2× threshold is crossed. Presets use the camera's
+native zoom ramp. The zoom and flashlight share a local material treatment and a
+44-point baseline; import and Station Start/Stop share a fixed 48-point circular slot.
+Station feedback sits independently above the framing controls.
+
+Binder framing, readable per-card detail, stack sharpness and physical zoom smoothness
+still need device verification. Simulator layout and camera-policy tests do not
+establish optical quality.
 
 Continuous autofocus targets the detected card during the existing settling delay. Capture
 reuses that focus instead of starting another focus/exposure pass at the shutter. If the

@@ -7,12 +7,22 @@ public struct RootTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AppModel.self) private var appModel
     @State private var captureModel = AutoScanViewModel()
+    @State private var cameraSession: CameraSessionManager
     private let captureContent: ((DetectionMode, Bool) -> AnyView)?
 
-    public init() { captureContent = nil }
+    public init() {
+        captureContent = nil
+        _cameraSession = State(initialValue: CameraSessionManager())
+    }
+
+    init(cameraSession: CameraSessionManager) {
+        captureContent = nil
+        _cameraSession = State(initialValue: cameraSession)
+    }
 
     init(captureContent: @escaping (DetectionMode, Bool) -> AnyView) {
         self.captureContent = captureContent
+        _cameraSession = State(initialValue: CameraSessionManager())
     }
 
     public var body: some View {
@@ -73,7 +83,7 @@ public struct RootTabView: View {
             captureContent(mode, appModel.selectedTab == tab)
         } else {
             ScanView(detectionMode: .constant(mode), isActive: appModel.selectedTab == tab,
-                     autoScanViewModel: captureModel)
+                     autoScanViewModel: captureModel, cameraSession: cameraSession)
         }
     }
 

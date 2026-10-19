@@ -16,7 +16,8 @@ final class ZoomPresetTests: XCTestCase {
         for (value, family) in [(1.0, 1), (1.9999, 1), (2.0, 2), (2.9999, 2), (3.0, 3), (5.0, 3)] {
             XCTAssertEqual(ZoomPresetControl.family(value), family)
         }
-        XCTAssertEqual(ZoomPresetControl.label(1.9999), "2×")
+        XCTAssertEqual(ZoomPresetControl.label(1.9999), "1.9×")
+        XCTAssertEqual(ZoomPresetControl.label(2.9999), "2.9×")
     }
 
     func testEveryAnchorExposesNamedBaseAndHalfStepActions() throws {

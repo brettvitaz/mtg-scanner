@@ -25,7 +25,7 @@ final class CameraViewController: UIViewController {
     ///
     /// Used by `AutoScanViewModel` to feed frames into `CardPresenceTracker`.
     /// Set to `nil` when not in Auto Scan mode to avoid unnecessary overhead.
-    var onAutoScanFrame: ((CMSampleBuffer) -> Void)?
+    var onAutoScanFrame: (@Sendable (CMSampleBuffer) -> Void)?
 
     var shouldChangeZoom: ((CGFloat) -> Bool)?
     private(set) var appliedZoom: CGFloat = 1
@@ -37,6 +37,8 @@ final class CameraViewController: UIViewController {
     // MARK: - Private
 
     private let sessionManager: CameraSessionManager
+    private let frameOwner: UUID
+    private let startSession: (@escaping @MainActor @Sendable () -> Void) -> Void
     private let engine = CardDetectionEngine()
     private var renderer: DetectionOverlayRenderer?
     private var isVisible = false
@@ -52,18 +54,37 @@ final class CameraViewController: UIViewController {
     var willChangeZoom: ((CGFloat) -> Bool)?
     var onZoomMotionChanged: ((Bool) -> Void)?
     var onZoomFailure: ((CGFloat) -> Void)?
+    var onZoomPresetChanged: ((CGFloat?) -> Void)?
+    private var presetZoom: CGFloat? {
+        didSet { if presetZoom != oldValue { onZoomPresetChanged?(presetZoom) } }
+    }
+    private let configureTorch: (Float) -> Void
+    private let configureExposure: (Float) -> Void
     private var zoomDestination: CGFloat = 1
     var scheduleZoomFrame: (@escaping @MainActor @Sendable () -> Void) -> Void = { work in
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.016, execute: work)
     }
 
-    init(sessionManager: CameraSessionManager = CameraSessionManager()) {
+    init(sessionManager: CameraSessionManager = CameraSessionManager(),
+         configureTorch: ((Float) -> Void)? = nil, configureExposure: ((Float) -> Void)? = nil,
+         startSession: ((@escaping @MainActor @Sendable () -> Void) -> Void)? = nil) {
+        let owner = UUID()
+        frameOwner = owner
+        self.startSession = startSession ?? { sessionManager.start(owner: owner, onStarted: $0) }
         self.sessionManager = sessionManager
+        self.configureTorch = configureTorch ?? sessionManager.setTorchLevel
+        self.configureExposure = configureExposure ?? sessionManager.setExposureBias
         super.init(nibName: nil, bundle: nil)
     }
 
     required init?(coder: NSCoder) {
-        sessionManager = CameraSessionManager()
+        let manager = CameraSessionManager()
+        let owner = UUID()
+        frameOwner = owner
+        startSession = { manager.start(owner: owner, onStarted: $0) }
+        sessionManager = manager
+        configureTorch = manager.setTorchLevel
+        configureExposure = manager.setExposureBias
         super.init(coder: coder)
     }
 
@@ -81,9 +102,18 @@ final class CameraViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         isVisible = true
-        sessionManager.start()
-        applyTorchLevel(desiredTorchLevel)
-        sessionManager.setExposureBias(desiredExposureBias)
+        let engine = engine
+        let autoScanFrame = onAutoScanFrame
+        sessionManager.setFrameHandler(owner: frameOwner) { buffer in
+            engine.processFrame(buffer)
+            autoScanFrame?(buffer)
+        }
+        startSession { [weak self] in
+            guard let self, self.isVisible else { return }
+            self.applyTorchLevel(self.desiredTorchLevel)
+            self.configureExposure(self.desiredExposureBias)
+            self.synchronizeZoom()
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -91,7 +121,7 @@ final class CameraViewController: UIViewController {
         isVisible = false
         cancelZoom()
         sessionManager.setTorchLevel(0)
-        sessionManager.pauseForNavigation()
+        sessionManager.pauseForNavigation(owner: frameOwner)
         renderer?.clear()
     }
 
@@ -145,29 +175,31 @@ final class CameraViewController: UIViewController {
     func shutDown() {
         cancelZoom()
         onAutoScanFrame = nil
-        sessionManager.shutDown()
+        sessionManager.shutDown(owner: frameOwner)
     }
 
     // MARK: - Torch
 
     /// Sets the torch brightness. Level 0 turns the torch off; 0.1–1.0 turns it on at that brightness.
     func setTorchLevel(_ level: Float) {
+        guard desiredTorchLevel != level else { return }
         desiredTorchLevel = level
         guard isVisible else { return }
         applyTorchLevel(level)
     }
 
     private func applyTorchLevel(_ level: Float) {
-        sessionManager.setTorchLevel(level)
+        configureTorch(level)
     }
 
     // MARK: - Exposure
 
     /// Sets the exposure bias (EV offset). Positive = brighter, negative = darker.
     func setExposureBias(_ bias: Float) {
+        guard desiredExposureBias != bias else { return }
         desiredExposureBias = bias
         guard isVisible else { return }
-        sessionManager.setExposureBias(bias)
+        configureExposure(bias)
     }
 
     // MARK: - Setup
@@ -187,11 +219,6 @@ final class CameraViewController: UIViewController {
     }
 
     private func wireComponents() {
-        sessionManager.onFrame = { [weak self] sampleBuffer in
-            self?.engine.processFrame(sampleBuffer)
-            self?.onAutoScanFrame?(sampleBuffer)
-        }
-
         engine.onDetection = { [weak self] cards in
             guard let self, let previewLayer = self.previewLayer else { return }
             // Only show green detection overlay in scan mode, not auto mode (which uses YOLO)
@@ -207,18 +234,28 @@ final class CameraViewController: UIViewController {
 
 extension CameraViewController {
     func setZoom(_ factor: CGFloat, animated: Bool = false) {
-        guard let device = zoomDevice ?? CameraZoomDevice(sessionManager) else { onZoomFailure?(factor); return }
+        guard let device = zoomDevice ?? CameraZoomDevice(sessionManager, owner: frameOwner) else {
+            onZoomFailure?(factor)
+            return
+        }
+        appliedZoom = device.currentFactor?() ?? appliedZoom
         let destination = Self.clampedZoom(start: factor, scale: 1, max: min(5, device.maximum))
         guard shouldChangeZoom?(destination) ?? true else { return }
         zoomGeneration &+= 1
         let generation = zoomGeneration
         zoomDestination = destination
         guard destination != appliedZoom else {
+            cancelDeviceZoom(device, generation: generation)
             setZoomMoving(false)
+            onZoomFactorChanged?(appliedZoom)
             return
         }
-        if animated {
-            advanceZoom(step: 1, start: appliedZoom, destination: destination, device: device, generation: generation)
+        presetZoom = animated ? destination : nil
+        if animated, let ramp = device.ramp {
+            startNativeZoom(destination, ramp: ramp, generation: generation)
+        } else if animated {
+            advanceZoom(start: appliedZoom, destination: destination,
+                        startedAt: ProcessInfo.processInfo.systemUptime - 0.016, device: device, generation: generation)
         } else {
             applyZoom(destination, device: device, generation: generation) { [weak self] in
                 if self?.pinchInProgress == false { self?.setZoomMoving(false) }
@@ -226,18 +263,55 @@ extension CameraViewController {
         }
     }
 
+    func synchronizeZoom() {
+        guard zoomDevice != nil || isVisible,
+              let device = zoomDevice ?? CameraZoomDevice(sessionManager, owner: frameOwner) else { return }
+        appliedZoom = device.currentFactor?() ?? appliedZoom
+        onZoomFactorChanged?(appliedZoom)
+    }
+
+    private func authorizeZoom(_ value: CGFloat, generation: Int) -> Bool {
+        guard generation == zoomGeneration, shouldChangeZoom?(value) ?? true,
+              willChangeZoom?(value) ?? true else { return false }
+        setZoomMoving(true)
+        return true
+    }
+
+    private func startNativeZoom(_ destination: CGFloat, ramp: CameraZoomDevice.Ramp, generation: Int) {
+        ramp(destination, { [weak self] in self?.authorizeZoom(destination, generation: generation) ?? false },
+             { [weak self] factor in
+                 guard let self, generation == self.zoomGeneration else { return }
+                 self.appliedZoom = factor
+                 self.onZoomFactorChanged?(factor)
+             }, { [weak self] success in
+                 guard let self, generation == self.zoomGeneration else { return }
+                 if success { self.setZoomMoving(false) } else {
+                     self.cancelZoom()
+                     self.onZoomFailure?(destination)
+                 }
+             })
+    }
+
+    private func cancelDeviceZoom(_ device: CameraZoomDevice, generation: Int) {
+        device.cancel? { [weak self] factor in
+            guard let self, generation == self.zoomGeneration else { return }
+            self.appliedZoom = factor
+            self.onZoomFactorChanged?(factor)
+        }
+    }
+
     private func advanceZoom(
-        step: Int, start: CGFloat, destination: CGFloat, device: CameraZoomDevice, generation: Int
+        start: CGFloat, destination: CGFloat, startedAt: TimeInterval, device: CameraZoomDevice, generation: Int
     ) {
         guard generation == zoomGeneration else { return }
-        let progress = CGFloat(step) / 16
+        let progress = CGFloat(min(1, (ProcessInfo.processInfo.systemUptime - startedAt) / 0.25))
         let eased = progress * progress * (3 - 2 * progress)
-        let value = step == 16 ? destination : start + (destination - start) * eased
+        let value = progress == 1 ? destination : start + (destination - start) * eased
         applyZoom(value, device: device, generation: generation) { [weak self] in
             guard let self, generation == self.zoomGeneration else { return }
-            guard step < 16 else { self.setZoomMoving(false); return }
+            guard progress < 1 else { self.setZoomMoving(false); return }
             self.scheduleZoomFrame { [weak self] in
-                self?.advanceZoom(step: step + 1, start: start, destination: destination,
+                self?.advanceZoom(start: start, destination: destination, startedAt: startedAt,
                                   device: device, generation: generation)
             }
         }
@@ -247,11 +321,7 @@ extension CameraViewController {
         _ value: CGFloat, device: CameraZoomDevice, generation: Int, completion: @escaping () -> Void
     ) {
         device.change(value, { [weak self] in
-            guard let self, generation == self.zoomGeneration,
-                  self.shouldChangeZoom?(value) ?? true,
-                  self.willChangeZoom?(value) ?? true else { return false }
-            self.setZoomMoving(true)
-            return true
+            self?.authorizeZoom(value, generation: generation) ?? false
         }, { [weak self] success in
             guard let self, generation == self.zoomGeneration else { return }
             guard success else {
@@ -268,10 +338,14 @@ extension CameraViewController {
     func cancelZoom() {
         zoomGeneration &+= 1
         pinchInProgress = false
+        if let device = zoomDevice ?? CameraZoomDevice(sessionManager, owner: frameOwner) {
+            cancelDeviceZoom(device, generation: zoomGeneration)
+        }
         setZoomMoving(false)
     }
 
     private func setZoomMoving(_ moving: Bool) {
+        if !moving { presetZoom = nil }
         guard isZoomMoving != moving else { return }
         isZoomMoving = moving
         onZoomMotionChanged?(moving)
@@ -280,6 +354,7 @@ extension CameraViewController {
     func beginPinch() {
         cancelZoom()
         pinchInProgress = true
+        synchronizeZoom()
         zoomFactorAtGestureStart = appliedZoom
     }
 

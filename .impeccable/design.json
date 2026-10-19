@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-18T20:31:48.112484+00:00",
+  "generatedAt": "2026-10-19T01:17:13.437680+00:00",
   "title": "Design System: MTG Scanner capture",
   "extensions": {
     "platform": {
@@ -20,29 +20,30 @@
         "displayName": "Control Foreground",
         "nativeSource": "Color.white"
       },
-      "local-backing": {
-        "role": "neutral",
-        "displayName": "Local Backing",
-        "nativeSource": "Color.black.opacity(0.65)"
-      },
       "disabled-shutter": {
         "role": "neutral",
         "displayName": "Disabled Shutter",
         "nativeSource": "Color.white.opacity(0.4)"
+      },
+      "feedback-backing": {
+        "role": "neutral",
+        "displayName": "Feedback Backing",
+        "nativeSource": "Color.black.opacity(0.65)",
+        "purpose": "Station status capsule and capture-recovery surface; selected zoom retains the flashlight material without this backing"
       }
     },
     "typographyMeta": {
       "active-zoom": {
-        "nativeStyle": ".title3.weight(.semibold)",
-        "purpose": "Selected applied zoom, monospaced digits"
+        "nativeStyle": ".subheadline.weight(.semibold)",
+        "purpose": "Selected pinch factor or preset destination, monospaced digits"
       },
       "inactive-zoom": {
         "nativeStyle": ".subheadline.weight(.medium)",
         "purpose": "Neighboring base anchors, monospaced digits"
       },
       "station-action": {
-        "nativeStyle": ".subheadline.weight(.semibold)",
-        "purpose": "Start/Stop action"
+        "nativeStyle": ".system(size: 20, weight: .medium)",
+        "purpose": "Play/stop SF Symbol with accessible Start/Stop label"
       },
       "station-status": {
         "nativeStyle": ".caption.weight(.semibold)",
@@ -59,14 +60,9 @@
     ],
     "shadows": [
       {
-        "name": "zoom-text",
-        "value": "Color.black.opacity(0.9), radius: 1, y: 1",
-        "purpose": "Native supporting text shadow; does not replace selected-circle contrast backing"
-      },
-      {
-        "name": "station-status",
-        "value": "Color.black.opacity(0.8), radius: 2, y: 1",
-        "purpose": "Native supporting status shadow"
+        "name": "zoom-text-outline",
+        "value": "Four Color.black shadows, radius: 0; x: 1, x: -1, y: 1, y: -1",
+        "purpose": "Crisp outline for selected and inactive zoom numerals over bright camera imagery"
       }
     ],
     "motion": [
@@ -95,12 +91,17 @@
       {
         "name": "accessibility-zoom",
         "condition": "Dynamic Type accessibility size",
-        "behavior": "Active centered above two inactive anchors; scaled diameter 56 relativeTo title3, inactive font metric 17 relativeTo subheadline, inactive min height max(44, fontMetric * 1.2 + 8)"
+        "behavior": "Active centered above two inactive anchors; rowHeight = max(44, scaled lineHeight + 12), lineHeight 20 relativeTo subheadline; intrinsic text width plus 4-point horizontal padding, minimum width 44; second row offset rowHeight + 8"
       },
       {
-        "name": "accessibility-station",
-        "condition": "Dynamic Type accessibility size",
-        "behavior": "Start/Stop and status below shutter in separate rows"
+        "name": "station-feedback",
+        "condition": "All text sizes and both capture modes",
+        "behavior": "Independent centered status above framing; minimum height 20 scaled relativeTo caption, gap 8; Table preserves invisible space and hides status from accessibility; fixed 48-point trailing action remains beside shutter"
+      },
+      {
+        "name": "capture-rhythm",
+        "condition": "All capture layouts",
+        "behavior": "24-point framing-to-shutter gap and bottom inset; maximum cluster width 420, horizontal inset 20; shutter row height 76, side slots 48"
       }
     ],
     "nativeComponents": [
@@ -117,7 +118,7 @@
         "refersTo": "zoom-selected",
         "source": "ZoomPresetControl.swift",
         "language": "swift",
-        "snippet": "Text(Self.label(currentZoom))\n    .font(.title3.weight(.semibold)).monospacedDigit()\n    .foregroundStyle(Color.yellow)\n    .background { Circle().fill(.ultraThinMaterial)\n        .overlay { Circle().fill(.black.opacity(0.65)) }\n        .environment(\\.colorScheme, .dark) }",
+        "snippet": "Text(active ? Self.label(currentZoom) : Self.label(CGFloat(anchor)))\n    .font(.subheadline.weight(active ? .semibold : .medium)).monospacedDigit()\n    .foregroundStyle(active ? Color.yellow : Color.white)\n    .shadow(color: .black, radius: 0, x: 1)\n    .shadow(color: .black, radius: 0, x: -1)\n    .shadow(color: .black, radius: 0, y: 1)\n    .shadow(color: .black, radius: 0, y: -1)\n    .fixedSize().padding(.horizontal, 4)\n    .frame(minWidth: 44, minHeight: rowHeight)\n    .background { if active { Color.clear.captureControlSurface(in: Capsule()) } }",
         "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
       },
       {
@@ -125,7 +126,15 @@
         "refersTo": "station-action",
         "source": "AutoScanView.swift",
         "language": "swift",
-        "snippet": "Text(viewModel.isActive ? \"Stop\" : \"Start\")\n    .font(.subheadline.weight(.semibold))\n    .fixedSize(horizontal: true, vertical: true)\n    .foregroundStyle(.white).padding(.horizontal, 14)\n    .frame(minWidth: 64, minHeight: 48)\n    .captureControlSurface(in: Capsule())",
+        "snippet": "Image(systemName: viewModel.isActive ? \"stop.fill\" : \"play.fill\")\n    .font(.system(size: 20, weight: .medium))\n    .foregroundStyle(.white).frame(width: 48, height: 48)\n    .captureControlSurface(in: Circle())",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      },
+      {
+        "name": "Station status",
+        "refersTo": "station-status",
+        "source": "AutoScanView.swift",
+        "language": "swift",
+        "snippet": "Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)\n    .font(.caption.weight(.semibold)).foregroundStyle(.white)\n    .padding(.horizontal, 8).padding(.vertical, 4)\n    .background(.black.opacity(0.65), in: Capsule())\n    .captureControlSurface(in: Capsule())",
         "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
       },
       {
@@ -154,15 +163,15 @@
         "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureFramingControls.swift",
         "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/AutoScan/AutoScanView.swift"
       ],
-      "review": "tmp/capture-rework-build/native-finish-verdict.md",
-      "verdictScope": "Two scored simulator contrast fixes resolved; not whole-surface acceptance",
+      "review": "tmp/capture-refinement/corrections.md",
+      "verdictScope": "Current-source documentation merge under C1\u2013C11 human corrections; earlier contrast-only verdict is superseded and no new finish verdict is asserted here",
       "unresolved": [
-        "R8 common physical lens policy",
         "Physical optical movement/focus/framing acceptance",
         "VoiceOver device focus continuity",
         "Reduce Transparency verification"
       ],
-      "rasterProvenance": "No new shipping raster assets introduced; pre-existing synthetic fixture photos are layout evidence only."
+      "rasterProvenance": "No new shipping raster assets introduced; pre-existing synthetic fixture photos are layout evidence only.",
+      "cameraPolicy": "ScanView requests camera: .automatic for both modes; policy implementation and physical optical acceptance are distinct"
     },
     "representationNotes": [
       "Native semantic colors have no fabricated tonal ramps.",
@@ -173,7 +182,7 @@
   "components": [],
   "narrative": {
     "northStar": "Fluid native viewfinder",
-    "overview": "Table and Station keep collectors inside the camera image. Independent controls float over the scene: the white shutter leads, selected magnification uses restrained system yellow, and local dark material supports secondary actions. The result is clean, fast and confident, consistent with PRODUCT.md's precision reference tool.\n\nThis record covers the implemented capture surfaces only. It does not establish a design system for Results, Library or Settings. The approved capture brief and surface contract supply the language; the SwiftUI implementation supplies the tokens. Native simulator review resolved two local contrast defects, with a ship verdict limited to those fixes. Physical camera acceptance, common lens policy, VoiceOver focus continuity and Reduce Transparency verification remain outstanding.",
+    "overview": "Table and Station keep collectors inside the camera image. Independent controls float over the scene: the white shutter leads, selected magnification uses restrained system yellow, and local dark material supports secondary actions. The result is clean, fast and confident, consistent with PRODUCT.md's precision reference tool.\n\nThis record covers the implemented capture surfaces only. It does not establish a design system for Results, Library or Settings. The approved capture brief and surface contract supply the language; the SwiftUI implementation supplies the tokens. The latest human corrections supersede the earlier contrast-only verdict and its selected zoom backing. This record reflects current source; it does not assign a new finish-review verdict. Both modes now request the same automatic camera policy. Physical camera acceptance, VoiceOver focus continuity and Reduce Transparency verification remain separate outstanding checks.",
     "keyCharacteristics": [
       "Continuous camera imagery between independent controls.",
       "A centered shutter and active zoom axis, with stable secondary capture slots.",
@@ -188,7 +197,7 @@
       },
       {
         "name": "The Applied Value Rule",
-        "body": "Zoom text reports the applied factor, rounded for display only; family selection uses its unrounded value.",
+        "body": "Pinch text follows the actual factor and unrounded family, capping rounded labels at 1.9\u00d7 and 2.9\u00d7 before the next family. During a preset move, the selected destination is presented directly; intermediate applied factors remain authoritative for camera safety and interruption.",
         "section": "typography"
       }
     ],
@@ -200,7 +209,7 @@
     ],
     "donts": [
       "**Don't** restore the rejected zoom dropdown or an enclosing opaque lower control band.",
-      "**Don't** replace applied zoom with a requested destination, focal-length label or physical lens claim.",
+      "**Don't** count through intermediate applied factors during a preset move or label magnification as a focal length or physical lens.",
       "**Don't** treat sampled colors, fixture scenery or schematic storyboard fills as production palette tokens.",
       "**Don't** infer physical camera quality or complete accessibility acceptance from simulator presentation."
     ]

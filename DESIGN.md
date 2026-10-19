@@ -3,7 +3,7 @@ name: MTG Scanner capture
 description: A fluid native viewfinder for Table and Station.
 colors:
   selected-zoom: "yellow"
-  active-capture-mode: "yellow"
+  tab-selection: "blue"
   control-foreground: "white"
   feedback-backing: "rgb(0 0 0 / 65%)"
   disabled-shutter: "rgb(255 255 255 / 40%)"
@@ -72,10 +72,10 @@ This record covers the implemented capture surfaces only. It does not establish 
 
 ## Colors
 
-A compact native camera palette gives the shutter priority and uses yellow for selected magnification and the active capture-mode icon.
+A compact native camera palette gives the shutter priority and uses yellow for selected magnification and blue consistently for selected navigation.
 
 ### Primary
-- **Active Capture Mode:** `UIColor.systemYellow` on the selected Table or Station tab image only. Native labels, inactive images and other tabs retain their existing styling.
+- **Tab Selection:** `UIColor.systemBlue` on every native selected tab image/title. All five destinations use the same selected icon and label accent; native selection geometry and unselected styling remain.
 - **Selected Zoom:** SwiftUI `Color.yellow`, scoped to the active zoom value. The frontmatter's CSS-compatible name preserves the native color name, not a fixed sRGB measurement. Native rendering remains authoritative; do not substitute CSS yellow or a sampled screenshot hex into production.
 
 ### Neutral

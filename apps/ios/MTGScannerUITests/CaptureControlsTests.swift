@@ -118,9 +118,9 @@ final class CaptureControlsTests: XCTestCase {
         XCTAssertTrue(app.buttons["capture-shutter"].isEnabled)
         assertStatus("Ready")
         XCTAssertEqual(app.buttons["station-start-stop"].label, "Stop Station")
-        screenshot("post-zoom-ready-yellow-station")
+        screenshot("post-zoom-ready-blue-station")
         app.tabBars.buttons["Table"].tap()
-        screenshot("table-selected-yellow")
+        screenshot("table-selected-blue")
     }
 
     func testNativePinchCrossesFamiliesAndCanReturnToBase() {
@@ -317,5 +317,17 @@ final class CaptureControlsTests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+extension CaptureControlsTests {
+    func testAllFiveTabsUseSharedSelectedAccent() {
+        launch("capture-table-binder")
+        for title in ["Table", "Station", "Results", "Library", "Settings"] {
+            let tab = app.tabBars.buttons[title]
+            tab.tap()
+            XCTAssertTrue(tab.isSelected)
+            screenshot("selected-tab-\(title.lowercased())")
+        }
     }
 }

@@ -44,7 +44,7 @@ Run the `MTGScanner` scheme in Xcode. The app flow is:
 The five native tabs are **Table**, **Station**, **Results**, **Library**, and **Settings**.
 Table opens first and captures one or more cards on a table, binder page, or in hand;
 it also imports photos. Station watches a fixed scanning station for card drops.
-The selected capture tab icon is yellow. Tap either capture tab to open it directly. Re-selecting a tab does not change modes.
+All five tabs use the same blue selected state. Tap either capture tab to open it directly. Re-selecting a tab does not change modes.
 Successful recognition adds to the unseen Results count; opening Results clears it.
 
 Both capture tabs place zoom above the centered shutter, the last capture at left,

@@ -31,11 +31,11 @@
         "nativeSource": "Color.black.opacity(0.65)",
         "purpose": "Station status capsule and capture-recovery surface; selected zoom retains the flashlight material without this backing"
       },
-      "active-capture-mode": {
+      "tab-selection": {
         "role": "primary",
-        "displayName": "Active Capture Mode",
-        "nativeSource": "UIColor.systemYellow on selected UITabBarItem artwork",
-        "interpretation": "Capture icon only; labels, inactive items and other destinations retain native styling."
+        "displayName": "Tab Selection",
+        "nativeSource": "UIColor.systemBlue on every native selected tab image/title",
+        "interpretation": "One selected icon and label accent across all five destinations; camera zoom keeps yellow."
       }
     },
     "typographyMeta": {

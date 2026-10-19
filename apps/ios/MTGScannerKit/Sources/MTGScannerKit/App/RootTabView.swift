@@ -97,7 +97,7 @@ public struct RootTabView: View {
 
 }
 
-/// Preserve native tab styling while supplying capture-only selected artwork and Results accessibility.
+/// Supplies consistent selected tab artwork and the Results accessibility value.
 private struct NativeTabPresentation: UIViewRepresentable {
     let value: String
 
@@ -120,10 +120,19 @@ private struct NativeTabPresentation: UIViewRepresentable {
             guard let tab = findTab(in: window?.rootViewController),
                   let items = tab.tabBar.items, items.indices.contains(AppTab.results.rawValue) else { return }
             items[AppTab.results.rawValue].accessibilityValue = value
-            for (destination, mode) in [(AppTab.table, DetectionMode.scan), (.station, .auto)] {
-                guard items.indices.contains(destination.rawValue) else { continue }
-                items[destination.rawValue].selectedImage = UIImage(systemName: mode.systemImage)?
-                    .withTintColor(.systemYellow, renderingMode: .alwaysOriginal)
+            // Capture tabs impose a dark toolbar scheme that overrides SwiftUI's tint.
+            // Supply the same selected artwork/title color for every native destination.
+            for item in items {
+                item.selectedImage = (item.selectedImage ?? item.image)?
+                    .withTintColor(.systemBlue, renderingMode: .alwaysOriginal)
+                let appearance = UITabBarAppearance(barAppearance: tab.tabBar.standardAppearance)
+                for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance,
+                               appearance.compactInlineLayoutAppearance] {
+                    layout.selected.iconColor = .systemBlue
+                    layout.selected.titleTextAttributes[.foregroundColor] = UIColor.systemBlue
+                }
+                item.standardAppearance = appearance
+                item.scrollEdgeAppearance = appearance
             }
         }
 

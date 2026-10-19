@@ -87,6 +87,7 @@ private struct SettingsForm: View {
     @ViewBuilder
     private var recognitionSection: some View {
         Section("Recognition") {
+            Toggle("Show recognition notifications", isOn: $appModel.showRecognitionNotifications)
             Toggle("On-Device Crop", isOn: $appModel.onDeviceCropEnabled)
 
             Text(
@@ -117,7 +118,7 @@ private struct SettingsForm: View {
 
     @ViewBuilder
     private var autoScanSection: some View {
-        Section("Auto Scan") {
+        Section("Station") {
             captureDelayRow
             confidenceRow
             concurrentUploadsRow

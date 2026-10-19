@@ -70,7 +70,8 @@ public struct CardListPricingFixtureView: View {
     public var body: some View {
         if let container {
             content.modelContainer(container).environment(appModel).environment(libraryViewModel)
-                .environment(\.undoSelectedTab, route == "undo-collection" || route == "undo-deck" ? 2 : 1)
+                .environment(\.undoSelectedTab, route == "undo-collection" || route == "undo-deck"
+                    ? AppTab.library.rawValue : AppTab.results.rawValue)
         } else {
             Text(setupError ?? "Unable to load pricing fixture.")
         }

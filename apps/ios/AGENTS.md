@@ -174,6 +174,16 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 | `settings` | `SettingsView` | Full settings form with real `AppModel` |
 | `scan-count-zero` / `scan-count-new` / `scan-count-overflow` | `ScanCountFixtureView` | Production tab shell on Settings: no badge with older Results, 12 newly scanned cards, or 1,000 cards displayed as 99+ |
 | `scan-count-navigation` | `ScanCountFixtureView` | Open Results to clear 12; leave and simulate a new scan. Open Results button also checks programmatic navigation |
+| `capture-table-binder` | `CaptureFixtureView` | Nine-pocket page, production Table tab and controls, fractional zoom |
+| `capture-station-preparing` / `capture-station-ready` / `capture-station-settling` / `capture-station-capturing` | `CaptureFixtureView` | Inert capture dependencies, real Station states |
+| `capture-station-stopped` / `capture-station-error` / `capture-station-paused` | `CaptureFixtureView` | Explicit Start, capture retry, temporary zoom suspension with activity still started |
+| `capture-recognition-foil` / `capture-recognition-disabled` | `CaptureFixtureView` | Foil completion notice or notification preference suppression |
+| `capture-recognition-stack` / `capture-recognition-processing` | `CaptureFixtureView` | Three compact completion notices with three queued requests, or queued requests alone; production queue actions |
+| `capture-zoom-open` / `capture-zoom-menu` | `CaptureFixtureView` | Fully exposed inline selector at 1.5×; former menu route is a compatibility alias |
+| `capture-zoom-pinch-low` / `capture-zoom-pinch-high` / `capture-zoom-pinch-edge` / `capture-zoom-pinch-upper` | `CaptureFixtureView` | Station Ready after zoom at applied 1.9× / 2.1× / 1.99× / 3.2× (1.99× displays 1.9×) with the corresponding family centered |
+| `capture-zoom-transition` / `capture-station-zoom-transition` | `CaptureFixtureView` | Fixture driver held at intermediate applied zoom, chosen destination displayed; shutter locked, active Stop available; another target interrupts and resumes detection |
+| `capture-station-brightness` | `CaptureFixtureView` | Ready with the actual brightness popup open; opening alone has not paused Station |
+| `capture-brightness` / `capture-brightness-adjusted` | `CaptureFixtureView` | Actual horizontal popover at 50% / 48% |
 | `scan` | `FixtureCameraViewController` | Fixture card images + real detection overlay |
 | `csv-import` | `CSVImportFixtureView` | Matched, ambiguous, and invalid rows; problems-first review |
 | `csv-import-undo` | `CSVImportFixtureView` | Bulk skip feedback with Undo |
@@ -197,6 +207,25 @@ Set `IOS_SNAPSHOT_SIMULATOR_ID=<udid>` to target a specific simulator.
 3. Add `"<name>"` to the `IOS_SNAPSHOT_ROUTES` variable in `Makefile` so `make ios-snapshot-all` includes it.
 4. Run `make ios-snapshot ROUTE=<name>` to verify the PNG.
 5. Document the new route in the table above.
+
+### Capture fixture variants
+
+The `capture-*` routes use `RootTabView`, `ScanView`, and the production controls,
+with inert camera and recognition dependencies and an isolated in-memory store.
+State is seeded after appearance/configuration. Completion notices use a 60-second fixture lifetime for inspection; production retains independent three-second expiry. The stack and processing routes keep three real requests queued with concurrency zero, so their queue actions remain interactive without network access. Inline zoom and brightness use the
+real controls. Preset transition fixtures hold the elapsed-time fixture driver at an
+intermediate applied value while presenting the destination. Selecting a different
+anchor interrupts that hold.
+Set `SIMCTL_CHILD_CAPTURE_FIXTURE_BACKGROUND=bright` before `make ios-snapshot`
+for a bright photographic scene covering the entire viewfinder, including beneath
+controls and native tab material; the default scene is dark. A complete aspect-fit
+binder/card remains inset for edge inspection. This is synthetic layout evidence,
+not a production camera crop or optical framing result. The `CaptureFixture` log
+category records the runtime Reduce Motion, Reduce Transparency and Increase Contrast
+flags for verification.
+Use `xcrun simctl ui <udid> appearance light|dark` and
+`xcrun simctl ui <udid> content_size large|accessibility-extra-extra-extra-large`
+for appearance and text-size variants. The system Reduce Motion preference is honored.
 
 ### Camera routes and fixture frames
 

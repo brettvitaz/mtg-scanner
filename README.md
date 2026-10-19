@@ -41,18 +41,78 @@ Run the `MTGScanner` scheme in Xcode. The app flow is:
 3. Upload crops to the backend batch endpoint (or full image as fallback)
 4. View results list with card thumbnails; tap a card for full detail view with metadata, edition picker, and purchase links
 
-In Auto Scan, **Start** watches for card arrivals and **Stop** resets detection and calibration.
+The five native tabs are **Table**, **Station**, **Results**, **Library**, and **Settings**.
+Table opens first and captures one or more cards on a table, binder page, or in hand;
+it also imports photos. Station watches a fixed scanning station for card drops.
+All five tabs use the same blue selected state. Tap either capture tab to open it directly. Re-selecting a tab does not change modes.
+Successful recognition adds to the unseen Results count; opening Results clears it.
+
+Both capture tabs place zoom above the centered shutter, the last capture at left,
+and photo import (Table) or Start/Stop (Station) at right. Three inline zoom anchors
+show 1×, 2×, and 3×. Tap an inactive anchor to ease to its base; tap the active base
+again to select its half-step (1.5×, 2.5×, or 3.5×), then tap to return. After arbitrary
+pinch zoom, tapping the active anchor first returns to its family base. No increment
+setting or focal-length label is needed. The centered active circle reports the actual
+device-clamped factor, rounded only for display, and recenters at the unrounded 2×/3×
+boundaries. Pinch stays continuous and interrupts preset motion; another tap replaces
+the destination. Reduce Motion removes the sliding recentering effect.
+
+While zoom moves, a started Station temporarily suspends detection events and cancels
+settling. It stays started, retains its thumbnail and recognition queue, and automatically
+waits 0.75 seconds after the last zoom movement, then rebuilds the motion baseline before resuming. Stop remains available; manual capture is available once movement ends. New capture
+is unavailable during movement; an accepted photo/preparation blocks every zoom path.
+Stop and navigation cancel motion. Configuration failure provides Retry. Accessibility
+text reflows zoom choices without moving the Start/Stop control.
+
+Tap the torch to toggle its remembered brightness, or hold it to open brightness.
+VoiceOver also offers Adjust brightness. The horizontal bar shows one percentage:
+release a tap to select the nearest marked preset (1%, 10%, 25%, 50%, 75%, 100%),
+or drag from anywhere to adjust relative to the starting level in 1% steps.
+Only preset selection emits a haptic; touch-down and drag release do not snap.
+
+Station uses compact Preparing, Ready, Settling, Capturing, Stopped, and Paused feedback.
+Preparing learns scene variation within the existing motion warmup. Ready follows
+tracker rearming and release of the accepted capture; recognition can
+continue independently. Up to three compact completion notices verify recent cards/printings,
+with a brief foil shimmer that respects Reduce Motion. Settings → Show recognition notifications
+is on by default. Turning it off hides toast visuals/speech while preserving Results,
+counts, queue errors, and Station readiness.
+
+Station low-pass resamples each camera frame before measuring motion, preventing
+fine image detail from aliasing into the coarse motion grid. It measures motion
+outside the scene variation learned during warmup, then
+uses burst settlement and card-model validation to identify arrivals. Frame stability
+participates in settlement rather than discarding an already accepted candidate.
+Sampling continues during photo/crop preparation to rearm without an added per-card
+learning wait. Identical copies remain eligible when a new arrival produces motion.
+Recorded-scene replay covers Start/tap false triggers and real drops; physical stand
+acceptance is required to establish reliability under actual camera conditions.
+
+In Station, **Start** watches for card arrivals and **Stop** resets detection and calibration.
 After restarting, move or place the next card to trigger automatic capture. Use the shutter
-button to capture a stationary card immediately; it also works while Auto Scan is stopped
+button to capture a stationary card immediately; it also works while Station is stopped
 without starting automatic scanning. During the settling delay, the shutter captures immediately.
 Capture is disabled while a photo is being captured or prepared for recognition. If on-device
 cropping finds no card, the original photo is uploaded for recognition.
 
-Auto Scan automatically selects a fixed autofocus-capable ultra-wide camera when the
-device supports the 1080p video/photo pipeline. This keeps growing stacks in scanning
-stands within closer focusing range without a camera setting or lens switches during scanning.
-Phones without a suitable close-up lens use the main camera and may need a lower stack limit.
-Normal Scan uses the standard camera. Changing scan mode resets zoom and calibration.
+Table and Station share one camera session and one fixed lens policy. Both select an
+autofocus-capable physical ultra-wide camera when it supports the existing 1080p
+video/photo pipeline, with the physical wide camera as the common fallback. The
+lens stays fixed across mode changes. One preview layer moves between the two capture
+tabs, and the session stays running during handoff. Leaving both capture tabs or
+backgrounding stops the camera safely. Each mode restores its own saved zoom on return;
+Station calibration resets and returning to Station requires Start.
+
+Preset taps animate directly to the chosen zoom anchor without counting intermediate
+values in the button. Pinch zoom reports the actual applied factor; the 1× family
+stays at or below 1.9× until the 2× threshold is crossed. Presets use the camera's
+native zoom ramp. The zoom and flashlight share a local material treatment and a
+44-point baseline; import and Station Start/Stop share a fixed 48-point circular slot.
+Station feedback sits independently above the framing controls.
+
+Binder framing, readable per-card detail, stack sharpness and physical zoom smoothness
+still need device verification. Simulator layout and camera-policy tests do not
+establish optical quality.
 
 Continuous autofocus targets the detected card during the existing settling delay. Capture
 reuses that focus instead of starting another focus/exposure pass at the shutter. If the
@@ -68,6 +128,10 @@ Configuration failures log the underlying error and show a retry message in the 
 retrying an unchanged target attempts configuration again when no prepared state exists.
 See [ADR 0007](docs/decisions/adr-0007-auto-scan-focus-and-close-up-camera.md#physical-acceptance-check)
 for the physical acceptance check.
+
+For a local Debug-only Station processing profile, launch with
+`STATION_SAMPLE_PROFILE=1`. `[StationSample]` logs report sampler milliseconds
+and frames dropped while the tracker queue is busy; this does not record camera images.
 
 ## Useful commands
 ```bash
@@ -130,7 +194,7 @@ Returns a `CardPriceResponse` with `price_retail`, `qty_retail`, `price_buy`, `q
 ## iOS app
 
 The app provides a full scanning pipeline:
-1. **Scan** — capture with camera (live detection overlays) or pick from photo library
+1. **Table / Station** — capture with camera (live detection overlays) or pick from photo library
 2. **Results list** — card thumbnails with title, set, and collector number
 3. **Card detail** — tap a card to see its full details:
    - Card image from Scryfall (tap for fullscreen, toggle to on-device crop image)

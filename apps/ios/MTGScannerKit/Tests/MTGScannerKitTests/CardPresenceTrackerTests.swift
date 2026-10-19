@@ -30,6 +30,114 @@ final class CardPresenceTrackerTests: XCTestCase {
         await fulfillment(of: [noSignal], timeout: 0.05)
     }
 
+    func testLowLevelImageNoiseDoesNotPreventCardArrival() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        let arrived = expectation(description: "A stationary arrival with low image noise signals promptly")
+        arrived.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in arrived.fulfill() }
+        for _ in 0..<8 {
+            tracker.processFrame(try uniformFrame(0))
+            await tracker.finishRearming()
+        }
+        // The card has stopped; only a +/-1 luminance fluctuation remains.
+        // Its mean/reference difference is unchanged, and adjacent noise is below motionThreshold.
+        for phase in 0..<4 {
+            tracker.processFrame(try noisyFrame(180, phase: phase))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [arrived], timeout: 0.2)
+    }
+
+    func testNoisyRestingCardDoesNotRecaptureAndNextDropSignals() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        for _ in 0..<8 {
+            tracker.processFrame(try uniformFrame(0))
+            await tracker.finishRearming()
+        }
+        let first = expectation(description: "First arrival")
+        first.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in first.fulfill() }
+        for phase in 0..<4 {
+            tracker.processFrame(try noisyFrame(180, phase: phase))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [first], timeout: 0.2)
+        tracker.markCaptured()
+        let duplicate = expectation(description: "Resting noise is not another card")
+        duplicate.isInverted = true
+        tracker.onNewCardSignal = { _, _ in duplicate.fulfill() }
+        for phase in 0..<30 {
+            tracker.processFrame(try noisyFrame(180, phase: phase))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [duplicate], timeout: 0.1)
+        let next = expectation(description: "Second arrival")
+        next.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in next.fulfill() }
+        for phase in 0..<4 {
+            tracker.processFrame(try noisyFrame(80, phase: phase))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [next], timeout: 0.2)
+    }
+
+    private func noisyFrame(_ mean: Double, phase: Int) throws -> CMSampleBuffer {
+        try renderedFrame { context in
+            for y in 0..<12 {
+                for x in 0..<16 {
+                    let value = mean + ((x + y + phase) % 2 == 0 ? -1 : 1)
+                    context.setFillColor(UIColor(white: value / 255, alpha: 1).cgColor)
+                    context.fill(CGRect(x: x * 16, y: y * 16, width: 16, height: 16))
+                }
+            }
+        }
+    }
+
+    func testIdenticalCopyArrivalCanReturnToTheSameAppearance() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        for _ in 0..<8 { tracker.processFrame(try uniformFrame(128)); await tracker.finishRearming() }
+        let arrived = expectation(description: "Local passage is an arrival even with identical final appearance")
+        arrived.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in arrived.fulfill() }
+        for value: UInt8 in [0, 0, 128, 128, 128, 128] {
+            tracker.processFrame(try uniformFrame(value))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [arrived], timeout: 0.2)
+    }
+
+    private func uniformFrame(_ value: UInt8) throws -> CMSampleBuffer {
+        try renderedFrame { context in
+            context.setFillColor(UIColor(white: CGFloat(value) / 255, alpha: 1).cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: 256, height: 192))
+        }
+    }
+
+    private func renderedFrame(_ draw: (CGContext) -> Void) throws -> CMSampleBuffer {
+        var buffer: CVPixelBuffer?
+        XCTAssertEqual(CVPixelBufferCreate(kCFAllocatorDefault, 256, 192, kCVPixelFormatType_32BGRA,
+                                          nil, &buffer), kCVReturnSuccess)
+        let pixels = try XCTUnwrap(buffer)
+        CVPixelBufferLockBaseAddress(pixels, [])
+        let context = try XCTUnwrap(CGContext(
+            data: CVPixelBufferGetBaseAddress(pixels), width: 256, height: 192, bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(pixels), space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+        ))
+        draw(context)
+        CVPixelBufferUnlockBaseAddress(pixels, [])
+        return try sampleBuffer(pixels)
+    }
+
     private func verifyRestart(zone: DetectionZone?) async throws {
         let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
             [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]

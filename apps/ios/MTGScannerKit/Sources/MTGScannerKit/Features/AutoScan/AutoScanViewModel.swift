@@ -27,6 +27,12 @@ final class AutoScanViewModel {
         case capturing
     }
 
+    private(set) var isTrackerReady = false
+    private(set) var captureFailure: String?
+    var isPausedForZoom: Bool { isActive && (isZoomMoving || isZoomSettling) }
+    private(set) var completionSequence = 0
+    let feedback = CaptureFeedback()
+
     private(set) var isActive = false
     private(set) var captureState: CaptureState = .watching
     private(set) var statusMessage = "Tap Start to begin."
@@ -62,7 +68,13 @@ final class AutoScanViewModel {
     private(set) var scanSessionID = UUID()
     private var captureOperationID: UUID?
     private var preservedCaptureSessionID: UUID?
-    var canCaptureManually: Bool { captureOperationID == nil }
+    var isZoomMoving = false {
+        didSet { zoomMotionDidChange(from: oldValue) }
+    }
+    private var isZoomSettling = false
+    private var zoomSettlementTask: Task<Void, Never>?
+    var canChangeZoom: Bool { captureOperationID == nil }
+    var canCaptureManually: Bool { canChangeZoom && !isZoomMoving }
     private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
     private(set) var captureFocusPoint: CGPoint?
     var captureFocusedPhoto: (@MainActor (CGPoint?) async -> CameraCaptureResult)?
@@ -95,6 +107,7 @@ final class AutoScanViewModel {
     init(
         detectorProvider: @escaping () -> YOLOCardDetector? = YOLOCardDetector.init,
         recognitionQueue: RecognitionQueue,
+        presenceTracker: CardPresenceTracker? = nil,
         identifiedCardsViewModel: IdentifiedCardsViewModel? = nil,
         capturePhoto: (@MainActor () async -> RecognitionImagePayload?)? = nil,
         detectBox: (@Sendable (CGImage) async -> CGRect?)? = nil,
@@ -102,7 +115,7 @@ final class AutoScanViewModel {
             await CardCropService().detectAndCrop(image: $0, hint: $1)
         }
     ) {
-        presenceTracker = CardPresenceTracker(detectorProvider: detectorProvider)
+        self.presenceTracker = presenceTracker ?? CardPresenceTracker(detectorProvider: detectorProvider)
         self.recognitionQueue = recognitionQueue
         self.identifiedCardsViewModel = identifiedCardsViewModel ?? IdentifiedCardsViewModel()
         self.detectBox = detectBox
@@ -117,6 +130,10 @@ final class AutoScanViewModel {
     }
 
     private func setupSignalHandler() {
+        presenceTracker.onReadinessChanged = { [weak self] ready, session in
+            guard let self, session == scanSessionID else { return }
+            isTrackerReady = ready
+        }
         presenceTracker.onNewCardSignal = { [weak self] boundingBox, sessionID in
             Task { @MainActor [weak self] in
                 self?.handleNewCardSignal(boundingBox: boundingBox, sessionID: sessionID)
@@ -126,24 +143,31 @@ final class AutoScanViewModel {
 
     private func setupRecognitionCallback() {
         recognitionQueue.onCardIdentified = { [weak self] card in
-            self?.appModel?.recordScannedCard()
+            guard let self else { return }
+            appModel?.recordScannedCard()
+            guard appModel?.showRecognitionNotifications ?? true else { return }
             let identifiedCard = IdentifiedCard(from: card)
-            self?.identifiedCardsViewModel.addCard(identifiedCard)
+            identifiedCardsViewModel.addCard(identifiedCard)
+            feedback.recognized(identifiedCard) { [weak self] in
+                self?.appModel?.showRecognitionNotifications ?? true
+            }
         }
     }
 
     // MARK: - Controls
 
     func start() {
-        guard !isActive else { return }
+        guard !isActive, !isZoomMoving else { return }
         resetSession()
         isActive = true
+        captureFailure = nil
         captureState = .watching
         statusMessage = "Watching for cards…"
     }
 
     /// Stops new captures while allowing the accepted photo and crop to finish.
     func pauseForNavigation() {
+        captureCoordinator?.cancelZoom()
         if captureOperationID == nil {
             settleTask?.cancel()
         } else if preservedCaptureSessionID == nil {
@@ -153,7 +177,27 @@ final class AutoScanViewModel {
         resetScanningState()
     }
 
+    /// Discard the old framing baseline while retaining the started Station activity.
+    func prepareForZoomChange(from current: CGFloat, to applied: CGFloat) -> Bool {
+        guard canChangeZoom else { return false }
+        guard current != applied, isActive, !isZoomMoving else { return true }
+        settleTask?.cancel()
+        settleTask = nil
+        captureState = .watching
+        captureFailure = nil
+        resetSession()
+        return true
+    }
+
+    func updateNotificationPreference(_ enabled: Bool) {
+        if !enabled {
+            identifiedCardsViewModel.clearAll()
+            feedback.cancelRecognition()
+        }
+    }
+
     func stop() {
+        captureCoordinator?.cancelZoom()
         preservedCaptureSessionID = nil
         settleTask?.cancel()
         settleTask = nil
@@ -161,7 +205,9 @@ final class AutoScanViewModel {
     }
 
     private func resetScanningState() {
+        cancelZoomSettlement()
         isActive = false
+        captureFailure = nil
         captureState = .watching
         lastCroppedImage = nil
         statusMessage = "Tap Start to begin."
@@ -172,6 +218,7 @@ final class AutoScanViewModel {
     private func resetSession() {
         captureFocusPoint = nil
         scanSessionID = UUID()
+        isTrackerReady = false
         detectionZone = nil
         isCalibrated = false
         presenceTracker.resetSession(scanSessionID)
@@ -180,6 +227,7 @@ final class AutoScanViewModel {
     /// Captures immediately, including when automatic scanning is stopped.
     func captureManually() {
         guard canCaptureManually else { return }
+        cancelZoomSettlement()
         settleTask?.cancel()
         settleTask = nil
         let sessionID = scanSessionID
@@ -205,70 +253,23 @@ final class AutoScanViewModel {
         presenceTracker.burstConfiguration = configuration
     }
 
-    // MARK: - Standard Scan Enqueue
-
-    /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.
-    ///
-    /// Called by scan mode after a manual capture. Runs Vision detection
-    /// on a detached background task to avoid blocking the main actor.
-    @MainActor
-    func enqueueCapturedImage(_ payload: RecognitionImagePayload, cropEnabled: Bool) async {
-        let image = payload.displayImage
-        if cropEnabled {
-            let detectCrops = cropImage
-            let crops = await Task.detached(priority: .userInitiated) {
-                await detectCrops(image, nil)
-            }.value
-            if crops.crops.isEmpty {
-                recognitionQueue.enqueue(
-                    payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
-                )
-                return
-            }
-
-            for crop in crops.crops {
-                guard let cropPayload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
-                recognitionQueue.enqueue(
-                    payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
-                )
-            }
-        } else {
-            recognitionQueue.enqueue(
-                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
-            )
-        }
-    }
-
-    @MainActor
-    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
-        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else { return }
-        await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
-    }
-
-#if DEBUG
-    @MainActor
-    func saveRawCaptureIfEnabled(_ payload: RecognitionImagePayload) async {
-        guard debugSaveRawCapturesToPhotoLibrary else { return }
-        await rawCaptureSaver.saveRawCapture(payload)
-    }
-#endif
-
     // MARK: - Frame Forwarding
 
     /// Forward camera frames to the presence tracker while active.
     ///
-    /// Frames are dropped during `.settling` and `.capturing` — there is no value in
-    /// processing motion while a capture is imminent or in progress, and doing so
-    /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
+    /// Sampling continues during capture preparation to learn the next baseline without
+    /// delaying Ready. The tracker cannot emit another arrival until capture acknowledgement.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, captureState == .watching, canCaptureManually else { return }
-        presenceTracker.processFrame(sampleBuffer)
+        guard isActive, !isPausedForZoom, captureFailure == nil, !isZoomMoving else { return }
+        presenceTracker.processFrame(sampleBuffer, allowCapture: captureState == .watching && canCaptureManually)
     }
 
     // MARK: - State Machine
 
     private func handleNewCardSignal(boundingBox: CGRect?, sessionID: UUID) {
-        guard isActive, sessionID == scanSessionID, boundingBox != nil, canCaptureManually else { return }
+        guard isActive, !isPausedForZoom, captureFailure == nil, sessionID == scanSessionID,
+              boundingBox != nil, canCaptureManually else { return }
+        isTrackerReady = true // A validated tracker signal is emitted only after baseline learning.
         switch captureState {
         case .watching:
             captureFocusPoint = CameraFocus.point(fromYOLOBox: boundingBox)
@@ -297,31 +298,47 @@ final class AutoScanViewModel {
     private func beginCapture() -> UUID {
         let operationID = UUID()
         captureOperationID = operationID
+        captureFailure = nil
         captureState = .capturing
         statusMessage = "Capturing…"
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         return operationID
     }
 
     private func performCapture(sessionID: UUID, operationID: UUID) async {
-        defer {
-            if captureOperationID == operationID {
-                captureOperationID = nil
-                preservedCaptureSessionID = nil
-            }
+        guard acceptsCapture(from: sessionID) else {
+            releaseCapture(operationID)
+            return
         }
-        guard acceptsCapture(from: sessionID) else { return }
         let result = await captureResult()
-        guard acceptsCapture(from: sessionID) else { return }
+        guard acceptsCapture(from: sessionID) else {
+            releaseCapture(operationID)
+            return
+        }
         switch result {
         case .success(let payload):
             await processAutoCapturedPayload(payload, sessionID: sessionID)
+            let completedInSession = sessionID == scanSessionID
+            // Acknowledge on the real tracker queue before releasing the accepted operation.
+            await presenceTracker.finishRearming()
+            releaseCapture(operationID)
+            guard completedInSession, sessionID == scanSessionID else { return }
+            completionSequence += 1
+            let ready = isActive && canCaptureManually && isTrackerReady
+            feedback.completed(ready: ready)
         case .failure(let failure):
+            releaseCapture(operationID)
             guard sessionID == scanSessionID else { return }
             if isActive { presenceTracker.markCaptured() }
             captureState = .watching
+            captureFailure = failure.message
             statusMessage = failure.message
         }
+    }
+
+    private func releaseCapture(_ operationID: UUID) {
+        guard captureOperationID == operationID else { return }
+        captureOperationID = nil
+        preservedCaptureSessionID = nil
     }
 
     private func captureResult() async -> CameraCaptureResult {
@@ -367,6 +384,102 @@ final class AutoScanViewModel {
     }
 }
 
+// MARK: - Station presentation
+extension AutoScanViewModel {
+    enum StationStatus: String {
+        case preparing = "Preparing", ready = "Ready", settling = "Settling", capturing = "Capturing"
+        case stopped = "Stopped", paused = "Paused"
+
+        var symbol: String {
+            switch self {
+            case .preparing: "hourglass"
+            case .ready: "checkmark.circle"
+            case .settling: "hourglass"
+            case .capturing: "camera.fill"
+            case .stopped: "stop.circle"
+            case .paused: "pause.circle"
+            }
+        }
+    }
+
+    var stationStatus: StationStatus {
+        if !canChangeZoom { return .capturing }
+        if isPausedForZoom || captureFailure != nil { return .paused }
+        guard isActive else { return .stopped }
+        if captureState == .settling { return .settling }
+        return isTrackerReady ? .ready : .preparing
+    }
+}
+
+// MARK: - Table recognition preparation
+extension AutoScanViewModel {
+    func captureTablePhoto(cropEnabled: Bool) async -> String? {
+        guard canCaptureManually else { return nil }
+        let operationID = beginCapture()
+        defer { releaseCapture(operationID) }
+        switch await captureResult() {
+        case .success(let payload):
+#if DEBUG
+            await saveRawCaptureIfEnabled(payload)
+#endif
+            await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
+            return nil
+        case .failure(let failure):
+            return failure.message
+        }
+    }
+
+    // MARK: - Standard Scan Enqueue
+
+    /// Crops `image` off-main and enqueues the resulting crops (or the full image) for recognition.
+    ///
+    /// Called by scan mode after a manual capture. Runs Vision detection
+    /// on a detached background task to avoid blocking the main actor.
+    @MainActor
+    func enqueueCapturedImage(_ payload: RecognitionImagePayload, cropEnabled: Bool) async {
+        let image = payload.displayImage
+        lastCroppedImage = image
+        if cropEnabled {
+            let detectCrops = cropImage
+            let crops = await Task.detached(priority: .userInitiated) {
+                await detectCrops(image, nil)
+            }.value
+            if crops.crops.isEmpty {
+                recognitionQueue.enqueue(
+                    payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+                )
+                return
+            }
+
+            for crop in crops.crops {
+                guard let cropPayload = RecognitionImagePayload.generatedJPEG(from: crop) else { continue }
+                recognitionQueue.enqueue(
+                    payload: cropPayload, isCropped: true, apiBaseURL: apiBaseURL, modelContext: modelContext
+                )
+            }
+        } else {
+            recognitionQueue.enqueue(
+                payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
+            )
+        }
+    }
+
+    @MainActor
+    func enqueueCapturedImage(_ image: UIImage, cropEnabled: Bool) async {
+        guard let payload = RecognitionImagePayload.generatedJPEG(from: image) else { return }
+        await enqueueCapturedImage(payload, cropEnabled: cropEnabled)
+    }
+
+#if DEBUG
+    @MainActor
+    func saveRawCaptureIfEnabled(_ payload: RecognitionImagePayload) async {
+        guard debugSaveRawCapturesToPhotoLibrary else { return }
+        await rawCaptureSaver.saveRawCapture(payload)
+    }
+#endif
+
+}
+
 // MARK: - Crop Helpers
 private extension AutoScanViewModel {
     private func cropCapturedPayload(_ payload: RecognitionImagePayload) async -> CropResult {
@@ -399,5 +512,35 @@ private extension AutoScanViewModel {
                 payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
             )
         }
+    }
+}
+
+// MARK: - Post-zoom settling
+private extension AutoScanViewModel {
+    func zoomMotionDidChange(from wasMoving: Bool) {
+        guard wasMoving != isZoomMoving else { return }
+        cancelZoomSettlement()
+        guard !isZoomMoving, isActive else { return }
+        isZoomSettling = true
+        let sessionID = scanSessionID
+        zoomSettlementTask = Task { [weak self] in
+            // Focus/exposure and residual framing changes must not become card-arrival motion.
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled, let self, isActive, !isZoomMoving,
+                  scanSessionID == sessionID else { return }
+            resetSession()
+            let baselineSession = scanSessionID
+            await presenceTracker.finishRearming()
+            guard !Task.isCancelled, isActive, !isZoomMoving,
+                  scanSessionID == baselineSession else { return }
+            isZoomSettling = false
+            zoomSettlementTask = nil
+        }
+    }
+
+    func cancelZoomSettlement() {
+        zoomSettlementTask?.cancel()
+        zoomSettlementTask = nil
+        isZoomSettling = false
     }
 }

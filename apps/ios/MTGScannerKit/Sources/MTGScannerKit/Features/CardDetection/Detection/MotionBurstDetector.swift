@@ -75,13 +75,13 @@ struct MotionBurstDetector: Sendable {
     /// - Parameter diff: Normalized frame difference (0-1) from previous frame.
     /// - Returns: `true` if settlement is confirmed (ready to capture), `false` otherwise.
     @discardableResult
-    mutating func process(diff: Float) -> Bool {
+    mutating func process(diff: Float, isFrameStable: Bool? = nil) -> Bool {
         // Update history buffer
         diffHistory[frameIndex % configuration.burstWindowSize] = diff
         frameIndex += 1
 
         // Update consecutive low frame counter
-        if diff < configuration.motionThreshold {
+        if diff < configuration.motionThreshold && (isFrameStable ?? true) {
             consecutiveLowFrames += 1
         } else {
             consecutiveLowFrames = 0
@@ -89,7 +89,7 @@ struct MotionBurstDetector: Sendable {
 
         // Update consecutive stable frame counter (diff not changing much = card settled)
         let diffDelta = abs(diff - previousDiff)
-        if diffDelta < configuration.motionThreshold * 0.5 {
+        if isFrameStable ?? (diffDelta < configuration.motionThreshold * 0.5) {
             consecutiveStableFrames += 1
         } else {
             consecutiveStableFrames = 0

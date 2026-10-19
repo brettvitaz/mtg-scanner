@@ -126,13 +126,59 @@ legacy identities must be corrected before applying.
 Simulator fixtures: `make ios-snapshot ROUTE=list-subtract`, `ROUTE=list-operation`,
 `ROUTE=list-add-delete`, `ROUTE=list-operation-complete`, and `ROUTE=csv-subtract`.
 
-## Scan navigation
+## Capture navigation
 
-Leaving Scan or Auto Scan stops new automatic captures and turns off the torch.
+Leaving Table or Station stops new automatic captures and turns off the torch.
 A photo capture already accepted by the camera, cropping, and queued recognition
-continue; successful identifications appear in Results. Returning to Scan does
-not restart Auto Scan. Its explicit Stop/reset still discards an unfinished
+continue; successful identifications appear in Results. Switching capture tabs restores
+the incoming mode’s saved zoom and resets calibration. Returning to Station does
+not restart automatic capture. Its explicit Stop/reset still discards an unfinished
 capture, and the recognition badge's Cancel action cancels queued uploads.
+Zoom changes while watching/settling use a separate pause: thumbnail and queued jobs
+remain, settling is cancelled, and activity stays started. Detection resumes automatically
+with a fresh motion baseline after zoom ends; stale tracking callbacks are ignored.
+
+Capture UI changes begin with a native feasibility checkpoint in the production tab
+shell: Table/Station, exposed inline zoom, base/half-step taps, threshold crossings,
+retarget/pinch interruption, capture locks, brightness, toast, and largest text. Keep
+full-screen PNGs, gesture recordings, pinned simulator OS, and a concern-by-concern
+verdict. A passing geometry test does not establish native materials or physical focus.
+The capture rework checkpoint is recorded in the task worktree's
+`tmp/capture-rework-build/checkpoint-report.md`; its first inspection and correction
+artifacts remain available for manual review.
+
+Run `make ios-build`, `make ios-lint`, `make ios-test`, and
+`make ios-ui-test IOS_UI_TEST_FILTER=MTGScannerUITests/CaptureControlsTests`.
+Pin `IOS_TEST_DESTINATION` / `IOS_UI_TEST_DESTINATION` to an installed OS. For iPad,
+`CaptureControlsTests/testTabletOrientationKeepsControlsOnTheShutterAxis` covers both
+landscape orientations and portrait. Export `XCUIScreen.main.screenshot()` attachments
+for full-display landscape evidence; app-only screenshots can crop the rotated canvas.
+Named SwiftUI action invocation is currently
+unavailable through ViewInspector on the installed runtime; that test reports an
+explicit skip. Check those actions and VoiceOver focus continuity on a device.
+
+Use `make ios-snapshot ROUTE=capture-zoom-open` and the capture routes in
+`apps/ios/AGENTS.md` for production-shell visual checks. `capture-zoom-menu` is a
+compatibility alias for the exposed inline controls. Transition routes hold the
+fixture motion driver at an intermediate applied value while the button presents the
+chosen destination; selecting a different anchor replaces that held request and completes
+normally. The frame fixture proves logic and layout, not optical zoom. Production presets
+use the native camera ramp; deterministic fixtures use an elapsed-time
+driver. Pinch shows applied factors and caps rounded family labels below their next
+threshold. Both modes share a root-owned close-focus camera session and identical fallback.
+Ownership checks prevent an outgoing tab from stopping the current session. Preset progress
+is output only; SwiftUI updates never feed it back as a new camera request. Hardware configuration and mutation run
+on the session queue, with the accepted-photo and Station pause guards checked
+before the first mutation. Stop/navigation invalidate queued frames and late callbacks.
+
+For physical acceptance, run the app from `open apps/ios/MTGScanner.xcworkspace`.
+In Table, capture a complete nine-pocket binder page and inspect all page/card edges,
+titles, and collector numbers in the full-resolution photos and crops. In Station,
+follow ADR 0007's physical acceptance check for low/middle/high stacks at the user's
+125–175 mm reference distances (geometry, not a guaranteed focus range). Include a
+phone using the main-camera fallback when available. Enable Save Raw Captures to
+Photos in Debug and inspect Console's `com.mtgscanner` / `CameraFocus` logs.
+Simulator snapshots cannot establish these optical or framing results.
 
 ## Contract-first changes
 - Update versioned schemas under `packages/schemas/v1/`.
@@ -203,3 +249,27 @@ For sample artwork and missing-data review, launch `card-row-list` (cached
 fixture image, no network required). For native menu and gesture review, launch `pricing-results`,
 `pricing-collection`, or `pricing-deck` and hold a row. Check light/dark,
 large text, horizontal swipes, quantity controls, and preview-to-detail navigation.
+
+Before changing the common camera policy, compare viable physical lenses on the same
+phone at equivalent applied factors in both modes, separately recording per-mode zoom
+restoration. Keep lens/capability/minimum-focus-distance data, configured photo dimensions,
+preview crop/aspect, focus/deadline logs, complete binder pages, low/middle/high Station
+stacks, full-resolution crops and fallback-device evidence. Both modes implement the
+same close-focus policy; comparative optical acceptance remains separate. ADR 0007’s
+close-focus evidence remains authoritative.
+
+### Camera lifecycle regression verification
+
+The capture tabs share one preview layer and session. Only the appearing controller
+attaches the layer; offscreen layout must not resize it. Root tab/scene visibility
+keeps the session warm across Table/Station and stops it outside capture or in the
+background. Simulator fixtures cannot prove that a physical preview is rendering.
+
+On an unlocked paired phone, run the physical-only
+`CaptureControlsTests/testLiveCameraRemainsConnectedAcrossCaptureModes` workflow using
+the MTGScannerUITests scheme and the device destination with signing enabled. It
+checks AVFoundation `isPreviewing` and visible layer ownership through DEBUG-only
+accessibility instrumentation, switching tabs without taking photos. The test skips
+on Simulator. An unsigned Simulator runner can remain cached after test-source changes;
+remove only `com.brettvitaz.mtgscanner.uitests.xctrunner` from the task Simulator and
+rerun when observed assertions do not match compiled source. Preserve failed logs.

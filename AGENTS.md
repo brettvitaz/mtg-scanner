@@ -59,6 +59,65 @@ in a task-specific git worktree, never directly on main/master.
 4. Set up only the dependencies needed for the task and do all work in the worktree.
 5. Leave the worktree, branch, local configuration, and review artifacts available for the user's manual review after completing implementation and verification.
 
+### Repository skill provenance
+
+When the user selects a task worktree, repository-owned skills and their relative
+references must come from that worktree. A skill catalog can still point to another
+checkout of this repository. Check that path and read the task-worktree copy too;
+use the task copy for repository workflow instructions. If that copy is missing,
+report the mismatch before dependent work rather than silently using an older copy.
+This does not relocate third-party skills or authorize changes in another checkout.
+If the supplied root instructions came from another checkout, read the task
+worktree's `AGENTS.md` once before relying on its repository workflow.
+
+### Active feature brief maintenance
+
+When the user or current task handoff designates a feature brief, keep it as the
+living contract throughout that task, including ordinary follow-up turns without
+another skill invocation. Preserve its absolute path in handoffs and compacted state.
+Do not choose a brief by searching for the newest file. If no brief is designated,
+this rule does not require creating one or guessing which existing brief applies.
+
+- Before work depends on an approved correction, update the authoritative decision
+  record and affected brief Behavior/Test map sections with source, status and
+  supersession. Keep settled approval; ask only about genuinely unresolved choices.
+- Before handoff, record material verified findings, failed acceptance, validation
+  scope and remaining uncertainty in the brief or its explicitly linked canonical
+  record. Preserve one current decision record; do not leave contradictory effective
+  sections or silently replace historical failures with later success.
+- Handoffs, ADRs and design tokens provide supporting evidence; updating them alone
+  does not synchronize the brief. Open the actual brief even when it is gitignored.
+- Final handoff must include **Brief synchronization**: absolute brief/record path,
+  updated sections or requirement IDs, and what decisions/findings changed. If no
+  update was needed, state why; if no brief was designated, say so.
+- In an explicitly read-only review, do not repair requirements. Report stale or
+  missing synchronization as a finding, with affected paths and the required fix.
+
+### Approved brief retention
+
+Drafts may live in `tmp/`. Once a designated brief is approved, retain its effective
+contract in a tracked repository document before dependent implementation. Use
+`docs/plans/<feature>.md`, or the existing task record under `docs/work-efforts/`;
+keep one canonical record. Preserve the original request, approval source/version,
+effective requirements and supersession, rationale, test map, material findings,
+verification scope and remaining limits. Link ADRs and design docs for detail.
+
+For a legacy approved brief in ignored storage, promote it before further dependent
+work or completion/PR handoff. Verify the promoted content, then make predecessor
+briefs forwarding pointers; preserve local history and evidence. If the user requires
+an ignored brief path, keep that path as a pointer to the tracked canonical record.
+Private recordings, raw session logs and credentials stay local. Record a sufficient
+evidence summary in the repo so approval and conclusions do not depend on those files.
+Retention does not authorize publishing private artifacts or deleting local material.
+
+Before completion, verify the canonical record is not ignored and is included in the
+commit/PR (`git check-ignore --no-index -- <path>` and `git ls-files --error-unmatch -- <path>`
+after staging). Its essential linked records must also be tracked and resolve from
+a fresh checkout. Extend **Brief synchronization** with this tracked path, retention
+verification and PR/commit reference when available. An ignored-only approved record
+is a correctness failure; read-only reviewers report it without promotion or edits.
+No designated brief means no new brief is required by this rule.
+
 ### Worktree setup
 
 - Documentation/instruction-only changes require no API bootstrap, data downloads, or app build.

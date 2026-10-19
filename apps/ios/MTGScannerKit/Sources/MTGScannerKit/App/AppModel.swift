@@ -15,6 +15,9 @@ public final class AppModel {
     var apiBaseURL: String {
         didSet { persistAPIBaseURL() }
     }
+    var showRecognitionNotifications: Bool {
+        didSet { preferences.set(showRecognitionNotifications, forKey: "show_recognition_notifications") }
+    }
     var onDeviceCropEnabled: Bool {
         didSet { persistOnDeviceCrop() }
     }
@@ -50,7 +53,7 @@ public final class AppModel {
     /// Crops detected during the last capture, for display in the preview.
     var lastDetectedCrops: [UIImage] = []
     var shouldShowResults = false
-    private(set) var selectedTab = AppTab.scan
+    private(set) var selectedTab = AppTab.table
     private(set) var newlyScannedCardCount = 0
     /// Navigation path for the Results tab — reset to dismiss detail views.
     var resultsNavigationPath = NavigationPath()
@@ -88,6 +91,8 @@ public final class AppModel {
     init(feedbackUploader: RecognitionFeedbackUploader, preferences: UserDefaults = .standard) {
         self.feedbackUploader = feedbackUploader
         self.preferences = preferences
+        self.showRecognitionNotifications =
+            preferences.object(forKey: "show_recognition_notifications") as? Bool ?? true
         self.apiBaseURL = preferences.string(forKey: apiBaseURLStoreKey) ?? AppConfig.defaultAPIBaseURL
         self.onDeviceCropEnabled = preferences.object(forKey: onDeviceCropStoreKey) as? Bool ?? true
 #if DEBUG

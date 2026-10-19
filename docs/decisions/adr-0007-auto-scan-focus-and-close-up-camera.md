@@ -1,5 +1,8 @@
 # ADR 0007: Automatic fixed close-up lens and continuous focus for Auto Scan
 
+The capture UI now calls Auto Scan **Station** and Normal Scan **Table**. The
+lens, focus, processing preset, and still-photo quality decisions below remain authoritative.
+
 ## Status
 
 Accepted. User testing confirmed that Close-up produces sharper growing-stack images;
@@ -17,7 +20,7 @@ one-shot focus/exposure pass at the shutter slows scanning without overcoming le
 
 - Auto Scan selects the autofocus-capable physical ultra-wide camera when it supports
   the existing 1080p video/photo pipeline; otherwise it uses the physical wide camera.
-  Keep that lens fixed for the session. Normal Scan uses the standard camera. No camera
+  Keep that lens fixed for the shared Table/Station session. Both modes use this policy. No camera
   setting or model-specific branch is exposed, and the former camera preference is ignored.
 - Target detected cards in native top-left YOLO coordinates. Ignore target jitter within
   0.02 normalized units to avoid restarting focus unnecessarily.
@@ -28,8 +31,11 @@ one-shot focus/exposure pass at the shutter slows scanning without overcoming le
   If focus adjustment is ongoing, wait at most 0.5 seconds after the capture request, then
   capture with continuous autofocus active. Exposure adjustment does not block capture.
   Adjustment flags do not prove optical sharpness.
-- Replace the controller on scan-mode changes, cancelling old capture, disconnecting old
-  frames, and resetting zoom/calibration. Reapply exposure and supported torch controls.
+- Share one root-owned camera session across capture modes. Ownership-tag frame delivery,
+  navigation stops and shutdown so an outgoing controller cannot stop the incoming one.
+  Restore each mode’s saved actual zoom and reset calibration on activation; preserve
+  accepted photos and queued recognition.
+  Reapply exposure and supported torch controls at session start, skipping unchanged updates.
 
 ## Consequences
 
@@ -87,3 +93,43 @@ problem rather than treating improved recognition as proof of settling.
 Apple documents separate [focus adjustment](https://developer.apple.com/documentation/avfoundation/avcapturedevice/isadjustingfocus)
 and [exposure adjustment](https://developer.apple.com/documentation/avfoundation/avcapturedevice/isadjustingexposure)
 flags. Neither is an image sharpness measurement.
+
+## Capture correction: common physical policy (2026-10-18)
+
+The user explicitly required the same lens in both modes. Both now use the established
+close-focus automatic policy above, including the same wide fallback; a single
+RootTabView-owned CameraSessionManager keeps its configured physical input across tabs.
+The earlier separate Table/Station selection and hardware-based implementation deferral
+are superseded. Physical image quality remains an acceptance check, not a reason to
+leave different policies implemented.
+
+Presets use AVCaptureDevice's native zoom ramp. Its rate is logarithmic (powers of two
+per second), so equal outward/return ratios use equal rates. Direct pinch interrupts at
+the instantaneous actual factor. Configuration stays on the session queue; generation
+and owner checks discard obsolete work. Assignment of the instantaneous zoom stops a
+ramp immediately before direct pinch or manual capture. These choices follow Apple's
+[zoom factor](https://developer.apple.com/documentation/avfoundation/avcapturedevice/videozoomfactor)
+and [ramp API](https://developer.apple.com/documentation/avfoundation/avcapturedevice/ramp(tovideozoomfactor:withrate:)) documentation.
+
+Production-wiring tests cover shared session identity, both capability profiles, mode
+return synchronization, old-owner shutdown rejection, native progress/interruption and
+logarithmic rate symmetry. Device checks above still establish framing, sharpness and
+motion quality separately.
+
+## Preview lifecycle repair and transient zoom suspension
+
+A shared session alone did not share preview ownership: each tab created its own
+AVCaptureVideoPreviewLayer and requested navigation stop/start. The lifecycle repair
+uses one manager-owned layer, attached only by the appearing controller; offscreen
+layout cannot resize it. Root capture/scene visibility keeps the session running across
+capture tabs and requests a safe stop elsewhere. The lens policy stays common.
+
+The latest user instruction supersedes 1× navigation resets and explicit Start after
+zoom. Each capture mode restores its saved magnification. Zoom suspends Station events
+and settling while leaving activity started; the old tracking generation is invalidated
+and a fresh baseline is established automatically when movement ends. Accepted photos
+still prevent zoom from starting. Navigation and explicit Stop retain their semantics.
+
+Preview-only Station reframing is a separate design question for the user’s iPhone 17 Pro.
+Do not shift sensor-space detection/crop coordinates or alter full captured photos to
+compensate for a mount-specific low card position.

@@ -7,7 +7,7 @@ final class ScanCountTests: XCTestCase {
     func testCountsAccumulateAcrossOtherTabVisits() {
         let app = AppModel()
         XCTAssertNil(app.resultsBadgeText)
-        for tab in [AppTab.scan, .library, .settings, .scan] {
+        for tab in [AppTab.table, .station, .settings, .table] {
             app.selectTab(tab)
             app.recordScannedCard()
         }
@@ -70,7 +70,7 @@ final class ScanCountTests: XCTestCase {
 
 @MainActor
 func makeScanCountContext() throws -> ModelContext {
-    let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self])
+    let schema = Schema([CollectionItem.self, CardCollection.self, Deck.self, RecognitionFeedbackEvent.self])
     let container = try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let context = ModelContext(container)
     context.autosaveEnabled = false

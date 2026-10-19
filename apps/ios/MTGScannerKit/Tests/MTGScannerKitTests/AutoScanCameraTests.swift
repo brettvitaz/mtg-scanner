@@ -11,7 +11,7 @@ final class AutoScanCameraTests: XCTestCase {
         XCTAssertEqual(AutoScanCamera.automatic.preferredDeviceType(closeUpAvailable: false), .builtInWideAngleCamera)
     }
 
-    func testNormalScanKeepsWideEvenWhenCloseUpIsAvailable() {
+    func testExplicitStandardPolicySelectsWideEvenWhenCloseUpIsAvailable() {
         XCTAssertEqual(AutoScanCamera.standard.preferredDeviceType(closeUpAvailable: true), .builtInWideAngleCamera)
     }
 

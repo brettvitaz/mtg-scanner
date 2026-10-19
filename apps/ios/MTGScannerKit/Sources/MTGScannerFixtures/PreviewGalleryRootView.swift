@@ -62,6 +62,19 @@ public struct PreviewGalleryRootView: View {
             }
 
         #if DEBUG
+        case "capture-table-binder", "capture-station-ready", "capture-station-preparing", "capture-station-settling",
+             "capture-station-capturing", "capture-station-stopped", "capture-station-error",
+             "capture-station-paused", "capture-recognition-foil", "capture-recognition-disabled",
+             "capture-recognition-stack", "capture-recognition-processing",
+             "capture-zoom-menu", "capture-brightness", "capture-brightness-adjusted",
+             "capture-zoom-open", "capture-zoom-pinch-low", "capture-zoom-pinch-high",
+             "capture-zoom-pinch-upper", "capture-zoom-pinch-edge", "capture-zoom-transition",
+             "capture-station-zoom-transition", "capture-station-brightness":
+            if let binder = Bundle.module.url(forResource: "CaptureBinder", withExtension: "jpg"),
+               let card = Bundle.module.url(forResource: "ResultScanSample", withExtension: "jpg"),
+               let binderData = try? Data(contentsOf: binder), let cardData = try? Data(contentsOf: card) {
+                CaptureFixtureView(route: route, binderData: binderData, cardData: cardData)
+            }
         case "scan-count-zero", "scan-count-new", "scan-count-overflow", "scan-count-navigation":
             ScanCountFixtureView(route: route)
         case "result-scan-artwork", "result-scan-image", "result-scan-zoom", "result-scan-edit",
@@ -195,4 +208,92 @@ public struct PreviewGalleryRootView: View {
 
 #Preview("Price filter invalid") {
     PreviewGalleryRootView(route: "pricing-filter-invalid")
+}
+
+#Preview("capture-table-binder") {
+    PreviewGalleryRootView(route: "capture-table-binder")
+}
+
+#Preview("capture-station-ready") {
+    PreviewGalleryRootView(route: "capture-station-ready")
+}
+
+#Preview("capture-station-settling") {
+    PreviewGalleryRootView(route: "capture-station-settling")
+}
+
+#Preview("capture-station-capturing") {
+    PreviewGalleryRootView(route: "capture-station-capturing")
+}
+
+#Preview("capture-station-stopped") {
+    PreviewGalleryRootView(route: "capture-station-stopped")
+}
+
+#Preview("capture-station-error") {
+    PreviewGalleryRootView(route: "capture-station-error")
+}
+
+#Preview("capture-station-paused") {
+    PreviewGalleryRootView(route: "capture-station-paused")
+}
+
+#Preview("capture-recognition-foil") {
+    PreviewGalleryRootView(route: "capture-recognition-foil")
+}
+
+#Preview("capture-recognition-disabled") {
+    PreviewGalleryRootView(route: "capture-recognition-disabled")
+}
+
+#Preview("capture-zoom-menu") {
+    PreviewGalleryRootView(route: "capture-zoom-menu")
+}
+
+#Preview("capture-brightness") {
+    PreviewGalleryRootView(route: "capture-brightness")
+}
+
+#Preview("capture-brightness-adjusted") {
+    PreviewGalleryRootView(route: "capture-brightness-adjusted")
+}
+
+#Preview("capture-zoom-open") {
+    PreviewGalleryRootView(route: "capture-zoom-open")
+}
+
+#Preview("capture-zoom-pinch-low") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-low")
+}
+
+#Preview("capture-zoom-pinch-high") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-high")
+}
+
+#Preview("capture-zoom-pinch-upper") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-upper")
+}
+
+#Preview("capture-zoom-transition") {
+    PreviewGalleryRootView(route: "capture-zoom-transition")
+}
+
+#Preview("capture-station-zoom-transition") {
+    PreviewGalleryRootView(route: "capture-station-zoom-transition")
+}
+
+#Preview("capture-station-brightness") {
+    PreviewGalleryRootView(route: "capture-station-brightness")
+}
+
+#Preview("capture-zoom-pinch-edge") {
+    PreviewGalleryRootView(route: "capture-zoom-pinch-edge")
+}
+
+#Preview("capture-recognition-stack") {
+    PreviewGalleryRootView(route: "capture-recognition-stack")
+}
+
+#Preview("capture-recognition-processing") {
+    PreviewGalleryRootView(route: "capture-recognition-processing")
 }

@@ -13,7 +13,16 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
 
     // MARK: - Public
 
-    let session = AVCaptureSession()
+    let session: AVCaptureSession
+    @MainActor lazy var previewLayer = AVCaptureVideoPreviewLayer(session: session)
+    private var captureVisible = false
+
+    override convenience init() { self.init(session: AVCaptureSession()) }
+
+    init(session: AVCaptureSession) {
+        self.session = session
+        super.init()
+    }
 
     /// Called on the session queue for each delivered video frame.
     var onFrame: ((CMSampleBuffer) -> Void)?
@@ -42,6 +51,9 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
     /// Set to `true` in tests to simulate a running session without real hardware.
     /// In production this is always driven by `session.isRunning` via `start()`/`stop()`.
     var isSessionReady = false
+    // Confined to sessionQueue; navigation from an outgoing tab must not stop the new owner.
+    var activeFrameOwner: UUID?
+    var zoomRampGeneration = 0
 
     /// Set to `true` in tests to skip issuing a real AVCapturePhotoOutput request.
     /// This allows state-machine tests to run without a configured camera pipeline.
@@ -77,6 +89,7 @@ final class CameraSessionManager: NSObject, CameraFrameSource, @unchecked Sendab
     }
 
     private func configureOnSessionQueue(camera: AutoScanCamera) {
+        guard session.inputs.isEmpty else { return }
         session.beginConfiguration()
         defer {
             session.commitConfiguration()
@@ -398,50 +411,82 @@ extension CameraSessionManager {
 
 extension CameraSessionManager {
 
-    func start() {
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            self.stopAfterCapture = false
-            if !self.session.isRunning { self.session.startRunning() }
-            self.isSessionReady = self.session.isRunning && self.captureDevice != nil
-            if self.focusSettlingState == nil, let device = self.captureDevice {
-                self.observeAdjustments(device)
-                if !self.configureFocus(device, point: self.focusPoint) {
-                    print("[Camera] Could not restore continuous focus")
-                }
-            }
+    func setFrameHandler(owner: UUID, handler: @escaping @Sendable (CMSampleBuffer) -> Void) {
+        sessionQueue.async { [self] in
+            activeFrameOwner = owner
+            onFrame = handler
         }
     }
 
-    func shutDown() {
+    func setCaptureVisible(_ visible: Bool) {
         sessionQueue.async { [self] in
+            captureVisible = visible
+            if !visible { pauseOnSessionQueue() } else if captureDevice != nil { resumeSession() }
+        }
+    }
+
+    func start() { start(owner: nil, onStarted: {}) }
+
+    func start(owner: UUID?, onStarted: @escaping @MainActor @Sendable () -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, self.ownsCamera(owner) else { return }
+            self.resumeSession()
+            Task { @MainActor in onStarted() }
+        }
+    }
+
+    private func resumeSession() {
+        stopAfterCapture = false
+        if !session.isRunning { session.startRunning() }
+        isSessionReady = session.isRunning && captureDevice != nil
+        if focusSettlingState == nil, let device = captureDevice {
+            observeAdjustments(device)
+            if !configureFocus(device, point: focusPoint) { print("[Camera] Could not restore continuous focus") }
+        }
+    }
+
+    func shutDown(owner: UUID? = nil) {
+        sessionQueue.async { [self] in
+            guard ownsCamera(owner) else { return }
             onFrame = nil
             onPixelBuffer = nil
+            if owner == nil { stopOnSessionQueue() } else { pauseOnSessionQueue() }
         }
-        stop()
     }
 
-    /// Rejects new photos immediately, then stops the session after the accepted photo finishes.
-    func pauseForNavigation() {
+    /// Rejects new photos immediately, then stops after the accepted photo finishes.
+    func pauseForNavigation(owner: UUID? = nil) {
         sessionQueue.async { [self] in
-            stopAfterCapture = true
-            isSessionReady = false
-            if !isCaptureInFlight { stopSession() }
+            guard ownsCamera(owner) else { return }
+            pauseOnSessionQueue()
         }
+    }
+
+    private func pauseOnSessionQueue() {
+        stopAfterCapture = !captureVisible
+        isSessionReady = false
+        if !captureVisible && !isCaptureInFlight { stopSession() }
+    }
+
+    func ownsCamera(_ owner: UUID?) -> Bool {
+        dispatchPrecondition(condition: .onQueue(sessionQueue))
+        return owner == nil || activeFrameOwner == owner
     }
 
     func stop() {
-        sessionQueue.async { [self] in
-            self.stopAfterCapture = false
-            self.isSessionReady = false
-            if self.isCaptureInFlight {
-                self.captureGeneration &+= 1
-                self._activeHandler?.cancel()
-                self._activeHandler = nil
-                self.isCaptureInFlight = false
-            }
-            self.stopSession()
+        sessionQueue.async { [self] in stopOnSessionQueue() }
+    }
+
+    private func stopOnSessionQueue() {
+        stopAfterCapture = false
+        isSessionReady = false
+        if isCaptureInFlight {
+            captureGeneration &+= 1
+            _activeHandler?.cancel()
+            _activeHandler = nil
+            isCaptureInFlight = false
         }
+        stopSession()
     }
 
     private func stopSession() {

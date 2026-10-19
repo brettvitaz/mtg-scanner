@@ -333,6 +333,7 @@ extension AutoScanCaptureLifecycleTests {
         vm.start()
         vm.captureManually()
         try await waitForPhoto(camera)
+        vm.feedback.announce = { _, _ in XCTFail("Navigation must not announce automatic readiness") }
         vm.pauseForNavigation()
         vm.pauseForNavigation()
         camera.finish(makePayload())

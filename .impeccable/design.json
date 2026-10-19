@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-19T01:17:13.437680+00:00",
+  "title": "Design System: MTG Scanner capture",
+  "extensions": {
+    "platform": {
+      "name": "SwiftUI / iOS",
+      "scope": "Table and Station capture only",
+      "units": "Native layout dimensions are points. Typography uses semantic SwiftUI styles. No browser rendering equivalence is asserted."
+    },
+    "colorMeta": {
+      "selected-zoom": {
+        "role": "primary",
+        "displayName": "Selected Zoom",
+        "nativeSource": "Color.yellow",
+        "interpretation": "Frontmatter yellow is the source color name, not fixed CSS-yellow rendering. iOS resolves the semantic value."
+      },
+      "control-foreground": {
+        "role": "neutral",
+        "displayName": "Control Foreground",
+        "nativeSource": "Color.white"
+      },
+      "disabled-shutter": {
+        "role": "neutral",
+        "displayName": "Disabled Shutter",
+        "nativeSource": "Color.white.opacity(0.4)"
+      },
+      "feedback-backing": {
+        "role": "neutral",
+        "displayName": "Feedback Backing",
+        "nativeSource": "Color.black.opacity(0.65)",
+        "purpose": "Station status capsule and capture-recovery surface; selected zoom retains the flashlight material without this backing"
+      },
+      "tab-selection": {
+        "role": "primary",
+        "displayName": "Tab Selection",
+        "nativeSource": "UIColor.systemBlue on every native selected tab image/title",
+        "interpretation": "One selected icon and label accent across all five destinations; camera zoom keeps yellow."
+      }
+    },
+    "typographyMeta": {
+      "active-zoom": {
+        "nativeStyle": ".subheadline.weight(.semibold)",
+        "purpose": "Selected pinch factor or preset destination, monospaced digits"
+      },
+      "inactive-zoom": {
+        "nativeStyle": ".subheadline.weight(.medium)",
+        "purpose": "Neighboring base anchors, monospaced digits"
+      },
+      "station-action": {
+        "nativeStyle": ".system(size: 20, weight: .medium)",
+        "purpose": "Play/stop SF Symbol with accessible Start/Stop label"
+      },
+      "station-status": {
+        "nativeStyle": ".caption.weight(.semibold)",
+        "purpose": "Operational status and symbol"
+      }
+    },
+    "materials": [
+      {
+        "name": "local-control",
+        "nativeSource": ".ultraThinMaterial",
+        "environment": "colorScheme = .dark",
+        "purpose": "Independent local control surfaces and native capture-tab integration"
+      }
+    ],
+    "shadows": [
+      {
+        "name": "zoom-text-outline",
+        "value": "Four Color.black shadows, radius: 0; x: 1, x: -1, y: 1, y: -1",
+        "purpose": "Crisp outline for selected and inactive zoom numerals over bright camera imagery"
+      }
+    ],
+    "motion": [
+      {
+        "name": "family-recentering",
+        "value": ".smooth(duration: 0.24)",
+        "purpose": "Family offset transition; nil under Reduce Motion"
+      },
+      {
+        "name": "shutter-press",
+        "value": ".spring(response: 0.2, dampingFraction: 0.6), scale: 0.9",
+        "purpose": "Press feedback; no scaling or animation under Reduce Motion"
+      },
+      {
+        "name": "station-completion",
+        "value": ".symbolEffect(.bounce, options: .nonRepeating)",
+        "purpose": "Completion-sequence change; sequence suppressed under Reduce Motion"
+      },
+      {
+        "name": "foil-completion",
+        "value": ".easeOut(duration: 0.8), one pass",
+        "purpose": "Subtle cyan/pink completion shimmer; absent under Reduce Motion"
+      }
+    ],
+    "nativeLayout": [
+      {
+        "name": "torch-relocation",
+        "condition": "available control width < 360 points OR Dynamic Type accessibility size",
+        "behavior": "Lift torch above zoom rail"
+      },
+      {
+        "name": "accessibility-zoom",
+        "condition": "Dynamic Type accessibility size",
+        "behavior": "Active centered above two inactive anchors; rowHeight = max(44, scaled lineHeight + 12), lineHeight 20 relativeTo subheadline; intrinsic text width plus 4-point horizontal padding, minimum width 44; second row offset rowHeight + 8"
+      },
+      {
+        "name": "station-feedback",
+        "condition": "All text sizes and both capture modes",
+        "behavior": "Independent centered status above framing; minimum height 20 scaled relativeTo caption, gap 8; Table preserves invisible space and hides status from accessibility; fixed 48-point trailing action remains beside shutter Preparing represents initial scene learning within the existing warmup; Ready requires a learned reference. Next-reference learning overlaps accepted capture preparation without an added per-card wait."
+      },
+      {
+        "name": "capture-rhythm",
+        "condition": "All capture layouts",
+        "behavior": "24-point framing-to-shutter gap and bottom inset; maximum cluster width 420, horizontal inset 20; shutter row height 76, trailing action 48; leading aggregate queue/thumbnail group fills available width before protected 24-point shutter gap"
+      },
+      {
+        "name": "recognition-feedback",
+        "condition": "Table and Station",
+        "behavior": "Aggregate queue actions stay with latest-capture thumbnail; AX queue uses dedicated reserved row. Up to three independently expiring three-second notices overlay the top; AX shows one. Notices never position capture controls."
+      }
+    ],
+    "nativeComponents": [
+      {
+        "name": "Capture shutter",
+        "refersTo": "shutter",
+        "source": "CaptureButton.swift",
+        "language": "swift",
+        "snippet": "Circle().strokeBorder(Color.white, lineWidth: 4).frame(width: 76, height: 76)\n// Inner fill: Color.white, or Color.white.opacity(0.4) when disabled; 64 \u00d7 64.\n// Local background: .ultraThinMaterial in Circle(), dark color scheme.",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      },
+      {
+        "name": "Selected zoom",
+        "refersTo": "zoom-selected",
+        "source": "ZoomPresetControl.swift",
+        "language": "swift",
+        "snippet": "Text(active ? Self.label(currentZoom) : Self.label(CGFloat(anchor)))\n    .font(.subheadline.weight(active ? .semibold : .medium)).monospacedDigit()\n    .foregroundStyle(active ? Color.yellow : Color.white)\n    .shadow(color: .black, radius: 0, x: 1)\n    .shadow(color: .black, radius: 0, x: -1)\n    .shadow(color: .black, radius: 0, y: 1)\n    .shadow(color: .black, radius: 0, y: -1)\n    .fixedSize().padding(.horizontal, 4)\n    .frame(minWidth: 44, minHeight: rowHeight)\n    .background { if active { Color.clear.captureControlSurface(in: Capsule()) } }",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      },
+      {
+        "name": "Station action",
+        "refersTo": "station-action",
+        "source": "AutoScanView.swift",
+        "language": "swift",
+        "snippet": "Image(systemName: viewModel.isActive ? \"stop.fill\" : \"play.fill\")\n    .font(.system(size: 20, weight: .medium))\n    .foregroundStyle(.white).frame(width: 48, height: 48)\n    .captureControlSurface(in: Circle())",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      },
+      {
+        "name": "Station status",
+        "refersTo": "station-status",
+        "source": "AutoScanView.swift",
+        "language": "swift",
+        "snippet": "Label(viewModel.stationStatus.rawValue, systemImage: viewModel.stationStatus.symbol)\n    .font(.caption.weight(.semibold)).foregroundStyle(.white)\n    .padding(.horizontal, 8).padding(.vertical, 4)\n    .background(.black.opacity(0.65), in: Capsule())\n    .captureControlSurface(in: Capsule())",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      },
+      {
+        "name": "Capture recovery",
+        "refersTo": "capture-recovery",
+        "source": "AutoScanView.swift",
+        "language": "swift",
+        "snippet": "Text(message).font(.caption).multilineTextAlignment(.center)\n    .frame(maxWidth: .infinity, minHeight: 44)\n    .padding(.horizontal, 12).padding(.vertical, 8)\n    .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))\n    .captureControlSurface(in: RoundedRectangle(cornerRadius: 16))",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      },
+      {
+        "name": "Local control material",
+        "refersTo": null,
+        "source": "CaptureControlSurface.swift",
+        "language": "swift",
+        "snippet": "background(.ultraThinMaterial, in: shape)\n    .environment(\\.colorScheme, .dark)",
+        "snippetScope": "Source excerpt with surrounding state/view context required; not a browser-renderable component"
+      }
+    ],
+    "evidence": {
+      "sourceFiles": [
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/ScanView.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/ZoomPresetControl.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureButton.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureControlSurface.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/Scan/CaptureFramingControls.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/AutoScan/AutoScanView.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/App/RootTabView.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/AutoScan/AutoScanViewModel.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Camera/CameraSessionManager.swift",
+        "apps/ios/MTGScannerKit/Sources/MTGScannerKit/Features/CardDetection/Camera/CameraViewController.swift"
+      ],
+      "review": "tmp/capture-lifecycle/requirements.md",
+      "verdictScope": "Current-source behavior documentation merge under latest lifecycle corrections L1\u2013L4; no new finish verdict or physical acceptance asserted",
+      "unresolved": [
+        "Physical optical movement/focus/framing acceptance",
+        "VoiceOver device focus continuity",
+        "Reduce Transparency verification"
+      ],
+      "rasterProvenance": "No new shipping raster assets introduced; pre-existing synthetic fixture photos are layout evidence only.",
+      "cameraPolicy": "ScanView requests camera: .automatic for both modes; policy implementation and physical optical acceptance are distinct",
+      "captureLifecycle": {
+        "preview": "One movable preview layer follows the visible capture mode; session stays warm during Table\u2013Station handoff.",
+        "zoom": "Each mode independently saves applied zoom and restores it on navigation return; supersedes navigation resets to 1\u00d7.",
+        "station": "Active Station suspends detection during zoom and for 0.75 seconds after last motion, then rebaselines/resumes automatically. Further zoom restarts hold; Stop/navigation cancel it. Manual capture cancels the deferred reset; accepted-photo protection remains.",
+        "reframing": "Preview-only iPhone 17 Pro framing remains investigation; no new control or sensor offset, and full photo remains unchanged.",
+        "physicalEvidence": "Physical iPhone 17 Pro live-preview test passed across repeated capture-mode handoffs; optical image quality remains unverified."
+      }
+    },
+    "representationNotes": [
+      "Native semantic colors have no fabricated tonal ramps.",
+      "SwiftUI materials, semantic text and native snippets are preserved as v2 extensions rather than HTML/CSS approximations.",
+      "No HTML/CSS rendering proof or optical acceptance is asserted."
+    ],
+    "stationMotionAcceptance": {
+      "scope": "Physical iPhone 17 Pro, Station at 1.5\u00d7: Start/taps, rapid identical-copy drops and empty-tray first arrival passed with four intended captures and no reported extras or misses.",
+      "performance": "Sampler median 8.7 ms, p95 12.7 ms; no busy drops while watching. Four capture-to-rearm intervals ranged 1.19\u20131.53 s. This small sample does not establish unchanged throughput.",
+      "limits": "No universal lighting, stand, zoom or optical-quality acceptance inferred."
+    }
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Fluid native viewfinder",
+    "overview": "Table and Station keep collectors inside the camera image. Independent controls float over the scene: the white shutter leads, selected magnification uses restrained system yellow, and local dark material supports secondary actions. The result is clean, fast and confident, consistent with PRODUCT.md's precision reference tool.\n\nThis record covers the implemented capture surfaces only. It does not establish a design system for Results, Library or Settings. The approved capture brief and surface contract supply the language; the SwiftUI implementation supplies the tokens. The latest human corrections supersede the earlier contrast-only verdict and its selected zoom backing. This record reflects current source, including the latest capture lifecycle correction; it does not assign a new finish-review verdict. Both modes request the same automatic camera policy. One movable preview layer follows the visible capture mode, and the capture session stays warm during Table\u2013Station handoff. Each mode restores its own saved applied zoom on return; navigation no longer resets magnification to 1\u00d7. Physical camera acceptance, VoiceOver focus continuity and Reduce Transparency verification remain separate outstanding checks.",
+    "keyCharacteristics": [
+      "Continuous camera imagery between independent controls.",
+      "A centered shutter and active zoom axis, with stable secondary capture slots.",
+      "Native semantic text, SF Symbols and local dark system materials.",
+      "Truthful magnification and Station status, with restrained state motion."
+    ],
+    "rules": [
+      {
+        "name": "The Local Contrast Rule",
+        "body": "Back operational text with local contrast where camera detail can compete with it; preserve visible image between independent controls.",
+        "section": "colors"
+      },
+      {
+        "name": "The Applied Value Rule",
+        "body": "Pinch text follows the actual factor and unrounded family, capping rounded labels at 1.9\u00d7 and 2.9\u00d7 before the next family. During a preset move, the selected destination is presented directly; intermediate applied factors remain authoritative for camera safety and interruption.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "**Do** keep the camera image visible between independent capture controls.",
+      "**Do** use native semantic text and dark system material in capture components.",
+      "**Do** preserve the centered active zoom and shutter axis through family changes.",
+      "**Do** pair Station state text with its native symbol and keep capture recovery distinct from queue recovery."
+    ],
+    "donts": [
+      "**Don't** restore the rejected zoom dropdown or an enclosing opaque lower control band.",
+      "**Don't** count through intermediate applied factors during a preset move or label magnification as a focal length or physical lens.",
+      "**Don't** treat sampled colors, fixture scenery or schematic storyboard fills as production palette tokens.",
+      "**Don't** infer physical camera quality or complete accessibility acceptance from simulator presentation."
+    ]
+  }
+}

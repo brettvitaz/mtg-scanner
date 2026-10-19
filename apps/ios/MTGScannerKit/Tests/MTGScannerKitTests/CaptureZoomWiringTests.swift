@@ -52,7 +52,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         XCTAssertFalse(model.isCalibrated)
     }
 
-    // A single assignment, stale ramp completion or post-movement pause breaks these assertions.
+    // Device motion locks capture; automatic detection stays paused while optics settle afterward.
     func testMotionReportsProgressPausesBeforeMutationAndLocksCaptureUntilCompletion() async throws {
         let model = AutoScanViewModel(detector: nil)
         let camera = CameraViewController()
@@ -77,7 +77,8 @@ final class CaptureZoomWiringTests: XCTestCase {
         try await waitForScanCount { !camera.isZoomMoving }
         XCTAssertEqual(camera.appliedZoom, 2.4)
         XCTAssertTrue(model.canCaptureManually)
-        XCTAssertEqual(model.stationStatus, .ready)
+        XCTAssertEqual(model.stationStatus, .paused)
+        try await waitForScanCount { model.stationStatus == .ready }
         XCTAssertGreaterThan(factors.count, 2)
         XCTAssertTrue(zip(factors, factors.dropFirst()).allSatisfy { $0 <= $1 })
         model.start()
@@ -161,7 +162,7 @@ final class CaptureZoomWiringTests: XCTestCase {
         XCTAssertEqual(camera.appliedZoom, pausedAt)
     }
 
-    func testSmallActualMovementSuspendsRatherThanStoppingStation() {
+    func testSmallActualMovementSuspendsRatherThanStoppingStation() async throws {
         let camera = CameraViewController()
         let model = AutoScanViewModel(detector: nil)
         camera.zoomDevice = immediateZoomDevice(maximum: 4) { _ in
@@ -173,7 +174,8 @@ final class CaptureZoomWiringTests: XCTestCase {
         model.start()
         camera.setZoom(1.00001)
         XCTAssertEqual(camera.appliedZoom, 1.00001)
-        XCTAssertEqual(model.stationStatus, .ready)
+        XCTAssertEqual(model.stationStatus, .paused)
+        try await waitForScanCount { model.stationStatus == .ready }
         model.stop()
     }
 

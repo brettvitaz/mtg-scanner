@@ -3,6 +3,7 @@ name: MTG Scanner capture
 description: A fluid native viewfinder for Table and Station.
 colors:
   selected-zoom: "yellow"
+  active-capture-mode: "yellow"
   control-foreground: "white"
   feedback-backing: "rgb(0 0 0 / 65%)"
   disabled-shutter: "rgb(255 255 255 / 40%)"
@@ -71,9 +72,10 @@ This record covers the implemented capture surfaces only. It does not establish 
 
 ## Colors
 
-A compact native camera palette gives the shutter priority and reserves yellow for selected magnification.
+A compact native camera palette gives the shutter priority and uses yellow for selected magnification and the active capture-mode icon.
 
 ### Primary
+- **Active Capture Mode:** `UIColor.systemYellow` on the selected Table or Station tab image only. Native labels, inactive images and other tabs retain their existing styling.
 - **Selected Zoom:** SwiftUI `Color.yellow`, scoped to the active zoom value. The frontmatter's CSS-compatible name preserves the native color name, not a fixed sRGB measurement. Native rendering remains authoritative; do not substitute CSS yellow or a sampled screenshot hex into production.
 
 ### Neutral
@@ -128,7 +130,7 @@ Three always-exposed anchors represent the 1×, 2× and 3× families. The active
 
 ### Station action and status
 
-Start/Stop is a fixed circle with a play/stop symbol. Compact symbol-plus-text status occupies the independent strip above framing in a capsule with 8-point horizontal and 4-point vertical padding, black feedback backing and shared dark material. An active Station temporarily suspends detection events during zoom motion while remaining active, with Stop available. Stale tracking results are discarded and Station automatically establishes a fresh baseline and resumes when motion ends. Navigation stops the activity; returning or an explicitly stopped Station still requires Start, which is unavailable during zoom motion. Accepted-photo protection remains in effect. Status derives from operational state, and completion can trigger a nonrepeating symbol bounce unless Reduce Motion is enabled. The label and symbol keep state understandable without depending on color alone.
+Start/Stop is a fixed circle with a play/stop symbol. Compact symbol-plus-text status occupies the independent strip above framing in a capsule with 8-point horizontal and 4-point vertical padding, black feedback backing and shared dark material. An active Station temporarily suspends detection events during zoom motion while remaining active, with Stop available. Stale tracking results are discarded and Station automatically establishes a fresh baseline and resumes after 0.75 seconds without zoom movement and a fresh tracker baseline. Navigation stops the activity; returning or an explicitly stopped Station still requires Start, which is unavailable during zoom motion. Accepted-photo protection remains in effect. Status derives from operational state, and completion can trigger a nonrepeating symbol bounce unless Reduce Motion is enabled. The label and symbol keep state understandable without depending on color alone.
 
 Preview-only reframing for iPhone 17 Pro remains an investigation; no new framing control, sensor offset or full-photo crop is established here. The physical iPhone 17 Pro live-preview test passed across repeated Table/Station handoffs. This verifies preview rendering and visible ownership; it does not establish optical image quality.
 
@@ -161,3 +163,7 @@ The latest-capture thumbnail is grouped with aggregate queue activity, not linke
 Completion notices and queue captions use the existing 65% black feedback backing with local dark native material for readable text over bright scenery. Completion notices use a card title and a set/collector metadata line with an explicit Foil label when applicable. Up to three notices stack newest first with 6-point separation; each retains its independent three-second expiry. A fourth completion evicts the oldest visible notice, while every identification remains in Results. The existing notification setting suppresses completion feedback without suppressing queue activity or failures. Notice dismissal remains available as a VoiceOver custom action, without a visible close icon.
 
 Foil receives one subtle cyan/pink shimmer pass over 0.8 seconds at appearance. It neither repeats nor runs with Reduce Motion enabled. Notice insertions and removals use a short opacity transition, also respecting Reduce Motion. Existing camera lifecycle, optics, zoom, Station state and the proposal-only reframing remain unchanged.
+
+### Stand vibration
+
+Automatic capture requires stable adjacent image samples; a stable aggregate difference score alone is insufficient. A bounded whole-frame thumbnail registration check rejects confidently global translation only when the same motion explains multiple textured peripheral tiles outside the detected card. Local or inconclusive motion stays eligible, including identical printings with the same final appearance. Tight framing without independent background declines this veto. This signal check changes no card bounds, crop coordinates, provider contracts or preview framing. Physical stand acceptance remains separate from synthetic-image regression evidence.

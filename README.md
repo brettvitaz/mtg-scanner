@@ -44,7 +44,7 @@ Run the `MTGScanner` scheme in Xcode. The app flow is:
 The five native tabs are **Table**, **Station**, **Results**, **Library**, and **Settings**.
 Table opens first and captures one or more cards on a table, binder page, or in hand;
 it also imports photos. Station watches a fixed scanning station for card drops.
-Tap either capture tab to open it directly. Re-selecting a tab does not change modes.
+The selected capture tab icon is yellow. Tap either capture tab to open it directly. Re-selecting a tab does not change modes.
 Successful recognition adds to the unseen Results count; opening Results clears it.
 
 Both capture tabs place zoom above the centered shutter, the last capture at left,
@@ -59,7 +59,7 @@ the destination. Reduce Motion removes the sliding recentering effect.
 
 While zoom moves, a started Station temporarily suspends detection events and cancels
 settling. It stays started, retains its thumbnail and recognition queue, and automatically
-rebuilds the motion baseline when movement ends. Stop remains available. New capture
+waits 0.75 seconds after the last zoom movement, then rebuilds the motion baseline before resuming. Stop remains available; manual capture is available once movement ends. New capture
 is unavailable during movement; an accepted photo/preparation blocks every zoom path.
 Stop and navigation cancel motion. Configuration failure provides Retry. Accessibility
 text reflows zoom choices without moving the Start/Stop control.
@@ -72,10 +72,16 @@ Only preset selection emits a haptic; touch-down and drag release do not snap.
 
 Station uses compact Ready, Settling, Capturing, Stopped, and Paused feedback.
 Ready follows tracker rearming and release of the accepted capture; recognition can
-continue independently. One compact Recognized toast verifies the latest card/printing,
-with a foil effect that respects Reduce Motion. Settings → Show recognition notifications
+continue independently. Up to three compact completion notices verify recent cards/printings,
+with a brief foil shimmer that respects Reduce Motion. Settings → Show recognition notifications
 is on by default. Turning it off hides toast visuals/speech while preserving Results,
 counts, queue errors, and Station readiness.
+
+Station requires stable image samples before triggering. It rejects motion confidently explained
+by the whole scene translating together, using textured areas outside the detected card as
+independent background evidence. Local changes, identical-card placements, and ambiguous
+or texture-poor scenes remain eligible; this is not a guarantee against every vibration or
+vision-model false positive.
 
 In Station, **Start** watches for card arrivals and **Stop** resets detection and calibration.
 After restarting, move or place the next card to trigger automatic capture. Use the shutter

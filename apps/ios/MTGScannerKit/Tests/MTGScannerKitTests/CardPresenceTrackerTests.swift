@@ -30,6 +30,139 @@ final class CardPresenceTrackerTests: XCTestCase {
         await fulfillment(of: [noSignal], timeout: 0.05)
     }
 
+    func testGlobalVibrationOfRealCardSceneDoesNotSignalAndNextPlacementStillWorks() async throws {
+        try await verifyVibration(vertical: false)
+    }
+
+    func testVerticalVibrationDoesNotSignalAndNextPlacementStillWorks() async throws {
+        try await verifyVibration(vertical: true)
+    }
+
+    private func verifyVibration(vertical: Bool) async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "IMG_1955", withExtension: "jpeg"))
+        let image = try XCTUnwrap(UIImage(contentsOfFile: url.path)?.cgImage)
+        let noSignal = expectation(description: "Stand vibration is not a new card")
+        noSignal.isInverted = true
+        tracker.onNewCardSignal = { _, _ in noSignal.fulfill() }
+        for offset in Array(repeating: 0, count: 8) + [4, -4, 3, -3, 2, -2, 1, -1] +
+            Array(repeating: 0, count: 8) {
+            tracker.processFrame(try translatedFrame(image, offset: vertical ? 0 : offset,
+                                                      vertical: vertical ? offset : 0))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [noSignal], timeout: 0.1)
+        let next = expectation(description: "A real replacement still signals")
+        tracker.onNewCardSignal = { _, _ in next.fulfill() }
+        for _ in 0..<8 { tracker.processFrame(try uniformFrame(255)); await tracker.finishRearming() }
+        await fulfillment(of: [next], timeout: 1)
+    }
+
+    func testAlternatingSpatialPatternsCannotSettleJustBecauseTheirAverageDifferenceMatches() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        let noSignal = expectation(description: "Still-moving samples must not signal")
+        noSignal.isInverted = true
+        tracker.onNewCardSignal = { _, _ in noSignal.fulfill() }
+        for _ in 0..<8 { tracker.processFrame(try uniformFrame(128)); await tracker.finishRearming() }
+        for index in 0..<12 {
+            tracker.processFrame(try patternedFrame(phase: index % 2))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [noSignal], timeout: 0.1)
+        let arrived = expectation(description: "A stable card can settle after spatial motion")
+        tracker.onNewCardSignal = { _, _ in arrived.fulfill() }
+        for _ in 0..<8 { tracker.processFrame(try uniformFrame(255)); await tracker.finishRearming() }
+        await fulfillment(of: [arrived], timeout: 1)
+    }
+
+    func testLargeIdenticalCardIsNotVetoedWhenItOccupiesPeripheralTiles() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.19, y: 0.11, width: 0.62, height: 0.78), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "IMG_1955", withExtension: "jpeg"))
+        let image = try XCTUnwrap(UIImage(contentsOfFile: url.path)?.cgImage)
+        let arrived = expectation(description: "Insufficient independent background must preserve eligibility")
+        arrived.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in arrived.fulfill() }
+        for offset in Array(repeating: 0, count: 8) + [4, -4, 3, -3, 2, -2] + Array(repeating: 0, count: 8) {
+            tracker.processFrame(try translatedFrame(image, offset: offset))
+            await tracker.finishRearming()
+        }
+        await fulfillment(of: [arrived], timeout: 1)
+    }
+
+    func testLocalReplacementCanReturnToIdenticalAppearanceAndStillSignal() async throws {
+        let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
+            [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]
+        })
+        tracker.resetSession(UUID())
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "IMG_1955", withExtension: "jpeg"))
+        let image = try XCTUnwrap(UIImage(contentsOfFile: url.path)?.cgImage)
+        let arrived = expectation(description: "Local replacement mixed with shake still signals once")
+        arrived.assertForOverFulfill = true
+        tracker.onNewCardSignal = { _, _ in arrived.fulfill() }
+        for _ in 0..<8 { tracker.processFrame(try translatedFrame(image, offset: 0)); await tracker.finishRearming() }
+        for offset in [4, -4, 3, -3] {
+            tracker.processFrame(try renderedFrame { context in
+                context.draw(image, in: CGRect(x: offset, y: 0, width: 256, height: 192))
+                context.setFillColor(UIColor.white.cgColor)
+                context.fill(CGRect(x: 80 + offset * 2, y: 48, width: 96, height: 96))
+            })
+            await tracker.finishRearming()
+        }
+        for _ in 0..<8 { tracker.processFrame(try translatedFrame(image, offset: 0)); await tracker.finishRearming() }
+        await fulfillment(of: [arrived], timeout: 1)
+    }
+
+    private func uniformFrame(_ value: UInt8) throws -> CMSampleBuffer {
+        try renderedFrame { context in
+            context.setFillColor(UIColor(white: CGFloat(value) / 255, alpha: 1).cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: 256, height: 192))
+        }
+    }
+
+    private func translatedFrame(_ image: CGImage, offset: Int, vertical: Int = 0) throws -> CMSampleBuffer {
+        try renderedFrame { context in
+            context.setFillColor(UIColor.black.cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: 256, height: 192))
+            context.draw(image, in: CGRect(x: offset, y: vertical, width: 256, height: 192))
+        }
+    }
+
+    private func patternedFrame(phase: Int) throws -> CMSampleBuffer {
+        try renderedFrame { context in
+            for y in 0..<12 {
+                for x in 0..<16 {
+                    context.setFillColor((x + y + phase) % 2 == 0 ? UIColor.black.cgColor : UIColor.white.cgColor)
+                    context.fill(CGRect(x: x * 16, y: y * 16, width: 16, height: 16))
+                }
+            }
+        }
+    }
+
+    private func renderedFrame(_ draw: (CGContext) -> Void) throws -> CMSampleBuffer {
+        var buffer: CVPixelBuffer?
+        XCTAssertEqual(CVPixelBufferCreate(kCFAllocatorDefault, 256, 192, kCVPixelFormatType_32BGRA,
+                                          nil, &buffer), kCVReturnSuccess)
+        let pixels = try XCTUnwrap(buffer)
+        CVPixelBufferLockBaseAddress(pixels, [])
+        let context = try XCTUnwrap(CGContext(
+            data: CVPixelBufferGetBaseAddress(pixels), width: 256, height: 192, bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(pixels), space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+        ))
+        draw(context)
+        CVPixelBufferUnlockBaseAddress(pixels, [])
+        return try sampleBuffer(pixels)
+    }
+
     private func verifyRestart(zone: DetectionZone?) async throws {
         let tracker = CardPresenceTracker(detectorProvider: { nil }, detectCards: { _ in
             [CardBoundingBox(rect: CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), confidence: 0.9)]

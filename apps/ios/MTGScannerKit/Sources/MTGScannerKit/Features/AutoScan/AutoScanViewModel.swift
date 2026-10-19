@@ -28,7 +28,7 @@ final class AutoScanViewModel {
     }
 
     private(set) var captureFailure: String?
-    var isPausedForZoom: Bool { isActive && isZoomMoving }
+    var isPausedForZoom: Bool { isActive && (isZoomMoving || isZoomSettling) }
     private(set) var completionSequence = 0
     let feedback = CaptureFeedback()
 
@@ -68,10 +68,10 @@ final class AutoScanViewModel {
     private var captureOperationID: UUID?
     private var preservedCaptureSessionID: UUID?
     var isZoomMoving = false {
-        didSet {
-            if oldValue && !isZoomMoving && isActive { resetSession() }
-        }
+        didSet { zoomMotionDidChange(from: oldValue) }
     }
+    private var isZoomSettling = false
+    private var zoomSettlementTask: Task<Void, Never>?
     var canChangeZoom: Bool { captureOperationID == nil }
     var canCaptureManually: Bool { canChangeZoom && !isZoomMoving }
     private var capturePhoto: (@MainActor () async -> RecognitionImagePayload?)?
@@ -200,6 +200,7 @@ final class AutoScanViewModel {
     }
 
     private func resetScanningState() {
+        cancelZoomSettlement()
         isActive = false
         captureFailure = nil
         captureState = .watching
@@ -220,6 +221,7 @@ final class AutoScanViewModel {
     /// Captures immediately, including when automatic scanning is stopped.
     func captureManually() {
         guard canCaptureManually else { return }
+        cancelZoomSettlement()
         settleTask?.cancel()
         settleTask = nil
         let sessionID = scanSessionID
@@ -253,14 +255,15 @@ final class AutoScanViewModel {
     /// processing motion while a capture is imminent or in progress, and doing so
     /// wastes CPU and risks a spurious second trigger before `markCaptured` runs.
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isActive, captureFailure == nil, captureState == .watching, canCaptureManually else { return }
+        guard isActive, !isPausedForZoom, captureFailure == nil,
+              captureState == .watching, canCaptureManually else { return }
         presenceTracker.processFrame(sampleBuffer)
     }
 
     // MARK: - State Machine
 
     private func handleNewCardSignal(boundingBox: CGRect?, sessionID: UUID) {
-        guard isActive, captureFailure == nil, sessionID == scanSessionID,
+        guard isActive, !isPausedForZoom, captureFailure == nil, sessionID == scanSessionID,
               boundingBox != nil, canCaptureManually else { return }
         switch captureState {
         case .watching:
@@ -502,5 +505,35 @@ private extension AutoScanViewModel {
                 payload: payload, isCropped: false, apiBaseURL: apiBaseURL, modelContext: modelContext
             )
         }
+    }
+}
+
+// MARK: - Post-zoom settling
+private extension AutoScanViewModel {
+    func zoomMotionDidChange(from wasMoving: Bool) {
+        guard wasMoving != isZoomMoving else { return }
+        cancelZoomSettlement()
+        guard !isZoomMoving, isActive else { return }
+        isZoomSettling = true
+        let sessionID = scanSessionID
+        zoomSettlementTask = Task { [weak self] in
+            // Focus/exposure and residual framing changes must not become card-arrival motion.
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled, let self, isActive, !isZoomMoving,
+                  scanSessionID == sessionID else { return }
+            resetSession()
+            let baselineSession = scanSessionID
+            await presenceTracker.finishRearming()
+            guard !Task.isCancelled, isActive, !isZoomMoving,
+                  scanSessionID == baselineSession else { return }
+            isZoomSettling = false
+            zoomSettlementTask = nil
+        }
+    }
+
+    func cancelZoomSettlement() {
+        zoomSettlementTask?.cancel()
+        zoomSettlementTask = nil
+        isZoomSettling = false
     }
 }

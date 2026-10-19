@@ -62,10 +62,85 @@ final class StationFeedbackTests: XCTestCase {
         XCTAssertEqual(model.captureState, .watching)
         model.isZoomMoving = false
         XCTAssertTrue(model.isActive)
-        XCTAssertEqual(model.stationStatus, .ready)
+        XCTAssertEqual(model.stationStatus, .paused)
+        try await wait { model.stationStatus == .ready }
         model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), oldSession)
         await Task.yield()
         XCTAssertEqual(model.captureState, .watching)
+        model.stop()
+    }
+
+    func testPostZoomPauseRejectsSignalsThenRearmsWithAFreshSession() async throws {
+        let model = AutoScanViewModel(detector: nil)
+        model.captureDelay = 60
+        model.start()
+        XCTAssertTrue(model.prepareForZoomChange(from: 1, to: 2))
+        model.isZoomMoving = true
+        model.isZoomMoving = false
+        let settlingSession = model.scanSessionID
+        let ended = ContinuousClock.now
+        XCTAssertEqual(model.stationStatus, .paused)
+        XCTAssertTrue(model.canCaptureManually)
+        model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), settlingSession)
+        await Task.yield()
+        XCTAssertEqual(model.captureState, .watching)
+        try await wait { model.stationStatus == .ready }
+        XCTAssertGreaterThanOrEqual(ended.duration(to: .now), .milliseconds(700))
+        XCTAssertNotEqual(model.scanSessionID, settlingSession)
+        model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), settlingSession)
+        await Task.yield()
+        XCTAssertEqual(model.captureState, .watching)
+        model.presenceTracker.onNewCardSignal?(CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6), model.scanSessionID)
+        try await wait { model.captureState == .settling }
+        model.stop()
+    }
+
+    func testAnotherZoomRestartsThePauseAndStopCancelsIt() async throws {
+        let model = AutoScanViewModel(detector: nil)
+        model.start()
+        model.isZoomMoving = true
+        model.isZoomMoving = false
+        // A second user gesture arrives before the first post-zoom pause ends.
+        try await Task.sleep(for: .milliseconds(300))
+        model.isZoomMoving = true
+        model.isZoomMoving = false
+        let ended = ContinuousClock.now
+        XCTAssertEqual(model.stationStatus, .paused)
+        try await wait { model.stationStatus == .ready }
+        XCTAssertGreaterThanOrEqual(ended.duration(to: .now), .milliseconds(700))
+        model.isZoomMoving = true
+        model.isZoomMoving = false
+        model.stop()
+        XCTAssertFalse(model.isPausedForZoom)
+        XCTAssertEqual(model.stationStatus, .stopped)
+        model.start()
+        XCTAssertEqual(model.stationStatus, .ready)
+        model.stop()
+    }
+
+    func testManualPhotoAcceptedDuringPostZoomPauseSurvivesTheOldPauseDeadline() async throws {
+        let gate = StationCropGate()
+        let queue = RecognitionQueue()
+        queue.maxConcurrent = 0
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { _ in }
+        let model = AutoScanViewModel(
+            detectorProvider: { nil }, recognitionQueue: queue,
+            capturePhoto: { .cameraCapture(image: image, data: Data([1])) },
+            detectBox: { _ in CGRect(x: 0.25, y: 0.2, width: 0.3, height: 0.6) },
+            cropImage: { _, _ in await gate.run() }
+        )
+        model.start()
+        model.isZoomMoving = true
+        model.isZoomMoving = false
+        XCTAssertEqual(model.stationStatus, .paused)
+        model.captureManually()
+        try await wait { await gate.isWaiting }
+        // The accepted crop deliberately completes after the cancelled pause's deadline.
+        try await Task.sleep(for: .milliseconds(900))
+        await gate.finish(image)
+        try await wait { queue.pendingCount == 1 && model.canCaptureManually }
+        XCTAssertNotNil(model.lastCroppedImage)
+        XCTAssertEqual(model.stationStatus, .ready)
         model.stop()
     }
 

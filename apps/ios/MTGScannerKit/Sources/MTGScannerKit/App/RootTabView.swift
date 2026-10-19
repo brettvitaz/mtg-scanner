@@ -57,7 +57,7 @@ public struct RootTabView: View {
         }
         .onAppear { updateCameraVisibility() }
         .onChange(of: appModel.selectedTab) { _, _ in updateCameraVisibility() }
-        .background(ResultsTabAccessibility(value: appModel.resultsBadgeAccessibilityValue))
+        .background(NativeTabPresentation(value: appModel.resultsBadgeAccessibilityValue))
         .onChange(of: appModel.shouldShowResults) { _, newValue in
             if newValue {
                 appModel.selectTab(.results)
@@ -97,29 +97,34 @@ public struct RootTabView: View {
 
 }
 
-/// SwiftUI does not forward accessibilityValue to UITabBarItem.
-private struct ResultsTabAccessibility: UIViewRepresentable {
+/// Preserve native tab styling while supplying capture-only selected artwork and Results accessibility.
+private struct NativeTabPresentation: UIViewRepresentable {
     let value: String
 
-    func makeUIView(context: Context) -> TabAccessibilityView { TabAccessibilityView() }
+    func makeUIView(context: Context) -> TabPresentationView { TabPresentationView() }
 
-    func updateUIView(_ view: TabAccessibilityView, context: Context) {
+    func updateUIView(_ view: TabPresentationView, context: Context) {
         view.value = value
-        DispatchQueue.main.async { [weak view] in view?.updateResultsValue() }
+        DispatchQueue.main.async { [weak view] in view?.updateTabItems() }
     }
 
-    final class TabAccessibilityView: UIView {
+    final class TabPresentationView: UIView {
         var value = ""
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            DispatchQueue.main.async { [weak self] in self?.updateResultsValue() }
+            DispatchQueue.main.async { [weak self] in self?.updateTabItems() }
         }
 
-        func updateResultsValue() {
+        func updateTabItems() {
             guard let tab = findTab(in: window?.rootViewController),
                   let items = tab.tabBar.items, items.indices.contains(AppTab.results.rawValue) else { return }
             items[AppTab.results.rawValue].accessibilityValue = value
+            for (destination, mode) in [(AppTab.table, DetectionMode.scan), (.station, .auto)] {
+                guard items.indices.contains(destination.rawValue) else { continue }
+                items[destination.rawValue].selectedImage = UIImage(systemName: mode.systemImage)?
+                    .withTintColor(.systemYellow, renderingMode: .alwaysOriginal)
+            }
         }
 
         private func findTab(in controller: UIViewController?) -> UITabBarController? {

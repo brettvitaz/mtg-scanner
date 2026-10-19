@@ -71,7 +71,12 @@ final class StationTrackerIntegrationTests: XCTestCase {
         model.isZoomMoving = true
         model.isZoomMoving = false
         XCTAssertTrue(model.isActive)
-        // The changed framing becomes a baseline, never a new arrival.
+        XCTAssertEqual(model.stationStatus, .paused)
+        // Residual camera changes are dropped, not learned as a card arrival.
+        try await burst(model, baseline: 0, card: 255)
+        XCTAssertEqual(photos(), 2)
+        try await wait { model.stationStatus == .ready }
+        // Only settled framing becomes the new baseline.
         try await burst(model, baseline: 100, card: 100)
         XCTAssertEqual(photos(), 2)
         model.stop()

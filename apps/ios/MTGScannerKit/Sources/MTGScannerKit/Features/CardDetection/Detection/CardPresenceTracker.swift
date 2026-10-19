@@ -81,6 +81,8 @@ final class CardPresenceTracker: @unchecked Sendable {
 
     private let detectorProvider: () -> YOLOCardDetector?
     private let analyzer = FrameDifferenceAnalyzer()
+    private let cameraMotion = CameraMotionAnalyzer()
+    private var consecutiveStillFrames = 0
     private let presenceQueue = DispatchQueue(
         label: "com.mtgscanner.cardpresence",
         qos: .userInitiated
@@ -146,6 +148,8 @@ final class CardPresenceTracker: @unchecked Sendable {
             self.detectionZone = nil
             self.referenceSamples = []
             self.lastSamples = []
+            self.consecutiveStillFrames = 0
+            self.cameraMotion.reset()
             self.burstDetector.reset()
             self.pendingCapture = false
         }
@@ -191,6 +195,9 @@ final class CardPresenceTracker: @unchecked Sendable {
             guard self.detectionZone != zone else { return }
             self.detectionZone = zone
             self.referenceSamples = []
+            self.lastSamples = []
+            self.consecutiveStillFrames = 0
+            self.cameraMotion.reset()
             self.burstDetector.reset()
         }
     }
@@ -203,6 +210,9 @@ final class CardPresenceTracker: @unchecked Sendable {
         // burstDetector.reset() leaves shouldUpdateReference=true, so checkReferenceDecay
         // populates the reference automatically on the first new frame.
         referenceSamples = []
+        lastSamples = []
+        consecutiveStillFrames = 0
+        cameraMotion.reset()
         burstDetector.reset()
         pendingCapture = false
         #if DEBUG
@@ -248,6 +258,7 @@ final class CardPresenceTracker: @unchecked Sendable {
     private func process(pixelBuffer: CVPixelBuffer) {
         let motionZone = detectionZone?.effectiveRect
         let samples = analyzer.sample(pixelBuffer, zone: motionZone)
+        updateFrameStability(samples)
         lastSamples = samples
         let legacyMode = useLegacyDetection
 
@@ -258,8 +269,11 @@ final class CardPresenceTracker: @unchecked Sendable {
         // Establish reference BEFORE computing diff so post-reset frames use real data.
         // After markCaptured() clears the reference and resets the burst detector,
         // checkReferenceDecay will populate the reference from lastSamples.
-        checkReferenceDecay()
+        checkReferenceDecay(pixelBuffer)
         let diff = calculateFrameDiff(samples: samples)
+        if !legacyMode && diff >= burstConfiguration.motionThreshold {
+            cameraMotion.observe(pixelBuffer, threshold: burstConfiguration.motionThreshold)
+        }
 
         let shouldTrigger = determineTrigger(diff: diff, legacyMode: legacyMode)
         sendDebugMetricsIfEnabled()
@@ -269,7 +283,8 @@ final class CardPresenceTracker: @unchecked Sendable {
         #endif
 
         guard shouldTrigger else { return }
-        processTriggeredFrame(pixelBuffer: pixelBuffer)
+        guard legacyMode || consecutiveStillFrames >= burstConfiguration.settlementFrames else { return }
+        processTriggeredFrame(pixelBuffer: pixelBuffer, legacyMode: legacyMode)
     }
 
     private func calculateFrameDiff(samples: [UInt8]) -> Float {
@@ -280,11 +295,13 @@ final class CardPresenceTracker: @unchecked Sendable {
         referenceSamples.isEmpty ? 0.0 : analyzer.difference(from: referenceSamples, to: samples)
     }
 
-    private func checkReferenceDecay() {
+    private func checkReferenceDecay(_ pixelBuffer: CVPixelBuffer) {
         let shouldUpdate = burstDetector.shouldDecayReference() ||
                           burstDetector.currentMetrics().shouldUpdateReference
         guard shouldUpdate else { return }
         referenceSamples = lastSamples
+        consecutiveStillFrames = 0
+        cameraMotion.setReference(pixelBuffer)
         burstDetector.markReferenceUpdated()
         #if DEBUG
         print("\(logTimestamp()) [CardPresence] Reference frame updated - new baseline established")
@@ -305,20 +322,29 @@ final class CardPresenceTracker: @unchecked Sendable {
         }
     }
 
-    private func resetDetectionState() {
+    private func resetDetectionState(pixelBuffer: CVPixelBuffer) {
         referenceSamples = lastSamples
+        consecutiveStillFrames = 0
+        cameraMotion.setReference(pixelBuffer)
         burstDetector.reset()
         burstDetector.markReferenceUpdated()
     }
 
-    private func processTriggeredFrame(pixelBuffer: CVPixelBuffer) {
+    private func processTriggeredFrame(pixelBuffer: CVPixelBuffer, legacyMode: Bool) {
         guard !pendingCapture else {
-            resetDetectionState()
+            resetDetectionState(pixelBuffer: pixelBuffer)
             return
         }
         guard let bestBox = detectBestFilteredBox(in: pixelBuffer) else { return }
+        if !legacyMode && cameraMotion.isCameraOnlyMotion(excluding: bestBox) {
+            resetDetectionState(pixelBuffer: pixelBuffer)
+            #if DEBUG
+            print("\(logTimestamp()) [CardPresence] Ignored global camera vibration")
+            #endif
+            return
+        }
         pendingCapture = true
-        resetDetectionState()
+        resetDetectionState(pixelBuffer: pixelBuffer)
         let signalSessionID = sessionID
         DispatchQueue.main.async { [weak self] in
             self?.onNewCardSignal?(bestBox, signalSessionID)
@@ -331,14 +357,14 @@ final class CardPresenceTracker: @unchecked Sendable {
         print("\(logTimestamp()) [CardPresence] YOLO boxes: \(boxes.count)")
         #endif
         guard !boxes.isEmpty else {
-            resetDetectionState()
+            resetDetectionState(pixelBuffer: pixelBuffer)
             #if DEBUG
             print("\(logTimestamp()) [CardPresence] No YOLO boxes, updated reference to prevent re-trigger")
             #endif
             return nil
         }
         guard let bestBox = filterBoxes(boxes) else {
-            resetDetectionState()
+            resetDetectionState(pixelBuffer: pixelBuffer)
             #if DEBUG
             print("\(logTimestamp()) [CardPresence] All \(boxes.count) boxes filtered out by zone constraints")
             #endif
@@ -431,5 +457,14 @@ private extension CardPresenceTracker {
         }
         detector?.confidenceThreshold = confidenceThreshold
         return detector
+    }
+}
+
+private extension CardPresenceTracker {
+    func updateFrameStability(_ samples: [UInt8]) {
+        let comparable = !samples.isEmpty && samples.count == lastSamples.count
+        let stable = comparable && analyzer.difference(from: lastSamples, to: samples) <
+            burstConfiguration.motionThreshold * 0.5
+        consecutiveStillFrames = stable ? consecutiveStillFrames + 1 : 0
     }
 }

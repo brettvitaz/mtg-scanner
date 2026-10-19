@@ -118,6 +118,9 @@ final class CaptureControlsTests: XCTestCase {
         XCTAssertTrue(app.buttons["capture-shutter"].isEnabled)
         assertStatus("Ready")
         XCTAssertEqual(app.buttons["station-start-stop"].label, "Stop Station")
+        screenshot("post-zoom-ready-yellow-station")
+        app.tabBars.buttons["Table"].tap()
+        screenshot("table-selected-yellow")
     }
 
     func testNativePinchCrossesFamiliesAndCanReturnToBase() {
